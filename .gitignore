@@ -1,0 +1,19 @@
+# 编译产物
+obj/
+*.o
+*.d
+*.elf
+*.hex
+*.lst
+*.map
+*.bin
+
+# MounRiver Studio 工作区
+.mrs/
+.dbg/
+
+# IDE 配置
+.vscode/
+
+# 临时文件
+*.tmp
