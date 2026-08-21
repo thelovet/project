@@ -220,6 +220,19 @@ static const void *sok_load_img(FlashStoreId img_id, uint16_t img_bytes)
     return (FlashStore_ResRead(img_id, 0, s, img_bytes) == img_bytes) ? s : 0;
 }
 
+/**
+ * @brief  按需加载纯RGB565图像的前vis_rows行到共享scratch (裁剪绘制用)
+ * @note   源图每行src_w个像素(2字节/像素)连续存放, 因此只读可见行即可,
+ *         减少拖拽阶段每帧的外部Flash读取量(由整图降为可见行)
+ * @return 图像数据指针(前vis_rows行); 失败返回0
+ */
+static const void *sok_load_img_rows(FlashStoreId img_id, uint16_t src_w, int16_t vis_rows)
+{
+    uint8_t *s = FlashStore_Scratch();
+    uint16_t bytes = (uint16_t)vis_rows * src_w * 2;
+    return (FlashStore_ResRead(img_id, 0, s, bytes) == bytes) ? s : 0;
+}
+
 
 /**
  * @brief  全屏绘制关卡到LCD, 自动计算缩放和居中
@@ -640,15 +653,15 @@ static void sok_draw_nav_buttons_at(int16_t y)
     if (vis_rows > 31) vis_rows = 31;
 
     if (s_current_level > 0) {
-        const void *img = sok_load_img(FLASH_STORE_ID_IMG_PREV, PREV_IMG_W * PREV_IMG_H * 2);
+        const void *img = sok_load_img_rows(FLASH_STORE_ID_IMG_PREV, PREV_IMG_W, vis_rows);
         if (img) sok_draw_btn_clipped(SOK_BTN1_X, y, img, vis_rows);
     }
     {
-        const void *img = sok_load_img(FLASH_STORE_ID_IMG_RESTART, RESTART_IMG_W * RESTART_IMG_H * 2);
+        const void *img = sok_load_img_rows(FLASH_STORE_ID_IMG_RESTART, RESTART_IMG_W, vis_rows);
         if (img) sok_draw_btn_clipped(SOK_BTN2_X, y, img, vis_rows);
     }
     if (s_current_level < SOKOBAN_LEVEL_COUNT - 1) {
-        const void *img = sok_load_img(FLASH_STORE_ID_IMG_NEXT, NEXT_IMG_W * NEXT_IMG_H * 2);
+        const void *img = sok_load_img_rows(FLASH_STORE_ID_IMG_NEXT, NEXT_IMG_W, vis_rows);
         if (img) sok_draw_btn_clipped(SOK_BTN3_X, y, img, vis_rows);
     }
     LCD_CS_SET;
