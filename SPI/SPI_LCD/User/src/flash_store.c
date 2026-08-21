@@ -34,6 +34,7 @@ typedef struct {
     uint32_t    size;   /* 数据长度(字节) */
 } FlashStoreRes;
 
+#ifdef FLASH_DATA_STORE_MODE
 static const FlashStoreRes s_resources[] = {
     /* ---- 24x24中文点阵字库 (chinese_fonts.c, 72字节/字) ---- */
     { font_tui,     72 }, { font_xiang,   72 }, { font_zi,     72 },
@@ -67,13 +68,15 @@ static const FlashStoreRes s_resources[] = {
     { sok_img_next,     NEXT_IMG_W * NEXT_IMG_H * 2 },
     { sok_img_restart,  RESTART_IMG_W * RESTART_IMG_H * 2 },
 };
+#endif /* FLASH_DATA_STORE_MODE */
 
-#define FLASH_STORE_RES_COUNT \
-    (sizeof(s_resources) / sizeof(s_resources[0]))
+#define FLASH_STORE_RES_COUNT  (FLASH_STORE_ID_COUNT)  /* 资源总数 = 枚举ID数量(编译期一致) */
 
+#ifdef FLASH_DATA_STORE_MODE
 /* 资源表数量必须与flash_store.h中定义的资源ID数量一致(编译期检查) */
 typedef char flash_store_count_check[
     ((FLASH_STORE_ID_COUNT == FLASH_STORE_RES_COUNT) ? 1 : -1)];
+#endif /* FLASH_DATA_STORE_MODE */
 
 /* 目录缓冲(位于Flash最末尾) */
 #define FLASH_STORE_DIR_SIZE \
@@ -86,7 +89,9 @@ static uint8_t s_scratch[FLASH_STORE_SCRATCH_SIZE];
 
 /* ================================================================
  * CRC16 (MODBUS: 多项式0x8005反向0xA001, 初值0xFFFF)
+ * 仅烧录模式使用(写入/校验), 游戏模式不编译以消除警告
  * ================================================================ */
+#if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
 static uint16_t flash_store_crc16_update(uint16_t crc, uint8_t byte)
 {
     crc ^= byte;
@@ -103,11 +108,13 @@ static uint16_t flash_store_crc16(const uint8_t *data, uint32_t len)
     while (len--) crc = flash_store_crc16_update(crc, *data++);
     return crc;
 }
+#endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE */
 
 /* ================================================================
  * 4字节地址SPI Flash访问 (兼容 >16MB 地址区域, 不改变芯片地址模式)
+ * 擦除/写入仅烧录模式使用; 读取游戏模式也用, 不参与条件编译
  * ================================================================ */
-
+#if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
 /* 扇区擦除(4K) */
 static void flash_store_erase_sector_4b(uint32_t addr)
 {
@@ -150,6 +157,7 @@ static void flash_store_write_4b(const uint8_t *src, uint32_t addr, uint32_t len
         len  -= chunk;
     }
 }
+#endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE */
 
 /* 读数据(4字节地址) */
 static void flash_store_read_4b(uint8_t *buf, uint32_t addr, uint16_t len)
@@ -185,6 +193,10 @@ static void flash_store_detect_chip(void)
     s_use_4b = (s_flash_size > 16UL * 1024 * 1024);
 }
 
+/* ================================================================
+ * 统一扇区擦除/跨页写 (仅烧录模式使用)
+ * ================================================================ */
+#if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
 /* 统一扇区擦除(按实际地址模式) */
 static void flash_store_erase_sector(uint32_t addr)
 {
@@ -204,14 +216,17 @@ static void flash_store_write(const uint8_t *src, uint32_t addr, uint32_t len)
         SPI_Flash_Write_NoCheck((uint8_t *)src, addr, (uint16_t)len);
     }
 }
+#endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE */
 
-/* 统一读数据(按实际地址模式) */
+/* 统一读数据(按实际地址模式; 3字节地址用DMA读取, 释放CPU) */
 static void flash_store_read(uint8_t *buf, uint32_t addr, uint16_t len)
 {
     if (s_use_4b) {
         flash_store_read_4b(buf, addr, len);
     } else {
-        SPI_Flash_Read(buf, addr, len);
+        SPI_Flash_Read_dma_start(addr); /* 发FastRead命令+地址+dummy, 使能SPI DMA */
+        SPI1_Read_DMA(buf, len);        /* DMA读len字节(TX发0xFF提供时钟, RX收数据) */
+        SPI_Flash_Read_dma_end();       /* CS拉高, 禁用SPI DMA */
     }
 }
 
@@ -280,8 +295,9 @@ uint8_t *FlashStore_Scratch(void)
 }
 
 /* ================================================================
- * 进度条UI (240x240屏幕)
+ * 进度条UI (240x240屏幕, 仅烧录模式使用)
  * ================================================================ */
+#if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
 #define UI_BAR_X0      17   /* 进度条填充区左边界 */
 #define UI_BAR_X1      225  /* 进度条填充区右边界(不含) */
 #define UI_BAR_Y0      92   /* 进度条填充区上边界 */
@@ -366,10 +382,12 @@ static void flash_store_ui_fail(uint8_t pct)
     LCD_Fill(UI_BAR_X0, UI_BAR_Y0, UI_BAR_X1, UI_BAR_Y1, LCD_RED);
     flash_store_ui_draw_pct(pct, LCD_RED);
 }
+#endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE */
 
 /* ================================================================
- * 烧录主流程
+ * 烧录主流程 (FLASH_DATA_STORE_MODE: 字库/图片资源烧录)
  * ================================================================ */
+#ifdef FLASH_DATA_STORE_MODE
 void FlashStore_BurnAll(void)
 {
     uint32_t i;
@@ -493,6 +511,7 @@ void FlashStore_BurnAll(void)
         Delay_Ms(1000);
     }
 }
+#endif /* FLASH_DATA_STORE_MODE */
 
 /* ================================================================
  * 视频数据块烧录 (VIDEO_CHUNK_STORE_MODE)
