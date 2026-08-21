@@ -227,21 +227,26 @@ static uint32_t flash_store_dir_field(const uint8_t *e, uint8_t off)
 
 uint8_t FlashStore_ResInit(void)
 {
-    flash_store_detect_chip();   /* 先识别芯片容量与地址模式 */
+    uint8_t try;
+    for (try = 0; try < 3; try++) {
+        flash_store_detect_chip();   /* 识别芯片容量与地址模式 */
 
-    uint32_t dir_addr = s_flash_size - FLASH_STORE_DIR_SIZE;
-    flash_store_read(s_dir_buf, dir_addr, FLASH_STORE_DIR_SIZE);
+        uint32_t dir_addr = s_flash_size - FLASH_STORE_DIR_SIZE;
+        flash_store_read(s_dir_buf, dir_addr, FLASH_STORE_DIR_SIZE);
 
-    if (s_dir_buf[0] != FLASH_STORE_DIR_MAGIC0 ||
-        s_dir_buf[1] != FLASH_STORE_DIR_MAGIC1 ||
-        s_dir_buf[2] != FLASH_STORE_DIR_VERSION ||
-        s_dir_buf[3] != (uint8_t)FLASH_STORE_RES_COUNT) {
-        s_res_valid = 0;
-        return 0;
+        if (s_dir_buf[0] == FLASH_STORE_DIR_MAGIC0 &&
+            s_dir_buf[1] == FLASH_STORE_DIR_MAGIC1 &&
+            s_dir_buf[2] == FLASH_STORE_DIR_VERSION &&
+            s_dir_buf[3] == (uint8_t)FLASH_STORE_RES_COUNT) {
+            s_data_start = flash_store_dir_field(s_dir_buf, 4);
+            s_res_valid  = 1;
+            return 1;
+        }
+        /* 开机早期Flash刚从PowerDown唤醒可能未就绪, 延时后重试 */
+        Delay_Ms(20);
     }
-    s_data_start = flash_store_dir_field(s_dir_buf, 4);
-    s_res_valid  = 1;
-    return 1;
+    s_res_valid = 0;
+    return 0;
 }
 
 uint16_t FlashStore_ResRead(FlashStoreId id, uint32_t offset, uint8_t *buf, uint16_t len)
