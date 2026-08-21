@@ -77,6 +77,10 @@ typedef char flash_store_count_check[
     (FLASH_STORE_DIR_HEADER_SIZE + FLASH_STORE_RES_COUNT * FLASH_STORE_ENTRY_SIZE)
 static uint8_t s_dir_buf[FLASH_STORE_DIR_SIZE];
 
+/* 运行期共享scratch缓冲区(最大资源: 导航图标1860字节) */
+#define FLASH_STORE_SCRATCH_SIZE  2048
+static uint8_t s_scratch[FLASH_STORE_SCRATCH_SIZE];
+
 /* ================================================================
  * CRC16 (MODBUS: 多项式0x8005反向0xA001, 初值0xFFFF)
  * ================================================================ */
@@ -144,7 +148,7 @@ static void flash_store_write_4b(const uint8_t *src, uint32_t addr, uint32_t len
     }
 }
 
-/* 读数据 */
+/* 读数据(4字节地址) */
 static void flash_store_read_4b(uint8_t *buf, uint32_t addr, uint16_t len)
 {
     FLASH_CS_CLR;
@@ -155,6 +159,116 @@ static void flash_store_read_4b(uint8_t *buf, uint32_t addr, uint16_t len)
     FLASH_Write((uint8_t)addr);
     for (uint16_t i = 0; i < len; i++) buf[i] = FLASH_Read();
     FLASH_CS_SET;
+}
+
+/* ================================================================
+ * 芯片容量检测 + 统一地址访问封装
+ * 多数设备为8MB(W25Q64, 仅支持3字节地址); >16MB芯片才用4字节地址
+ * ================================================================ */
+static uint32_t s_flash_size = FLASH_STORE_FLASH_SIZE; /* 实际容量(检测后更新) */
+static uint8_t  s_use_4b     = 0;                       /* 1=使用4字节地址指令 */
+
+/* 根据JEDEC ID容量字节识别芯片大小 */
+static void flash_store_detect_chip(void)
+{
+    uint32_t jedec = SPI_Flash_ReadJedecDeviceID();
+    switch (jedec & 0xFF) {
+    case 0x17: s_flash_size = 8UL  * 1024 * 1024; break;  /* W25Q64  (64Mbit) */
+    case 0x18: s_flash_size = 16UL * 1024 * 1024; break;  /* W25Q128 (128Mbit) */
+    case 0x19: s_flash_size = 32UL * 1024 * 1024; break;  /* W25Q256 (256Mbit) */
+    case 0x20: s_flash_size = 64UL * 1024 * 1024; break;  /* W25Q512 (512Mbit) */
+    default:   s_flash_size = FLASH_STORE_FLASH_SIZE; break; /* 未知芯片: 用宏默认值 */
+    }
+    s_use_4b = (s_flash_size > 16UL * 1024 * 1024);
+}
+
+/* 统一扇区擦除(按实际地址模式) */
+static void flash_store_erase_sector(uint32_t addr)
+{
+    if (s_use_4b) {
+        flash_store_erase_sector_4b(addr);
+    } else {
+        SPI_Flash_Erase_Sector(addr / 4096);   /* 3字节地址, 参数为扇区序号 */
+    }
+}
+
+/* 统一跨页写(按实际地址模式) */
+static void flash_store_write(const uint8_t *src, uint32_t addr, uint32_t len)
+{
+    if (s_use_4b) {
+        flash_store_write_4b(src, addr, len);
+    } else {
+        SPI_Flash_Write_NoCheck((uint8_t *)src, addr, (uint16_t)len);
+    }
+}
+
+/* 统一读数据(按实际地址模式) */
+static void flash_store_read(uint8_t *buf, uint32_t addr, uint16_t len)
+{
+    if (s_use_4b) {
+        flash_store_read_4b(buf, addr, len);
+    } else {
+        SPI_Flash_Read(buf, addr, len);
+    }
+}
+
+/* ================================================================
+ * 运行期资源读取 (游戏模式: 从外部Flash按ID读取已烧录的字库/图片)
+ * ================================================================ */
+static uint8_t  s_res_valid = 0;     /* 目录缓存是否有效 */
+static uint32_t s_data_start = 0;    /* 数据区起始地址(来自目录头) */
+
+/* 目录项解析辅助: 读取条目中的4字节大端字段 */
+static uint32_t flash_store_dir_field(const uint8_t *e, uint8_t off)
+{
+    return ((uint32_t)e[off] << 24) | ((uint32_t)e[off + 1] << 16) |
+           ((uint32_t)e[off + 2] << 8) | (uint32_t)e[off + 3];
+}
+
+uint8_t FlashStore_ResInit(void)
+{
+    flash_store_detect_chip();   /* 先识别芯片容量与地址模式 */
+
+    uint32_t dir_addr = s_flash_size - FLASH_STORE_DIR_SIZE;
+    flash_store_read(s_dir_buf, dir_addr, FLASH_STORE_DIR_SIZE);
+
+    if (s_dir_buf[0] != FLASH_STORE_DIR_MAGIC0 ||
+        s_dir_buf[1] != FLASH_STORE_DIR_MAGIC1 ||
+        s_dir_buf[2] != FLASH_STORE_DIR_VERSION ||
+        s_dir_buf[3] != (uint8_t)FLASH_STORE_RES_COUNT) {
+        s_res_valid = 0;
+        return 0;
+    }
+    s_data_start = flash_store_dir_field(s_dir_buf, 4);
+    s_res_valid  = 1;
+    return 1;
+}
+
+uint16_t FlashStore_ResRead(FlashStoreId id, uint32_t offset, uint8_t *buf, uint16_t len)
+{
+    if (!s_res_valid || (uint32_t)id >= FLASH_STORE_RES_COUNT) return 0;
+
+    const uint8_t *e = &s_dir_buf[FLASH_STORE_DIR_HEADER_SIZE + (uint32_t)id * FLASH_STORE_ENTRY_SIZE];
+    uint32_t off    = flash_store_dir_field(e, 4);   /* 相对数据区起始的偏移 */
+    uint32_t length = flash_store_dir_field(e, 8);   /* 资源长度 */
+    if (offset >= length) return 0;
+
+    uint16_t n = len;
+    if ((uint32_t)n > length - offset) n = (uint16_t)(length - offset);
+    flash_store_read(buf, s_data_start + off + offset, n);
+    return n;
+}
+
+const uint8_t *FlashStore_ResLoad(FlashStoreId id, uint32_t offset, uint16_t len)
+{
+    if (len > FLASH_STORE_SCRATCH_SIZE) return 0;
+    if (FlashStore_ResRead(id, offset, s_scratch, len) != len) return 0;
+    return s_scratch;
+}
+
+uint8_t *FlashStore_Scratch(void)
+{
+    return s_scratch;
 }
 
 /* ================================================================
@@ -192,6 +306,27 @@ static void flash_store_ui_init(void)
     LCD_Fill(UI_BAR_X1,     UI_BAR_Y0 - 2, UI_BAR_X1 + 1, UI_BAR_Y1 + 1, LCD_WHITE);
 }
 
+/* 绘制百分比数字(居中, 指定颜色) */
+static void flash_store_ui_draw_pct(uint8_t pct, uint16_t color)
+{
+    LCD_Fill(60, 42, 180, 80, LCD_BLACK);
+    LCD_CS_CLR;
+    if (pct >= 100) {
+        sok_draw_digit_16x32(88,  44, 1, color);
+        sok_draw_digit_16x32(104, 44, 0, color);
+        sok_draw_digit_16x32(120, 44, 0, color);
+        flash_store_draw_percent(140, 44, color);
+    } else if (pct >= 10) {
+        sok_draw_digit_16x32(96,  44, pct / 10, color);
+        sok_draw_digit_16x32(112, 44, pct % 10, color);
+        flash_store_draw_percent(132, 44, color);
+    } else {
+        sok_draw_digit_16x32(104, 44, pct, color);
+        flash_store_draw_percent(124, 44, color);
+    }
+    LCD_CS_SET;
+}
+
 /* 更新进度条填充与百分比数值 */
 static void flash_store_ui_update(uint8_t pct)
 {
@@ -206,42 +341,22 @@ static void flash_store_ui_update(uint8_t pct)
         s_ui_last_fill = fill_w;
     }
 
-    /* 2. 百分比数值(清除旧区域后重绘) */
-    LCD_Fill(60, 42, 180, 80, LCD_BLACK);
-    {
-        uint16_t x;
-        LCD_CS_CLR;
-        if (pct >= 100) {
-            x = 88;
-            sok_draw_digit_16x32(x,      44, 1, LCD_WHITE);
-            sok_draw_digit_16x32(x + 16, 44, 0, LCD_WHITE);
-            sok_draw_digit_16x32(x + 32, 44, 0, LCD_WHITE);
-            flash_store_draw_percent(x + 52, 44, LCD_WHITE);
-        } else if (pct >= 10) {
-            x = 96;
-            sok_draw_digit_16x32(x,      44, pct / 10, LCD_WHITE);
-            sok_draw_digit_16x32(x + 16, 44, pct % 10, LCD_WHITE);
-            flash_store_draw_percent(x + 36, 44, LCD_WHITE);
-        } else {
-            x = 104;
-            sok_draw_digit_16x32(x,      44, pct, LCD_WHITE);
-            flash_store_draw_percent(x + 20, 44, LCD_WHITE);
-        }
-        LCD_CS_SET;
-    }
+    /* 2. 百分比数值 */
+    flash_store_ui_draw_pct(pct, LCD_WHITE);
     s_ui_last_pct = pct;
 }
 
 /* 烧录完成: 绿色突出显示100% */
 static void flash_store_ui_done(void)
 {
-    LCD_Fill(60, 42, 180, 80, LCD_BLACK);
-    LCD_CS_CLR;
-    sok_draw_digit_16x32(88,  44, 1, LCD_GREEN);
-    sok_draw_digit_16x32(104, 44, 0, LCD_GREEN);
-    sok_draw_digit_16x32(120, 44, 0, LCD_GREEN);
-    flash_store_draw_percent(140, 44, LCD_GREEN);
-    LCD_CS_SET;
+    flash_store_ui_draw_pct(100, LCD_GREEN);
+}
+
+/* 校验失败: 进度条变红, 百分比数字变红提示 */
+static void flash_store_ui_fail(uint8_t pct)
+{
+    LCD_Fill(UI_BAR_X0, UI_BAR_Y0, UI_BAR_X1, UI_BAR_Y1, LCD_RED);
+    flash_store_ui_draw_pct(pct, LCD_RED);
 }
 
 /* ================================================================
@@ -251,28 +366,31 @@ void FlashStore_BurnAll(void)
 {
     uint32_t i;
 
+    /* 0. 识别芯片容量与地址模式(8MB芯片用3字节地址, >16MB用4字节) */
+    flash_store_detect_chip();
+
     /* 1. 计算全部资源总大小 */
     uint32_t total = 0;
     for (i = 0; i < FLASH_STORE_RES_COUNT; i++) {
         total += s_resources[i].size;
     }
 
-    /* 2. 从64MB Flash末尾往前布局:
+    /* 2. 从实际Flash末尾往前布局:
      *    目录区位于最末尾, 数据区紧随其前(从前往后顺序写入) */
-    uint32_t dir_start  = FLASH_STORE_FLASH_SIZE - FLASH_STORE_DIR_SIZE;
+    uint32_t dir_start  = s_flash_size - FLASH_STORE_DIR_SIZE;
     uint32_t data_start = dir_start - total;
 
     /* 3. 初始化显示 */
     flash_store_ui_init();
     flash_store_ui_update(0);
 
-    /* 4. 擦除覆盖区域(4字节地址, 4K扇区) */
+    /* 4. 擦除覆盖区域(按实际地址模式, 4K扇区) */
     {
         uint32_t erase_start = (data_start / 4096) * 4096;
-        uint32_t erase_total = FLASH_STORE_FLASH_SIZE - erase_start;
+        uint32_t erase_total = s_flash_size - erase_start;
         uint32_t addr;
-        for (addr = erase_start; addr < FLASH_STORE_FLASH_SIZE; addr += 4096) {
-            flash_store_erase_sector_4b(addr);
+        for (addr = erase_start; addr < s_flash_size; addr += 4096) {
+            flash_store_erase_sector(addr);
             flash_store_ui_update(
                 (uint8_t)(10UL * (addr - erase_start + 4096) / erase_total));
         }
@@ -297,7 +415,7 @@ void FlashStore_BurnAll(void)
             const uint8_t *src  = (const uint8_t *)s_resources[i].data;
             uint32_t       size = s_resources[i].size;
 
-            flash_store_write_4b(src, cur, size);
+            flash_store_write(src, cur, size);
             uint16_t crc = flash_store_crc16(src, size);
 
             /* 目录项 */
@@ -322,7 +440,7 @@ void FlashStore_BurnAll(void)
         }
 
         /* 6. 写入目录区 */
-        flash_store_write_4b(s_dir_buf, dir_start, FLASH_STORE_DIR_SIZE);
+        flash_store_write(s_dir_buf, dir_start, FLASH_STORE_DIR_SIZE);
         flash_store_ui_update(90);
     }
 
@@ -339,7 +457,7 @@ void FlashStore_BurnAll(void)
             while (left) {
                 uint16_t chunk = (left > sizeof(rbuf)) ? (uint16_t)sizeof(rbuf)
                                                        : (uint16_t)left;
-                flash_store_read_4b(rbuf, a, chunk);
+                flash_store_read(rbuf, a, chunk);
                 for (uint16_t j = 0; j < chunk; j++) {
                     crc = flash_store_crc16_update(crc, rbuf[j]);
                 }
@@ -358,7 +476,7 @@ void FlashStore_BurnAll(void)
             flash_store_ui_update(100);
             flash_store_ui_done(); /* 绿色100% */
         } else {
-            LCD_Fill(UI_BAR_X0, UI_BAR_Y0, UI_BAR_X1, UI_BAR_Y1, LCD_RED); /* 校验失败: 红色 */
+            flash_store_ui_fail(s_ui_last_pct); /* 红色进度条+红色百分比提示校验失败 */
         }
     }
 

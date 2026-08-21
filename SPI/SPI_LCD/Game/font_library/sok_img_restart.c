@@ -6,6 +6,7 @@
 #include "sok_img_restart.h"
 #include "sok_img_prev.h"
 #include "lcd.h"
+#include "flash_store.h"   /* 图标数据从外部Flash读取 */
 
 /* TFT彩屏取模数据
  * 图像尺寸: 30x30 像素
@@ -101,5 +102,8 @@ const uint16_t sok_img_restart[RESTART_IMG_W * RESTART_IMG_H] = {
  */
 void sok_restart_draw(uint16_t x, uint16_t y)
 {
-    sok_nav_draw_rgb565(x, y, sok_img_restart);
+    /* 图标数据已烧录到外部Flash, 读入共享scratch后绘制 */
+    const uint8_t *img = FlashStore_ResLoad(FLASH_STORE_ID_IMG_RESTART, 0,
+                                            RESTART_IMG_W * RESTART_IMG_H * 2);
+    if (img) sok_nav_draw_rgb565(x, y, (const uint16_t *)img);
 }

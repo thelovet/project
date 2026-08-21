@@ -5,6 +5,7 @@
 
 #include "sok_img_prev.h"
 #include "lcd.h"
+#include "flash_store.h"   /* 图标数据从外部Flash读取 */
 
 const uint16_t sok_img_prev[PREV_IMG_W * PREV_IMG_H] = {
     0x0000, 0x0000, 0x0000, 0x6a8f, 0x8b96, 0x8355, 0x8375, 0x8b55, 0x8b55, 0x8b75, 0x8355, 0x8355,
@@ -134,5 +135,8 @@ void sok_nav_draw_rgb565(uint16_t x, uint16_t y, const uint16_t *image)
 
 void sok_prev_draw(uint16_t x, uint16_t y)
 {
-    sok_nav_draw_rgb565(x, y, sok_img_prev);
+    /* 图标数据已烧录到外部Flash, 读入共享scratch后绘制 */
+    const uint8_t *img = FlashStore_ResLoad(FLASH_STORE_ID_IMG_PREV, 0,
+                                            PREV_IMG_W * PREV_IMG_H * 2);
+    if (img) sok_nav_draw_rgb565(x, y, (const uint16_t *)img);
 }

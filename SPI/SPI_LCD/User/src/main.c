@@ -1376,6 +1376,7 @@ int main(void) {
     Delay_Ms(20);            // 等待LCD复位完成和SPI稳定
     SPI_FLASH_Init();//初始化Flash SPI 
     SPI_Flash_WAKEUP();      // 从PowerDown或Standby中唤醒Flash
+    FlashStore_ResInit();    // 读取外部Flash资源目录(字库/图片数据已烧录)
 
     PVD_CheckLowVoltage(); // 低电压检测<2.7V复位,>= 2.7V正常
 

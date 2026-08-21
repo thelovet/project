@@ -15,6 +15,7 @@
 #include "sok_img_prev.h"
 #include "sok_img_restart.h"
 #include "sok_img_next.h"
+#include "flash_store.h"   /* 图像资源从外部Flash读取 */
 
 #define SOK_BATTERY_X  108
 #define SOK_BATTERY_Y    2
@@ -185,6 +186,40 @@ static void sok_draw_scaled_sprite(uint16_t dx, uint16_t dy,
     }
 }
 
+/* ================================================================
+ * 外部Flash图像加载辅助 (图像+调色板已烧录到外部Flash, 读入共享scratch)
+ * ================================================================ */
+
+/**
+ * @brief  加载"调色板+图像"到共享scratch
+ * @param  pal_id   调色板资源ID
+ * @param  pal_bytes 调色板字节数
+ * @param  img_id   图像资源ID
+ * @param  img_bytes 图像字节数
+ * @param  pal      输出: 调色板指针(位于scratch起始)
+ * @return 图像数据指针(位于调色板之后); 失败返回0
+ */
+static const void *sok_load_pal_img(FlashStoreId pal_id, uint16_t pal_bytes,
+                                    FlashStoreId img_id, uint16_t img_bytes,
+                                    const uint16_t **pal)
+{
+    uint8_t *s = FlashStore_Scratch();
+    if (FlashStore_ResRead(pal_id, 0, s, pal_bytes) != pal_bytes) return 0;
+    if (FlashStore_ResRead(img_id, 0, s + pal_bytes, img_bytes) != img_bytes) return 0;
+    *pal = (const uint16_t *)s;
+    return s + pal_bytes;
+}
+
+/**
+ * @brief  加载纯RGB565图像(无调色板)到共享scratch
+ * @return 图像数据指针; 失败返回0
+ */
+static const void *sok_load_img(FlashStoreId img_id, uint16_t img_bytes)
+{
+    uint8_t *s = FlashStore_Scratch();
+    return (FlashStore_ResRead(img_id, 0, s, img_bytes) == img_bytes) ? s : 0;
+}
+
 
 /**
  * @brief  全屏绘制关卡到LCD, 自动计算缩放和居中
@@ -220,23 +255,65 @@ static void sokoban_draw_cell_at(uint8_t row, uint8_t col)
 
     switch (cell) {
     case SOK_OUTER: break;
-    case SOK_FLOOR:  sok_draw_scaled_tile(ux, uy, sok_img_bg, sok_img_bg_palette); break;
-    case SOK_WALL:   sok_draw_scaled_tile(ux, uy, sok_img_wall, sok_img_wall_palette); break;
-    case SOK_BOX:    sok_draw_scaled_tile(ux, uy, sok_img_box, sok_img_box_palette); break;
-    case SOK_BOX_ON_TARGET: sok_draw_scaled_tile(ux, uy, sok_img_box_on_target, sok_img_box_on_target_palette); break;
-    case SOK_TARGET:
-        sok_draw_scaled_tile(ux, uy, sok_img_bg, sok_img_bg_palette);
-        sok_draw_scaled_sprite(ux, uy, sok_img_target, SOK_TARGET_SIZE, 0x0000, sok_img_target_palette);
+    case SOK_FLOOR: {
+        const uint16_t *pal;
+        const void *img = sok_load_pal_img(FLASH_STORE_ID_BG_PALETTE, 206,
+                                           FLASH_STORE_ID_BG_IMG, 900, &pal);
+        if (img) sok_draw_scaled_tile(ux, uy, img, pal);
         break;
-    case SOK_PLAYER:
-        sok_draw_scaled_tile(ux, uy, sok_img_bg, sok_img_bg_palette);
-        sok_draw_scaled_sprite(ux, uy, sok_img_player, SOK_PLAYER_SIZE, 0xffff, 0);
+    }
+    case SOK_WALL: {
+        const uint16_t *pal;
+        const void *img = sok_load_pal_img(FLASH_STORE_ID_WALL_PALETTE, 108,
+                                           FLASH_STORE_ID_WALL_IMG, 900, &pal);
+        if (img) sok_draw_scaled_tile(ux, uy, img, pal);
         break;
-    case SOK_PLAYER_ON_TARGET:
-        sok_draw_scaled_tile(ux, uy, sok_img_bg, sok_img_bg_palette);
-        sok_draw_scaled_sprite(ux, uy, sok_img_target, SOK_TARGET_SIZE, 0x0000, sok_img_target_palette);
-        sok_draw_scaled_sprite(ux, uy, sok_img_player, SOK_PLAYER_SIZE, 0xffff, 0);
+    }
+    case SOK_BOX: {
+        const uint16_t *pal;
+        const void *img = sok_load_pal_img(FLASH_STORE_ID_BOX_PALETTE, 350,
+                                           FLASH_STORE_ID_BOX_IMG, 900, &pal);
+        if (img) sok_draw_scaled_tile(ux, uy, img, pal);
         break;
+    }
+    case SOK_BOX_ON_TARGET: {
+        const uint16_t *pal;
+        const void *img = sok_load_pal_img(FLASH_STORE_ID_BOX_ON_TARGET_PALETTE, 50,
+                                           FLASH_STORE_ID_BOX_ON_TARGET_IMG, 900, &pal);
+        if (img) sok_draw_scaled_tile(ux, uy, img, pal);
+        break;
+    }
+    case SOK_TARGET: {
+        const uint16_t *pal;
+        const void *img = sok_load_pal_img(FLASH_STORE_ID_BG_PALETTE, 206,
+                                           FLASH_STORE_ID_BG_IMG, 900, &pal);
+        if (img) sok_draw_scaled_tile(ux, uy, img, pal);
+        img = sok_load_pal_img(FLASH_STORE_ID_TARGET_PALETTE, 72,
+                               FLASH_STORE_ID_TARGET_IMG, 625, &pal);
+        if (img) sok_draw_scaled_sprite(ux, uy, img, SOK_TARGET_SIZE, 0x0000, pal);
+        break;
+    }
+    case SOK_PLAYER: {
+        const uint16_t *pal;
+        const void *img = sok_load_pal_img(FLASH_STORE_ID_BG_PALETTE, 206,
+                                           FLASH_STORE_ID_BG_IMG, 900, &pal);
+        if (img) sok_draw_scaled_tile(ux, uy, img, pal);
+        img = sok_load_img(FLASH_STORE_ID_PLAYER_IMG, 1250);
+        if (img) sok_draw_scaled_sprite(ux, uy, img, SOK_PLAYER_SIZE, 0xffff, 0);
+        break;
+    }
+    case SOK_PLAYER_ON_TARGET: {
+        const uint16_t *pal;
+        const void *img = sok_load_pal_img(FLASH_STORE_ID_BG_PALETTE, 206,
+                                           FLASH_STORE_ID_BG_IMG, 900, &pal);
+        if (img) sok_draw_scaled_tile(ux, uy, img, pal);
+        img = sok_load_pal_img(FLASH_STORE_ID_TARGET_PALETTE, 72,
+                               FLASH_STORE_ID_TARGET_IMG, 625, &pal);
+        if (img) sok_draw_scaled_sprite(ux, uy, img, SOK_TARGET_SIZE, 0x0000, pal);
+        img = sok_load_img(FLASH_STORE_ID_PLAYER_IMG, 1250);
+        if (img) sok_draw_scaled_sprite(ux, uy, img, SOK_PLAYER_SIZE, 0xffff, 0);
+        break;
+    }
     }
 }
 
@@ -562,11 +639,18 @@ static void sok_draw_nav_buttons_at(int16_t y)
     int16_t vis_rows = max_vis_row + 1;
     if (vis_rows > 31) vis_rows = 31;
 
-    if (s_current_level > 0)
-        sok_draw_btn_clipped(SOK_BTN1_X, y, sok_img_prev, vis_rows);
-    sok_draw_btn_clipped(SOK_BTN2_X, y, sok_img_restart, vis_rows);
-    if (s_current_level < SOKOBAN_LEVEL_COUNT - 1)
-        sok_draw_btn_clipped(SOK_BTN3_X, y, sok_img_next, vis_rows);
+    if (s_current_level > 0) {
+        const void *img = sok_load_img(FLASH_STORE_ID_IMG_PREV, PREV_IMG_W * PREV_IMG_H * 2);
+        if (img) sok_draw_btn_clipped(SOK_BTN1_X, y, img, vis_rows);
+    }
+    {
+        const void *img = sok_load_img(FLASH_STORE_ID_IMG_RESTART, RESTART_IMG_W * RESTART_IMG_H * 2);
+        if (img) sok_draw_btn_clipped(SOK_BTN2_X, y, img, vis_rows);
+    }
+    if (s_current_level < SOKOBAN_LEVEL_COUNT - 1) {
+        const void *img = sok_load_img(FLASH_STORE_ID_IMG_NEXT, NEXT_IMG_W * NEXT_IMG_H * 2);
+        if (img) sok_draw_btn_clipped(SOK_BTN3_X, y, img, vis_rows);
+    }
     LCD_CS_SET;
 }
 

@@ -5,6 +5,7 @@
 
 #include "sok_img_win.h"
 #include "lcd.h"
+#include "flash_store.h"
 
 /* 单色字库: 每个字32x32, 每数据行打包4个像素行(16字节), MSB=左, 共128字节/字 */
 #define FONT_CHAR_W   16   /* 数据行字节数 (4像素行×4字节) */
@@ -248,10 +249,10 @@ void sok_draw_char_24(uint16_t x, uint16_t y, const uint8_t *font, uint16_t colo
 void sok_win_draw(uint16_t x, uint16_t y)
 {
     LCD_CS_CLR;
-    sok_draw_char_32(x,      y, font_gong, LCD_RED);
-    sok_draw_char_32(x + 32, y, font_xi,   LCD_RED);
-    sok_draw_char_32(x + 64, y, font_tong, LCD_RED);
-    sok_draw_char_32(x + 96, y, font_guan, LCD_RED);
+    sok_draw_char_32(x,      y, FlashStore_ResLoad(FLASH_STORE_ID_32_GONG, 0, FONT_CHAR_SIZE), LCD_RED);
+    sok_draw_char_32(x + 32, y, FlashStore_ResLoad(FLASH_STORE_ID_32_XI,   0, FONT_CHAR_SIZE), LCD_RED);
+    sok_draw_char_32(x + 64, y, FlashStore_ResLoad(FLASH_STORE_ID_32_TONG, 0, FONT_CHAR_SIZE), LCD_RED);
+    sok_draw_char_32(x + 96, y, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), LCD_RED);
     LCD_CS_SET;
 }
 
@@ -266,8 +267,12 @@ void sok_win_draw(uint16_t x, uint16_t y)
 void sok_draw_digit_16x32(uint16_t x, uint16_t y, uint8_t digit, uint16_t color)
 {
     if (digit > 9) return;
+    /* 优先从外部Flash读取字模, 烧录模式下回退内部Flash */
+    const uint8_t *data = FlashStore_ResLoad(FLASH_STORE_ID_DIGITS,
+                                             (uint32_t)digit * FONT_DIGIT_BYTES,
+                                             FONT_DIGIT_BYTES);
+    if (!data) data = &font_digits[digit * FONT_DIGIT_BYTES];
     uint8_t py, px;
-    const uint8_t *data = &font_digits[digit * FONT_DIGIT_BYTES];
     for (py = 0; py < 32; py++) {
         uint8_t left_byte  = data[py * 2];
         uint8_t right_byte = data[py * 2 + 1];
@@ -325,9 +330,9 @@ void sok_level_draw(uint8_t level, uint16_t color)
     uint16_t y = (240 - 32) / 2 - 20;
 
     /* 绘制 "关" */
-    sok_draw_char_32(x, y, font_guan, color);
+    sok_draw_char_32(x, y, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), color);
     /* 绘制 "卡" */
-    sok_draw_char_32(x + 32, y, font_ka, color);
+    sok_draw_char_32(x + 32, y, FlashStore_ResLoad(FLASH_STORE_ID_32_KA, 0, FONT_CHAR_SIZE), color);
 
     /* 绘制数字 (16x32, 与中文顶部对齐) */
     uint16_t dx = x + 64 + 4;
@@ -354,7 +359,11 @@ void sok_draw_digit_scaled(uint16_t x, uint16_t y, uint8_t digit,
 {
     if (digit > 9 || tw == 0 || th == 0) return;
 
-    const uint8_t *data = &font_digits[digit * FONT_DIGIT_BYTES];
+    /* 优先从外部Flash读取字模, 烧录模式下回退内部Flash */
+    const uint8_t *data = FlashStore_ResLoad(FLASH_STORE_ID_DIGITS,
+                                             (uint32_t)digit * FONT_DIGIT_BYTES,
+                                             FONT_DIGIT_BYTES);
+    if (!data) data = &font_digits[digit * FONT_DIGIT_BYTES];
     uint8_t ty, tx;
 
     for (ty = 0; ty < th; ty++) {

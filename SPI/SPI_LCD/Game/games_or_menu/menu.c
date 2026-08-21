@@ -5,6 +5,7 @@
 
 #include "menu.h"
 #include "sok_img_win.h"
+#include "flash_store.h"   /* 菜单字库从外部Flash读取 */
 #include "settings.h"
 #include "decompress.h"    /* LoadVideoAddress */
 #include "sokoban.h"       /* sokoban_reset_touch */
@@ -336,11 +337,51 @@ int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count)
 
 
 
+/* 菜单24x24字库: 从外部Flash整体读入RAM缓存(条带渲染需逐行随机访问) */
+static uint8_t s_menu_fonts[22 * 72];   /* 22个常用汉字 x 72字节 */
+static uint8_t s_menu_fonts_ok = 0;
+static uint8_t s_menu_digits[4 * 64];   /* 2048行数字 2/0/4/8 的字模缓存 */
+static uint8_t s_menu_digits_ok = 0;
+
+/* 菜单行用到的汉字ID表 (替代原字体指针数组, 数据存外部Flash) */
+static const uint8_t s_fonts_tui_id[3] = { FLASH_STORE_ID_24_TUI, FLASH_STORE_ID_24_XIANG, FLASH_STORE_ID_24_ZI };
+static const uint8_t s_fonts_sp_id[2]  = { FLASH_STORE_ID_24_SHI, FLASH_STORE_ID_24_PIN };
+static const uint8_t s_fonts_fh_id[2]  = { FLASH_STORE_ID_24_FAN, FLASH_STORE_ID_24_HUI };
+static const uint8_t s_fonts_cx_id[4]  = { FLASH_STORE_ID_24_CHONG, FLASH_STORE_ID_24_XIN, FLASH_STORE_ID_24_KAI, FLASH_STORE_ID_24_SHI3 };
+static const uint8_t s_fonts_ld_id[4]  = { FLASH_STORE_ID_24_LIANG, FLASH_STORE_ID_24_DU, FLASH_STORE_ID_24_SHE, FLASH_STORE_ID_24_ZHI };
+static const uint8_t s_fonts_xp_id[4]  = { FLASH_STORE_ID_24_XI2, FLASH_STORE_ID_24_PING, FLASH_STORE_ID_24_SHI2, FLASH_STORE_ID_24_JIAN };
+static const uint8_t s_fonts_pm_id[4]  = { FLASH_STORE_ID_24_PING, FLASH_STORE_ID_24_MU, FLASH_STORE_ID_24_FAN2, FLASH_STORE_ID_24_XIANG2 };
+static const uint8_t s_dig_2048[4]   = { 2, 0, 4, 8 };
+
+/* 加载菜单字库缓存 (24x24字库ID 0-21 各自独立资源, 逐字读入) */
+static void menu_font_cache_load(void)
+{
+    uint8_t i;
+    if (s_menu_fonts_ok) return;
+    for (i = 0; i < 22; i++) {
+        if (FlashStore_ResRead((FlashStoreId)i, 0, s_menu_fonts + (uint16_t)i * 72, 72) != 72) {
+            break;   /* 任一读取失败即放弃缓存(外部Flash未烧录) */
+        }
+    }
+    if (i == 22) s_menu_fonts_ok = 1;
+
+    if (!s_menu_digits_ok) {
+        for (i = 0; i < 4; i++) {
+            FlashStore_ResRead(FLASH_STORE_ID_DIGITS, (uint32_t)s_dig_2048[i] * 64,
+                               s_menu_digits + i * 64, 64);
+        }
+        s_menu_digits_ok = 1;
+    }
+}
+
+
+
 /*********************************************************************
  * @brief  绘制主菜单 (5行: 推箱子/2048/俄罗斯方块/华容道/返回)
  **********************************************************************/
 void main_menu_draw(void)
 {
+    menu_font_cache_load();  /* 确保24x24字库缓存已从外部Flash加载 */
     menu_draw_frame();
     /* MENU_Y=5, MENU_H=230, MENU_BDR=5, M_GAP=(230-10-160)/6=10 */
     menu_draw_5row_borders(20, 62, 104, 146, 188);
@@ -350,17 +391,17 @@ void main_menu_draw(void)
     LCD_CS_CLR;
     uint16_t tx;
     tx = MENU_X + (MENU_W - 3 * 24) / 2;
-    sok_draw_char_24(tx,       24, font_tui,   MENU_TEXT_COLOR);
-    sok_draw_char_24(tx + 24,  24, font_xiang, MENU_TEXT_COLOR);
-    sok_draw_char_24(tx + 48,  24, font_zi,    MENU_TEXT_COLOR);
+    sok_draw_char_24(tx,       24, &s_menu_fonts[FLASH_STORE_ID_24_TUI * 72],   MENU_TEXT_COLOR);
+    sok_draw_char_24(tx + 24,  24, &s_menu_fonts[FLASH_STORE_ID_24_XIANG * 72], MENU_TEXT_COLOR);
+    sok_draw_char_24(tx + 48,  24, &s_menu_fonts[FLASH_STORE_ID_24_ZI * 72],    MENU_TEXT_COLOR);
     tx = MENU_X + (MENU_W - 4 * 14) / 2;
     sok_draw_digit_scaled(tx,       64, 2, MENU_TEXT_COLOR, 14, 28);
     sok_draw_digit_scaled(tx + 14,  64, 0, MENU_TEXT_COLOR, 14, 28);
     sok_draw_digit_scaled(tx + 28,  64, 4, MENU_TEXT_COLOR, 14, 28);
     sok_draw_digit_scaled(tx + 42,  64, 8, MENU_TEXT_COLOR, 14, 28);
     tx = MENU_X + (MENU_W - 2 * 24) / 2;
-    sok_draw_char_24(tx,       192, font_fan, MENU_TEXT_COLOR);
-    sok_draw_char_24(tx + 24,  192, font_hui, MENU_TEXT_COLOR);
+    sok_draw_char_24(tx,       192, &s_menu_fonts[FLASH_STORE_ID_24_FAN * 72], MENU_TEXT_COLOR);
+    sok_draw_char_24(tx + 24,  192, &s_menu_fonts[FLASH_STORE_ID_24_HUI * 72], MENU_TEXT_COLOR);
     LCD_CS_SET;
 }
 
@@ -376,16 +417,6 @@ void main_menu_draw_frame_only(int16_t y_top)
     menu_draw_nrow_frame_only(y_top, types, 5);
 }
 
-/* 共享字体指针数组 (避免函数内static在各case分支重复) */
-static const uint8_t *s_fonts_tui[3] = { font_tui, font_xiang, font_zi };
-static const uint8_t *s_fonts_sp[2]  = { font_shi, font_pin };
-static const uint8_t *s_fonts_fh[2]  = { font_fan, font_hui };
-static const uint8_t *s_fonts_cx[4]  = { font_chong, font_xin2, font_kai2, font_shi3 };
-static const uint8_t *s_fonts_ld[4] = { font_liang, font_du, font_she, font_zhi };
-static const uint8_t *s_fonts_xp[4] = { font_xi2, font_ping, font_shi2, font_jian };
-static const uint8_t *s_fonts_pm[4] = { font_ping, font_mu, font_fan2, font_xiang2 };
-static const uint8_t s_dig_2048[4]   = { 2, 0, 4, 8 };
-
 /* 2048数字条带渲染: 14x28缩放, 32px行内垂直居中 (颜色常量 = MENU_TEXT_COLOR: 0xF81F) */
 static void draw_2048_strip(uint8_t *row, uint8_t cr, uint16_t menu_w)
 {
@@ -396,7 +427,7 @@ static void draw_2048_strip(uint8_t *row, uint8_t cr, uint16_t menu_w)
 
     uint16_t dx = (menu_w - 56) / 2;  /* 4 * 14 = 56 */
     for (uint8_t di = 0; di < 4; di++) {
-        const uint8_t *dp = &font_digits[s_dig_2048[di] * 64 + sy * 2];
+        const uint8_t *dp = &s_menu_digits[di * 64 + sy * 2];
         uint8_t left  = dp[0];
         uint8_t right = dp[1];
 
@@ -490,6 +521,8 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
     strip_buf[0] = shared_buffer;
     strip_buf[1] = s_menu_strip_buf1;
     uint8_t active = 0;
+
+    menu_font_cache_load();  /* 确保菜单字库缓存已从外部Flash加载 */
 
     LCD_CS_CLR;
     LCD_Address_Set(mx, (uint16_t)y0,
@@ -619,31 +652,31 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
                 case MENU_ROW_SHIPIN:
                 case MENU_ROW_SHEZHI:
                 case MENU_ROW_FANHUI: {
-                    const uint8_t **fnt;
+                    const uint8_t *fnt;   /* 汉字ID数组 */
                     uint8_t cnt;
                     if (row_types[i] == MENU_ROW_CHONGXIN) {
-                        fnt = s_fonts_cx; cnt = 4;
+                        fnt = s_fonts_cx_id; cnt = 4;
                     } else if (row_types[i] == MENU_ROW_LDSZ) {
-                        fnt = s_fonts_ld; cnt = 4;
+                        fnt = s_fonts_ld_id; cnt = 4;
                     } else if (row_types[i] == MENU_ROW_XPSJ) {
-                        fnt = s_fonts_xp; cnt = 4;
+                        fnt = s_fonts_xp_id; cnt = 4;
                     } else if (row_types[i] == MENU_ROW_PMFX) {
-                        fnt = s_fonts_pm; cnt = 4;
+                        fnt = s_fonts_pm_id; cnt = 4;
                     } else if (row_types[i] == MENU_ROW_TUI) {
-                        fnt = s_fonts_tui; cnt = 3;
+                        fnt = s_fonts_tui_id; cnt = 3;
                     } else if (row_types[i] == MENU_ROW_SHIPIN) {
-                        fnt = s_fonts_sp; cnt = 2;
+                        fnt = s_fonts_sp_id; cnt = 2;
                     } else if (row_types[i] == MENU_ROW_SHEZHI) {
-                        fnt = s_fonts_ld + 2; cnt = 2;
+                        fnt = s_fonts_ld_id + 2; cnt = 2;
                     } else {
-                        fnt = s_fonts_fh; cnt = 2;
+                        fnt = s_fonts_fh_id; cnt = 2;
                     }
                     if (cr < 4 || cr >= 28) break;
                     cr -= 4;
                     cx = (mw - cnt * 24) / 2;
                     cl = cr >> 2; co = (cr & 3) * 3;
                     for (ci = 0; ci < cnt; ci++) {
-                        const uint8_t *fp = fnt[ci] + cl * 12 + co;
+                        const uint8_t *fp = &s_menu_fonts[(uint16_t)fnt[ci] * 72 + cl * 12 + co];
                         for (uint8_t b = 0; b < 3; b++) {
                             uint8_t bits = fp[b];
                             for (int8_t bt = 7; bt >= 0; bt--) {

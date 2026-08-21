@@ -7,6 +7,7 @@
 #include "tetris.h"        /* GAME_RET_* */
 #include "menu.h"          /* 菜单/退出/重开 */
 #include "sok_img_win.h"   /* sok_draw_digit_16x32 */
+#include "flash_store.h"   /* 字库资源从外部Flash读取 */
 #include "lcd.h"
 #include "display.h"
 #include "touch.h"
@@ -731,10 +732,10 @@ uint8_t d2048_update(void)
             uint16_t cx = (240 - 128) / 2;
             uint16_t cy = 108;
             LCD_CS_CLR;
-            sok_draw_char_32(cx,       cy, font_you, LCD_RED);
-            sok_draw_char_32(cx + 32,  cy, font_xi3, LCD_RED);
-            sok_draw_char_32(cx + 64,  cy, font_jie, LCD_RED);
-            sok_draw_char_32(cx + 96,  cy, font_shu, LCD_RED);
+            sok_draw_char_32(cx,       cy, FlashStore_ResLoad(FLASH_STORE_ID_32_YOU,  0, FONT_CHAR_SIZE), LCD_RED);
+            sok_draw_char_32(cx + 32,  cy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI3,  0, FONT_CHAR_SIZE), LCD_RED);
+            sok_draw_char_32(cx + 64,  cy, FlashStore_ResLoad(FLASH_STORE_ID_32_JIE,  0, FONT_CHAR_SIZE), LCD_RED);
+            sok_draw_char_32(cx + 96,  cy, FlashStore_ResLoad(FLASH_STORE_ID_32_SHU,  0, FONT_CHAR_SIZE), LCD_RED);
             LCD_CS_SET;
         }
 
@@ -743,10 +744,10 @@ uint8_t d2048_update(void)
             uint16_t cx = (240 - 128) / 2;   /* 4个字x32=128, 居中 */
             uint16_t cy = 108;
             LCD_CS_CLR;
-            sok_draw_char_32(cx, cy, font_gong, LCD_RED);
-            sok_draw_char_32(cx + 32, cy, font_xi, LCD_RED);
-            sok_draw_char_32(cx + 64, cy, font_tong, LCD_RED);
-            sok_draw_char_32(cx + 96, cy, font_guan, LCD_RED);
+            sok_draw_char_32(cx, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_GONG, 0, FONT_CHAR_SIZE), LCD_RED);
+            sok_draw_char_32(cx + 32, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI,   0, FONT_CHAR_SIZE), LCD_RED);
+            sok_draw_char_32(cx + 64, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_TONG, 0, FONT_CHAR_SIZE), LCD_RED);
+            sok_draw_char_32(cx + 96, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), LCD_RED);
             LCD_CS_SET;
         }
     }

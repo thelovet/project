@@ -10,6 +10,7 @@
 #include "tetris.h"       /* GAME_RET_* */
 #include "menu.h"
 #include "sok_img_win.h"
+#include "flash_store.h"   /* 字库资源从外部Flash读取 */
 #include "lcd.h"
 #include "display.h"
 #include "touch.h"
@@ -698,10 +699,10 @@ uint8_t klotski_update(void)
             /* "恭喜通关" (4个32x32汉字) */
             {
                 uint16_t cx = (240 - 128) / 2;
-                sok_draw_char_32(cx,       90, font_gong, LCD_RED);
-                sok_draw_char_32(cx + 32,  90, font_xi,   LCD_RED);
-                sok_draw_char_32(cx + 64,  90, font_tong, LCD_RED);
-                sok_draw_char_32(cx + 96,  90, font_guan, LCD_RED);
+                sok_draw_char_32(cx,       90, FlashStore_ResLoad(FLASH_STORE_ID_32_GONG, 0, FONT_CHAR_SIZE), LCD_RED);
+                sok_draw_char_32(cx + 32,  90, FlashStore_ResLoad(FLASH_STORE_ID_32_XI,   0, FONT_CHAR_SIZE), LCD_RED);
+                sok_draw_char_32(cx + 64,  90, FlashStore_ResLoad(FLASH_STORE_ID_32_TONG, 0, FONT_CHAR_SIZE), LCD_RED);
+                sok_draw_char_32(cx + 96,  90, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), LCD_RED);
             }
             /* 步数 (居中16x32数字) */
             {

@@ -108,4 +108,32 @@ typedef enum {
  */
 void FlashStore_BurnAll(void);
 
+/* ================================================================
+ * 运行期资源读取接口 (游戏模式使用)
+ * 通过已烧录到外部Flash末尾的目录表, 按资源ID随机读取数据
+ * ================================================================ */
+/** @brief 初始化资源读取: 从外部Flash末尾读取目录并缓存, 返回1=成功(已烧录) */
+uint8_t FlashStore_ResInit(void);
+
+/**
+ * @brief  按资源ID读取一段数据
+ * @param  id     资源ID (FlashStoreId)
+ * @param  offset 资源内偏移(字节)
+ * @param  buf    目标缓冲区
+ * @param  len    期望读取字节数
+ * @return 实际读取字节数(越界时截断, 未初始化/失败返回0)
+ */
+uint16_t FlashStore_ResRead(FlashStoreId id, uint32_t offset, uint8_t *buf, uint16_t len);
+
+/**
+ * @brief  按资源ID将一段数据读入内部共享scratch缓冲区
+ * @return 指向scratch缓冲区的指针(数据长度len), 失败返回0
+ * @note   scratch为共享缓冲区(2048字节), 二次调用会覆盖上一次数据,
+ *         调用方须在下次加载前完成使用
+ */
+const uint8_t *FlashStore_ResLoad(FlashStoreId id, uint32_t offset, uint16_t len);
+
+/** @brief 获取共享scratch缓冲区指针(2048字节) */
+uint8_t *FlashStore_Scratch(void);
+
 #endif /* __FLASH_STORE_H__ */

@@ -7,6 +7,7 @@
 #include "tetris.h"
 #include "menu.h"
 #include "sok_img_win.h"
+#include "flash_store.h"   /* 字库资源从外部Flash读取 */
 #include "lcd.h"
 #include "display.h"
 #include "touch.h"
@@ -593,10 +594,10 @@ static void draw_game_over(void)
         uint16_t gx = BOARD_X + (BOARD_W - gw) / 2;
         uint16_t gy = 75;  /* 上方, 给分数留出空间 */
         LCD_CS_CLR;
-        sok_draw_char_32(gx,       gy, font_you, LCD_WHITE);
-        sok_draw_char_32(gx + 32,  gy, font_xi3, LCD_WHITE);
-        sok_draw_char_32(gx + 64,  gy, font_jie, LCD_WHITE);
-        sok_draw_char_32(gx + 96,  gy, font_shu, LCD_WHITE);
+        sok_draw_char_32(gx,       gy, FlashStore_ResLoad(FLASH_STORE_ID_32_YOU,  0, FONT_CHAR_SIZE), LCD_WHITE);
+        sok_draw_char_32(gx + 32,  gy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI3,  0, FONT_CHAR_SIZE), LCD_WHITE);
+        sok_draw_char_32(gx + 64,  gy, FlashStore_ResLoad(FLASH_STORE_ID_32_JIE,  0, FONT_CHAR_SIZE), LCD_WHITE);
+        sok_draw_char_32(gx + 96,  gy, FlashStore_ResLoad(FLASH_STORE_ID_32_SHU,  0, FONT_CHAR_SIZE), LCD_WHITE);
         LCD_CS_SET;
     }
 
