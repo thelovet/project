@@ -14,7 +14,10 @@
 #include "flash_store.h"
 #include "flash.h"
 #include "lcd.h"
+#include "display.h"       /* LCD_ShowNum(串口烧录收包计数) */
+#include "timer.h"         /* GetTimerCount(串口空闲超时) */
 #include "debug.h"
+#include "ch32v20x_usart.h"  /* 串口烧录: USART1 */
 
 #include "chinese_fonts.h"   /* 24x24中文点阵字库 */
 #include "sok_img_win.h"     /* 32x32中文字库 + 16x32数字字库 */
@@ -490,3 +493,94 @@ void FlashStore_BurnAll(void)
         Delay_Ms(1000);
     }
 }
+
+/* ================================================================
+ * 视频数据块烧录 (VIDEO_CHUNK_STORE_MODE)
+ * 嵌入固件的数据块(video_chunk.c)烧录到外部Flash地址0(视频区域)偏移处,
+ * 块大小/偏移由 gen_video_chunk.py 生成的 video_chunk.h 指定(4KB对齐);
+ * 屏幕显示百分比: 擦除阶段0-10%, 写入阶段10-90%, 回读校验90-100%。
+ * ================================================================ */
+#ifdef VIDEO_CHUNK_STORE_MODE
+#include "video_chunk.h"
+
+/**
+ * @brief  视频数据块烧录主流程 (不返回)
+ * @note   进入前需已初始化SPI Flash与LCD;
+ *         将嵌入固件的 g_video_chunk[VIDEO_CHUNK_SIZE] 从外部Flash的
+ *         VIDEO_CHUNK_OFFSET 开始顺序写入(扇区擦除+写入), 完成后回读CRC校验
+ */
+void VideoChunkStore_BurnAll(void)
+{
+    flash_store_detect_chip();   /* 识别芯片容量与地址模式 */
+
+    flash_store_ui_init();
+    flash_store_ui_update(0);
+
+    /* 显示剩余烧录次数(当前块之后的块数, 供观察烧录进度) */
+    LCD_ShowNum((uint16_t)(VIDEO_BLOCK_COUNT - VIDEO_CHUNK_INDEX - 1), 175);
+
+    /* 1. 边界检查: 本块不得超出视频区域(Flash容量内) */
+    uint32_t start = VIDEO_CHUNK_OFFSET;
+    uint32_t end   = start + VIDEO_CHUNK_SIZE;
+    if (end > s_flash_size) {
+        flash_store_ui_fail(0);
+        while (1) { Delay_Ms(1000); }
+    }
+
+    /* 2. 擦除本块覆盖的全部扇区(4KB对齐) */
+    {
+        uint32_t erase_total = ((end + 4095) & ~((uint32_t)4095)) -
+                               (start & ~((uint32_t)4095));
+        uint32_t done = 0;
+        uint32_t addr;
+        for (addr = start & ~((uint32_t)4095); addr < end; addr += 4096) {
+            flash_store_erase_sector(addr);
+            done += 4096;
+            flash_store_ui_update((uint8_t)(10UL * done / erase_total));
+        }
+    }
+
+    /* 3. 写入数据(每次1个扇区大小, 便于进度更新) */
+    {
+        uint32_t written = 0;
+        while (written < VIDEO_CHUNK_SIZE) {
+            uint32_t n = VIDEO_CHUNK_SIZE - written;
+            if (n > 4096) n = 4096;
+            flash_store_write(g_video_chunk + written, start + written, n);
+            written += n;
+            flash_store_ui_update((uint8_t)(10 + 80UL * written / VIDEO_CHUNK_SIZE));
+        }
+    }
+
+    /* 4. 回读校验: 与源数据CRC比对 */
+    {
+        uint8_t rbuf[64];
+        uint32_t left = VIDEO_CHUNK_SIZE;
+        uint32_t a    = start;
+        uint16_t c    = 0xFFFF;
+        while (left) {
+            uint16_t n = (left > sizeof(rbuf)) ? (uint16_t)sizeof(rbuf)
+                                               : (uint16_t)left;
+            flash_store_read(rbuf, a, n);
+            for (uint16_t j = 0; j < n; j++) {
+                c = flash_store_crc16_update(c, rbuf[j]);
+            }
+            a += n;
+            left -= n;
+            flash_store_ui_update(
+                (uint8_t)(90 + 10UL * (VIDEO_CHUNK_SIZE - left) / VIDEO_CHUNK_SIZE));
+        }
+        if (c == flash_store_crc16(g_video_chunk, VIDEO_CHUNK_SIZE)) {
+            flash_store_ui_update(100);
+            flash_store_ui_done();     /* 绿色100% */
+        } else {
+            flash_store_ui_fail(s_ui_last_pct);  /* 红色 */
+        }
+    }
+
+    /* 烧录/校验完成后保持画面显示 */
+    while (1) {
+        Delay_Ms(1000);
+    }
+}
+#endif /* VIDEO_CHUNK_STORE_MODE */

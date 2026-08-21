@@ -42,6 +42,8 @@
  *    VOICE_SW   -- PB3 (low=enable voice, high=disable)
  */
 
+//恢复正常播放，运行 switch_mode.ps1 game
+//进入烧录模式运行 burn_all.ps1
 #include "debug.h"
 #include "string.h"
 #include "lcd.h"
@@ -71,11 +73,10 @@
 #define DEBUG_SWJ_KEEP
 // 注意：屏幕背光极性在 config.h 中定义 TEST_SCREEN_BACKLIGHT，此处不修改背光相关宏
 
-// ====== Flash数据存储模式 ======
-// 定义此宏: 仅执行数据烧录(将所有字库资源与图片数据写入外部Flash末尾),
-//           屏幕实时显示烧录进度百分比, 完成后显示100%(含CRC完整性校验)。
-// 注释掉此宏: 恢复正常游戏程序, 不影响原有功能。
-//#define FLASH_DATA_STORE_MODE
+// 烧录模式宏定义在 config.h 中切换:
+//   FLASH_DATA_STORE_MODE  = 全量自动烧录字库/图片到外部Flash末尾(绿色100%)
+//   VIDEO_CHUNK_STORE_MODE = 烧录嵌入固件的视频数据块到外部Flash地址0(视频区域)
+// 两个宏都注释即恢复正常游戏程序。
 
 #define HOLD_THRESHOLD    40   /* 触摸按住移动阈值 */
 #define RELEASE_THRESHOLD 15   /* 触摸释放移动阈值 */
@@ -1183,7 +1184,29 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
 }
 
 int main(void) {
-#ifdef FLASH_DATA_STORE_MODE
+#ifdef VIDEO_CHUNK_STORE_MODE
+    /* ====== 视频数据块烧录模式 ======
+     * 将嵌入固件的视频数据块(g_video_chunk)烧录到外部Flash地址0(视频区域),
+     * 块内容由 gen_video_chunk.py 生成; 注释掉宏即恢复正常程序 */
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);//设置中断优先级分组1
+    SystemCoreClockUpdate();//更新系统时钟
+    Delay_Init();//初始化延时函数
+
+    LCD_PWR_Init();          // LCD电源+背光引脚初始化
+    LCD_PWR_ON;              // LCD 从OFF切ON
+    Delay_Ms(20);            // 等待LCD复位完成和SPI稳定
+    SPI_FLASH_Init();        // 初始化外部Flash SPI
+    SPI_Flash_WAKEUP();      // 从PowerDown中唤醒Flash
+    LCD_Init();              // 初始化LCD
+
+    LCD_Backlight_PWM_Stop();// PB9回GPIO模式, 停PWM
+    LCD_LED_CLR;             // 打开背光
+
+    VideoChunkStore_BurnAll();  // 烧录嵌入的视频数据块到外部Flash, 完成后常驻显示100%
+    while (1) {
+        Delay_Ms(1000);
+    }
+#elif defined(FLASH_DATA_STORE_MODE)
     /* ====== Flash数据存储模式 ======
      * 仅执行字库/图片资源烧录, 不进入任何游戏逻辑;
      * 注释掉main.c顶部的 FLASH_DATA_STORE_MODE 宏即恢复正常游戏程序 */

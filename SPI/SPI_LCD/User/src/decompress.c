@@ -35,14 +35,15 @@ uint8_t pre_data[PARALLEL_BUFFER_COUNT];//预读数据数组
 //当前视频段
 uint8_t current_video_index = 0;
 //最大视频段数
-uint8_t max_video_count = 4;
+uint8_t max_video_count = VIDEO_SEGMENT_COUNT;
 
 // 视频段地址范围定义（每组{起始地址4字节, 结束地址4字节}）
-const uint8_t video_ranges[4][8] = {
-	{0x00, 0x00, 0x00, 0x00, 0x00, 0x0A, 0xD1, 0xE2},
-	{0x00, 0x0A, 0xD1, 0xE3, 0x00, 0x1D, 0x47, 0x93},
-	{0x00, 0x1D, 0x47, 0x94, 0x00, 0x30, 0xFB, 0x35},
-	{0x00, 0x30, 0xFB, 0x36, 0x00, 0x5C, 0x1E, 0x2B},
+const uint8_t video_ranges[VIDEO_SEGMENT_COUNT][8] = {
+	{0x00, 0x00, 0x00, 0x00, 0x00, 0x7E, 0xBC, 0x25},
+	// {0x00, 0x00, 0x00, 0x00, 0x00, 0x0A, 0xD1, 0xE2},
+	// {0x00, 0x0A, 0xD1, 0xE3, 0x00, 0x1D, 0x47, 0x93},
+	// {0x00, 0x1D, 0x47, 0x94, 0x00, 0x30, 0xFB, 0x35},
+	// {0x00, 0x30, 0xFB, 0x36, 0x00, 0x5C, 0x1E, 0x2B},
 	//{0x00, 0x61, 0x07, 0xEC, 0x00, 0x6C, 0xF1, 0xFF},
 };
 
@@ -236,44 +237,44 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 					input_pos = ((uint32_t)*location4 << 24) | ((uint32_t)*location3 << 16) |
 						((uint32_t)*location2 << 8) | (uint32_t)*location1;
 					//Delay_Ms(100);
-					if (!key_response) {//没有输入响应，播放一遍后闪烁再休眠
-						if (Battery_GetStatus() != BAT_CHARGING) {
-							/* 闪烁前已在按着: I2C触摸状态比PA8脉冲可靠, 跳过检测 */
-							uint8_t blink_check = !g_touch_pressed;
-							if (blink_check) g_touch_int_flag = 0;  /* 未在按, 清旧标志等新按下 */
-							uint8_t b = 2;
-							do {
-								LCD_Backlight_PWM_SetDuty(0);//灭
-							for (uint8_t i = 0; i < 35; i++) {
-								IWDG_ReloadCounter(); Delay_Ms(10);
-								if (Battery_GetStatus() == BAT_CHARGING || Battery_GetStatus() == BAT_FULL) {
-									LCD_Backlight_PWM_SetDuty(g_brightness);
-									goto blink_out;
-								}
-							}
-							LCD_Backlight_PWM_SetDuty(g_brightness);//亮
-							for (uint8_t i = 0; i < 35; i++) {
-								IWDG_ReloadCounter(); Delay_Ms(10);
-								if (blink_check && g_touch_int_flag) {
-									g_touch_int_flag = 0;
-									LCD_Backlight_PWM_SetDuty(g_brightness);
-									blink_touched = 1;
-									current_video_index = (current_video_index + 1) % max_video_count;
-									LoadVideoAddress();
-									key_response = 1;
-									goto blink_out;
-								}
-								if (Battery_GetStatus() == BAT_CHARGING || Battery_GetStatus() == BAT_FULL) {
-									LCD_Backlight_PWM_SetDuty(g_brightness);
-									goto blink_out;
-								}
-							}
-							} while (--b);
-						}
-						end_flag = 1;//结束一个循环
-					}
+					 if (!key_response) {//没有输入响应，播放一遍后闪烁再休眠
+					// 	if (Battery_GetStatus() != BAT_CHARGING) {
+					// 		/* 闪烁前已在按着: I2C触摸状态比PA8脉冲可靠, 跳过检测 */
+					// 		uint8_t blink_check = !g_touch_pressed;
+					// 		if (blink_check) g_touch_int_flag = 0;  /* 未在按, 清旧标志等新按下 */
+					// 		uint8_t b = 2;
+					// 		do {
+					// 			LCD_Backlight_PWM_SetDuty(0);//灭
+					// 		for (uint8_t i = 0; i < 35; i++) {
+					// 			IWDG_ReloadCounter(); Delay_Ms(10);
+					// 			if (Battery_GetStatus() == BAT_CHARGING || Battery_GetStatus() == BAT_FULL) {
+					// 				LCD_Backlight_PWM_SetDuty(g_brightness);
+					// 				goto blink_out;
+					// 			}
+					// 		}
+					// 		LCD_Backlight_PWM_SetDuty(g_brightness);//亮
+					// 		for (uint8_t i = 0; i < 35; i++) {
+					// 			IWDG_ReloadCounter(); Delay_Ms(10);
+					// 			if (blink_check && g_touch_int_flag) {
+					// 				g_touch_int_flag = 0;
+					// 				LCD_Backlight_PWM_SetDuty(g_brightness);
+					// 				blink_touched = 1;
+					// 				current_video_index = (current_video_index + 1) % max_video_count;
+					// 				LoadVideoAddress();
+					// 				key_response = 1;
+					// 				goto blink_out;
+					// 			}
+					// 			if (Battery_GetStatus() == BAT_CHARGING || Battery_GetStatus() == BAT_FULL) {
+					// 				LCD_Backlight_PWM_SetDuty(g_brightness);
+					// 				goto blink_out;
+					// 			}
+					// 		}
+					// 		} while (--b);
+					// 	}
+					 	end_flag = 1;//结束一个循环
+					 }
 					key_response = 0;//清除输入响应标志
-				blink_out:;
+				//blink_out:;
 				}
 				//while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//等待屏幕刷新完成
 				while ((SPI2_DMA_TX_CH->CNTR) > 0);//等待SPI2屏幕刷新完成

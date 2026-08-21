@@ -66,4 +66,13 @@
 /* Standby模式保持LCD供电，支持触摸唤醒（会增加功耗） */
 #define KEEP_LCD_POWER_IN_STANDBY
 
+/* ================================================================
+ * 烧录模式切换 (二选一, 都注释 = 正常游戏程序)
+ *   FLASH_DATA_STORE_MODE : 全量自动烧录内置字库/图片资源到外部Flash末尾
+ *   VIDEO_CHUNK_STORE_MODE: 烧录嵌入固件的视频数据块到外部Flash地址0(视频区域)
+ *                           每块由 gen_video_chunk.py 生成(video_chunk.c/h)
+ * ================================================================ */
+//#define FLASH_DATA_STORE_MODE
+//#define VIDEO_CHUNK_STORE_MODE
+
 #endif

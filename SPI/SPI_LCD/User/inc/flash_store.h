@@ -136,4 +136,12 @@ const uint8_t *FlashStore_ResLoad(FlashStoreId id, uint32_t offset, uint16_t len
 /** @brief 获取共享scratch缓冲区指针(2048字节) */
 uint8_t *FlashStore_Scratch(void);
 
+/* ================================================================
+ * 视频数据块烧录 (VIDEO_CHUNK_STORE_MODE)
+ * 将嵌入固件的视频数据块(g_video_chunk)从外部Flash地址0(视频区域)偏移处
+ * 顺序写入并回读CRC校验, 屏幕显示百分比进度。
+ * 本函数不返回; 进入前需已初始化SPI Flash与LCD。
+ * ================================================================ */
+void VideoChunkStore_BurnAll(void);
+
 #endif /* __FLASH_STORE_H__ */
