@@ -64,11 +64,18 @@
 #include "game_save.h"       // 游戏状态存档
 #include "sok_img_win.h"    // 32x32中文字库
 #include "settings.h"       // 设置界面
+#include "flash_store.h"    // Flash数据存储程序(字库/图片资源烧录)
 
  // ====== 调试配置 ======
  // 调试模式：保留SWJ调试接口。如果不需要调试，注释掉下面这行即可省电
 #define DEBUG_SWJ_KEEP
 // 注意：屏幕背光极性在 config.h 中定义 TEST_SCREEN_BACKLIGHT，此处不修改背光相关宏
+
+// ====== Flash数据存储模式 ======
+// 定义此宏: 仅执行数据烧录(将所有字库资源与图片数据写入外部Flash末尾),
+//           屏幕实时显示烧录进度百分比, 完成后显示100%(含CRC完整性校验)。
+// 注释掉此宏: 恢复正常游戏程序, 不影响原有功能。
+//#define FLASH_DATA_STORE_MODE
 
 #define HOLD_THRESHOLD    40   /* 触摸按住移动阈值 */
 #define RELEASE_THRESHOLD 15   /* 触摸释放移动阈值 */
@@ -1176,6 +1183,29 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
 }
 
 int main(void) {
+#ifdef FLASH_DATA_STORE_MODE
+    /* ====== Flash数据存储模式 ======
+     * 仅执行字库/图片资源烧录, 不进入任何游戏逻辑;
+     * 注释掉main.c顶部的 FLASH_DATA_STORE_MODE 宏即恢复正常游戏程序 */
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);//设置中断优先级分组1
+    SystemCoreClockUpdate();//更新系统时钟
+    Delay_Init();//初始化延时函数
+
+    LCD_PWR_Init();          // LCD电源+背光引脚初始化
+    LCD_PWR_ON;              // LCD 从OFF切ON
+    Delay_Ms(20);            // 等待LCD复位完成和SPI稳定
+    SPI_FLASH_Init();        // 初始化外部Flash SPI
+    SPI_Flash_WAKEUP();      // 从PowerDown中唤醒Flash
+    LCD_Init();              // 初始化LCD
+
+    LCD_Backlight_PWM_Stop();// PB9回GPIO模式, 停PWM
+    LCD_LED_CLR;             // 打开背光
+
+    FlashStore_BurnAll();    // 烧录+CRC校验, 完成后常驻显示100%
+    while (1) {
+        Delay_Ms(1000);
+    }
+#else
     // 主循环局部变量
     uint16_t peak_voltage = 0;
     uint8_t  was_charging = 0;
@@ -1532,4 +1562,5 @@ int main(void) {
             NVIC_SystemReset();//系统复位(经IWDG复位)进入Standby
         }
     }
+#endif
 }
