@@ -875,6 +875,63 @@ uint8_t tetris_restore_state(const uint8_t *buf, uint8_t len)
     }
     return 1;
 }
+/* Draw the menu background for the exit/restart menu states.
+   If the game was OVER before the menu, show the game-over screen instead of
+   redrawing the board (the board redraw used to wipe the game-over text). */
+static void tetris_draw_menu_scene(void)
+{
+    if (g_state_before_menu == TETRIS_STATE_OVER) {
+        draw_game_over();
+        g_gameover_drawn = 1;
+        g_board_dirty = 0;
+        g_sidebar_dirty = 0;
+        g_preview_dirty = 0;
+        return;
+    }
+
+    uint8_t rr, cc;
+    if (g_board_dirty == 2) draw_board_bg();
+    else {
+        uint8_t gi;
+        uint16_t fill_x1 = BOARD_X;
+        uint16_t fill_y1 = BOARD_Y + 5 * CELL_SIZE + 1;
+        uint16_t fill_x2 = BOARD_X + BOARD_W - 1;
+        uint16_t fill_y2 = BOARD_Y + 15 * CELL_SIZE - 1;
+        LCD_Fill(fill_x1, fill_y1, fill_x2, fill_y2, BOARD_BG);
+        for (gi = 0; gi <= BOARD_COLS; gi++) {
+            uint16_t x = BOARD_X + gi * CELL_SIZE;
+            LCD_Fill(x, fill_y1, x + GRID_WIDTH - 1, fill_y2, BOARD_GRID);
+        }
+        for (gi = 6; gi <= 14; gi++) {
+            uint16_t y = BOARD_Y + gi * CELL_SIZE;
+            LCD_Fill(fill_x1, y, fill_x2, y + GRID_WIDTH - 1, BOARD_GRID);
+        }
+    }
+    for (rr = 0; rr < BOARD_ROWS; rr++) {
+        for (cc = 0; cc < BOARD_COLS; cc++) {
+            if (g_board[rr][cc] != 0) {
+                draw_cell(cc, rr, piece_colors[g_board[rr][cc] - 1]);
+            }
+        }
+    }
+    if (g_board_dirty == 2) {
+        draw_sidebar();
+        draw_preview();
+        draw_score_area();
+    }
+    g_sidebar_dirty = 0;
+    g_preview_dirty = 0;
+    g_ghost_y = find_ghost_y();
+    if (g_ghost_y != g_piece_y) {
+        draw_ghost_at(g_piece_type, g_piece_rot, g_piece_x, g_ghost_y);
+    }
+    draw_piece_at(g_piece_type, g_piece_rot, g_piece_x, g_piece_y,
+                  piece_colors[g_piece_type]);
+    g_board_dirty = 0;
+    g_sidebar_dirty = 0;
+    g_preview_dirty = 0;
+}
+
 
 /**
  * @brief  俄罗斯方块每帧更新: 处理触摸手势、菜单交互、自动下落、消行动画和渲染
@@ -900,50 +957,7 @@ uint8_t tetris_update(void)
     if (g_state == TETRIS_STATE_EXIT_MENU) {
         /* 重绘菜单背景: 从游戏画面开始绘制 */
         if (g_board_dirty >= 2) {
-            uint8_t rr, cc;
-            if (g_board_dirty == 2) draw_board_bg();
-            else {
-                uint8_t gi;
-                uint16_t fill_x1 = BOARD_X;
-                uint16_t fill_y1 = BOARD_Y + 5 * CELL_SIZE + 1;
-                uint16_t fill_x2 = BOARD_X + BOARD_W - 1;
-                uint16_t fill_y2 = BOARD_Y + 15 * CELL_SIZE - 1;
-                LCD_Fill(fill_x1, fill_y1, fill_x2, fill_y2, BOARD_BG);
-                for (gi = 0; gi <= BOARD_COLS; gi++) {
-                    uint16_t x = BOARD_X + gi * CELL_SIZE;
-                    LCD_Fill(x, fill_y1, x + GRID_WIDTH - 1, fill_y2, BOARD_GRID);
-                }
-                for (gi = 6; gi <= 14; gi++) {
-                    uint16_t y = BOARD_Y + gi * CELL_SIZE;
-                    LCD_Fill(fill_x1, y, fill_x2, y + GRID_WIDTH - 1, BOARD_GRID);
-                }
-            }
-            for (rr = 0; rr < BOARD_ROWS; rr++) {
-                for (cc = 0; cc < BOARD_COLS; cc++) {
-                    if (g_board[rr][cc] != 0) {
-                        draw_cell(cc, rr, piece_colors[g_board[rr][cc] - 1]);
-                    }
-                }
-            }
-            /* 电池闪灭(g_board_dirty==3)时侧边栏/预览/分数区无重叠或已
-               被菜单覆盖，跳过避免大填充闪烁 */
-            if (g_board_dirty == 2) {
-                draw_sidebar();
-                draw_preview();
-                draw_score_area();
-            }
-            g_sidebar_dirty = 0;
-            g_preview_dirty = 0;
-            /* 活动方块和投影也要画 */
-            g_ghost_y = find_ghost_y();
-            if (g_ghost_y != g_piece_y) {
-                draw_ghost_at(g_piece_type, g_piece_rot, g_piece_x, g_ghost_y);
-            }
-            draw_piece_at(g_piece_type, g_piece_rot, g_piece_x, g_piece_y,
-                          piece_colors[g_piece_type]);
-            g_board_dirty = 0;
-            g_sidebar_dirty = 0;
-            g_preview_dirty = 0;
+            tetris_draw_menu_scene();
             if (!g_exit_dragging && !g_exit_sliding) {
                 menu_draw_nrow_frame_only(g_exit_drag_y, tetris_row_types, 6);
             }
@@ -1021,48 +1035,7 @@ uint8_t tetris_update(void)
     if (g_state == TETRIS_STATE_RESTART_MENU) {
         /* 重绘菜单背景: 从游戏画面开始绘制 */
         if (g_board_dirty >= 2) {
-            uint8_t rr, cc;
-            if (g_board_dirty == 2) draw_board_bg();
-            else {
-                uint8_t gi;
-                uint16_t fill_x1 = BOARD_X;
-                uint16_t fill_y1 = BOARD_Y + 5 * CELL_SIZE + 1;
-                uint16_t fill_x2 = BOARD_X + BOARD_W - 1;
-                uint16_t fill_y2 = BOARD_Y + 15 * CELL_SIZE - 1;
-                LCD_Fill(fill_x1, fill_y1, fill_x2, fill_y2, BOARD_BG);
-                for (gi = 0; gi <= BOARD_COLS; gi++) {
-                    uint16_t x = BOARD_X + gi * CELL_SIZE;
-                    LCD_Fill(x, fill_y1, x + GRID_WIDTH - 1, fill_y2, BOARD_GRID);
-                }
-                for (gi = 6; gi <= 14; gi++) {
-                    uint16_t y = BOARD_Y + gi * CELL_SIZE;
-                    LCD_Fill(fill_x1, y, fill_x2, y + GRID_WIDTH - 1, BOARD_GRID);
-                }
-            }
-            for (rr = 0; rr < BOARD_ROWS; rr++) {
-                for (cc = 0; cc < BOARD_COLS; cc++) {
-                    if (g_board[rr][cc] != 0) {
-                        draw_cell(cc, rr, piece_colors[g_board[rr][cc] - 1]);
-                    }
-                }
-            }
-            if (g_board_dirty == 2) {
-                draw_sidebar();
-                draw_preview();
-                draw_score_area();
-            }
-            g_sidebar_dirty = 0;
-            g_preview_dirty = 0;
-            /* 活动方块和投影也要画，电池刷新后不丢 */
-            g_ghost_y = find_ghost_y();
-            if (g_ghost_y != g_piece_y) {
-                draw_ghost_at(g_piece_type, g_piece_rot, g_piece_x, g_ghost_y);
-            }
-            draw_piece_at(g_piece_type, g_piece_rot, g_piece_x, g_piece_y,
-                          piece_colors[g_piece_type]);
-            g_board_dirty = 0;
-            g_sidebar_dirty = 0;
-            g_preview_dirty = 0;
+            tetris_draw_menu_scene();
         }
         if (!g_restart_dragging && !g_restart_sliding) {
             game_battery_icon_update(184, 40, 0);
