@@ -7,6 +7,7 @@
  */
 #include "fish.h"
 #include "fish_imgs.h"     /* 鱼图片尺寸/数据(fish_imgs_dim) */
+#include "player_imgs.h"   /* 玩家形象尺寸/数据(player_imgs_dim) */
 #include "tetris.h"        /* GAME_RET_* */
 #include "menu.h"          /* 菜单/退出/重开 */
 #include "sok_img_win.h"   /* sok_draw_digit_16x32 */
@@ -20,7 +21,7 @@
  *  游戏参数
  * ================================================================ */
 #define FISH_PLAYER_START_LEVEL  0   /* 玩家初始等级(第1条沙丁鱼) */
-#define FISH_PLAYER_LEVEL_MAX    9   /* 玩家最大等级 */
+#define FISH_PLAYER_LEVEL_MAX    8   /* 玩家最大等级(第9张玩家形象, PLAYER_COUNT-1) */
 #define FISH_PLAYER_X   (LCD_W / 2)
 #define FISH_PLAYER_Y   (LCD_H / 2)
 
@@ -64,16 +65,21 @@ static uint16_t fish_rand(uint16_t n)
 }
 
 /* ================================================================
- *  共用鱼图片绘制: 按等级从外部Flash流式读取对应鱼, 跳过白色背景
- *  @param level  等级 0-9 (对应 FISH_COUNT 条鱼)
- *  @param x,y    鱼中心坐标
+ *  共用图片绘制: 按等级从外部Flash流式读取对应图, 跳过白色背景
+ *  @param id_base  资源ID基址 (FLASH_STORE_ID_*_0)
+ *  @param dims     尺寸表 (每等级 {w,h})
+ *  @param count    等级数
+ *  @param level    等级 0-(count-1)
+ *  @param x,y      中心坐标
  * ================================================================ */
-static void draw_fish_sprite(uint8_t level, uint16_t x, uint16_t y)
+static void draw_image_sprite(FlashStoreId id_base, const uint16_t dims[][2],
+                              uint8_t count, uint8_t level,
+                              uint16_t x, uint16_t y)
 {
-    if (level >= FISH_COUNT) return;
-    uint16_t w = fish_imgs_dim[level][0];
-    uint16_t h = fish_imgs_dim[level][1];
-    FlashStoreId id = (FlashStoreId)(FLASH_STORE_ID_FISH_0 + level);
+    if (level >= count) return;
+    uint16_t w = dims[level][0];
+    uint16_t h = dims[level][1];
+    FlashStoreId id = (FlashStoreId)(id_base + level);
     const uint8_t *img = FlashStore_ResLoad(id, 0, (uint16_t)(w * h * 2));
     if (!img) return;
 
@@ -105,9 +111,7 @@ static void draw_fish_sprite(uint8_t level, uint16_t x, uint16_t y)
             LCD_Address_Set((uint16_t)sx0, (uint16_t)sy,
                             (uint16_t)sx1, (uint16_t)sy);
             for (uint16_t i = 0; i < (uint16_t)(c - start); i++) {
-                int16_t sx = x0 + (int16_t)(start + i);
                 LCD_WR_DATA_16Bit(px[r * w + start + i]);
-                (void)sx;
             }
         }
     }
@@ -161,13 +165,13 @@ static void draw_game_over(void)
 static void food_respawn(FishEntity *e, uint8_t avoid_player)
 {
     e->active = 1;
-    /* 自适应难度: 小鱼等级在玩家 ±FISH_FOOD_RANGE 内随机, 并钳位到 [0,8] */
+    /* 自适应难度: 小鱼等级在玩家 ±FISH_FOOD_RANGE 内随机, 并钳位到 [0,9] */
     {
         int16_t pl = (int16_t)g_player.level;
         int16_t lo = pl - FISH_FOOD_RANGE;
         int16_t hi = pl + FISH_FOOD_RANGE;
         if (lo < 0) lo = 0;
-        if (hi > 8) hi = 8;
+        if (hi > 9) hi = 9;
         uint8_t span = (uint8_t)(hi - lo + 1);
         e->level = (uint8_t)(lo + (int16_t)fish_rand(span));
     }
@@ -289,10 +293,14 @@ uint8_t fish_update(void)
         uint8_t i;
         for (i = 0; i < FISH_NUM_FOOD; i++) {
             if (!g_food[i].active) continue;
-            draw_fish_sprite(g_food[i].level, g_food[i].x, g_food[i].y);
+            draw_image_sprite(FLASH_STORE_ID_FISH_0, fish_imgs_dim,
+                              FISH_COUNT, g_food[i].level,
+                              g_food[i].x, g_food[i].y);
         }
     }
-    draw_fish_sprite(g_player.level, g_player.x, g_player.y);
+    draw_image_sprite(FLASH_STORE_ID_PLAYER_0, player_imgs_dim,
+                      PLAYER_COUNT, g_player.level,
+                      g_player.x, g_player.y);
 
     /* 得分显示 */
     draw_score();

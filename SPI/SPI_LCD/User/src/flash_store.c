@@ -26,6 +26,7 @@
 #include "sok_img_next.h"    /* 下一关图标 */
 #include "sok_img_restart.h" /* 重新开始图标 */
 #include "fish_imgs.h"       /* 大鱼吃小鱼图片 */
+#include "player_imgs.h"     /* 大鱼吃小鱼玩家形象 */
 
 /* ================================================================
  * 资源表: 固件内全部需要烧录的字库与图片数据
@@ -79,6 +80,16 @@ static const FlashStoreRes s_resources[] = {
     { fish_img_7, FISH_7_W * FISH_7_H * 2 },
     { fish_img_8, FISH_8_W * FISH_8_H * 2 },
     { fish_img_9, FISH_9_W * FISH_9_H * 2 },
+    /* ---- 大鱼吃小鱼 9张玩家形象 (RGB565 小端序, 白色透明) ---- */
+    { player_img_0, PLAYER_0_W * PLAYER_0_H * 2 },
+    { player_img_1, PLAYER_1_W * PLAYER_1_H * 2 },
+    { player_img_2, PLAYER_2_W * PLAYER_2_H * 2 },
+    { player_img_3, PLAYER_3_W * PLAYER_3_H * 2 },
+    { player_img_4, PLAYER_4_W * PLAYER_4_H * 2 },
+    { player_img_5, PLAYER_5_W * PLAYER_5_H * 2 },
+    { player_img_6, PLAYER_6_W * PLAYER_6_H * 2 },
+    { player_img_7, PLAYER_7_W * PLAYER_7_H * 2 },
+    { player_img_8, PLAYER_8_W * PLAYER_8_H * 2 },
 };
 #endif /* FLASH_DATA_STORE_MODE */
 
@@ -95,8 +106,8 @@ typedef char flash_store_count_check[
     (FLASH_STORE_DIR_HEADER_SIZE + FLASH_STORE_RES_COUNT * FLASH_STORE_ENTRY_SIZE)
 static uint8_t s_dir_buf[FLASH_STORE_DIR_SIZE];
 
-/* 运行期共享scratch缓冲区(最大资源: 大白鲨52x31 图片3224字节) */
-#define FLASH_STORE_SCRATCH_SIZE  3328
+/* 运行期共享scratch缓冲区(最大资源: 玩家52x41 图片4264字节) */
+#define FLASH_STORE_SCRATCH_SIZE  4352
 static uint8_t s_scratch[FLASH_STORE_SCRATCH_SIZE];
 
 /* ================================================================
