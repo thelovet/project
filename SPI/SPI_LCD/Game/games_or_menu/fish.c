@@ -6,6 +6,7 @@
  *          鱼图片存于外部Flash, 运行时按大小DMA流式读取。
  */
 #include "fish.h"
+#include "fish_imgs.h"     /* 鱼图片尺寸/数据(fish_imgs_dim) */
 #include "tetris.h"        /* GAME_RET_* */
 #include "menu.h"          /* 菜单/退出/重开 */
 #include "sok_img_win.h"   /* sok_draw_digit_16x32 */
@@ -18,16 +19,14 @@
 /* ================================================================
  *  游戏参数
  * ================================================================ */
-#define FISH_LEVELS     10   /* 鱼等级 0(最小) ~ 9(最大) */
-#define FISH_IMG_SIZE   32   /* 每条鱼位图边长(正方形) */
-
-#define FISH_PLAYER_START_LEVEL  2   /* 玩家初始等级 */
+#define FISH_PLAYER_START_LEVEL  0   /* 玩家初始等级(第1条沙丁鱼) */
 #define FISH_PLAYER_LEVEL_MAX    9   /* 玩家最大等级 */
 #define FISH_PLAYER_X   (LCD_W / 2)
 #define FISH_PLAYER_Y   (LCD_H / 2)
 
 #define FISH_NUM_FOOD   6      /* 场上小鱼数量 */
 #define FISH_SPEED_BASE 3      /* 小鱼基础移动速度 */
+#define FISH_FOOD_RANGE 3      /* 自适应难度: 小鱼等级在玩家左右 ±3 内 */
 
 /* ================================================================
  *  游戏状态
@@ -53,8 +52,6 @@ static uint8_t   g_prev_pressed;
  *  颜色定义 (RGB565)
  * ================================================================ */
 #define COLOR_BG     0x14A6   /* 深海蓝背景 */
-#define COLOR_PLAYER 0x07E0   /* 玩家大鱼-鲜绿 */
-#define COLOR_FOOD   0xFD20   /* 小鱼-橙黄 */
 #define COL_RED      0xF800   /* 结束提示-红 */
 
 /* ================================================================
@@ -67,37 +64,54 @@ static uint16_t fish_rand(uint16_t n)
 }
 
 /* ================================================================
- *  绘制一条鱼 (程序化几何: 椭圆身 + 三角尾)
- *  @param x,y  中心坐标  @param size  鱼尺寸(边长)  @param color
+ *  共用鱼图片绘制: 按等级从外部Flash流式读取对应鱼, 跳过白色背景
+ *  @param level  等级 0-9 (对应 FISH_COUNT 条鱼)
+ *  @param x,y    鱼中心坐标
  * ================================================================ */
-static void draw_fish(uint16_t x, uint16_t y, uint8_t size, uint16_t color)
+static void draw_fish_sprite(uint8_t level, uint16_t x, uint16_t y)
 {
-    uint16_t hl = (uint16_t)size / 2;   /* 半径 */
-    uint16_t body_w = (uint16_t)size * 2 / 3;
-    uint16_t body_h = (uint16_t)size / 2;
-    uint16_t x0 = (x >= hl) ? (x - hl) : 0;
-    uint16_t y0 = (y >= body_h) ? (y - body_h) : 0;
-    uint16_t x1 = x + hl < LCD_W ? x + hl : LCD_W - 1;
-    uint16_t y1 = y + body_h < LCD_H ? y + body_h : LCD_H - 1;
+    if (level >= FISH_COUNT) return;
+    uint16_t w = fish_imgs_dim[level][0];
+    uint16_t h = fish_imgs_dim[level][1];
+    FlashStoreId id = (FlashStoreId)(FLASH_STORE_ID_FISH_0 + level);
+    const uint8_t *img = FlashStore_ResLoad(id, 0, (uint16_t)(w * h * 2));
+    if (!img) return;
 
-    /* 鱼身(椭圆近似: 一个矩形) */
-    if (x1 > x0 && y1 > y0)
-        LCD_Fill(x0, y0, x1, y1, color);
-    /* 尾鳍(左侧三角, 缩小) */
-    {
-        uint16_t tx0 = (x > body_w) ? (x - body_w - (uint16_t)size / 4) : 0;
-        uint16_t ty0 = (y >= 2) ? (y - 2) : 0;
-        uint16_t tx1 = (x > body_w) ? (x - body_w) : 0;
-        uint16_t ty1 = (y + 2 < LCD_H) ? (y + 2) : LCD_H - 1;
-        if (tx1 > tx0 && ty1 > ty0)
-            LCD_Fill(tx0, ty0, tx1, ty1, color);
+    const uint16_t *px = (const uint16_t *)img;   /* 小端序强转 */
+    /* 左上角(中心对齐) */
+    int16_t x0 = (int16_t)(x) - (int16_t)(w / 2);
+    int16_t y0 = (int16_t)(y) - (int16_t)(h / 2);
+
+    uint16_t r, c;
+    LCD_CS_CLR;
+    for (r = 0; r < h; r++) {
+        int16_t sy = y0 + (int16_t)r;
+        if (sy < 0 || sy >= 240) continue;
+        c = 0;
+        while (c < w) {
+            /* 跳过白色背景(透明) */
+            while (c < w && px[r * w + c] == 0xFFFF) c++;
+            if (c >= w) break;
+            uint16_t start = c;
+            /* 收集连续非白色段 */
+            while (c < w && px[r * w + c] != 0xFFFF) c++;
+            /* 段 [start, c), 屏幕X裁剪 */
+            int16_t sx0 = x0 + (int16_t)start;
+            int16_t sx1 = x0 + (int16_t)c - 1;
+            if (sx1 < 0 || sx0 >= 240) continue;
+            if (sx0 < 0) sx0 = 0;
+            if (sx1 > 239) sx1 = 239;
+            if (sx1 < sx0) continue;
+            LCD_Address_Set((uint16_t)sx0, (uint16_t)sy,
+                            (uint16_t)sx1, (uint16_t)sy);
+            for (uint16_t i = 0; i < (uint16_t)(c - start); i++) {
+                int16_t sx = x0 + (int16_t)(start + i);
+                LCD_WR_DATA_16Bit(px[r * w + start + i]);
+                (void)sx;
+            }
+        }
     }
-    /* 眼睛(右上一, 背景色点睛) */
-    {
-        uint16_t ex = (x + body_w / 2 - 2 < LCD_W) ? (x + body_w / 2 - 2) : LCD_W - 1;
-        uint16_t ey = (y >= body_h / 2) ? (y - body_h / 2) : 0;
-        LCD_Fill(ex, ey, ex, ey, COLOR_BG);
-    }
+    LCD_CS_SET;
 }
 
 /* ================================================================
@@ -147,7 +161,16 @@ static void draw_game_over(void)
 static void food_respawn(FishEntity *e, uint8_t avoid_player)
 {
     e->active = 1;
-    e->level = (uint8_t)fish_rand(FISH_PLAYER_LEVEL_MAX - 1);  /* 0..8 小鱼 */
+    /* 自适应难度: 小鱼等级在玩家 ±FISH_FOOD_RANGE 内随机, 并钳位到 [0,8] */
+    {
+        int16_t pl = (int16_t)g_player.level;
+        int16_t lo = pl - FISH_FOOD_RANGE;
+        int16_t hi = pl + FISH_FOOD_RANGE;
+        if (lo < 0) lo = 0;
+        if (hi > 8) hi = 8;
+        uint8_t span = (uint8_t)(hi - lo + 1);
+        e->level = (uint8_t)(lo + (int16_t)fish_rand(span));
+    }
     e->x = (uint16_t)fish_rand(LCD_W);
     e->y = (uint16_t)fish_rand(LCD_H);
     e->dir = (uint8_t)fish_rand(8);
@@ -266,12 +289,10 @@ uint8_t fish_update(void)
         uint8_t i;
         for (i = 0; i < FISH_NUM_FOOD; i++) {
             if (!g_food[i].active) continue;
-            draw_fish(g_food[i].x, g_food[i].y,
-                      (uint8_t)(10 + g_food[i].level * 4), COLOR_FOOD);
+            draw_fish_sprite(g_food[i].level, g_food[i].x, g_food[i].y);
         }
     }
-    draw_fish(g_player.x, g_player.y,
-              (uint8_t)(16 + g_player.level * 4), COLOR_PLAYER);
+    draw_fish_sprite(g_player.level, g_player.x, g_player.y);
 
     /* 得分显示 */
     draw_score();

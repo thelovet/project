@@ -95,6 +95,18 @@ typedef enum {
     /* 45: 重新开始图标 */
     FLASH_STORE_ID_IMG_RESTART = 45,
 
+    /* 46-55: 大鱼吃小鱼 10条鱼图片 (RGB565 小端序, 白色透明) */
+    FLASH_STORE_ID_FISH_0 = 46,
+    FLASH_STORE_ID_FISH_1,
+    FLASH_STORE_ID_FISH_2,
+    FLASH_STORE_ID_FISH_3,
+    FLASH_STORE_ID_FISH_4,
+    FLASH_STORE_ID_FISH_5,
+    FLASH_STORE_ID_FISH_6,
+    FLASH_STORE_ID_FISH_7,
+    FLASH_STORE_ID_FISH_8,
+    FLASH_STORE_ID_FISH_9,
+
     FLASH_STORE_ID_COUNT
 } FlashStoreId;
 
