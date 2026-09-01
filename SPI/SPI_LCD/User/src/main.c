@@ -62,6 +62,7 @@
 #include "d2048.h"         // 2048游戏
 #include "tetris.h"         // 俄罗斯方块游戏
 #include "klotski.h"        // 华容道游戏
+#include "fish.h"           // 大鱼吃小鱼游戏
 #include "menu.h"            // 菜单界面显示
 #include "game_save.h"       // 游戏状态存档
 #include "sok_img_win.h"    // 32x32中文字库
@@ -1140,6 +1141,17 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
         }
         if (!g_settings_from_game)
             game_handle_ret(klotski_update(), &s_main_mode, &s_game_inited,
+                            &s_touch_down, &key_response);
+    }
+    else if (s_main_mode == MAIN_MODE_FISH) {
+        /* 大鱼吃小鱼游戏 */
+        if (!s_game_inited) {
+            LCD_Backlight_PWM_SetDuty(g_brightness);
+            fish_init();
+            s_game_inited = 1;
+        }
+        if (!g_settings_from_game)
+            game_handle_ret(fish_update(), &s_main_mode, &s_game_inited,
                             &s_touch_down, &key_response);
     }
     else {

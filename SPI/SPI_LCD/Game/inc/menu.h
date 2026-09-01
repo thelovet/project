@@ -15,6 +15,7 @@ typedef enum {
     MAIN_MODE_D2048,       /* 2048游戏 */
     MAIN_MODE_TETRIS,      /* 俄罗斯方块游戏 */
     MAIN_MODE_KLOTSKI,     /* 华容道游戏 */
+    MAIN_MODE_FISH,        /* 大鱼吃小鱼游戏 */
 } MainMode;
 
 uint32_t game_rand(void);
@@ -66,11 +67,12 @@ void game_battery_set_charge_flash(uint8_t enable);
 #define MENU_ROW_FANHUI  3  /* "返回" */
 #define MENU_ROW_TETRIS  4  /* 俄罗斯方块T图标 */
 #define MENU_ROW_KLOTSKI   5  /* 华容道4x4图标 */
-#define MENU_ROW_CHONGXIN  6  /* "重新开始" 4字 */
-#define MENU_ROW_LDSZ      7  /* "亮度设置" 4字 */
-#define MENU_ROW_XPSJ      8  /* "息屏时间" 4字 */
-#define MENU_ROW_PMFX      9  /* "屏幕方向" 4字 */
-#define MENU_ROW_SHEZHI   10  /* "设置" 2字 */
+#define MENU_ROW_FISH      6  /* 大鱼吃小鱼图标 */
+#define MENU_ROW_CHONGXIN  7  /* "重新开始" 4字 */
+#define MENU_ROW_LDSZ      8  /* "亮度设置" 4字 */
+#define MENU_ROW_XPSJ      9  /* "息屏时间" 4字 */
+#define MENU_ROW_PMFX     10  /* "屏幕方向" 4字 */
+#define MENU_ROW_SHEZHI   11  /* "设置" 2字 */
 
 /* 重新开始菜单行类型数组 (3行: "重新开始" + "设置" + "返回") */
 extern const uint8_t g_restart_row_types[3];
@@ -184,6 +186,7 @@ void menu_draw_klotski_icon(uint16_t y);
  * @param  y  行绘制Y坐标
  */
 void menu_draw_tetris_icon(uint16_t y);
+void menu_draw_fish_icon(uint16_t y);   /* 大鱼吃小鱼图标 */
 
 void menu_clear_exit_area_to(int16_t y);  /* 按拖拽位置清退出菜单可见区域 */
 void menu_restart_cleanup(void);  /* 统一重启菜单关闭清理 */
@@ -210,7 +213,8 @@ int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count);
 #define EXIT_RET_SOKOBAN  4
 #define EXIT_RET_TETRIS   5
 #define EXIT_RET_KLOTSKI  6
-#define EXIT_RET_SETTINGS 7   /* 游戏内点击"设置"按钮 */
+#define EXIT_RET_FISH     7   /* 大鱼吃小鱼 */
+#define EXIT_RET_SETTINGS 8   /* 游戏内点击"设置"按钮 */
 
 #define EXIT_RET_NONE     0
 #define EXIT_RET_BACK     0xFF  /* 内部"关闭菜单"信号 */
@@ -234,7 +238,8 @@ uint8_t game_exit_menu_poll(const uint8_t ret_map[4], uint8_t *prev_pressed,
 #define MAIN_MENU_ACT_SOKOBAN 2
 #define MAIN_MENU_ACT_TETRIS  3
 #define MAIN_MENU_ACT_KLOTSKI 4
-#define MAIN_MENU_ACT_VIDEO   5
+#define MAIN_MENU_ACT_FISH    5
+#define MAIN_MENU_ACT_VIDEO   6
 
 /**
  * @brief  主菜单触摸处理 + 模式切换 (5行: 2048/推箱子/俄罗斯方块/华容道/视频)

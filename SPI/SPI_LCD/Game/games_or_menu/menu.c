@@ -10,6 +10,7 @@
 #include "decompress.h"    /* LoadVideoAddress */
 #include "sokoban.h"       /* sokoban_reset_touch */
 #include "d2048.h"         /* d2048_reset_touch */
+#include "fish.h"          /* fish_reset_touch (大鱼吃小鱼) */
 
 /* 游戏共用的退出菜单变量 (在 menu.c 中定义, menu.h 中 extern 声明) */
 uint8_t  g_touch_down;
@@ -33,8 +34,7 @@ uint8_t  g_game_enter_exit_menu = 0;  /* 设置菜单中顶部下滑→退出菜单标志 */
 #include "battery.h"
 #include "timer.h"
 
-/* 菜单条带双缓冲的私有缓冲区，另一块复用 shared_buffer */
-static u8 s_menu_strip_buf1[FILL_BUFFER_SIZE];
+/* 菜单条带渲染复用 shared_buffer (单缓冲, 牺牲流水线并行换 RAM 5120B) */
 
 /* 重新开始菜单行类型 (2行: "重新开始" + "返回") */
 const uint8_t g_restart_row_types[3] = {MENU_ROW_CHONGXIN, MENU_ROW_SHEZHI, MENU_ROW_FANHUI};
@@ -268,26 +268,59 @@ void menu_draw_tetris_icon(uint16_t y)
 }
 
 /*********************************************************************
- * @brief  绘制5行菜单的统一边框 + 分隔线
+ * @brief  绘制大鱼吃小鱼图标 (大鱼张着嘴, 嘴里含一条小鱼)
+ * @note   纯几何绘制: 大鱼身体 + 张开的口(用背景色挖空隙) + 口中小鱼
  **********************************************************************/
+void menu_draw_fish_icon(uint16_t y)
+{
+    uint16_t iw = 36;  /* 图标宽 */
+    uint16_t ih = 22;  /* 图标高 */
+    uint16_t ix = MENU_X + (MENU_W - iw) / 2;
+    uint16_t iy = y + (32 - ih) / 2;
+
+    /* ===== 大鱼身体 (朝向右侧) ===== */
+    /* 身体(椭圆状) */
+    LCD_Fill(ix + 6,  iy + 5,  ix + 18, iy + 15, MENU_TEXT_COLOR);   /* 身体中段 */
+    LCD_Fill(ix + 9,  iy + 3,  ix + 15, iy + 17, MENU_TEXT_COLOR);   /* 身体加高 */
+    /* 尾巴(左侧三角) */
+    LCD_Fill(ix + 2,  iy + 6,  ix + 6,  iy + 14, MENU_TEXT_COLOR);   /* 尾根部 */
+    LCD_Fill(ix + 1,  iy + 9,  ix + 2,  iy + 11, MENU_TEXT_COLOR);   /* 尾尖 */
+    /* 眼睛(左上, 用背景色点缀瞳孔) */
+    LCD_Fill(ix + 12, iy + 6,  ix + 13, iy + 7,  MENU_TEXT_COLOR);   /* 眼圈 */
+    LCD_Fill(ix + 12, iy + 6,  ix + 12, iy + 6,  MENU_BG_COLOR);     /* 瞳孔 */
+
+    /* ===== 鱼头(右侧) ===== */
+    /* 上颚 */
+    LCD_Fill(ix + 18, iy + 4,  ix + 26, iy + 8,  MENU_TEXT_COLOR);   /* 上颚 */
+    LCD_Fill(ix + 26, iy + 3,  ix + 28, iy + 7,  MENU_TEXT_COLOR);   /* 上唇尖 */
+    /* 下颚 */
+    LCD_Fill(ix + 18, iy + 12, ix + 24, iy + 16, MENU_TEXT_COLOR);   /* 下颚 */
+    LCD_Fill(ix + 24, iy + 13, ix + 26, iy + 15, MENU_TEXT_COLOR);   /* 下唇尖 */
+
+    /* ===== 张开的口 (用背景色挖出嘴部空隙) ===== */
+    LCD_Fill(ix + 18, iy + 8,  ix + 24, iy + 12, MENU_BG_COLOR);     /* 嘴内空隙 */
+
+    /* ===== 口中小鱼 (画在嘴空隙内) ===== */
+    LCD_Fill(ix + 19, iy + 9,  ix + 23, iy + 10, MENU_TEXT_COLOR);   /* 小鱼身 */
+    LCD_Fill(ix + 18, iy + 10, ix + 19, iy + 10, MENU_TEXT_COLOR);   /* 小鱼尾 */
+    LCD_Fill(ix + 22, iy + 8,  ix + 23, iy + 11, MENU_TEXT_COLOR);   /* 小鱼背鳍 */
+}
+
 /*********************************************************************
- * @brief  绘制单个菜单行的边框 (左竖线 / 右竖线 / 分隔线)
- * @param  r_y0     行顶部Y坐标
- * @param  r_y1     行底部Y坐标 (r_y0 + 31)
- * @param  is_first 第一行则画上边框, 否画顶部分隔线
- * @param  is_last  最后一行则画下边框, 否画底部分隔线
+ * @brief  绘制6行菜单的统一边框 + 分隔线 (主菜单6行版)
  **********************************************************************/
-static void menu_draw_5row_borders(uint16_t r0_y0, uint16_t r1_y0, uint16_t r2_y0,
-                            uint16_t r3_y0, uint16_t r4_y0)
+static void menu_draw_6row_borders(uint16_t r0_y0, uint16_t r1_y0, uint16_t r2_y0,
+                            uint16_t r3_y0, uint16_t r4_y0, uint16_t r5_y0)
 {
     uint16_t bx0 = MENU_X + (MENU_W - 3 * 24) / 2 - MENU_TEXT_BDR_PAD;
     uint16_t bx1 = MENU_X + (MENU_W + 3 * 24) / 2 + MENU_TEXT_BDR_PAD - 1;
     uint16_t by_top = r0_y0 - MENU_TEXT_BDR_PAD;
-    uint16_t by_bot = r4_y0 + 31 + MENU_TEXT_BDR_PAD;
+    uint16_t by_bot = r5_y0 + 31 + MENU_TEXT_BDR_PAD;
     uint16_t sep0_y = (r0_y0 + 31 + r1_y0) / 2;
     uint16_t sep1_y = (r1_y0 + 31 + r2_y0) / 2;
     uint16_t sep2_y = (r2_y0 + 31 + r3_y0) / 2;
     uint16_t sep3_y = (r3_y0 + 31 + r4_y0) / 2;
+    uint16_t sep4_y = (r4_y0 + 31 + r5_y0) / 2;
 
     LCD_Fill(bx0, by_top,                              bx1 + 1, by_top + MENU_TEXT_BDR_W,                MENU_TEXT_BDR_COLOR);
     LCD_Fill(bx0, by_bot - MENU_TEXT_BDR_W + 1,        bx1 + 1, by_bot + 1,                              MENU_TEXT_BDR_COLOR);
@@ -297,6 +330,7 @@ static void menu_draw_5row_borders(uint16_t r0_y0, uint16_t r1_y0, uint16_t r2_y
     LCD_Fill(bx0, sep1_y - MENU_TEXT_BDR_W / 2,        bx1 + 1, sep1_y + (MENU_TEXT_BDR_W + 1) / 2,       MENU_TEXT_BDR_COLOR);
     LCD_Fill(bx0, sep2_y - MENU_TEXT_BDR_W / 2,        bx1 + 1, sep2_y + (MENU_TEXT_BDR_W + 1) / 2,       MENU_TEXT_BDR_COLOR);
     LCD_Fill(bx0, sep3_y - MENU_TEXT_BDR_W / 2,        bx1 + 1, sep3_y + (MENU_TEXT_BDR_W + 1) / 2,       MENU_TEXT_BDR_COLOR);
+    LCD_Fill(bx0, sep4_y - MENU_TEXT_BDR_W / 2,        bx1 + 1, sep4_y + (MENU_TEXT_BDR_W + 1) / 2,       MENU_TEXT_BDR_COLOR);
 }
 
 /*********************************************************************
@@ -383,25 +417,26 @@ void main_menu_draw(void)
 {
     menu_font_cache_load();  /* 确保24x24字库缓存已从外部Flash加载 */
     menu_draw_frame();
-    /* MENU_Y=5, MENU_H=230, MENU_BDR=5, M_GAP=(230-10-160)/6=10 */
-    menu_draw_5row_borders(20, 62, 104, 146, 188);
-    menu_draw_tetris_icon(104);
-    menu_draw_klotski_icon(146);
+    /* MENU_Y=5, MENU_H=230, MENU_BDR=5, 6行: gap=(230-10-6*32)/7=4, 行Y=5+4+i*36 */
+    menu_draw_6row_borders(9, 45, 81, 117, 153, 189);
+    menu_draw_tetris_icon(81);
+    menu_draw_klotski_icon(117);
+    menu_draw_fish_icon(153);
 
     LCD_CS_CLR;
     uint16_t tx;
     tx = MENU_X + (MENU_W - 3 * 24) / 2;
-    sok_draw_char_24(tx,       24, &s_menu_fonts[FLASH_STORE_ID_24_TUI * 72],   MENU_TEXT_COLOR);
-    sok_draw_char_24(tx + 24,  24, &s_menu_fonts[FLASH_STORE_ID_24_XIANG * 72], MENU_TEXT_COLOR);
-    sok_draw_char_24(tx + 48,  24, &s_menu_fonts[FLASH_STORE_ID_24_ZI * 72],    MENU_TEXT_COLOR);
+    sok_draw_char_24(tx,       9,  &s_menu_fonts[FLASH_STORE_ID_24_TUI * 72],   MENU_TEXT_COLOR);
+    sok_draw_char_24(tx + 24,  9,  &s_menu_fonts[FLASH_STORE_ID_24_XIANG * 72], MENU_TEXT_COLOR);
+    sok_draw_char_24(tx + 48,  9,  &s_menu_fonts[FLASH_STORE_ID_24_ZI * 72],    MENU_TEXT_COLOR);
     tx = MENU_X + (MENU_W - 4 * 14) / 2;
-    sok_draw_digit_scaled(tx,       64, 2, MENU_TEXT_COLOR, 14, 28);
-    sok_draw_digit_scaled(tx + 14,  64, 0, MENU_TEXT_COLOR, 14, 28);
-    sok_draw_digit_scaled(tx + 28,  64, 4, MENU_TEXT_COLOR, 14, 28);
-    sok_draw_digit_scaled(tx + 42,  64, 8, MENU_TEXT_COLOR, 14, 28);
+    sok_draw_digit_scaled(tx,       45, 2, MENU_TEXT_COLOR, 14, 28);
+    sok_draw_digit_scaled(tx + 14,  45, 0, MENU_TEXT_COLOR, 14, 28);
+    sok_draw_digit_scaled(tx + 28,  45, 4, MENU_TEXT_COLOR, 14, 28);
+    sok_draw_digit_scaled(tx + 42,  45, 8, MENU_TEXT_COLOR, 14, 28);
     tx = MENU_X + (MENU_W - 2 * 24) / 2;
-    sok_draw_char_24(tx,       192, &s_menu_fonts[FLASH_STORE_ID_24_FAN * 72], MENU_TEXT_COLOR);
-    sok_draw_char_24(tx + 24,  192, &s_menu_fonts[FLASH_STORE_ID_24_HUI * 72], MENU_TEXT_COLOR);
+    sok_draw_char_24(tx,       189, &s_menu_fonts[FLASH_STORE_ID_24_FAN * 72], MENU_TEXT_COLOR);
+    sok_draw_char_24(tx + 24,  189, &s_menu_fonts[FLASH_STORE_ID_24_HUI * 72], MENU_TEXT_COLOR);
     LCD_CS_SET;
 }
 
@@ -410,11 +445,11 @@ void main_menu_draw(void)
  **********************************************************************/
 void main_menu_draw_frame_only(int16_t y_top)
 {
-    static const uint8_t types[5] = {
+    static const uint8_t types[6] = {
         MENU_ROW_TUI, MENU_ROW_2048,
-        MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FANHUI
+        MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH, MENU_ROW_FANHUI
     };
-    menu_draw_nrow_frame_only(y_top, types, 5);
+    menu_draw_nrow_frame_only(y_top, types, 6);
 }
 
 /* 2048数字条带渲染: 14x28缩放, 32px行内垂直居中 (颜色常量 = MENU_TEXT_COLOR: 0xF81F) */
@@ -454,7 +489,9 @@ static void draw_2048_strip(uint8_t *row, uint8_t cr, uint16_t menu_w)
 void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
                                 uint8_t n_rows)
 {
-    #define STRIP_H   17
+    /* 条带高度: MENU_W=150 → 行宽300B, 每条带8行=2400B,
+       双缓冲分块(shared_buffer 5120 = 前置2400 + 后置2400), 0额外RAM恢复流水线并行 */
+    #define STRIP_H   8
 
     #define TXT_SPAN  96  /* 文本边框内容区宽度: 4*24 = 3*32 = 96 */
 
@@ -491,7 +528,7 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
     /* 计算行Y坐标: row_y[i] = mb + gap + i*(32+gap) */
     uint8_t  nr    = n_rows;
     uint16_t row_gap = (uint16_t)((mh - 2*mb - nr*32) / (nr + 1));
-    uint16_t row_y[5];  /* 最大5行 */
+    uint16_t row_y[6];  /* 最大6行 */
     uint16_t i;
     for (i = 0; i < nr; i++)
         row_y[i] = (uint16_t)(mb + row_gap + i * (32 + row_gap));
@@ -508,7 +545,7 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
     int16_t bhw       = (int16_t)MENU_TEXT_BDR_W;
 
     /* 分隔线Y */
-    int16_t sep_y[4];  /* 最大4条分隔线 */
+    int16_t sep_y[5];  /* 最大5条分隔线 */
     for (i = 0; i < nr - 1; i++)
         sep_y[i] = (int16_t)((row_y[i] + 31 + row_y[i+1]) / 2);
 
@@ -517,10 +554,14 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
     if (y0 < 0) y0 = 0;
     if (y1 > 240) y1 = 240;
 
+    /* 乒乓双缓冲: 复用 shared_buffer 前后两半 (0额外RAM恢复画/发流水线并行)
+       STRIP_H=8 × ROW_BYTES(mw*2≤300)=2400B, 两块共4800B ≤ FILL_BUFFER_SIZE(5120) */
+    #define STRIP_BYTES ((uint16_t)(STRIP_H * ROW_BYTES))
     u8 *strip_buf[2];
     strip_buf[0] = shared_buffer;
-    strip_buf[1] = s_menu_strip_buf1;
+    strip_buf[1] = shared_buffer + STRIP_BYTES;
     uint8_t active = 0;
+    uint8_t first = 1;
 
     menu_font_cache_load();  /* 确保菜单字库缓存已从外部Flash加载 */
 
@@ -531,7 +572,6 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
     while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);
     LCD_DC_SET;
 
-    uint8_t first = 1;
     for (int16_t sy = 0; sy < (y1 - y0); sy += STRIP_H) {
         int16_t h = STRIP_H;
         if ((int16_t)(sy + h) > (y1 - y0)) h = (int16_t)(y1 - y0 - sy);
@@ -644,6 +684,62 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
                     }
                 } break;
 
+                case MENU_ROW_FISH: {
+                    /* 大鱼吃小鱼图标: 用行区间映射几何块 (iw=34, ih=20) */
+                    uint16_t iw = 34;
+                    uint16_t ih = 20;
+                    uint16_t ix = (uint16_t)(mw - iw) / 2;
+                    uint16_t iy_off = (uint16_t)(32 - ih) / 2;
+                    /* 有效区域校验 */
+                    if (cr < iy_off || cr >= iy_off + ih) break;
+                    uint16_t ry = cr - iy_off;   /* 图标内行 0..19 */
+                    /* 大鱼身体 (左侧椭圆) */
+                    if (ry >= 5 && ry <= 15) {
+                        for (x = ix+6; x < ix+18; x++)
+                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
+                    }
+                    if (ry >= 3 && ry <= 17) {
+                        for (x = ix+9; x < ix+15; x++)
+                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
+                    }
+                    /* 尾巴 (左侧三角) */
+                    if (ry >= 6 && ry <= 14) {
+                        for (x = ix+2; x < ix+6; x++)
+                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
+                    }
+                    if (ry >= 9 && ry <= 11) {
+                        for (x = ix+1; x < ix+2; x++)
+                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
+                    }
+                    /* 上颚 */
+                    if (ry >= 4 && ry <= 8) {
+                        for (x = ix+18; x < ix+26; x++)
+                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
+                    }
+                    if (ry >= 3 && ry <= 7) {
+                        for (x = ix+26; x < ix+28; x++)
+                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
+                    }
+                    /* 下颚 */
+                    if (ry >= 12 && ry <= 16) {
+                        for (x = ix+18; x < ix+24; x++)
+                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
+                    }
+                    if (ry >= 13 && ry <= 15) {
+                        for (x = ix+24; x < ix+26; x++)
+                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
+                    }
+                    /* 口中小鱼 (画出, 背景空隙已由未填充区域自然留下) */
+                    if (ry >= 9 && ry <= 10) {
+                        for (x = ix+19; x < ix+23; x++)
+                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
+                    }
+                    if (ry >= 8 && ry <= 11 && ry != 9 && ry != 10) {
+                        for (x = ix+22; x < ix+23; x++)
+                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
+                    }
+                } break;
+
                 case MENU_ROW_CHONGXIN:
                 case MENU_ROW_LDSZ:
                 case MENU_ROW_XPSJ:
@@ -695,6 +791,7 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
 
         __asm__ volatile("" ::: "memory");
         if (!first) {
+            /* 发送前等上一次(另一块) DMA 完毕, 再复用该块 */
             while (SPI2_DMA_TX_CH->CNTR > 0);
             while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);
         }
@@ -708,6 +805,7 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
     LCD_CS_SET;
 
     #undef STRIP_H
+    #undef STRIP_BYTES
     #undef TXT_SPAN
     #undef ROW_BYTES
     #undef BK_H
@@ -968,6 +1066,12 @@ uint8_t main_menu_handle(uint16_t x, uint16_t y,
         *game_inited = 0;
         *mode = MAIN_MODE_KLOTSKI;
     }
+    else if (sel == MAIN_MENU_ACT_FISH) {
+        LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
+        LCD_Backlight_PWM_SetDuty(g_brightness);
+        *game_inited = 0;
+        *mode = MAIN_MODE_FISH;
+    }
     else if (sel == MAIN_MENU_ACT_VIDEO) {
         /* 返回视频: 不黑屏, main.c视频循环直接渲染第一帧 */
         LoadVideoAddress();
@@ -988,12 +1092,13 @@ uint8_t main_menu_handle(uint16_t x, uint16_t y,
  **********************************************************************/
 uint8_t main_menu_hit_test(uint16_t x, uint16_t y)
 {
-    int8_t hit = menu_hit_test(x, y, 5);
-    if (hit < 0 || hit > 4) return MAIN_MENU_ACT_VIDEO;  /* 菜单外→返回视频 */
-    /* 行0=推箱子, 1=2048, 2=俄罗斯方块, 3=华容道, 4=返回 */
-    static const uint8_t map[5] = {
+    int8_t hit = menu_hit_test(x, y, 6);
+    if (hit < 0 || hit > 5) return MAIN_MENU_ACT_VIDEO;  /* 菜单外→返回视频 */
+    /* 行0=推箱子, 1=2048, 2=俄罗斯方块, 3=华容道, 4=大鱼吃小鱼, 5=返回 */
+    static const uint8_t map[6] = {
         MAIN_MENU_ACT_SOKOBAN, MAIN_MENU_ACT_D2048,
-        MAIN_MENU_ACT_TETRIS, MAIN_MENU_ACT_KLOTSKI, MAIN_MENU_ACT_VIDEO
+        MAIN_MENU_ACT_TETRIS, MAIN_MENU_ACT_KLOTSKI,
+        MAIN_MENU_ACT_FISH, MAIN_MENU_ACT_VIDEO
     };
     return map[hit];
 }
@@ -1006,6 +1111,7 @@ static MainMode game_ret_to_mode(uint8_t ret)
         case EXIT_RET_SOKOBAN: return MAIN_MODE_SOKOBAN;
         case EXIT_RET_TETRIS:  return MAIN_MODE_TETRIS;
         case EXIT_RET_KLOTSKI: return MAIN_MODE_KLOTSKI;
+        case EXIT_RET_FISH:    return MAIN_MODE_FISH;
         default:               return MAIN_MODE_VIDEO;
     }
 }
@@ -1018,6 +1124,7 @@ static void game_reset_touch(uint8_t ret)
         case EXIT_RET_SOKOBAN: sokoban_reset_touch(); break;
         case EXIT_RET_TETRIS:  tetris_reset_touch();  break;
         case EXIT_RET_KLOTSKI: klotski_reset_touch(); break;
+        case EXIT_RET_FISH:    fish_reset_touch();    break;
     }
 }
 
