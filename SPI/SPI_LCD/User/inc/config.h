@@ -72,7 +72,10 @@
  *   VIDEO_CHUNK_STORE_MODE: 烧录嵌入固件的视频数据块到外部Flash地址0(视频区域)
  *                           每块由 gen_video_chunk.py 生成(video_chunk.c/h)
  * ================================================================ */
-//#define FLASH_DATA_STORE_MODE
+// 烧录模式:
+//   FLASH_DATA_STORE_MODE  = 全量自动烧录字库/图片资源到外部Flash末尾
+//   VIDEO_CHUNK_STORE_MODE = 烧录嵌入固件的视频数据块到外部Flash地址0(视频区域)
+//#define FLASH_DATA_STORE_MODE   /* 烧录完成, 恢复游戏模式 */
 //#define VIDEO_CHUNK_STORE_MODE
 
 #endif
