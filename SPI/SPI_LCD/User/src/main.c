@@ -652,7 +652,8 @@ static uint8_t Main_HandleTouchInput(void)
              && s_main_mode != MAIN_MODE_SOKOBAN
              && s_main_mode != MAIN_MODE_D2048
              && s_main_mode != MAIN_MODE_TETRIS
-             && s_main_mode != MAIN_MODE_KLOTSKI) ? 1 : 0;
+             && s_main_mode != MAIN_MODE_KLOTSKI
+             && s_main_mode != MAIN_MODE_FISH) ? 1 : 0;
         s_touch_started_bottom =
             (ts.y > 210) ? 1 : 0;  /* >210 底部区域, 与video_menu_swipe_up_poll一致 */
         if (s_touch_started_top) {
@@ -681,6 +682,7 @@ static uint8_t Main_HandleTouchInput(void)
              && s_main_mode != MAIN_MODE_D2048
              && s_main_mode != MAIN_MODE_TETRIS
              && s_main_mode != MAIN_MODE_KLOTSKI
+             && s_main_mode != MAIN_MODE_FISH
              && (int16_t)ts.y - (int16_t)s_touch_start_y
                 > MENU_SWIPE_TRIGGER_DIST) {
         /* 顶部拖拽: 根据手指总位移算目标位置, 逐帧追过去 */
@@ -759,7 +761,8 @@ static uint8_t Main_HandleTouchInput(void)
                 && s_main_mode != MAIN_MODE_SOKOBAN
                 && s_main_mode != MAIN_MODE_D2048
                 && s_main_mode != MAIN_MODE_TETRIS
-                && s_main_mode != MAIN_MODE_KLOTSKI) {
+                && s_main_mode != MAIN_MODE_KLOTSKI
+                && s_main_mode != MAIN_MODE_FISH) {
                 /* 顶部下划, 切换菜单模式 (弹出动画) */
                 s_menu_sliding = 1;
                 /* 切换游戏复位参数, 清除游戏初始化标志 */
@@ -862,7 +865,8 @@ static void Main_FlashLowBattery(void)
     if (s_main_mode != MAIN_MODE_SOKOBAN
         && s_main_mode != MAIN_MODE_D2048
         && s_main_mode != MAIN_MODE_TETRIS
-        && s_main_mode != MAIN_MODE_KLOTSKI) {
+        && s_main_mode != MAIN_MODE_KLOTSKI
+        && s_main_mode != MAIN_MODE_FISH) {
         s_flash_on = 0;
         return;
     }
