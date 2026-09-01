@@ -5,6 +5,7 @@
 
 #include "menu.h"
 #include "sok_img_win.h"
+#include "chinese_fonts.h"
 #include "flash_store.h"   /* 菜单字库从外部Flash读取 */
 #include "settings.h"
 #include "decompress.h"    /* LoadVideoAddress */
@@ -268,42 +269,16 @@ void menu_draw_tetris_icon(uint16_t y)
 }
 
 /*********************************************************************
- * @brief  绘制大鱼吃小鱼图标 (大鱼张着嘴, 嘴里含一条小鱼)
- * @note   纯几何绘制: 大鱼身体 + 张开的口(用背景色挖空隙) + 口中小鱼
+ * @brief  绘制大鱼吃小鱼图标 (中文"鱼"字, 24x24)
+ * @note   直接使用固件内字模 font_yu 绘制, 不经外部Flash(免重新烧录)
  **********************************************************************/
 void menu_draw_fish_icon(uint16_t y)
 {
-    uint16_t iw = 36;  /* 图标宽 */
-    uint16_t ih = 22;  /* 图标高 */
+    uint16_t iw = 24;  /* 字宽 */
+    uint16_t ih = 24;  /* 字高 */
     uint16_t ix = MENU_X + (MENU_W - iw) / 2;
     uint16_t iy = y + (32 - ih) / 2;
-
-    /* ===== 大鱼身体 (朝向右侧) ===== */
-    /* 身体(椭圆状) */
-    LCD_Fill(ix + 6,  iy + 5,  ix + 18, iy + 15, MENU_TEXT_COLOR);   /* 身体中段 */
-    LCD_Fill(ix + 9,  iy + 3,  ix + 15, iy + 17, MENU_TEXT_COLOR);   /* 身体加高 */
-    /* 尾巴(左侧三角) */
-    LCD_Fill(ix + 2,  iy + 6,  ix + 6,  iy + 14, MENU_TEXT_COLOR);   /* 尾根部 */
-    LCD_Fill(ix + 1,  iy + 9,  ix + 2,  iy + 11, MENU_TEXT_COLOR);   /* 尾尖 */
-    /* 眼睛(左上, 用背景色点缀瞳孔) */
-    LCD_Fill(ix + 12, iy + 6,  ix + 13, iy + 7,  MENU_TEXT_COLOR);   /* 眼圈 */
-    LCD_Fill(ix + 12, iy + 6,  ix + 12, iy + 6,  MENU_BG_COLOR);     /* 瞳孔 */
-
-    /* ===== 鱼头(右侧) ===== */
-    /* 上颚 */
-    LCD_Fill(ix + 18, iy + 4,  ix + 26, iy + 8,  MENU_TEXT_COLOR);   /* 上颚 */
-    LCD_Fill(ix + 26, iy + 3,  ix + 28, iy + 7,  MENU_TEXT_COLOR);   /* 上唇尖 */
-    /* 下颚 */
-    LCD_Fill(ix + 18, iy + 12, ix + 24, iy + 16, MENU_TEXT_COLOR);   /* 下颚 */
-    LCD_Fill(ix + 24, iy + 13, ix + 26, iy + 15, MENU_TEXT_COLOR);   /* 下唇尖 */
-
-    /* ===== 张开的口 (用背景色挖出嘴部空隙) ===== */
-    LCD_Fill(ix + 18, iy + 8,  ix + 24, iy + 12, MENU_BG_COLOR);     /* 嘴内空隙 */
-
-    /* ===== 口中小鱼 (画在嘴空隙内) ===== */
-    LCD_Fill(ix + 19, iy + 9,  ix + 23, iy + 10, MENU_TEXT_COLOR);   /* 小鱼身 */
-    LCD_Fill(ix + 18, iy + 10, ix + 19, iy + 10, MENU_TEXT_COLOR);   /* 小鱼尾 */
-    LCD_Fill(ix + 22, iy + 8,  ix + 23, iy + 11, MENU_TEXT_COLOR);   /* 小鱼背鳍 */
+    sok_draw_char_24(ix, iy, font_yu, MENU_TEXT_COLOR);
 }
 
 /*********************************************************************
@@ -685,58 +660,20 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
                 } break;
 
                 case MENU_ROW_FISH: {
-                    /* 大鱼吃小鱼图标: 用行区间映射几何块 (iw=34, ih=20) */
-                    uint16_t iw = 34;
-                    uint16_t ih = 20;
+                    /* Chinese "yu" icon (24x24) via font_yu */
+                    uint16_t iw = 24;
+                    uint16_t ih = 24;
                     uint16_t ix = (uint16_t)(mw - iw) / 2;
                     uint16_t iy_off = (uint16_t)(32 - ih) / 2;
-                    /* 有效区域校验 */
                     if (cr < iy_off || cr >= iy_off + ih) break;
-                    uint16_t ry = cr - iy_off;   /* 图标内行 0..19 */
-                    /* 大鱼身体 (左侧椭圆) */
-                    if (ry >= 5 && ry <= 15) {
-                        for (x = ix+6; x < ix+18; x++)
-                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
-                    }
-                    if (ry >= 3 && ry <= 17) {
-                        for (x = ix+9; x < ix+15; x++)
-                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
-                    }
-                    /* 尾巴 (左侧三角) */
-                    if (ry >= 6 && ry <= 14) {
-                        for (x = ix+2; x < ix+6; x++)
-                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
-                    }
-                    if (ry >= 9 && ry <= 11) {
-                        for (x = ix+1; x < ix+2; x++)
-                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
-                    }
-                    /* 上颚 */
-                    if (ry >= 4 && ry <= 8) {
-                        for (x = ix+18; x < ix+26; x++)
-                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
-                    }
-                    if (ry >= 3 && ry <= 7) {
-                        for (x = ix+26; x < ix+28; x++)
-                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
-                    }
-                    /* 下颚 */
-                    if (ry >= 12 && ry <= 16) {
-                        for (x = ix+18; x < ix+24; x++)
-                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
-                    }
-                    if (ry >= 13 && ry <= 15) {
-                        for (x = ix+24; x < ix+26; x++)
-                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
-                    }
-                    /* 口中小鱼 (画出, 背景空隙已由未填充区域自然留下) */
-                    if (ry >= 9 && ry <= 10) {
-                        for (x = ix+19; x < ix+23; x++)
-                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
-                    }
-                    if (ry >= 8 && ry <= 11 && ry != 9 && ry != 10) {
-                        for (x = ix+22; x < ix+23; x++)
-                            { row[x*2]=TX_H; row[x*2+1]=TX_L; }
+                    uint16_t ry = cr - iy_off;
+                    uint16_t px;
+                    for (px = 0; px < 24; px++) {
+                        uint8_t bt = font_yu[(uint16_t)ry * 3 + (px >> 3)];
+                        if (bt & (0x80 >> (px & 7))) {
+                            uint16_t x = ix + px;
+                            row[x*2] = TX_H; row[x*2+1] = TX_L;
+                        }
                     }
                 } break;
 

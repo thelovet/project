@@ -32,4 +32,6 @@ extern const uint8_t font_mu[72];
 extern const uint8_t font_fan2[72];
 extern const uint8_t font_xiang2[72];
 
+extern const uint8_t font_yu[72];
+
 #endif
