@@ -21,7 +21,7 @@
 /* ================================================================
  *  游戏参数
  * ================================================================ */
-#define FISH_PLAYER_START_LEVEL  0   /* 玩家初始等级(第1条沙丁鱼) */
+#define FISH_PLAYER_START_LEVEL  0   /* 玩家物理初始等级0(第1条沙丁鱼); HUD显示为 等级+1 */
 #define FISH_PLAYER_LEVEL_MAX    8   /* 玩家最大等级(第9张玩家形象, PLAYER_COUNT-1) */
 #define FISH_PLAYER_X   (LCD_W / 2)
 #define FISH_PLAYER_Y   (LCD_H / 2)
@@ -35,11 +35,13 @@
 /* 顶部得分条区域(16x32数字从y=4到y=35), 实体不得越过, 避免游动时擦掉计分 */
 #define SCORE_TOP      4
 #define SCORE_H        32
-#define PLAY_TOP      (SCORE_TOP + SCORE_H)     /* 36: 游戏区顶部边界 */
+/* 顶部信息栏数字大小为8x14, 信息栏占 y4~31; PLAY_TOP=32 让鱼顶贴信息栏下缘 */
+#define PLAY_TOP       32   /* 游戏区顶部边界(信息栏底31, 留1px) */
 #define PLAY_Y_MIN    (PLAY_TOP + 20)           /* 最高实体半高(player=20), 防顶图越界 */
 #define PLAY_Y_MAX    (LCD_H - 21)              /* 高度最大41(半高20)时底边仍完整 */
 #define PLAY_X_MIN    26                        /* 宽度最大52(半宽26)时左右仍完整 */
 #define PLAY_X_MAX    (LCD_W - 26)
+#define PLAY_CORNER   30   /* 8角形倒角边长: 切掉矩形四角, 让鱼不进入圆形屏被遮挡的四角 */
 
 /* ================================================================
  *  游戏状态
@@ -58,8 +60,8 @@ typedef struct {
 static uint8_t   g_state = FISH_STATE_PLAYING;
 static FishEntity g_player;          /* 玩家大鱼 */
 static FishEntity g_food[FISH_NUM_FOOD];  /* 小鱼 */
-static uint16_t  g_score;            /* 得分 */
-static uint16_t  g_last_score;       /* 上一次已绘制的得分(变化才重绘计分) */
+static uint32_t  g_score;            /* 累积分(吃鱼得分 = 5^等级: 0级=1,1级=5,2级=25...) */
+static uint8_t   g_hud_dirty;        /* 顶部信息(分数/进度)需重绘 */
 static uint16_t  g_frame;            /* 帧计数器(用于动画/移动节拍) */
 static uint32_t  g_food_us;          /* 上次小鱼移动的时间戳(微秒, 真实时间节拍) */
 static uint8_t   g_full_redraw;      /* 全屏重绘脏标记 */
@@ -72,6 +74,10 @@ static int16_t   s_last_touch_y;
  * ================================================================ */
 #define COLOR_BG     0x14A6   /* 深海蓝背景 */
 #define COL_RED      0xF800   /* 结束提示-红 */
+/* 判断像素是否视为"透明": 接近白色(含纯白)也不显示, 避免边缘残留白边 */
+#define IS_TRANSPARENT(p)  (((((p) >> 11) & 0x1F) >= 0x1C) && \
+                            (((((p) >> 5) & 0x3F)) >= 0x38) && \
+                            (((p) & 0x1F) >= 0x1C))
 
 /* ================================================================
  *  内部工具: 随机数 (复用 game_rand)
@@ -80,6 +86,91 @@ static uint16_t fish_rand(uint16_t n)
 {
     if (n == 0) return 0;
     return (uint16_t)(game_rand() % n);
+}
+
+/* ================================================================
+ *  将鱼/玩家中心点钳制到"8角形"可游动区(矩形四角倒角, 贴合圆形屏).
+ *  倒角后中心点不再进入圆形屏被遮挡/裁切的四角。
+ *  @param px,py 指针: 入=当前位置, 出=钳制后位置
+ * ================================================================ */
+static void fish_clamp_pos(int16_t *px, int16_t *py)
+{
+    int16_t x = *px, y = *py;
+    /* 矩形钳位 */
+    if (x < PLAY_X_MIN) x = PLAY_X_MIN;
+    if (x > PLAY_X_MAX) x = PLAY_X_MAX;
+    if (y < PLAY_Y_MIN) y = PLAY_Y_MIN;
+    if (y > PLAY_Y_MAX) y = PLAY_Y_MAX;
+    /* 四角倒角: 角部(离两邻边都 < PLAY_CORNER)时, 把中心点推回45°斜边内 */
+    if (x < PLAY_X_MIN + PLAY_CORNER && y < PLAY_Y_MIN + PLAY_CORNER) {
+        if ((x - PLAY_X_MIN) + (y - PLAY_Y_MIN) < PLAY_CORNER)
+            x = PLAY_X_MIN + (int16_t)(PLAY_CORNER - (y - PLAY_Y_MIN));
+    }
+    if (x > PLAY_X_MAX - PLAY_CORNER && y < PLAY_Y_MIN + PLAY_CORNER) {
+        if ((PLAY_X_MAX - x) + (y - PLAY_Y_MIN) < PLAY_CORNER)
+            x = PLAY_X_MAX - (int16_t)(PLAY_CORNER - (y - PLAY_Y_MIN));
+    }
+    if (x < PLAY_X_MIN + PLAY_CORNER && y > PLAY_Y_MAX - PLAY_CORNER) {
+        if ((x - PLAY_X_MIN) + (PLAY_Y_MAX - y) < PLAY_CORNER)
+            x = PLAY_X_MIN + (int16_t)(PLAY_CORNER - (PLAY_Y_MAX - y));
+    }
+    if (x > PLAY_X_MAX - PLAY_CORNER && y > PLAY_Y_MAX - PLAY_CORNER) {
+        if ((PLAY_X_MAX - x) + (PLAY_Y_MAX - y) < PLAY_CORNER)
+            x = PLAY_X_MAX - (int16_t)(PLAY_CORNER - (PLAY_Y_MAX - y));
+    }
+    *px = x;
+    *py = y;
+}
+
+/* ================================================================
+ *  小鱼角落反弹: 在8角形的斜边处, 若速度仍朝外, 把速度反转向内
+ *  并贴回斜边, 避免鱼卡在角落要等随机变向才动。
+ * ================================================================ */
+static void fish_bounce_corners(FishEntity *f)
+{
+    int16_t X = (int16_t)f->x, Y = (int16_t)f->y;
+    int16_t dxl = X - PLAY_X_MIN, dxr = PLAY_X_MAX - X;
+    int16_t dyt = Y - PLAY_Y_MIN, dyb = PLAY_Y_MAX - Y;
+    if (dxl < PLAY_CORNER && dyt < PLAY_CORNER && f->vx <= 0 && f->vy <= 0) {
+        f->vx = (int16_t)-f->vx; f->vy = (int16_t)-f->vy;
+        X = PLAY_X_MIN + (int16_t)(PLAY_CORNER - dyt);
+    } else if (dxr < PLAY_CORNER && dyt < PLAY_CORNER && f->vx >= 0 && f->vy <= 0) {
+        f->vx = (int16_t)-f->vx; f->vy = (int16_t)-f->vy;
+        X = PLAY_X_MAX - (int16_t)(PLAY_CORNER - dyt);
+    } else if (dxl < PLAY_CORNER && dyb < PLAY_CORNER && f->vx <= 0 && f->vy >= 0) {
+        f->vx = (int16_t)-f->vx; f->vy = (int16_t)-f->vy;
+        X = PLAY_X_MIN + (int16_t)(PLAY_CORNER - dyb);
+    } else if (dxr < PLAY_CORNER && dyb < PLAY_CORNER && f->vx >= 0 && f->vy >= 0) {
+        f->vx = (int16_t)-f->vx; f->vy = (int16_t)-f->vy;
+        X = PLAY_X_MAX - (int16_t)(PLAY_CORNER - dyb);
+    }
+    f->x = (uint16_t)X;
+    f->y = (uint16_t)Y;
+}
+
+/* ================================================================
+ *  升级/得分阈值: 返回 5^lv (0级=1, 1级=5, 2级=25...). lv<=9 安全(uint32)
+ * ================================================================ */
+static uint32_t fish_thresh(uint8_t lv)
+{
+    uint32_t v = 1;
+    uint8_t i;
+    for (i = 0; i < lv; i++) v *= 5;
+    return v;
+}
+
+/* ================================================================
+ *  把 uint32 分数转成各位数字; 返回位数, digits[0]=个位 ... digits[n-1]=最高位
+ * ================================================================ */
+static uint8_t fish_score_digits(uint32_t v, uint8_t *digits)
+{
+    uint8_t n = 0;
+    do {
+        if (n >= 8) break;
+        digits[n++] = (uint8_t)(v % 10);
+        v /= 10;
+    } while (v > 0);
+    return n;
 }
 
 /* 前向声明: clear_entity_rect 内部需重绘相交实体 */
@@ -167,12 +258,12 @@ static void draw_image_sprite(FlashStoreId id_base, const uint16_t dims[][2],
         if (sy < 0 || sy >= 240) continue;
         c = 0;
         while (c < w) {
-            /* 跳过白色背景(透明) */
-            while (c < w && px[r * w + c] == 0xFFFF) c++;
+            /* 跳过接近白色背景(透明) */
+            while (c < w && IS_TRANSPARENT(px[r * w + c])) c++;
             if (c >= w) break;
             uint16_t start = c;
-            /* 收集连续非白色段 */
-            while (c < w && px[r * w + c] != 0xFFFF) c++;
+            /* 收集连续非透明(非白)段 */
+            while (c < w && !IS_TRANSPARENT(px[r * w + c])) c++;
             /* 段 [start, c), 屏幕X裁剪 */
             int16_t sx0 = x0 + (int16_t)start;
             int16_t sx1 = x0 + (int16_t)c - 1;
@@ -191,6 +282,95 @@ static void draw_image_sprite(FlashStoreId id_base, const uint16_t dims[][2],
 }
 
 /* ================================================================
+ *  小鱼移动的行级原子重绘: 对"旧∪新"区域逐行 "先写该行背景、再写该行新鱼像素",
+ *  避免整块背景填充造成的瞬间闪烁; 之后重绘区域内其它相交实体(防误伤)。
+ * ================================================================ */
+static void fish_move_redraw(const FishEntity *f)
+{
+    uint16_t w = fish_imgs_dim[f->level][0];
+    uint16_t h = fish_imgs_dim[f->level][1];
+    uint16_t ow = fish_imgs_dim[f->prev_level][0];
+    uint16_t oh = fish_imgs_dim[f->prev_level][1];
+    int16_t nx0 = (int16_t)f->x - (int16_t)(w / 2);
+    int16_t ny0 = (int16_t)f->y - (int16_t)(h / 2);
+    int16_t nx1 = nx0 + (int16_t)w - 1;
+    int16_t ny1 = ny0 + (int16_t)h - 1;
+    int16_t ox0 = (int16_t)f->prev_x - (int16_t)(ow / 2);
+    int16_t oy0 = (int16_t)f->prev_y - (int16_t)(oh / 2);
+    int16_t ox1 = ox0 + (int16_t)ow - 1;
+    int16_t oy1 = oy0 + (int16_t)oh - 1;
+    int16_t rx0 = (nx0 < ox0) ? nx0 : ox0;
+    int16_t ry0 = (ny0 < oy0) ? ny0 : oy0;
+    int16_t rx1 = (nx1 > ox1) ? nx1 : ox1;
+    int16_t ry1 = (ny1 > oy1) ? ny1 : oy1;
+    if (rx0 < 0) rx0 = 0;
+    if (ry0 < PLAY_TOP) ry0 = PLAY_TOP;
+    if (rx1 > 239) rx1 = 239;
+    if (ry1 > 239) ry1 = 239;
+    if (rx1 < rx0 || ry1 < ry0) return;
+
+    const uint8_t *img = FlashStore_ResLoad((FlashStoreId)(FLASH_STORE_ID_FISH_0 + f->level),
+                                            0, (uint16_t)(w * h * 2));
+    if (!img) return;
+    const uint16_t *px = (const uint16_t *)img;
+
+    LCD_CS_CLR;
+    for (int16_t y = ry0; y <= ry1; y++) {
+        /* 该行先写背景(不跨越行, 撕裂窗口收缩到单行, 减闪) */
+        LCD_Address_Set((uint16_t)rx0, (uint16_t)y, (uint16_t)rx1, (uint16_t)y);
+        for (int16_t x = rx0; x <= rx1; x++) LCD_WR_DATA_16Bit(COLOR_BG);
+        /* 该行新鱼的非白段(覆盖背景) */
+        int16_t fy = y - ny0;
+        if (fy >= 0 && fy < (int16_t)h) {
+            int16_t c = 0;
+            while (c < (int16_t)w) {
+                    while (c < (int16_t)w && IS_TRANSPARENT(px[fy * w + c])) c++;
+                    if (c >= (int16_t)w) break;
+                    int16_t start = c;
+                    while (c < (int16_t)w && !IS_TRANSPARENT(px[fy * w + c])) c++;
+                int16_t sx0 = nx0 + start;
+                int16_t sx1 = nx0 + (int16_t)c - 1;
+                if (sx1 < rx0 || sx0 > rx1) continue;
+                if (sx0 < rx0) sx0 = rx0;
+                if (sx1 > rx1) sx1 = rx1;
+                if (sx1 < sx0) continue;
+                LCD_Address_Set((uint16_t)sx0, (uint16_t)y, (uint16_t)sx1, (uint16_t)y);
+                for (uint16_t i = (uint16_t)(sx0 - nx0); i <= (uint16_t)(sx1 - nx0); i++)
+                    LCD_WR_DATA_16Bit(px[fy * w + i]);
+            }
+        }
+    }
+    LCD_CS_SET;
+
+    /* 重绘与区域相交的其它实体(当前坐标), 避免行背景误伤它们 */
+    {
+        uint16_t pw = player_imgs_dim[g_player.level][0];
+        uint16_t ph = player_imgs_dim[g_player.level][1];
+        int16_t px0 = (int16_t)g_player.x - (int16_t)(pw / 2);
+        int16_t py0 = (int16_t)g_player.y - (int16_t)(ph / 2);
+        int16_t px1 = px0 + (int16_t)pw - 1;
+        int16_t py1 = py0 + (int16_t)ph - 1;
+        if (px1 >= rx0 && px0 <= rx1 && py1 >= ry0 && py0 <= ry1)
+            draw_image_sprite(FLASH_STORE_ID_PLAYER_0, player_imgs_dim,
+                              PLAYER_COUNT, g_player.level, g_player.x, g_player.y);
+        uint8_t i;
+        for (i = 0; i < FISH_NUM_FOOD; i++) {
+            const FishEntity *of = &g_food[i];
+            if (of == f || !of->active) continue;
+            uint16_t fw = fish_imgs_dim[of->level][0];
+            uint16_t fh = fish_imgs_dim[of->level][1];
+            int16_t fx0 = (int16_t)of->x - (int16_t)(fw / 2);
+            int16_t fy0 = (int16_t)of->y - (int16_t)(fh / 2);
+            int16_t fx1 = fx0 + (int16_t)fw - 1;
+            int16_t fy1 = fy0 + (int16_t)fh - 1;
+            if (fx1 >= rx0 && fx0 <= rx1 && fy1 >= ry0 && fy0 <= ry1)
+                draw_image_sprite(FLASH_STORE_ID_FISH_0, fish_imgs_dim,
+                                  FISH_COUNT, of->level, of->x, of->y);
+        }
+    }
+}
+
+/* ================================================================
  *  清屏背景
  * ================================================================ */
 static void draw_background(void)
@@ -199,26 +379,55 @@ static void draw_background(void)
 }
 
 /* ================================================================
- *  绘制得分 (右上角, 16x32数字)
+ *  绘制顶部信息栏: 左=当前分数, 右=升级进度条(10格, 按分数在当前级的占比)
  * ================================================================ */
-static void draw_score(void)
+static void draw_hud(void)
 {
-    if (g_score == g_last_score) return;   /* 得分未变则不重绘(避免计分闪烁) */
-    /* 清空顶部计分条区域 */
+    if (!g_hud_dirty) return;
+    g_hud_dirty = 0;
+    /* 清空顶部信息区 */
     LCD_Fill(0, SCORE_TOP, LCD_W, PLAY_TOP, COLOR_BG);
-    uint8_t digits[8];
-    uint8_t dc = uint_to_digits(g_score, digits);
-    uint16_t total_w = dc * 16;
-    uint16_t start_x = (240 - total_w) / 2;
-    uint16_t y = SCORE_TOP;
-    LCD_CS_CLR;
-    uint8_t i;
-    for (i = 0; i < dc; i++) {
-        uint8_t d = digits[dc - 1 - i];
-        sok_draw_digit_16x32(start_x + i * 16, y, d, LCD_WHITE);
+    {
+        uint8_t digits[8];
+        uint8_t dc = fish_score_digits(g_score, digits);   /* 低位在前 */
+        uint16_t score_w = (uint16_t)dc * 8;
+        uint16_t prog_w = 10 * 4 + 9 * 1;         /* 进度条总宽49 */
+        uint16_t pl_total = prog_w + 2 + 7;       /* 进度+间隔+等级 */
+        LCD_CS_CLR;
+        /* 行1: 当前分数(居中, 黄色 7x11) */
+        {
+            uint16_t sx = (240 - score_w) / 2;
+            uint8_t i;
+            for (i = 0; i < dc; i++) {
+                uint8_t d = digits[dc - 1 - i];
+                sok_draw_digit_scaled(sx + i * 8, 4, d, LCD_YELLOW, 8, 14);
+            }
+        }
+        /* 行2: 升级进度条 + 当前等级(居中, 等级紧贴进度条右侧) */
+        {
+            uint16_t px = (240 - pl_total) / 2;
+            uint16_t py = 18;
+            uint8_t j;
+            uint32_t lo = (g_player.level > 0) ? fish_thresh(g_player.level) : 0;
+            uint32_t hi = fish_thresh((uint8_t)(g_player.level + 1));
+            uint32_t seg = hi - lo;
+            uint8_t fill = 0;
+            if (seg > 0) {
+                uint32_t cur = (g_score >= lo) ? (g_score - lo) : 0;
+                fill = (uint8_t)((cur * 10) / seg);
+                if (fill > 10) fill = 10;
+            }
+            for (j = 0; j < 10; j++) {
+                uint16_t col = (j < fill) ? 0xFFE0 : 0x1E69;
+                LCD_Fill(px, py, (uint16_t)(px + 4), (uint16_t)(py + 13), col);
+                px += 4 + 1;
+            }
+            px += 2;
+            LCD_CS_CLR;   /* 进度条 LCD_Fill 内部会切 CS, 画等级前须重新拉低片选, 否则写不进 */
+            sok_draw_digit_scaled(px, py, (uint8_t)(g_player.level + 1), LCD_WHITE, 8, 14);
+        }
+        LCD_CS_SET;
     }
-    LCD_CS_SET;
-    g_last_score = g_score;
 }
 
 /* ================================================================
@@ -249,7 +458,8 @@ static void draw_game_over(void)
         sok_draw_char_24(x + 72, y, FlashStore_ResLoad(FLASH_STORE_ID_24_SHI3,  0, 72), LCD_WHITE);
         LCD_CS_SET;
     }
-    draw_score();
+    g_hud_dirty = 1;
+    draw_hud();
 }
 
 /* ================================================================
@@ -259,18 +469,30 @@ static void food_respawn(FishEntity *e, uint8_t avoid_player)
 {
     uint8_t was_drawn = e->drawn;
     e->active = 1;
-    /* 自适应难度: 小鱼等级在玩家 ±FISH_FOOD_RANGE 内随机, 并钳位到 [0,9] */
-    {
-        int16_t pl = (int16_t)g_player.level;
-        int16_t lo = pl - FISH_FOOD_RANGE;
-        int16_t hi = pl + FISH_FOOD_RANGE;
-        if (lo < 0) lo = 0;
+    /* 大多小鱼 <=玩家级别(可吃, 供成长), 少数更大(挑战); 避免开局无鱼可吃 */
+    if (fish_rand(4) != 0) {
+        /* 75%: 等级 0..玩家级别 (含同级, 可吃) */
+        e->level = (uint8_t)fish_rand((uint16_t)(g_player.level + 1));
+    } else {
+        /* 25%: 玩家级别+1 .. +2 (更大, 碰撞失败) */
+        int16_t lo = (int16_t)g_player.level + 1;
+        int16_t hi = (int16_t)g_player.level + 2;
         if (hi > 9) hi = 9;
-        uint8_t span = (uint8_t)(hi - lo + 1);
-        e->level = (uint8_t)(lo + (int16_t)fish_rand(span));
+        if (lo > 9) lo = 9;
+        if (hi < lo) hi = lo;
+        e->level = (uint8_t)(lo + (int16_t)fish_rand((uint16_t)(hi - lo + 1)));
     }
+    if (e->level > 9) e->level = 9;
     e->x = (uint16_t)(PLAY_X_MIN + fish_rand(PLAY_X_MAX - PLAY_X_MIN + 1));
     e->y = (uint16_t)(PLAY_Y_MIN + fish_rand(PLAY_Y_MAX - PLAY_Y_MIN + 1));
+    /* 生成点也限制在8角形内(不进圆形屏四角) */
+    {
+        int16_t cx = (int16_t)e->x;
+        int16_t cy = (int16_t)e->y;
+        fish_clamp_pos(&cx, &cy);
+        e->x = (uint16_t)cx;
+        e->y = (uint16_t)cy;
+    }
     e->dir = (uint8_t)fish_rand(8);
     e->vx = (int16_t)fish_rand(FISH_SPEED_BASE * 2 + 1) - FISH_SPEED_BASE;
     e->vy = (int16_t)fish_rand(FISH_SPEED_BASE * 2 + 1) - FISH_SPEED_BASE;
@@ -293,7 +515,7 @@ void fish_init(void)
     uint8_t i;
     g_state = FISH_STATE_PLAYING;
     g_score = 0;
-    g_last_score = 0xFFFF;   /* 强制首帧重绘计分 */
+    g_hud_dirty = 1;   /* 首帧重绘顶部信息 */
     g_frame = 0;
     g_food_us = GetTimerCount();   /* 小鱼时间节拍基准 */
     g_full_redraw = 1;
@@ -352,11 +574,14 @@ uint8_t fish_update(void)
             s_last_touch_x = (int16_t)ts.x;
             s_last_touch_y = (int16_t)ts.y;
         }
-        /* 限制在游戏区内(不越入顶部计分条) */
-        if (g_player.x < PLAY_X_MIN) g_player.x = PLAY_X_MIN;
-        if (g_player.x > PLAY_X_MAX) g_player.x = PLAY_X_MAX;
-        if (g_player.y < PLAY_Y_MIN) g_player.y = PLAY_Y_MIN;
-        if (g_player.y > PLAY_Y_MAX) g_player.y = PLAY_Y_MAX;
+        /* 限制在8角形游动区(矩形+四角倒角, 不进圆形屏被遮挡的四角) */
+        {
+            int16_t px = (int16_t)g_player.x;
+            int16_t py = (int16_t)g_player.y;
+            fish_clamp_pos(&px, &py);
+            g_player.x = (uint16_t)px;
+            g_player.y = (uint16_t)py;
+        }
     }
 
     /* 小鱼随机游动 (基于真实时间节拍, 与帧率无关, 防未按下时主循环空转导致狂飙) */
@@ -374,6 +599,16 @@ uint8_t fish_update(void)
                 if (f->x > PLAY_X_MAX) { f->x = PLAY_X_MAX; f->vx = (int16_t)-f->vx; }
                 if (f->y < PLAY_Y_MIN) { f->y = PLAY_Y_MIN; f->vy = (int16_t)-f->vy; }
                 if (f->y > PLAY_Y_MAX) { f->y = PLAY_Y_MAX; f->vy = (int16_t)-f->vy; }
+                /* 8角形钳制: 不进圆形屏被遮挡的四角 */
+                {
+                    int16_t fx = (int16_t)f->x;
+                    int16_t fy = (int16_t)f->y;
+                    fish_clamp_pos(&fx, &fy);
+                    f->x = (uint16_t)fx;
+                    f->y = (uint16_t)fy;
+                }
+                /* 角落反弹: 速度朝外时反转向内, 防卡角 */
+                fish_bounce_corners(f);
                 /* 偶尔改变方向 */
                 if (fish_rand(64) == 0) {
                     f->vx = (int16_t)fish_rand(FISH_SPEED_BASE*2+1) - FISH_SPEED_BASE;
@@ -398,10 +633,13 @@ uint8_t fish_update(void)
             uint16_t pr = (uint16_t)(8 + g_player.level * 4);
             if (ddx < (int16_t)pr && ddy < (int16_t)pr) {
                 if (FISH_INVINCIBLE || f->level <= g_player.level) {
-                    /* 吃掉(无敌模式下碰到任何大小都吃): 长大+得分, 小鱼重生 */
-                    g_score += (uint16_t)(f->level + 1) * 10;
-                    if (g_player.level < FISH_PLAYER_LEVEL_MAX)
-                        g_player.level++;
+                    /* 吃掉: 按等级得分(5^等级:0级=1,1级=5...), 累计分达阈值即升一级 */
+                    g_score += fish_thresh(f->level);
+                    g_hud_dirty = 1;   /* 顶部分数/进度需刷新 */
+                    while (g_player.level < FISH_PLAYER_LEVEL_MAX &&
+                           g_score >= fish_thresh((uint8_t)(g_player.level + 1))) {
+                        g_player.level++;   /* 累计分达到下一级阈值, 升一级 */
+                    }
                     food_respawn(f, 1);
                 } else {
                     /* 碰到更大的鱼: 游戏结束 */
@@ -453,10 +691,10 @@ uint8_t fish_update(void)
                              f->level != f->prev_level);
             if (!f->drawn || moved) {
                 if (f->drawn && moved)
-                    clear_entity_rect(fish_imgs_dim, f->prev_level,
-                                      f->prev_x, f->prev_y);
-                draw_image_sprite(FLASH_STORE_ID_FISH_0, fish_imgs_dim,
-                                  FISH_COUNT, f->level, f->x, f->y);
+                    fish_move_redraw(f);   /* 行级原子重绘(鱼移动), 减闪 */
+                else
+                    draw_image_sprite(FLASH_STORE_ID_FISH_0, fish_imgs_dim,
+                                      FISH_COUNT, f->level, f->x, f->y);
                 f->prev_x = (int16_t)f->x;
                 f->prev_y = (int16_t)f->y;
                 f->prev_level = f->level;
@@ -465,8 +703,8 @@ uint8_t fish_update(void)
         }
     }
 
-    /* 得分显示 */
-    draw_score();
+    /* 顶部信息 */
+    draw_hud();
 
     return GAME_RET_NONE;
 }
