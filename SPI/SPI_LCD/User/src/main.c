@@ -1033,14 +1033,21 @@ static void GameSettings_Update(void)
             IWDG_ReloadCounter();
             Settings_Update();
         } else {
-            LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
-            if (s_main_mode == MAIN_MODE_D2048)
-                d2048_full_redraw();
-            else if (s_main_mode == MAIN_MODE_TETRIS)
-                tetris_full_redraw();
-            else
-                klotski_full_redraw();
             g_settings_from_game = 0;
+            /* Level-2 settings-options menu back-to-game: clear ONLY the menu
+               strip area with the game's background color, then repaint the
+               scene in the same frame. The menu is a bottom overlay (like the
+               level-1 menu) so the scene behind it is still alive ¡ª no need to
+               blacken the whole screen (which caused a one-frame black flash).
+               The back button is released here (ts.pressed==0), so update() is
+               a safe no-op gesture-wise. */
+            LCD_Fill_DMA(VIDEO_MENU_X, VIDEO_MENU_Y,
+                         VIDEO_MENU_X + VIDEO_MENU_W, 240, g_menu_clear_color);
+            if (s_main_mode == MAIN_MODE_SOKOBAN) { sokoban_full_redraw(); sokoban_update(); }
+            else if (s_main_mode == MAIN_MODE_D2048) { d2048_full_redraw(); d2048_update(); }
+            else if (s_main_mode == MAIN_MODE_TETRIS) { tetris_full_redraw(); tetris_update(); }
+            else if (s_main_mode == MAIN_MODE_FISH) { fish_full_redraw(); fish_update(); }
+            else if (s_main_mode == MAIN_MODE_KLOTSKI) { klotski_full_redraw(); klotski_update(); }
         }
     }
 }

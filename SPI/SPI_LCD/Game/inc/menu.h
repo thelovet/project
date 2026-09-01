@@ -50,11 +50,11 @@ void game_battery_set_charge_flash(uint8_t enable);
 #define RESTART_MENU_DRAG_MAX_STEP 3   /* 上划拖拽每帧最大位移 (与视频菜单一致) */
 #define RESTART_MENU_RELEASE_GAP 36    /* 松手后最小上划距离 */
 
-/* 菜单区域快捷清屏 (清除色可被游戏设为背景色, 避免切菜单黑闪) */
+/* 菜单区域快捷清屏 (DMA 低阻塞, 清除色可被游戏设为背景色, 避免切菜单黑闪) */
 #define LCD_CLEAR_MENU_AREA() \
-    LCD_Fill(MENU_X, 0, MENU_X + MENU_W, MENU_Y + MENU_H, g_menu_clear_color)
+    LCD_Fill_DMA(MENU_X, 0, MENU_X + MENU_W, MENU_Y + MENU_H, g_menu_clear_color)
 #define LCD_CLEAR_RESTART_AREA() \
-    LCD_Fill(RESTART_MENU_X, g_restart_slide_y, \
+    LCD_Fill_DMA(RESTART_MENU_X, g_restart_slide_y, \
              RESTART_MENU_X + RESTART_MENU_W, 240, g_menu_clear_color)
 #define RESTART_MENU_ROW0_Y (RESTART_MENU_Y + RESTART_MENU_BDR + RESTART_MENU_GAP)       /* 第1行Y ("重新开始") */
 #define RESTART_MENU_ROW1_Y (RESTART_MENU_ROW0_Y + 32 + RESTART_MENU_GAP)                /* 第2行Y ("设置") */

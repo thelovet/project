@@ -120,6 +120,7 @@ void LCD_WR_DATA_16Bit(uint16_t dat);
 void LCD_WR_REG(uint8_t data);
 
 void LCD_Fill(uint16_t xsta, uint16_t ysta, uint16_t xend, uint16_t yend, uint16_t color);//填充区域
+void LCD_Fill_DMA(uint16_t xsta, uint16_t ysta, uint16_t xend, uint16_t yend, uint16_t color);//DMA填充区域(同步, 等发送完)
 void LCD_DMA_Write_Buffer(uint16_t color, uint32_t total_size);//DMA写入缓冲区
 void LCD_Address_Set(uint16_t x, uint16_t y, uint16_t xEnd, uint16_t yEnd);//设置坐标
 void LCD_drawImageWithSize_DMA(uint16_t count, uint8_t pre_count);//DMA绘制图片
