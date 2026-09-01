@@ -684,6 +684,7 @@ uint8_t fish_update(void)
                                                             &g_restart_dragging, &ts);
             if (poll_ret == 1) {
                 g_restart_sliding = 1;
+                g_touch_down = 0;   /* 松手复位触摸, 保证随后下滑打断能被识别 */
                 g_prev_pressed = 0;
             } else if (poll_ret == 2) {
                 goto restart_menu_close;
@@ -754,6 +755,9 @@ uint8_t fish_update(void)
         }
         restart_menu_to_exit:
         game_menu_restart_to_exit((uint8_t *)&g_state, FISH_STATE_EXIT_MENU, ts.y);
+        g_exit_dragging = 0;   /* 打断后退出菜单直接滑入, 避免跟手拖拽需长划才弹出 */
+        g_exit_sliding = 1;
+        g_exit_drag_y = -MENU_H;
         fish_restore_scene_behind();
         return 0;
         restart_menu_close:
