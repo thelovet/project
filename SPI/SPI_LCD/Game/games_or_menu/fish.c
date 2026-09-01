@@ -459,17 +459,6 @@ static void draw_game_over(void)
         sok_draw_char_32(x + 96, y, FlashStore_ResLoad(FLASH_STORE_ID_32_SHU, 0, 128), LCD_RED);
         LCD_CS_SET;
     }
-    /* "重新开始" 24x24 四字提示, 居左下排 */
-    {
-        uint16_t x = (240 - 4 * 24) / 2;
-        uint16_t y = (240 - 32) / 2 + 22;
-        LCD_CS_CLR;
-        sok_draw_char_24(x,      y, FlashStore_ResLoad(FLASH_STORE_ID_24_CHONG, 0, 72), LCD_WHITE);
-        sok_draw_char_24(x + 24, y, FlashStore_ResLoad(FLASH_STORE_ID_24_XIN,   0, 72), LCD_WHITE);
-        sok_draw_char_24(x + 48, y, FlashStore_ResLoad(FLASH_STORE_ID_24_KAI,   0, 72), LCD_WHITE);
-        sok_draw_char_24(x + 72, y, FlashStore_ResLoad(FLASH_STORE_ID_24_SHI3,  0, 72), LCD_WHITE);
-        LCD_CS_SET;
-    }
     g_hud_dirty = 1;
     draw_hud();
 }
