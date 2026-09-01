@@ -40,6 +40,9 @@ static const uint8_t fish_row_types[6] = {
 #define FISH_NUM_FOOD   6      /* 场上小鱼数量 */
 #define FISH_SPEED_BASE 2      /* 小鱼基础移动速度(降慢, 便于捕捉) */
 #define FISH_MOVE_US    40000 /* 小鱼每40ms移动一次(基于真实时间, 更连续) */
+#define FISH_LIFE_TICKS     150   /* 可吃小鱼(<=玩家级)最长停留圈数, 40ms/圈≈6s */
+#define FISH_LIFE_BIG_TICKS  60    /* 比玩家大的鱼更快离开(≈2.4s), 避免场上全是吃不到的大鱼 */
+#define FISH_LEAVE_SPEED     2      /* 游出屏幕速度(px/40ms), 与普通小鱼一致保持自然移动 */
 #define FISH_FOOD_RANGE 3      /* 自适应难度: 小鱼等级在玩家左右 ±3 内 */
 #define FISH_INVINCIBLE 0      /* 无敌模式(1=碰到大鱼也不死, 直接吃掉; 0=正常玩法, 碰大鱼即失败) */
 
@@ -65,6 +68,9 @@ typedef struct {
     int16_t vx, vy;      /* 速度分量 */
     int16_t prev_x, prev_y;  /* 上一帧位置(增量擦除用) */
     uint8_t prev_level;  /* 上一帧等级(尺寸变化后擦除旧图用) */
+    uint16_t life;
+    uint8_t leaving;
+    uint8_t entering;  /* 从边缘入场中标志 */  /* 走出屏幕中标志 */
     uint8_t drawn;       /* 该实体已绘制过(用于只画变化) */
 } FishEntity;
 
@@ -484,20 +490,50 @@ static void food_respawn(FishEntity *e, uint8_t avoid_player)
         e->level = (uint8_t)(lo + (int16_t)fish_rand((uint16_t)(hi - lo + 1)));
     }
     if (e->level > 9) e->level = 9;
-    e->x = (uint16_t)(PLAY_X_MIN + fish_rand(PLAY_X_MAX - PLAY_X_MIN + 1));
-    e->y = (uint16_t)(PLAY_Y_MIN + fish_rand(PLAY_Y_MAX - PLAY_Y_MIN + 1));
-    /* 生成点也限制在8角形内(不进圆形屏四角) */
+    /* 从随机屏幕边缘外入场(下/左/右), 若与已有鱼出现位置重叠则沿边偏移错开 */
     {
-        int16_t cx = (int16_t)e->x;
-        int16_t cy = (int16_t)e->y;
-        fish_clamp_pos(&cx, &cy);
-        e->x = (uint16_t)cx;
-        e->y = (uint16_t)cy;
+        uint8_t edge = (uint8_t)fish_rand(3);
+        if (edge == 0) {          /* 下边(往上游入) */
+            e->x = (uint16_t)(60 + fish_rand(120));
+            e->y = (uint16_t)(LCD_H + 20);
+            e->vx = 0; e->vy = -(int16_t)FISH_SPEED_BASE;
+        } else if (edge == 1) {   /* 左边(往右游入) */
+            e->x = (uint16_t)(-20);
+            e->y = (uint16_t)(85 + fish_rand(100));
+            e->vx = (int16_t)FISH_SPEED_BASE; e->vy = 0;
+        } else {                  /* 右边(往左游入) */
+            e->x = (uint16_t)(LCD_W + 20);
+            e->y = (uint16_t)(85 + fish_rand(100));
+            e->vx = -(int16_t)FISH_SPEED_BASE; e->vy = 0;
+        }
+        /* 出现位置与其他鱼重叠时, 沿边平移错开 */
+        {
+            uint8_t tries;
+            for (tries = 0; tries < 8; tries++) {
+                int16_t overlap = 0;
+                uint8_t i2;
+                for (i2 = 0; i2 < FISH_NUM_FOOD; i2++) {
+                    FishEntity *o = &g_food[i2];
+                    if (o == e || !o->active) continue;
+                    uint16_t ow = fish_imgs_dim[o->level][0];
+                    uint16_t oh = fish_imgs_dim[o->level][1];
+                    uint16_t ew = fish_imgs_dim[e->level][0];
+                    uint16_t eh = fish_imgs_dim[e->level][1];
+                    int16_t adx = (int16_t)o->x - (int16_t)e->x;
+                    int16_t ady = (int16_t)o->y - (int16_t)e->y;
+                    if (adx < 0) adx = (int16_t)-adx;
+                    if (ady < 0) ady = (int16_t)-ady;
+                    if (adx < (int16_t)((ow + ew) / 2) &&
+                        ady < (int16_t)((oh + eh) / 2)) { overlap = 1; break; }
+                }
+                if (!overlap) break;
+                if (edge == 0) e->x = (uint16_t)((int16_t)e->x + 12);
+                else           e->y = (uint16_t)((int16_t)e->y + 12);
+            }
+        }
+        e->entering = 1;
     }
     e->dir = (uint8_t)fish_rand(8);
-    e->vx = (int16_t)fish_rand(FISH_SPEED_BASE * 2 + 1) - FISH_SPEED_BASE;
-    e->vy = (int16_t)fish_rand(FISH_SPEED_BASE * 2 + 1) - FISH_SPEED_BASE;
-    if (e->vx == 0 && e->vy == 0) e->vx = 1;   /* 保证至少一个方向有速度, 避免停死 */
     /* 先换好新位置再擦旧图: clear 用 prev(旧) 算旧矩形, 重绘相交实体用当前(已更新)坐标, 不会把旧位置又画回 */
     if (was_drawn)
         clear_entity_rect(fish_imgs_dim, e->prev_level, e->prev_x, e->prev_y);
@@ -505,6 +541,8 @@ static void food_respawn(FishEntity *e, uint8_t avoid_player)
     e->prev_y = (int16_t)e->y;
     e->prev_level = e->level;
     e->drawn = 0;
+    e->life = 0;
+    e->leaving = 0;
     (void)avoid_player;
 }
 
@@ -899,6 +937,34 @@ uint8_t fish_update(void)
             for (i = 0; i < FISH_NUM_FOOD; i++) {
                 FishEntity *f = &g_food[i];
                 if (!f->active) continue;
+                /* 走出屏幕中: 直冲出屏, 完全出屏后换新鱼 */
+                if (f->leaving) {
+                    f->x = (uint16_t)((int16_t)f->x + f->vx);
+                    f->y = (uint16_t)((int16_t)f->y + f->vy);
+                    {
+                        uint16_t w = fish_imgs_dim[f->level][0];
+                        uint16_t h = fish_imgs_dim[f->level][1];
+                        if ((int16_t)f->x + (int16_t)(w / 2) < 0 ||
+                            (int16_t)f->x - (int16_t)(w / 2) > (int16_t)LCD_W ||
+                            (int16_t)f->y + (int16_t)(h / 2) < 0 ||
+                            (int16_t)f->y - (int16_t)(h / 2) > (int16_t)LCD_H) {
+                            food_respawn(f, 1);
+                        }
+                    }
+                    continue;
+                }
+
+                /* 从屏幕边缘游入: 不钳制, 游进可游动区后转为常规移动 */
+                if (f->entering) {
+                    f->x = (uint16_t)((int16_t)f->x + f->vx);
+                    f->y = (uint16_t)((int16_t)f->y + f->vy);
+                    if ((int16_t)f->x >= (int16_t)PLAY_X_MIN && (int16_t)f->x <= (int16_t)PLAY_X_MAX &&
+                        (int16_t)f->y >= (int16_t)PLAY_Y_MIN && (int16_t)f->y <= (int16_t)PLAY_Y_MAX) {
+                        f->entering = 0;
+                    }
+                    continue;
+                }
+
                 f->x = (uint16_t)((int16_t)f->x + f->vx);
                 f->y = (uint16_t)((int16_t)f->y + f->vy);
                 if (f->x < PLAY_X_MIN) { f->x = PLAY_X_MIN; f->vx = (int16_t)-f->vx; }
@@ -920,6 +986,19 @@ uint8_t fish_update(void)
                     f->vx = (int16_t)fish_rand(FISH_SPEED_BASE*2+1) - FISH_SPEED_BASE;
                     f->vy = (int16_t)fish_rand(FISH_SPEED_BASE*2+1) - FISH_SPEED_BASE;
                     if (f->vx == 0 && f->vy == 0) f->vx = 1;   /* 避免停死 */
+                }
+                /* 寿命到期: 朝最近边缘游出屏幕(不原地消失) */
+                f->life++;
+                if (f->life >= ((f->level <= g_player.level) ? FISH_LIFE_TICKS : FISH_LIFE_BIG_TICKS)) {
+                    f->leaving = 1;
+                    int16_t dl = (int16_t)f->x;
+                    int16_t dr = (int16_t)LCD_W - (int16_t)f->x;
+                    int16_t dt = (int16_t)f->y;
+                    int16_t db = (int16_t)LCD_H - (int16_t)f->y;
+                    if (dl < dr && dl < dt && dl < db) { f->vx = -FISH_LEAVE_SPEED; f->vy = 0; }
+                    else if (dr < dt && dr < db)       { f->vx = FISH_LEAVE_SPEED;  f->vy = 0; }
+                    else if (dt < db)                  { f->vx = 0;                 f->vy = -FISH_LEAVE_SPEED; }
+                    else                               { f->vx = 0;                 f->vy = FISH_LEAVE_SPEED; }
                 }
             }
         }
