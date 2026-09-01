@@ -27,6 +27,7 @@ uint8_t  g_restart_menu_visible = 0;   /* 重新开始菜单可见 */
 uint8_t  g_restart_sliding = 0;        /* 重新开始菜单滑动中 */
 uint8_t  g_restart_dragging = 0;       /* 重新开始菜单拖拽中 */
 int16_t  g_restart_slide_y = 240;      /* 重新开始菜单滑动Y位置 */
+uint16_t g_menu_clear_color = LCD_BLACK;  /* 菜单/重开区域清除色(游戏可设为背景色) */
 uint8_t  g_settings_from_game = MAIN_MODE_VIDEO;  /* 从游戏进入设置的来源模式 */
 uint8_t  g_game_enter_exit_menu = 0;  /* 设置菜单中顶部下滑→退出菜单标志 */
 #include "tetris.h"        /* tetris_reset_touch, GAME_RET_* */
@@ -819,7 +820,7 @@ uint8_t game_menu_drag_poll(int16_t *drag_y, uint16_t *drag_touch_y,
         gdp_rel_cnt++;
         if (gdp_rel_cnt >= 2) gdp_tracking = 0;  /* 释放后重置起始记录 */
     }
-    menu_draw_nrow_frame_only(*drag_y, row_types, 5);
+    menu_draw_nrow_frame_only(*drag_y, row_types, 6);
     if (!ts->pressed && gdp_rel_cnt >= 2) {
         *dragging = 0;
         gdp_rel_cnt = 0;
@@ -1082,6 +1083,7 @@ uint8_t game_handle_ret(uint8_t ret, MainMode *mode, uint8_t *game_inited,
     if (ret == GAME_RET_INTERACT)  { *key_resp = 1; return ret; }
     if (ret == EXIT_RET_SETTINGS)  { *key_resp = 1; return ret; }
     game_battery_icon_reset();
+    g_menu_clear_color = LCD_BLACK;
 
     /* 模式切换只在松手后发生，同时清除主循环触摸状态 */
     *game_inited = 0;
@@ -1108,7 +1110,7 @@ uint8_t game_handle_ret(uint8_t ret, MainMode *mode, uint8_t *game_inited,
  * @param  out_ts        输出触摸坐标
  * @return EXIT_RET_NONE(0) / EXIT_RET_BACK(0xFF) / EXIT_RET_*
  **********************************************************************/
-uint8_t game_exit_menu_poll(const uint8_t ret_map[4], uint8_t *prev_pressed,
+uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t *prev_pressed,
                             TouchState *out_ts)
 {
     static int8_t pressed_hit = -1;
@@ -1117,14 +1119,14 @@ uint8_t game_exit_menu_poll(const uint8_t ret_map[4], uint8_t *prev_pressed,
     if (out_ts) *out_ts = ts;
 
     if (!(*prev_pressed) && ts.pressed) {
-        pressed_hit = menu_hit_test(ts.x, ts.y, 5);
+        pressed_hit = menu_hit_test(ts.x, ts.y, 6);
     }
     else if (*prev_pressed && !ts.pressed) {
-        int8_t released_hit = menu_hit_test(ts.x, ts.y, 5);
+        int8_t released_hit = menu_hit_test(ts.x, ts.y, 6);
         uint8_t ret = EXIT_RET_NONE;
 
         if (released_hit == pressed_hit) {
-            if (released_hit >= 0 && released_hit <= 3)
+            if (released_hit >= 0 && released_hit <= 4)
                 ret = ret_map[released_hit];
             else
                 ret = EXIT_RET_BACK;  /* hit==4或-1(菜单外)→关闭菜单 */
@@ -1354,5 +1356,5 @@ void menu_clear_exit_area_to(int16_t y)
 {
     int16_t bottom = y + MENU_H;
     if (y < 0) y = 0;
-    LCD_Fill(MENU_X, (uint16_t)y, MENU_X + MENU_W, (uint16_t)bottom, LCD_BLACK);
+    LCD_Fill(MENU_X, (uint16_t)y, MENU_X + MENU_W, (uint16_t)bottom, g_menu_clear_color);
 }

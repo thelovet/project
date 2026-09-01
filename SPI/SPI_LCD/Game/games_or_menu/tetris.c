@@ -141,13 +141,13 @@ static uint8_t  g_flash_hold;     /* 当前状态剩余帧数 */
 static uint32_t g_clear_mask;     /* 要消除的行位掩码 */
 
 /* 退出菜单 (视频/推箱子/2048/华容道/返回, 减当前=俄罗斯方块) */
-static const uint8_t tetris_exit_map[4] = {
-    EXIT_RET_VIDEO, EXIT_RET_SOKOBAN, EXIT_RET_D2048, EXIT_RET_KLOTSKI
+static const uint8_t tetris_exit_map[5] = {
+    EXIT_RET_VIDEO, EXIT_RET_SOKOBAN, EXIT_RET_D2048, EXIT_RET_KLOTSKI, EXIT_RET_FISH
 };
 
 /* 退出菜单行类型 (供 menu_draw_nrow_frame_only / game_menu_drag_poll 使用) */
-static const uint8_t tetris_row_types[5] = {
-    MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_KLOTSKI, MENU_ROW_FANHUI
+static const uint8_t tetris_row_types[6] = {
+    MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_KLOTSKI, MENU_ROW_FISH, MENU_ROW_FANHUI
 };
 
 #define SWIPE_THRESH  25
@@ -945,7 +945,7 @@ uint8_t tetris_update(void)
             g_sidebar_dirty = 0;
             g_preview_dirty = 0;
             if (!g_exit_dragging && !g_exit_sliding) {
-                menu_draw_nrow_frame_only(g_exit_drag_y, tetris_row_types, 5);
+                menu_draw_nrow_frame_only(g_exit_drag_y, tetris_row_types, 6);
             }
         }
 
@@ -994,7 +994,7 @@ uint8_t tetris_update(void)
                 g_exit_sliding = 0;
                 g_touch_down = 0;
             }
-            menu_draw_nrow_frame_only(g_exit_drag_y, tetris_row_types, 5);
+            menu_draw_nrow_frame_only(g_exit_drag_y, tetris_row_types, 6);
             return 0;
         }
 

@@ -21,12 +21,12 @@
  *  菜单: 退出菜单映射 + 行类型 (复用 menu.c 统一菜单系统)
  * ================================================================ */
 /* 下划菜单游戏映射 (视频/推箱子/2048/华容道, 减当前=大鱼吃小鱼) */
-static const uint8_t fish_exit_map[4] = {
-    EXIT_RET_VIDEO, EXIT_RET_SOKOBAN, EXIT_RET_D2048, EXIT_RET_KLOTSKI
+static const uint8_t fish_exit_map[5] = {
+    EXIT_RET_VIDEO, EXIT_RET_SOKOBAN, EXIT_RET_D2048, EXIT_RET_TETRIS, EXIT_RET_KLOTSKI
 };
 /* 退出菜单行类型 (供 menu_draw_nrow_frame_only / game_menu_drag_poll 使用) */
-static const uint8_t fish_row_types[5] = {
-    MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_KLOTSKI, MENU_ROW_FANHUI
+static const uint8_t fish_row_types[6] = {
+    MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FANHUI
 };         /* GetTimerCount: 基于真实时间的移动节拍(与帧率无关) */
 
 /* ================================================================
@@ -511,11 +511,49 @@ static void food_respawn(FishEntity *e, uint8_t avoid_player)
 /* ================================================================
  *  初始化
  * ================================================================ */
+/* Full redraw of the current fish scene (background + player + all food + HUD).
+   Used to restore the scene behind a menu after a menu-switch cleared the area to
+   black (mirrors tetris redrawing its board). Game-over screen uses draw_game_over. */
+static void fish_draw_scene(void)
+{
+    uint8_t i;
+    draw_background();
+    g_full_redraw = 0;
+    draw_image_sprite(FLASH_STORE_ID_PLAYER_0, player_imgs_dim,
+                      PLAYER_COUNT, g_player.level, g_player.x, g_player.y);
+    g_player.prev_x = (int16_t)g_player.x;
+    g_player.prev_y = (int16_t)g_player.y;
+    g_player.prev_level = g_player.level;
+    g_player.drawn = 1;
+    for (i = 0; i < FISH_NUM_FOOD; i++) {
+        FishEntity *f = &g_food[i];
+        if (!f->active) continue;
+        draw_image_sprite(FLASH_STORE_ID_FISH_0, fish_imgs_dim,
+                          FISH_COUNT, f->level, f->x, f->y);
+        f->prev_x = (int16_t)f->x;
+        f->prev_y = (int16_t)f->y;
+        f->prev_level = f->level;
+        f->drawn = 1;
+    }
+    g_hud_dirty = 1;
+    draw_hud();
+}
+
+/* Restore the background right after a menu clear (same frame) to avoid a
+   one-frame black flash on menu switch/cancel (others redraw the board fast).*/
+static void fish_restore_scene_behind(void)
+{
+    if (g_state_before_menu == FISH_STATE_OVER) draw_game_over();
+    else fish_draw_scene();
+    g_full_redraw = 0;
+}
+
 void fish_init(void)
 {
     uint8_t i;
     g_state = FISH_STATE_PLAYING;
     g_score = 0;
+    g_menu_clear_color = COLOR_BG;   /* 清菜单位置用背景色替代黑色, 避免切菜单黑闪 */
     g_hud_dirty = 1;   /* 首帧重绘顶部信息 */
     g_frame = 0;
     g_food_us = GetTimerCount();   /* 小鱼时间节拍基准 */
@@ -566,16 +604,17 @@ uint8_t fish_update(void)
         /* 从结束画面进入菜单时, 需重绘结束画面作背景 */
         if (g_full_redraw) {
             if (g_state_before_menu == FISH_STATE_OVER) draw_game_over();
+            else fish_draw_scene();
             g_full_redraw = 0;
         }
         if (!g_exit_dragging && !g_exit_sliding) {
-            menu_draw_nrow_frame_only(g_exit_drag_y, fish_row_types, 5);
+            menu_draw_nrow_frame_only(g_exit_drag_y, fish_row_types, 6);
         }
         /* 上划打断: 切换到重新开始菜单 */
         {
             uint8_t r = menu_swipe_to_restart_handler(220, 10);
             if (r) {
-                g_full_redraw = 1;
+                fish_restore_scene_behind();
                 g_state = FISH_STATE_RESTART_MENU;
                 return r - 1;
             }
@@ -592,7 +631,7 @@ uint8_t fish_update(void)
                 menu_clear_exit_area_to(g_exit_drag_y);
                 g_exit_menu_visible = 0;
                 g_state = g_state_before_menu;
-                g_full_redraw = 1;
+                fish_restore_scene_behind();
                 g_touch_down = 0;
                 g_menu_cooldown = 15;
             }
@@ -606,7 +645,7 @@ uint8_t fish_update(void)
                 g_exit_sliding = 0;
                 g_touch_down = 0;
             }
-            menu_draw_nrow_frame_only(g_exit_drag_y, fish_row_types, 5);
+            menu_draw_nrow_frame_only(g_exit_drag_y, fish_row_types, 6);
             return 0;
         }
         /* 点选退出菜单 */
@@ -616,7 +655,7 @@ uint8_t fish_update(void)
             if (ret == EXIT_RET_BACK) {
                 menu_exit_back_cleanup();
                 g_state = g_state_before_menu;
-                g_full_redraw = 1;
+                fish_restore_scene_behind();
                 return 0;
             }
             if (ret != EXIT_RET_NONE) {
@@ -632,6 +671,7 @@ uint8_t fish_update(void)
     if (g_state == FISH_STATE_RESTART_MENU) {
         if (g_full_redraw) {
             if (g_state_before_menu == FISH_STATE_OVER) draw_game_over();
+            else fish_draw_scene();
             g_full_redraw = 0;
         }
         if (!g_restart_dragging && !g_restart_sliding) {
@@ -713,13 +753,13 @@ uint8_t fish_update(void)
             return 0;
         }
         restart_menu_to_exit:
-        g_full_redraw = 1;
         game_menu_restart_to_exit((uint8_t *)&g_state, FISH_STATE_EXIT_MENU, ts.y);
+        fish_restore_scene_behind();
         return 0;
         restart_menu_close:
         menu_restart_cleanup();
         g_state = g_state_before_menu;
-        g_full_redraw = 1;
+        fish_restore_scene_behind();
         g_prev_pressed = ts.pressed;
         return interacted;
     }

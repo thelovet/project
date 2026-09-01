@@ -50,12 +50,12 @@ void game_battery_set_charge_flash(uint8_t enable);
 #define RESTART_MENU_DRAG_MAX_STEP 3   /* 上划拖拽每帧最大位移 (与视频菜单一致) */
 #define RESTART_MENU_RELEASE_GAP 36    /* 松手后最小上划距离 */
 
-/* 菜单区域快捷清屏 */
+/* 菜单区域快捷清屏 (清除色可被游戏设为背景色, 避免切菜单黑闪) */
 #define LCD_CLEAR_MENU_AREA() \
-    LCD_Fill(MENU_X, 0, MENU_X + MENU_W, MENU_Y + MENU_H, LCD_BLACK)
+    LCD_Fill(MENU_X, 0, MENU_X + MENU_W, MENU_Y + MENU_H, g_menu_clear_color)
 #define LCD_CLEAR_RESTART_AREA() \
     LCD_Fill(RESTART_MENU_X, g_restart_slide_y, \
-             RESTART_MENU_X + RESTART_MENU_W, 240, LCD_BLACK)
+             RESTART_MENU_X + RESTART_MENU_W, 240, g_menu_clear_color)
 #define RESTART_MENU_ROW0_Y (RESTART_MENU_Y + RESTART_MENU_BDR + RESTART_MENU_GAP)       /* 第1行Y ("重新开始") */
 #define RESTART_MENU_ROW1_Y (RESTART_MENU_ROW0_Y + 32 + RESTART_MENU_GAP)                /* 第2行Y ("设置") */
 #define RESTART_MENU_ROW2_Y (RESTART_MENU_ROW1_Y + 32 + RESTART_MENU_GAP)                /* 第3行Y ("返回") */
@@ -136,7 +136,7 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
  */
 uint8_t game_menu_drag_poll(int16_t *drag_y, uint16_t *drag_touch_y,
                              uint8_t *dragging, const TouchState *ts,
-                             const uint8_t row_types[5]);
+                             const uint8_t row_types[6]);
 
 /**
  * @brief  重置 game_menu_drag_poll 内部状态，确保下次拖拽从干净状态启动
@@ -229,7 +229,7 @@ int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count);
  *         EXIT_RET_BACK(0xFF) = 点击"关闭"
  *         其他 = EXIT_RET_* 切换目标
  */
-uint8_t game_exit_menu_poll(const uint8_t ret_map[4], uint8_t *prev_pressed,
+uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t *prev_pressed,
                             TouchState *out_ts);
 
 /* ---- 主菜单动作返回值 ---- */
@@ -342,6 +342,9 @@ extern uint8_t  g_restart_menu_visible;   /* 重新开始菜单可见 */
 extern uint8_t  g_restart_sliding;        /* 重新开始菜单滑动中 */
 extern uint8_t  g_restart_dragging;       /* 重新开始菜单拖拽中 */
 extern int16_t  g_restart_slide_y;        /* 重新开始菜单滑动Y位置 */
+
+/* 菜单/重开区域清除色 (游戏可设为自身背景色, 避免清菜单黑闪) */
+extern uint16_t g_menu_clear_color;
 
 /* 从游戏进入设置的标志 (MAIN_MODE_VIDEO=无, 其他=来源游戏模式) */
 extern uint8_t  g_settings_from_game;

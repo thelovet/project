@@ -52,15 +52,15 @@ static uint16_t g_touch_start_x;
 static uint8_t  g_prev_pressed;
 
 /* 下划菜单游戏映射 (顺序: 视频/推箱子/俄罗斯方块/华容道) */
-static const uint8_t d2048_exit_map[4] = {
-    EXIT_RET_VIDEO, EXIT_RET_SOKOBAN, EXIT_RET_TETRIS, EXIT_RET_KLOTSKI
+static const uint8_t d2048_exit_map[5] = {
+    EXIT_RET_VIDEO, EXIT_RET_SOKOBAN, EXIT_RET_TETRIS, EXIT_RET_KLOTSKI, EXIT_RET_FISH
 };
 
 #define SWIPE_THRESH  10   /* 滑动最小阈值 */
 
 /* 退出菜单行类型 (视频/推箱子/俄罗斯方块/华容道/返回) */
-static const uint8_t d2048_row_types[5] = {
-    MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FANHUI
+static const uint8_t d2048_row_types[6] = {
+    MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH, MENU_ROW_FANHUI
 };
 
 /* ================================================================
@@ -464,7 +464,7 @@ uint8_t d2048_update(void)
             g_full_redraw = 0;
             /* 非拖拽/滑动期间绘制退出菜单顶部框架 */
             if (!g_exit_dragging && !g_exit_sliding) {
-                menu_draw_nrow_frame_only(g_exit_drag_y, d2048_row_types, 5);
+                menu_draw_nrow_frame_only(g_exit_drag_y, d2048_row_types, 6);
             }
         }
 
@@ -507,7 +507,7 @@ uint8_t d2048_update(void)
                 g_exit_sliding = 0;
                 g_touch_down = 0;
             }
-            menu_draw_nrow_frame_only(g_exit_drag_y, d2048_row_types, 5);
+            menu_draw_nrow_frame_only(g_exit_drag_y, d2048_row_types, 6);
             return 0;
         }
 

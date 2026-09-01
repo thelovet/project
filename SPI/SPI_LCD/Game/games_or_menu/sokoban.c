@@ -59,8 +59,8 @@ static uint8_t  s_exit_dragging;      /* 拖拽中标志 */
 static uint16_t s_exit_drag_start_y;  /* 拖拽起点Y */
 
 /* 退出菜单 (视频/2048/俄罗斯方块/华容道/返回, 减当前=推箱子) */
-static const uint8_t sokoban_exit_map[4] = {
-    EXIT_RET_VIDEO, EXIT_RET_D2048, EXIT_RET_TETRIS, EXIT_RET_KLOTSKI
+static const uint8_t sokoban_exit_map[5] = {
+    EXIT_RET_VIDEO, EXIT_RET_D2048, EXIT_RET_TETRIS, EXIT_RET_KLOTSKI, EXIT_RET_FISH
 };
 
 /* ================================================================
@@ -77,8 +77,8 @@ static uint8_t  s_level_num     = 0;  /* 当前关卡号 (1-based) */
 static uint8_t  g_sok_dirty     = 0;  /* 0=干净, 1=全屏重绘, 2=电池闪灭仅局部 */
 
 /* 退出菜单行类型 (视频/2048/俄罗斯方块/华容道/返回) */
-static const uint8_t sok_row_types[5] = {
-    MENU_ROW_SHIPIN, MENU_ROW_2048, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FANHUI
+static const uint8_t sok_row_types[6] = {
+    MENU_ROW_SHIPIN, MENU_ROW_2048, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH, MENU_ROW_FANHUI
 };
 
 /* 触摸输入状态 */
@@ -832,7 +832,7 @@ uint8_t sokoban_update(void)
             }
         } else {
             /* 退出菜单可见：仅重绘菜单框架覆盖电池黑线 */
-            menu_draw_nrow_frame_only(s_exit_drag_y, sok_row_types, 5);
+            menu_draw_nrow_frame_only(s_exit_drag_y, sok_row_types, 6);
         }
         g_sok_dirty = 0;
     }
@@ -1221,7 +1221,7 @@ process_exit_menu:
                 s_exit_drag_y = MENU_Y;
                 s_exit_sliding = 0;
             }
-            menu_draw_nrow_frame_only(s_exit_drag_y, sok_row_types, 5);
+            menu_draw_nrow_frame_only(s_exit_drag_y, sok_row_types, 6);
             return 0;
         }
 
