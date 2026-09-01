@@ -16,7 +16,18 @@
 #include "display.h"
 #include "touch.h"
 #include "string.h"
-#include "timer.h"         /* GetTimerCount: 基于真实时间的移动节拍(与帧率无关) */
+#include "timer.h"
+/* ================================================================
+ *  菜单: 退出菜单映射 + 行类型 (复用 menu.c 统一菜单系统)
+ * ================================================================ */
+/* 下划菜单游戏映射 (视频/推箱子/2048/华容道, 减当前=大鱼吃小鱼) */
+static const uint8_t fish_exit_map[4] = {
+    EXIT_RET_VIDEO, EXIT_RET_SOKOBAN, EXIT_RET_D2048, EXIT_RET_KLOTSKI
+};
+/* 退出菜单行类型 (供 menu_draw_nrow_frame_only / game_menu_drag_poll 使用) */
+static const uint8_t fish_row_types[5] = {
+    MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_KLOTSKI, MENU_ROW_FANHUI
+};         /* GetTimerCount: 基于真实时间的移动节拍(与帧率无关) */
 
 /* ================================================================
  *  游戏参数
@@ -68,6 +79,7 @@ static uint8_t   g_full_redraw;      /* 全屏重绘脏标记 */
 static uint8_t   g_prev_pressed;
 static int16_t   s_last_touch_x;     /* 上一次有效触摸位置(增量拖动用) */
 static int16_t   s_last_touch_y;
+static uint16_t g_touch_start_x;
 
 /* ================================================================
  *  颜色定义 (RGB565)
@@ -520,7 +532,13 @@ void fish_init(void)
     g_food_us = GetTimerCount();   /* 小鱼时间节拍基准 */
     g_full_redraw = 1;
     g_prev_pressed = 0;
-
+    g_touch_down = 0;
+    g_menu_cooldown = 0;
+    g_exit_menu_visible = 0;
+    g_restart_menu_visible = 0;
+    g_restart_sliding = 0;
+    g_restart_dragging = 0;
+    g_restart_slide_y = RESTART_MENU_Y + RESTART_MENU_H;
     g_player.active = 1;
     g_player.level = FISH_PLAYER_START_LEVEL;
     g_player.x = FISH_PLAYER_X;
@@ -542,13 +560,243 @@ void fish_init(void)
  * ================================================================ */
 uint8_t fish_update(void)
 {
-    /* 已结束: 显示结束画面, 点击任意位置重新开始 */
-    if (g_state == FISH_STATE_OVER) {
-        TouchState ts_over;
-        Touch_Scan(&ts_over);
-        if (ts_over.pressed) {
-            fish_init();   /* 重新开始一局 */
+    uint8_t interacted = 0;
+
+    /* 菜单冷却 */
+    if (g_menu_cooldown > 0) g_menu_cooldown--;
+
+    /* 设置页面下滑→退出菜单 */
+    if (g_game_enter_exit_menu) {
+        g_game_enter_exit_menu = 0;
+        g_state = FISH_STATE_EXIT_MENU;
+        g_full_redraw = 1;
+    }
+
+    /* ---- 退出菜单 ---- */
+    if (g_state == FISH_STATE_EXIT_MENU) {
+        /* 从结束画面进入菜单时, 需重绘结束画面作背景 */
+        if (g_full_redraw) {
+            if (g_state_before_menu == FISH_STATE_OVER) draw_game_over();
+            g_full_redraw = 0;
         }
+        if (!g_exit_dragging && !g_exit_sliding) {
+            menu_draw_nrow_frame_only(g_exit_drag_y, fish_row_types, 5);
+        }
+        /* 上划打断: 切换到重新开始菜单 */
+        {
+            uint8_t r = menu_swipe_to_restart_handler(220, 10);
+            if (r) {
+                g_full_redraw = 1;
+                g_state = FISH_STATE_RESTART_MENU;
+                return r - 1;
+            }
+        }
+        /* 拖拽 */
+        if (g_exit_dragging) {
+            TouchState ts_d;
+            Touch_Scan(&ts_d);
+            uint8_t poll_ret = game_menu_drag_poll(&g_exit_drag_y, &g_exit_drag_start_y,
+                                                    &g_exit_dragging, &ts_d, fish_row_types);
+            if (poll_ret == 1) {
+                g_exit_sliding = 1;
+            } else if (poll_ret == 2) {
+                menu_clear_exit_area_to(g_exit_drag_y);
+                g_exit_menu_visible = 0;
+                g_state = g_state_before_menu;
+                g_full_redraw = 1;
+                g_touch_down = 0;
+                g_menu_cooldown = 15;
+            }
+            return 0;
+        }
+        /* 滑入动画 */
+        if (g_exit_sliding) {
+            g_exit_drag_y += MENU_SLIDE_SPEED;
+            if (g_exit_drag_y >= MENU_Y) {
+                g_exit_drag_y = MENU_Y;
+                g_exit_sliding = 0;
+                g_touch_down = 0;
+            }
+            menu_draw_nrow_frame_only(g_exit_drag_y, fish_row_types, 5);
+            return 0;
+        }
+        /* 点选退出菜单 */
+        {
+            TouchState ts;
+            uint8_t ret = game_exit_menu_poll(fish_exit_map, &g_prev_pressed, &ts);
+            if (ret == EXIT_RET_BACK) {
+                menu_exit_back_cleanup();
+                g_state = g_state_before_menu;
+                g_full_redraw = 1;
+                return 0;
+            }
+            if (ret != EXIT_RET_NONE) {
+                g_exit_menu_visible = 0;
+                g_state = FISH_STATE_PLAYING;
+                return ret;
+            }
+            return 0;
+        }
+    }
+
+    /* ---- 重开菜单 ---- */
+    if (g_state == FISH_STATE_RESTART_MENU) {
+        if (g_full_redraw) {
+            if (g_state_before_menu == FISH_STATE_OVER) draw_game_over();
+            g_full_redraw = 0;
+        }
+        if (!g_restart_dragging && !g_restart_sliding) {
+            menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
+        }
+        TouchState ts;
+        if (g_restart_dragging) {
+            Touch_Scan(&ts);
+            uint8_t poll_ret = game_restart_menu_drag_poll(&g_restart_slide_y, g_touch_start_y,
+                                                            &g_restart_dragging, &ts);
+            if (poll_ret == 1) {
+                g_restart_sliding = 1;
+                g_prev_pressed = 0;
+            } else if (poll_ret == 2) {
+                goto restart_menu_close;
+            } else if (poll_ret == 3) {
+                goto restart_menu_to_exit;
+            }
+            return 0;
+        }
+        if (g_restart_sliding) {
+            g_restart_slide_y -= RESTART_MENU_SLIDE_SPEED;
+            if (g_restart_slide_y <= RESTART_MENU_Y) {
+                g_restart_slide_y = RESTART_MENU_Y;
+                g_restart_sliding = 0;
+                g_prev_pressed = 0;
+            }
+            menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
+            {
+                TouchState ts_d;
+                Touch_Scan(&ts_d);
+                if (game_restart_menu_down_poll(&ts_d, &g_touch_down,
+                                                &g_touch_start_x, &g_touch_start_y))
+                    goto restart_menu_to_exit;
+            }
+            return 0;
+        }
+        Touch_Scan(&ts);
+        if (game_restart_menu_down_poll(&ts, &g_touch_down,
+                                        &g_touch_start_x, &g_touch_start_y))
+            goto restart_menu_to_exit;
+        {
+            static int8_t ph = -1;
+            int8_t ch = -1;
+            if (ts.x >= RESTART_MENU_X && ts.x < RESTART_MENU_X + RESTART_MENU_W) {
+                uint16_t yo = ts.y - (RESTART_MENU_Y + RESTART_MENU_BDR);
+                uint16_t ih = (RESTART_MENU_H - 2 * RESTART_MENU_BDR) / 3;
+                if (yo < ih * 3) ch = (int8_t)(yo / ih);
+            }
+            if (!g_prev_pressed && ts.pressed) {
+                ph = ch;
+            } else if (g_prev_pressed && !ts.pressed && ch == ph) {
+                if (ph < 0) {
+                    /* 点击菜单外 → 关闭菜单 */
+                    goto restart_menu_close;
+                }
+                if (ph == 0) {
+                    /* 重新开始 */
+                    menu_restart_cleanup();
+                    g_state = FISH_STATE_PLAYING;
+                    fish_init();
+                    ph = -1;
+                    g_prev_pressed = 0;
+                    return GAME_RET_INTERACT;
+                }
+                /* 设置 或 返回 */
+                if (ph == 1) {
+                    menu_enter_game_settings();
+                    interacted = EXIT_RET_SETTINGS;
+                } else {
+                    interacted = GAME_RET_INTERACT;
+                }
+                ph = -1;
+                g_prev_pressed = 0;
+                goto restart_menu_close;
+            }
+            if (!ts.pressed) ph = -1;
+            g_prev_pressed = ts.pressed;
+            return 0;
+        }
+        restart_menu_to_exit:
+        g_full_redraw = 1;
+        game_menu_restart_to_exit((uint8_t *)&g_state, FISH_STATE_EXIT_MENU, ts.y);
+        return 0;
+        restart_menu_close:
+        menu_restart_cleanup();
+        g_state = g_state_before_menu;
+        g_full_redraw = 1;
+        g_prev_pressed = ts.pressed;
+        return interacted;
+    }
+
+    /* ---- 游戏结束: 上滑/下滑呼出菜单 (不再点击任意处重开) ---- */
+    if (g_state == FISH_STATE_OVER) {
+        if (g_full_redraw) { draw_game_over(); g_full_redraw = 0; }
+        TouchState ts;
+        Touch_Scan(&ts);
+        if (ts.pressed && !g_touch_down) {
+            g_touch_down = 1;
+            g_touch_start_x = ts.x;
+            g_touch_start_y = ts.y;
+            if (ts.y <= 220) g_menu_cooldown = 0;  /* 非上划区清菜单冷却 */
+        }
+        else if (ts.pressed && g_touch_down && g_touch_start_y < MENU_SWIPE_START_Y) {
+            int16_t dy_move = (int16_t)ts.y - (int16_t)g_touch_start_y;
+            if (dy_move > MENU_SWIPE_TRIGGER_DIST) {
+                g_state_before_menu = g_state;
+                g_state = FISH_STATE_EXIT_MENU;
+                g_exit_menu_visible = 1;
+                g_exit_dragging = 1;
+                g_exit_drag_start_y = ts.y;
+                if (dy_move > MENU_DRAG_MAX_STEP) dy_move = MENU_DRAG_MAX_STEP;
+                g_exit_drag_y = -MENU_H + dy_move;
+                return 0;
+            }
+        }
+        else if (ts.pressed && g_touch_down && g_touch_start_y > 220) {
+            int16_t dy_move = (int16_t)ts.y - (int16_t)g_touch_start_y;
+            if (dy_move < -5) {
+                g_state_before_menu = g_state;
+                g_state = FISH_STATE_RESTART_MENU;
+                g_restart_menu_visible = 1;
+                g_restart_dragging = 1;
+                g_restart_sliding = 0;
+                g_restart_slide_y = RESTART_MENU_Y + RESTART_MENU_H;
+                game_restart_menu_drag_poll(&g_restart_slide_y, g_touch_start_y,
+                                            &g_restart_dragging, &ts);
+                return 0;
+            }
+        }
+        else if (!ts.pressed && g_touch_down) {
+            g_touch_down = 0;
+            int16_t dy = (int16_t)ts.y - (int16_t)g_touch_start_y;
+            if (g_touch_start_y > 220 && dy < -10) {
+                g_state_before_menu = g_state;
+                g_state = FISH_STATE_RESTART_MENU;
+                g_restart_menu_visible = 1;
+                g_restart_sliding = 1;
+                g_restart_dragging = 0;
+                g_restart_slide_y = RESTART_MENU_Y + RESTART_MENU_H + dy;
+                if (g_restart_slide_y < RESTART_MENU_Y + RESTART_MENU_RELEASE_GAP)
+                    g_restart_slide_y = RESTART_MENU_Y + RESTART_MENU_RELEASE_GAP;
+                return GAME_RET_INTERACT;
+            }
+            if (g_touch_start_y < MENU_SWIPE_START_Y && dy >= MENU_SWIPE_COMMIT_DIST) {
+                g_state_before_menu = g_state;
+                g_state = FISH_STATE_EXIT_MENU;
+                g_exit_menu_visible = 1;
+                g_exit_sliding = 1;
+                g_exit_drag_y = -MENU_H;
+                return GAME_RET_INTERACT;
+            }
+        }
+        g_prev_pressed = ts.pressed;
         return GAME_RET_INTERACT;
     }
 
@@ -560,8 +808,33 @@ uint8_t fish_update(void)
     uint8_t just_pressed = (uint8_t)(upress && !g_prev_pressed);
     g_prev_pressed = upress;
 
+    /* 触摸起始记录 (供菜单手势检测) */
+    if (upress && !g_touch_down) {
+        g_touch_down = 1;
+        g_touch_start_x = ts.x;
+        g_touch_start_y = ts.y;
+        if (ts.y <= 220) g_menu_cooldown = 0;  /* 非上划区清菜单冷却 */
+    }
+    /* 下滑触发退出菜单拖拽 */
+    if (game_menu_enter_exit_drag(&ts, (uint8_t *)&g_state,
+                                   FISH_STATE_PLAYING, FISH_STATE_EXIT_MENU))
+        return 0;
+    /* 上划触发重新开始菜单 */
+    if (game_menu_enter_restart_drag(&ts, (uint8_t *)&g_state,
+                                      FISH_STATE_PLAYING, FISH_STATE_RESTART_MENU, 220))
+        return 0;
+    /* 松手提交菜单 */
+    if (!upress && g_touch_down) {
+        g_touch_down = 0;
+        int16_t dy = (int16_t)ts.y - (int16_t)g_touch_start_y;
+        if (game_menu_commit_exit(dy, (uint8_t *)&g_state, FISH_STATE_EXIT_MENU))
+            return GAME_RET_INTERACT;
+        if (game_menu_commit_restart(dy, (uint8_t *)&g_state,
+                                      FISH_STATE_RESTART_MENU, 220, 10))
+            return GAME_RET_INTERACT;
+    }
     /* 增量拖动: 按住滑动时, 鱼按手指的位移增量平移(不吸附到手指位置, 松开即停) */
-    if (upress) {
+    if (g_state == FISH_STATE_PLAYING && upress) {
         if (just_pressed) {
             /* 刚按下: 记录起点, 本帧鱼不动 */
             s_last_touch_x = (int16_t)ts.x;
@@ -645,6 +918,7 @@ uint8_t fish_update(void)
                     /* 碰到更大的鱼: 游戏结束 */
                     g_state = FISH_STATE_OVER;
                     draw_game_over();
+                    g_touch_down = 0;
                     return GAME_RET_INTERACT;
                 }
             }
