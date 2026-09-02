@@ -356,6 +356,8 @@ extern uint8_t  vm_touch_down;
 
 /* 游戏进入设置: 保存来源并打开视频设置菜单 */
 void menu_enter_game_settings(void);
+/* 游戏"二次上划"进入设置并跟手滑出 (推箱子用, 复用 VideoMenu_Update 拖拽状态机) */
+void menu_enter_game_settings_swipe(uint16_t start_y);
 
 /* 设置菜单中顶部下滑触发: GameSettings_Update设置, 各游戏update检查 */
 extern uint8_t g_game_enter_exit_menu;

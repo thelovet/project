@@ -384,6 +384,21 @@ static void sok_draw_nav_buttons(void)
         sok_next_draw(SOK_BTN3_X, SOK_BTN_Y);
     }
 }
+
+/**
+ * @brief  清除关卡文字"关卡N"的背景 (只清文字本身居中宽度, 不全宽, 避免左右黑块)
+ * @note   y=(240-32)/2-20=84, 字高32; 文字宽 total_w=64+4+digit_w (关32+卡32+数字)
+ *         与 sok_level_draw 的布局公式一致
+ */
+static void sok_level_clear(void)
+{
+    uint8_t lv = s_level_num;
+    uint8_t dc = (lv / 10 > 0) ? 2 : 1;
+    uint16_t dw = dc * 16 + (dc - 1) * 2;
+    uint16_t total_w = 64 + 4 + dw;
+    uint16_t x = (240 - total_w) / 2;
+    LCD_Fill(x, 84, x + total_w, 116, LCD_BLACK);
+}
 /**
  * @brief  准备关卡数据结构, 不涉及LCD刷新
  * @param  level_index  关卡索引
@@ -471,6 +486,22 @@ uint8_t sokoban_is_menu_visible(void)
 {
     return s_exit_menu_visible || s_menu_visible;
 }
+
+/**
+ * @brief  从设置菜单返回到按钮面板 (main.c GameSettings_Update 返回分支调用)
+ * @note   置 s_menu_visible=1 让下一帧 sokoban_update 重绘导航按钮面板 + 关卡编号
+ */
+void sokoban_menu_settings_restore(void)
+{
+    s_menu_visible = 1;
+    /* 局部恢复(参照按钮面板退出/下划打断做法): 只清设置条带覆盖区(y>=VIDEO_MENU_Y)重绘图格,
+       再画按钮面板, 不全屏重绘(会闪)。设置条带覆盖 y=52~240, 故从 VIDEO_MENU_Y 清起。 */
+    LCD_Fill(0, VIDEO_MENU_Y, 239, 239, LCD_BLACK);
+    sok_redraw_grid_below(VIDEO_MENU_Y);
+    sok_draw_nav_buttons();
+    sok_level_draw(s_level_num, LCD_RED);
+}
+
 
 /**
  * @brief  移动玩家 (含推箱子逻辑)
@@ -846,6 +877,21 @@ uint8_t sokoban_update(void)
     if (s_menu_cooldown > 0) s_menu_cooldown--;
     if (g_menu_cooldown > 0) g_menu_cooldown--;
 
+    /* 设置菜单中顶部下滑→退出菜单 (main.c 设标志, 四游戏各自消费; 推箱子需自行处理) */
+    if (g_game_enter_exit_menu) {
+        g_game_enter_exit_menu = 0;
+        s_menu_visible = 0;
+        s_exit_menu_visible = 1;
+        s_exit_dragging = 1;
+        s_exit_sliding = 0;
+        s_exit_drag_start_y = 0;   /* game_menu_drag_poll 内部用 gdp_start_ty 记录, 此值仅作输出 */
+        s_exit_drag_y = -MENU_H + MENU_DRAG_MAX_STEP;
+        s_hold_button = 0;
+        s_hold_us = 0;
+        s_prev_pressed = 1;   /* 吸收下一帧触摸抖动 */
+        sokoban_draw_level(s_current_level);   /* 设置下滑已把屏幕刷黑, 需重绘整图 */
+    }
+
     /* ---- 电池闪灭恢复: 仅重绘电池覆盖区域，避免全屏刷新闪烁 ---- */
     if (g_sok_dirty) {
         if (!s_exit_menu_visible) {
@@ -1056,6 +1102,31 @@ uint8_t sokoban_update(void)
                     return interacted;
                 }
             }
+
+            /* 二次上划: 按钮面板已显示时, 再次上划进设置菜单 (亮度/息屏/方向/返回)
+             * 置于下划打断分支之外, 起点在按钮区(中下部)也能触发 */
+            if (s_menu_cooldown == 0
+                && (int16_t)s_swipe_origin_y - (int16_t)ts.y > MENU_SWIPE_COMMIT_DIST) {
+                int16_t up_move;
+                Touch_UpdateCoords();
+                Touch_Scan(&ts);
+                up_move = (int16_t)s_swipe_origin_y - (int16_t)ts.y;
+                if (up_move > MENU_SWIPE_COMMIT_DIST) {
+                    s_menu_visible      = 0;   /* 按钮面板直接消失 */
+                    s_hold_button       = 0;
+                    s_hold_us           = 0;
+                    s_prev_pressed      = 0;
+                    s_menu_cooldown     = 15;
+                    /* 局部清除按钮面板区(与按钮面板退出一致): 只清文字窄带 + 按钮带两个小区域,
+                       不全宽/不全屏重绘(会闪)。文字用 sok_level_clear(文字本身居中宽度),
+                       按钮带全宽(3按钮分布广)。 */
+                    sok_level_clear();
+                    LCD_Fill(0, SOK_BTN_Y, 239, SOK_BTN_Y + SOK_BTN_H, LCD_BLACK);
+                    sok_redraw_grid_below(84);
+                    menu_enter_game_settings_swipe(s_swipe_origin_y);
+                    return interacted;
+                }
+            }
             sokoban_hold_update();
         }
 
@@ -1086,7 +1157,9 @@ uint8_t sokoban_update(void)
             /*  按钮栏下滑>5px取消 */
             if (s_btn_max_y - s_touch_start_y > 5) {
                 s_menu_visible = 0;
-                LCD_Fill(0, 84, 240, 240, LCD_BLACK);
+                /* 窄带清除: 文字带+按钮带, 避免整块黑闪 */
+                sok_level_clear();
+                LCD_Fill(0, SOK_BTN_Y, 239, SOK_BTN_Y + SOK_BTN_H, LCD_BLACK);
                 sok_redraw_grid_below(84);
                 s_drag_btn = 0;
                 s_hold_button = 0;
@@ -1107,7 +1180,11 @@ uint8_t sokoban_update(void)
             } else if (s_drag_btn == 0 && !s_menu_from_swipe) {
                 /* 非上划的菜单: 点击空白区关闭菜单开始游戏 */
                 s_menu_visible = 0;
-                LCD_Fill(0, 84, 239, 239, LCD_BLACK);
+                /* 分两次清窄条带: 关卡文字带(84~116) + 按钮带(160~220), 不清 y=84~239 整块,
+                   避免大片黑闪。中间 y=116~160 地图格子保留不动。
+                   文字/按钮是透明覆盖, 其下格子由 sok_redraw_grid_below 重绘恢复。 */
+                sok_level_clear();
+                LCD_Fill(0, SOK_BTN_Y, 239, SOK_BTN_Y + SOK_BTN_H, LCD_BLACK);
                 sok_redraw_grid_below(84);
                 s_menu_cooldown =
                     (s_swipe_origin_y < MENU_SWIPE_START_Y) ? 0 : 15;

@@ -976,6 +976,24 @@ static void VideoMenu_Update(const TouchState *ts, uint8_t is_video_mode)
 }
 
 /**
+ * @brief  从游戏"二次上划"进入设置菜单并跟手滑出 (推箱子用)
+ * @param  start_y  触摸起点Y (上划手势的按下起始位置)
+ * @note   复用 VideoMenu_Update 的跟手拖拽状态机: 置 s_video_menu_dragging=1,
+ *         s_video_menu_slide_y 从底部(VIDEO_MENU_Y+VIDEO_MENU_H4)开始, 随后
+ *         每帧由 video_menu_drag_poll 依据手指位移往上跟手滑出, 松手滑到顶部。
+ *         与静止的 menu_enter_game_settings() 区别: 后者直接显示, 无跟手动画。
+ */
+void menu_enter_game_settings_swipe(uint16_t start_y)
+{
+    g_settings_from_game = 1;
+    s_video_menu_visible = 0;
+    s_video_menu_dragging = 1;
+    s_video_menu_slide_y = VIDEO_MENU_Y + VIDEO_MENU_H4;
+    s_video_menu_drag_start_y = start_y;
+    vm_touch_down = 0;
+}
+
+/**
  * @brief  从游戏进入设置的通用处理: 菜单绘制/设置页面更新/返回游戏
  * @note   仅在 g_settings_from_game != MAIN_MODE_VIDEO 时生效
  */
@@ -1028,6 +1046,9 @@ static void GameSettings_Update(void)
             menu_draw_nrow_frame_only(s_video_menu_slide_y,
                                        g_video_menu_row_types, 4);
     } else {
+        /* 跟手拖拽/回滑期间由 VideoMenu_Update 绘制, 不得误判为"退出设置" */
+        if (s_video_menu_dragging || vm_sliding)
+            return;
         if (s_settings_mode != SETTINGS_NONE) {
             IWDG_ReloadCounter();
             Settings_Update();
@@ -1039,7 +1060,7 @@ static void GameSettings_Update(void)
                返回键在此处松开(ts.pressed==0), 因此 update() 在手势层面是安全的无操作。 */
             LCD_Fill_DMA(VIDEO_MENU_X, VIDEO_MENU_Y,
                          VIDEO_MENU_X + VIDEO_MENU_W, 240, g_menu_clear_color);
-            if (s_main_mode == MAIN_MODE_SOKOBAN) { sokoban_full_redraw(); sokoban_update(); }
+            if (s_main_mode == MAIN_MODE_SOKOBAN) { sokoban_menu_settings_restore(); }
             else if (s_main_mode == MAIN_MODE_D2048) { d2048_full_redraw(); d2048_update(); }
             else if (s_main_mode == MAIN_MODE_TETRIS) { tetris_menu_mark_dirty(); tetris_menu_bg_redraw(); }
             else if (s_main_mode == MAIN_MODE_FISH) { fish_full_redraw(); fish_update(); }
@@ -1114,8 +1135,9 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
             sokoban_init_level(0);
             s_game_inited = 1;
         }
-        game_handle_ret(sokoban_update(), &s_main_mode, &s_game_inited,
-                        &s_touch_down, &key_response);
+        if (!g_settings_from_game)
+            game_handle_ret(sokoban_update(), &s_main_mode, &s_game_inited,
+                            &s_touch_down, &key_response);
     }
     else if (s_main_mode == MAIN_MODE_D2048) {
         /* 2048游戏 */
