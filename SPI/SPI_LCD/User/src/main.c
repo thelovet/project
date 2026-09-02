@@ -1,9 +1,8 @@
-/*
- *@Note
- * Standby low-power mode with PA8 touch and PB5/PB6 charge wake-up.
- * Reference: EVT/EXAM/PWR/Standby_Mode
+/**
+ * @brief  待机低功耗模式说明（PA8 触摸 + PB5/PB6 充电唤醒）
+ * @note   参考 EVT/EXAM/PWR/Standby_Mode
  *
- * pins:
+ *    管脚分配:
  *    FLASH_CS   -- PA2   (1脚)
  *    FLASH_DO   -- PA6(SPI1_MISO)(2脚)
  *    FLASH_WP   -- 3.3V (3脚)
@@ -20,26 +19,26 @@
  *    LCD_SCK    -- PB13(SPI2_SCK)
  *    LCD_MOSI   -- PB15(SPI2_MOSI)
  *
- *    Touch RST   -- PB8
- *    Touch INT   -- PA8
- *    Touch SDA   -- PB11 (I2C2_SDA)
- *    Touch SCL   -- PB10 (I2C2_SCL)
+ *    触摸 RST   -- PB8
+ *    触摸 INT   -- PA8
+ *    触摸 SDA   -- PB11 (I2C2_SDA)
+ *    触摸 SCL   -- PB10 (I2C2_SCL)
  *
  *    KEY        -- PA0 (旧版预留，当前固件未启用)
  *
- *    Battery detect:
- *    CHRG       -- PB6 (low=charging)
- *    STDBY      -- PB5 (low=full)
+ *    电池检测：
+ *    CHRG       -- PB6 (低=充电中)
+ *    STDBY      -- PB5 (低=充满)
  *
- *    Voltage measure switch:
- *    VOLT_SW    -- PA15 (low=enable measure, high=disable)
+ *    电压测量开关：
+ *    VOLT_SW    -- PA15 (低=允许测量, 高=关闭)
  *
- *    Battery voltage:
- *    BAT_ADC    -- PA1 (ADC1_Channel_1, voltage divider input, half of battery)
- *                  4.2V full -> 2.1V ADC input
- *                  Only measure when VOLT_SW is low
- *    Voice IC:
- *    VOICE_SW   -- PB3 (low=enable voice, high=disable)
+ *    电池电压：
+ *    BAT_ADC    -- PA1 (ADC1_Channel_1, 分压输入, 为电池电压的一半)
+ *                  4.2V 满电 → 2.1V ADC 输入
+ *                  仅当 VOLT_SW 为低时才测量
+ *    语音 IC：
+ *    VOICE_SW   -- PB3 (低=允许语音, 高=关闭)
  */
 
 //恢复正常播放，运行 switch_mode.ps1 game
@@ -1034,13 +1033,10 @@ static void GameSettings_Update(void)
             Settings_Update();
         } else {
             g_settings_from_game = 0;
-            /* Level-2 settings-options menu back-to-game: clear ONLY the menu
-               strip area with the game's background color, then repaint the
-               scene in the same frame. The menu is a bottom overlay (like the
-               level-1 menu) so the scene behind it is still alive — no need to
-               blacken the whole screen (which caused a one-frame black flash).
-               The back button is released here (ts.pressed==0), so update() is
-               a safe no-op gesture-wise. */
+            /* 二级"设置选项"菜单返回游戏: 只用游戏背景色清除菜单条带区,
+               并在同一帧重绘场景。二级菜单是底部覆盖条(与一级菜单一样),
+               场景始终在它后面, 无需整屏刷黑(那会造成一帧黑闪)。
+               返回键在此处松开(ts.pressed==0), 因此 update() 在手势层面是安全的无操作。 */
             LCD_Fill_DMA(VIDEO_MENU_X, VIDEO_MENU_Y,
                          VIDEO_MENU_X + VIDEO_MENU_W, 240, g_menu_clear_color);
             if (s_main_mode == MAIN_MODE_SOKOBAN) { sokoban_full_redraw(); sokoban_update(); }
