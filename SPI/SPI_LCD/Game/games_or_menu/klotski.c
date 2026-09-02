@@ -35,8 +35,6 @@ static KlotskiState g_state;
 static uint8_t  g_grid_dirty;
 
 /* 触摸状态 */
-static uint16_t g_touch_start_x;
-static uint8_t  g_prev_pressed;
 
 /* 下划菜单游戏映射 (顺序: 视频/推箱子/2048/俄罗斯方块, 减当前=华容道) */
 static const uint8_t klotski_exit_map[5] = {
@@ -393,6 +391,51 @@ uint8_t klotski_restore_state(const uint8_t *buf, uint8_t len)
     return 1;
 }
 
+/* ================================================================
+ *  配置驱动菜单状态机的 hook (mark_dirty / bg_redraw / on_to_exit)
+ * ================================================================ */
+static void klotski_menu_mark_dirty(void)   /* 关闭/取消菜单后需重绘场景 */
+{
+    g_grid_dirty = 1;
+}
+
+/* 依据脏标记重绘菜单背景: 返回1=本帧已重绘 */
+static uint8_t klotski_menu_bg_redraw(void)
+{
+    if (!g_grid_dirty) return 0;
+    if (g_grid_dirty == 2) {
+        /* 电池闪灭: 仅重绘中段行(row1-2)以减少SPI冲突 */
+        uint8_t r, c;
+        for (r = 1; r <= 2; r++) {
+            for (c = 0; c < KLOTSKI_COLS; c++) {
+                uint8_t val = g_grid[r * KLOTSKI_COLS + c];
+                uint16_t bg = (val == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR;
+                draw_tile_bg(r, c, bg);
+                if (val != 0) draw_tile_number(r, c, val);
+            }
+        }
+    } else {
+        draw_grid();
+        draw_status();
+    }
+    g_grid_dirty = 0;
+    return 1;
+}
+
+/* 重菜下滑打断进退出菜单后的补充处理: 置脏以便重绘背景 */
+static void klotski_menu_on_to_exit(void)
+{
+    g_grid_dirty = 1;
+}
+
+static const GameMenuCfg g_klotski_menu_cfg = {
+    KLOTSKI_STATE_PLAYING, KLOTSKI_STATE_EXIT_MENU, KLOTSKI_STATE_RESTART_MENU,
+    klotski_row_types, klotski_exit_map,
+    210, 10,
+    164, 22,
+    klotski_menu_mark_dirty, klotski_menu_bg_redraw, klotski_menu_on_to_exit
+};
+
 uint8_t klotski_update(void)
 {
     uint8_t interacted = 0;
@@ -407,193 +450,17 @@ uint8_t klotski_update(void)
         g_grid_dirty = 1;
     }
 
-    /* ---- 退出菜单 ---- */
-    if (g_state == KLOTSKI_STATE_EXIT_MENU) {
-        /* 电池闪灭(g_grid_dirty==2): 仅重绘下方网格区域避免全屏LCD_Fill闪烁 */
-        if (g_grid_dirty) {
-            if (g_grid_dirty != 2) {
-                draw_grid();
-                draw_status();
-            }
-            g_grid_dirty = 0;
+    /* ---- 退出菜单 / 重新开始菜单: 配置驱动统一状态机 ---- */
+    if (g_state == KLOTSKI_STATE_EXIT_MENU || g_state == KLOTSKI_STATE_RESTART_MENU) {
+        uint8_t out_ret;
+        uint8_t cmd = game_menu_command(&g_klotski_menu_cfg, (uint8_t *)&g_state, &out_ret);
+        switch (cmd) {
+            case GAME_MENU_CMD_SWITCH:   return out_ret;
+            case GAME_MENU_CMD_RESTART:  klotski_init(); return GAME_RET_INTERACT;
+            case GAME_MENU_CMD_SETTINGS: menu_enter_game_settings(); return EXIT_RET_SETTINGS;
+            case GAME_MENU_CMD_INTERACT: return GAME_RET_INTERACT;
+            default:                     return 0;
         }
-        /* 非拖拽/滑动时绘制退出菜单顶部框架 */
-        if (!g_exit_dragging && !g_exit_sliding) {
-            menu_draw_nrow_frame_only(g_exit_drag_y, klotski_row_types, 6);
-        }
-
-        /* 上划打断: 退出菜单切到重新开始菜单(上划/拖拽), 阈值与俄罗斯方块一致 */
-        {
-            uint8_t r = menu_swipe_to_restart_handler(210, 10);
-            if (r) {
-                g_grid_dirty = 1;
-                g_state = KLOTSKI_STATE_RESTART_MENU;
-                return r - 1;
-            }
-        }
-
-        /* 退出菜单拖拽中: 跟手/松手/取消 */
-        if (g_exit_dragging) {
-            TouchState ts_d;
-            Touch_Scan(&ts_d);
-            uint8_t poll_ret = game_menu_drag_poll(&g_exit_drag_y, &g_exit_drag_start_y,
-                                                    &g_exit_dragging, &ts_d, klotski_row_types);
-            if (poll_ret == 1) {
-                g_exit_sliding = 1;
-            } else if (poll_ret == 2) {
-                menu_clear_exit_area_to(g_exit_drag_y);
-                g_exit_menu_visible = 0;
-                g_state = g_state_before_menu;
-                g_grid_dirty = 1;
-                g_touch_down = 0;
-                g_menu_cooldown = 15;
-            }
-            return 0;
-        }
-        /* 退出菜单滑动动画中: 平滑展开, 到位后静止 */
-        if (g_exit_sliding) {
-            g_exit_drag_y += MENU_SLIDE_SPEED;
-            if (g_exit_drag_y >= MENU_Y) {
-                g_exit_drag_y = MENU_Y;
-                g_exit_sliding = 0;
-                g_touch_down = 0;
-            }
-            menu_draw_nrow_frame_only(g_exit_drag_y, klotski_row_types, 6);
-            return 0;
-        }
-
-        TouchState ts;
-        uint8_t ret = game_exit_menu_poll(klotski_exit_map, &g_prev_pressed, &ts);
-        if (ret == EXIT_RET_BACK) {
-            menu_exit_back_cleanup();
-            g_state = g_state_before_menu;
-            g_grid_dirty = 1;
-            return 0;
-        }
-        if (ret != EXIT_RET_NONE) {
-            g_exit_menu_visible = 0;
-            g_state = KLOTSKI_STATE_PLAYING;
-            return ret;
-        }
-        return 0;
-    }
-
-    /* ---- 重新开始菜单 ---- */
-    if (g_state == KLOTSKI_STATE_RESTART_MENU) {
-        /* g_grid_dirty==2: 电池闪灭恢复时仅重绘中段行(row 1-2)以减少SPI冲突 */
-        if (g_grid_dirty) {
-            if (g_grid_dirty == 2) {
-                uint8_t r, c;
-                for (r = 1; r <= 2; r++) {
-                    for (c = 0; c < KLOTSKI_COLS; c++) {
-                        uint8_t val = g_grid[r * KLOTSKI_COLS + c];
-                        uint16_t bg = (val == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR;
-                        draw_tile_bg(r, c, bg);
-                        if (val != 0) draw_tile_number(r, c, val);
-                    }
-                }
-            } else {
-                draw_grid();
-                draw_status();
-            }
-            g_grid_dirty = 0;
-        }
-        if (!g_restart_dragging && !g_restart_sliding) {
-            game_battery_icon_update(164, 22, 0);
-            menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
-        }
-        TouchState ts;
-
-        if (g_restart_dragging) {
-            Touch_Scan(&ts);
-            uint8_t poll_ret = game_restart_menu_drag_poll(&g_restart_slide_y, g_touch_start_y,
-                                                            &g_restart_dragging, &ts);
-            if (poll_ret == 1) {
-                g_restart_sliding = 1;
-                g_prev_pressed = 0;
-            } else if (poll_ret == 2) {
-                goto restart_menu_close;
-            } else if (poll_ret == 3) {
-                goto restart_menu_to_exit;
-            }
-            return 0;
-        }
-
-        if (g_restart_sliding) {
-            g_restart_slide_y -= RESTART_MENU_SLIDE_SPEED;
-            if (g_restart_slide_y <= RESTART_MENU_Y) {
-                g_restart_slide_y = RESTART_MENU_Y;
-                g_restart_sliding = 0;
-                g_prev_pressed = 0;
-            }
-            menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
-            {
-                TouchState ts;
-                Touch_Scan(&ts);
-                if (game_restart_menu_down_poll(&ts, &g_touch_down,
-                                                &g_touch_start_x, &g_touch_start_y))
-                    goto restart_menu_to_exit;
-            }
-            return 0;
-        }
-
-        Touch_Scan(&ts);
-
-        if (game_restart_menu_down_poll(&ts, &g_touch_down,
-                                        &g_touch_start_x, &g_touch_start_y))
-            goto restart_menu_to_exit;
-
-        {
-            static int8_t ph = -1;
-
-            int8_t ch = -1;
-            if (ts.x >= RESTART_MENU_X && ts.x < RESTART_MENU_X + RESTART_MENU_W) {
-                uint16_t yo = ts.y - (RESTART_MENU_Y + RESTART_MENU_BDR);
-                uint16_t ih = (RESTART_MENU_H - 2 * RESTART_MENU_BDR) / 3;
-                if (yo < ih * 3) ch = (int8_t)(yo / ih);
-            }
-
-            if (!g_prev_pressed && ts.pressed) {
-                ph = ch;
-            } else if (g_prev_pressed && !ts.pressed && ch == ph) {
-                if (ph < 0) {
-                    /* 点击空白区 → 关闭菜单 */
-                    goto restart_menu_close;
-                }
-                if (ph == 0) {
-                    /* 重新开始 */
-                    menu_restart_cleanup();
-                    g_state = KLOTSKI_STATE_PLAYING;
-                    klotski_init();
-                    ph = -1;
-                    g_prev_pressed = 0;
-                    return GAME_RET_INTERACT;
-                }
-                /* 设置 或 返回 */
-                if (ph == 1) {
-                    menu_enter_game_settings();
-                    interacted = EXIT_RET_SETTINGS;
-                } else {
-                    interacted = GAME_RET_INTERACT;
-                }
-                ph = -1;
-                g_prev_pressed = 0;
-                goto restart_menu_close;
-            }
-            if (!ts.pressed) ph = -1;
-            g_prev_pressed = ts.pressed;
-            return 0;
-        }
-        restart_menu_to_exit:
-        g_grid_dirty = 1;
-        game_menu_restart_to_exit((uint8_t *)&g_state, KLOTSKI_STATE_EXIT_MENU, ts.y);
-        return 0;
-        restart_menu_close:
-        menu_restart_cleanup();
-        g_state = g_state_before_menu;
-        g_grid_dirty = 1;
-        g_prev_pressed = ts.pressed;
-        return interacted;
     }
 
     /* ---- 游戏进行中 ---- */

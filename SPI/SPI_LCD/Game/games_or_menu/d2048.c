@@ -47,9 +47,7 @@ static D2048State g_state;
 static uint8_t  g_grid_dirty;       /* 格子脏标记 */
 static uint8_t  g_full_redraw;      /* 全屏重绘/电池闪灭后脏标记 */
 
-/* 触摸状态 */
-static uint16_t g_touch_start_x;
-static uint8_t  g_prev_pressed;
+/* 触摸状态: g_touch_start_x / g_prev_pressed 提升为 menu.c 共享全局 */
 
 /* 下划菜单游戏映射 (顺序: 视频/推箱子/俄罗斯方块/华容道) */
 static const uint8_t d2048_exit_map[5] = {
@@ -435,6 +433,50 @@ uint8_t d2048_restore_state(const uint8_t *buf, uint8_t len)
     return 1;
 }
 
+/* ================================================================
+ *  配置驱动菜单状态机的 hook (mark_dirty / bg_redraw)
+ * ================================================================ */
+static void d2048_menu_mark_dirty(void)   /* 关闭/取消菜单后需重绘场景 */
+{
+    g_grid_dirty = 1;
+    g_full_redraw = 1;
+}
+
+/* 依据脏标记重绘菜单背景: 返回1=本帧已重绘 */
+static uint8_t d2048_menu_bg_redraw(void)
+{
+    if (!g_grid_dirty) return 0;
+    if (g_grid_dirty == 2) {
+        /* 电池闪灭: 仅重绘第2、3行(电池下方), 避免大面积LCD_Fill闪烁 */
+        uint8_t r, c;
+        for (r = 1; r <= 2; r++) {
+            for (c = 0; c < D2048_COLS; c++) {
+                uint8_t idx = r * D2048_COLS + c;
+                uint16_t val = g_grid[idx];
+                uint8_t ci = (val == 0) ? 0 : get_color_idx(val);
+                uint16_t bg = (val == 0) ? 0xCE59 : tile_colors[ci];
+                draw_tile_bg(r, c, bg);
+                draw_tile_number(r, c, val);
+                g_prev_grid[idx] = val;
+            }
+        }
+    } else {
+        draw_grid();
+        draw_score();
+    }
+    g_grid_dirty = 0;
+    g_full_redraw = 0;
+    return 1;
+}
+
+static const GameMenuCfg g_d2048_menu_cfg = {
+    D2048_STATE_PLAYING, D2048_STATE_EXIT_MENU, D2048_STATE_RESTART_MENU,
+    d2048_row_types, d2048_exit_map,
+    210, 10,
+    164, 22,
+    d2048_menu_mark_dirty, d2048_menu_bg_redraw, NULL
+};
+
 uint8_t d2048_update(void)
 {
     uint8_t interacted = 0;
@@ -451,207 +493,17 @@ uint8_t d2048_update(void)
         g_full_redraw = 1;
     }
 
-    /* ---- 退出菜单状态 ---- */
-    if (g_state == D2048_STATE_EXIT_MENU) {
-        /* 脏标记/全屏重绘时触发完整grid重绘 */
-        if (g_grid_dirty) {
-            /* g_grid_dirty==2: 电池闪灭恢复时仅重绘下方两行以免大面积LCD_Fill闪烁 */
-            if (g_grid_dirty == 1) {
-                draw_grid();
-                draw_score();
-            }
-            g_grid_dirty = 0;
-            g_full_redraw = 0;
-            /* 非拖拽/滑动期间绘制退出菜单顶部框架 */
-            if (!g_exit_dragging && !g_exit_sliding) {
-                menu_draw_nrow_frame_only(g_exit_drag_y, d2048_row_types, 6);
-            }
+    /* ---- 退出菜单 / 重新开始菜单: 配置驱动统一状态机 ---- */
+    if (g_state == D2048_STATE_EXIT_MENU || g_state == D2048_STATE_RESTART_MENU) {
+        uint8_t out_ret;
+        uint8_t cmd = game_menu_command(&g_d2048_menu_cfg, (uint8_t *)&g_state, &out_ret);
+        switch (cmd) {
+            case GAME_MENU_CMD_SWITCH:   return out_ret;
+            case GAME_MENU_CMD_RESTART:  d2048_init(); return GAME_RET_INTERACT;
+            case GAME_MENU_CMD_SETTINGS: menu_enter_game_settings(); return EXIT_RET_SETTINGS;
+            case GAME_MENU_CMD_INTERACT: return GAME_RET_INTERACT;
+            default:                     return 0;
         }
-
-        /* 上划打断: 退出菜单切到重新开始菜单(上划/拖拽), 阈值与俄罗斯方块一致 */
-        {
-            uint8_t r = menu_swipe_to_restart_handler(210, 10);
-            if (r) {
-                g_grid_dirty = 1;
-                g_full_redraw = 1;
-                g_state = D2048_STATE_RESTART_MENU;
-                return r - 1;
-            }
-        }
-
-        /* 退出菜单拖拽中: 跟手/松手/取消 */
-        if (g_exit_dragging) {
-            TouchState ts_d;
-            Touch_Scan(&ts_d);
-            uint8_t poll_ret = game_menu_drag_poll(&g_exit_drag_y, &g_exit_drag_start_y,
-                                                    &g_exit_dragging, &ts_d, d2048_row_types);
-            if (poll_ret == 1) {
-                g_exit_sliding = 1;
-            } else if (poll_ret == 2) {
-                menu_clear_exit_area_to(g_exit_drag_y);
-                g_exit_menu_visible = 0;
-                g_state = g_state_before_menu;
-                g_grid_dirty = 1;
-                g_full_redraw = 1;
-                g_touch_down = 0;
-                g_menu_cooldown = 15;
-            }
-            return 0;
-        }
-
-        /* 退出菜单滑动动画中: 平滑展开, 到位后静止 */
-        if (g_exit_sliding) {
-            g_exit_drag_y += MENU_SLIDE_SPEED;
-            if (g_exit_drag_y >= MENU_Y) {
-                g_exit_drag_y = MENU_Y;
-                g_exit_sliding = 0;
-                g_touch_down = 0;
-            }
-            menu_draw_nrow_frame_only(g_exit_drag_y, d2048_row_types, 6);
-            return 0;
-        }
-
-        TouchState ts;
-        uint8_t ret = game_exit_menu_poll(d2048_exit_map, &g_prev_pressed, &ts);
-        if (ret == EXIT_RET_BACK) {
-            menu_exit_back_cleanup();
-            g_state = g_state_before_menu;
-            g_grid_dirty = 1;
-            g_full_redraw = 1;
-            return 0;
-        }
-        if (ret != EXIT_RET_NONE) {
-            g_exit_menu_visible = 0;
-            g_state = D2048_STATE_PLAYING;
-            return ret;
-        }
-        return 0;
-    }
-
-    /* ---- 重新开始菜单状态 ---- */
-    if (g_state == D2048_STATE_RESTART_MENU) {
-        /* 脏标记/电池闪灭恢复: 触发局部grid重绘避免大面积LCD_Fill闪烁 */
-        /* g_grid_dirty==2: 电池闪灭恢复时仅重绘第2和第3行(电池下方), 并跳过draw_score中LCD_Fill */
-        if (g_grid_dirty) {
-            if (g_grid_dirty == 2) {
-                uint8_t r, c;
-                for (r = 1; r <= 2; r++) {
-                    for (c = 0; c < D2048_COLS; c++) {
-                        uint8_t idx = r * D2048_COLS + c;
-                        uint16_t val = g_grid[idx];
-                        uint8_t ci = (val == 0) ? 0 : get_color_idx(val);
-                        uint16_t bg = (val == 0) ? 0xCE59 : tile_colors[ci];
-                        draw_tile_bg(r, c, bg);
-                        draw_tile_number(r, c, val);
-                        g_prev_grid[idx] = val;
-                    }
-                }
-            } else {
-                draw_grid();
-                draw_score();
-            }
-            g_grid_dirty = 0;
-            g_full_redraw = 0;
-        }
-        if (!g_restart_dragging && !g_restart_sliding) {
-            game_battery_icon_update(164, 22, 0);
-            menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
-        }
-        TouchState ts;
-
-        if (g_restart_dragging) {
-            Touch_Scan(&ts);
-            uint8_t poll_ret = game_restart_menu_drag_poll(&g_restart_slide_y, g_touch_start_y,
-                                                            &g_restart_dragging, &ts);
-            if (poll_ret == 1) {
-                g_restart_sliding = 1;
-                g_touch_down = 0;
-                g_prev_pressed = 0;
-            } else if (poll_ret == 2) {
-                goto restart_menu_close;
-            } else if (poll_ret == 3) {
-                goto restart_menu_to_exit;
-            }
-            return 0;
-        }
-
-        if (g_restart_sliding) {
-            g_restart_slide_y -= RESTART_MENU_SLIDE_SPEED;
-            if (g_restart_slide_y <= RESTART_MENU_Y) {
-                g_restart_slide_y = RESTART_MENU_Y;
-                g_restart_sliding = 0;
-                g_prev_pressed = 0;
-            }
-            menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
-            {
-                TouchState ts;
-                Touch_Scan(&ts);
-                if (game_restart_menu_down_poll(&ts, &g_touch_down,
-                                                &g_touch_start_x, &g_touch_start_y))
-                    goto restart_menu_to_exit;
-            }
-            return 0;
-        }
-
-        Touch_Scan(&ts);
-
-        if (game_restart_menu_down_poll(&ts, &g_touch_down,
-                                        &g_touch_start_x, &g_touch_start_y))
-            goto restart_menu_to_exit;
-
-        {
-            static int8_t ph = -1;
-
-            int8_t ch = -1;
-            if (ts.x >= RESTART_MENU_X && ts.x < RESTART_MENU_X + RESTART_MENU_W) {
-                uint16_t yo = ts.y - (RESTART_MENU_Y + RESTART_MENU_BDR);
-                uint16_t ih = (RESTART_MENU_H - 2 * RESTART_MENU_BDR) / 3;
-                if (yo < ih * 3) ch = (int8_t)(yo / ih);
-            }
-
-            if (!g_prev_pressed && ts.pressed) {
-                ph = ch;
-            } else if (g_prev_pressed && !ts.pressed && ch == ph) {
-                if (ph < 0) {
-                    /* 点击空白区 → 关闭菜单 */
-                    goto restart_menu_close;
-                }
-                if (ph == 0) {
-                    /* 重新开始 */
-                    menu_restart_cleanup();
-                    g_state = D2048_STATE_PLAYING;
-                    d2048_init();
-                    ph = -1;
-                    g_prev_pressed = 0;
-                    return 1;
-                }
-                /* 设置 或 返回 */
-                if (ph == 1) {
-                    menu_enter_game_settings();
-                    interacted = EXIT_RET_SETTINGS;
-                } else {
-                    interacted = GAME_RET_INTERACT;
-                }
-                ph = -1;
-                g_prev_pressed = 0;
-                goto restart_menu_close;
-            }
-            if (!ts.pressed) ph = -1;
-            g_prev_pressed = ts.pressed;
-            return 0;
-        }
-        restart_menu_to_exit:
-        g_grid_dirty = 1;
-        g_full_redraw = 1;
-        game_menu_restart_to_exit((uint8_t *)&g_state, D2048_STATE_EXIT_MENU, ts.y);
-        return 0;
-        restart_menu_close:
-        menu_restart_cleanup();
-        g_state = g_state_before_menu;
-        g_grid_dirty = 1;
-        g_full_redraw = 1;
-        g_prev_pressed = ts.pressed;
-        return interacted;
     }
 
     /* ---- 游戏进行中 ---- */

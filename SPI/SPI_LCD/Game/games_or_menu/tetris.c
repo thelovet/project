@@ -123,8 +123,6 @@ static uint16_t g_saved_interval;  /* 加速前原始速度 */
 static uint8_t  g_lock_delay;     /* 落地锁定延迟计时器 */
 
 /* 触摸手势 */
-static uint16_t g_touch_start_x;
-static uint8_t  g_prev_pressed;
 static uint8_t  g_wait_touch_release;
 
 /* 长按重复 */
@@ -937,6 +935,40 @@ static void tetris_draw_menu_scene(void)
  * @brief  俄罗斯方块每帧更新: 处理触摸手势、菜单交互、自动下落、消行动画和渲染
  * @retval GAME_RET_NONE=无交互, GAME_RET_INTERACT=有交互, 其他=退出到指定游戏/视频
  */
+/* ================================================================
+ *  配置驱动菜单状态机的 hook (mark_dirty / bg_redraw / on_to_exit)
+ * ================================================================ */
+static void tetris_menu_mark_dirty(void)   /* 关闭/取消菜单后需重绘场景 */
+{
+    g_board_dirty = 2;
+    g_sidebar_dirty = 1;
+    g_preview_dirty = 1;
+    g_gameover_drawn = 0;
+}
+
+/* 依据脏标记重绘菜单背景(棋盘/结束画面): 返回1=本帧已重绘 */
+static uint8_t tetris_menu_bg_redraw(void)
+{
+    if (g_board_dirty >= 2) { tetris_draw_menu_scene(); return 1; }
+    return 0;
+}
+
+/* 重菜下滑打断进退出菜单后的补充处理: 置脏以便重绘 */
+static void tetris_menu_on_to_exit(void)
+{
+    g_board_dirty = 2;
+    g_sidebar_dirty = 1;
+    g_preview_dirty = 1;
+}
+
+static const GameMenuCfg g_tetris_menu_cfg = {
+    TETRIS_STATE_PLAYING, TETRIS_STATE_EXIT_MENU, TETRIS_STATE_RESTART_MENU,
+    tetris_row_types, tetris_exit_map,
+    210, 25,
+    184, 40,
+    tetris_menu_mark_dirty, tetris_menu_bg_redraw, tetris_menu_on_to_exit
+};
+
 uint8_t tetris_update(void)
 {
     uint8_t interacted = 0;
@@ -953,195 +985,17 @@ uint8_t tetris_update(void)
         g_preview_dirty = 1;
     }
 
-    /* ---- 退出菜单模式 ---- */
-    if (g_state == TETRIS_STATE_EXIT_MENU) {
-        /* 重绘菜单背景: 从游戏画面开始绘制 */
-        if (g_board_dirty >= 2) {
-            tetris_draw_menu_scene();
-            if (!g_exit_dragging && !g_exit_sliding) {
-                menu_draw_nrow_frame_only(g_exit_drag_y, tetris_row_types, 6);
-            }
+    /* ---- 退出菜单 / 重新开始菜单: 配置驱动统一状态机 ---- */
+    if (g_state == TETRIS_STATE_EXIT_MENU || g_state == TETRIS_STATE_RESTART_MENU) {
+        uint8_t out_ret;
+        uint8_t cmd = game_menu_command(&g_tetris_menu_cfg, (uint8_t *)&g_state, &out_ret);
+        switch (cmd) {
+            case GAME_MENU_CMD_SWITCH:   return out_ret;
+            case GAME_MENU_CMD_RESTART:  g_wait_touch_release = 1; tetris_init(); return GAME_RET_INTERACT;
+            case GAME_MENU_CMD_SETTINGS: g_wait_touch_release = 1; menu_enter_game_settings(); return EXIT_RET_SETTINGS;
+            case GAME_MENU_CMD_INTERACT: g_wait_touch_release = 1; return GAME_RET_INTERACT;
+            default:                     g_wait_touch_release = 1; return 0;  /* RETURN/关闭 */
         }
-
-        /* 底部上划: 打断退出菜单(含拖拽/滑入中), 切换到重新开始菜单 */
-        {
-            uint8_t r = menu_swipe_to_restart_handler(210, 25);
-            if (r) {
-                g_board_dirty = 2;
-                g_sidebar_dirty = 1;
-                g_preview_dirty = 1;
-                g_gameover_drawn = 0;
-                g_state = TETRIS_STATE_RESTART_MENU;
-                return r - 1;
-            }
-        }
-
-        /* 拖拽菜单 */
-        if (g_exit_dragging) {
-            TouchState ts_d;
-            Touch_Scan(&ts_d);
-            uint8_t drag_ret = game_menu_drag_poll(&g_exit_drag_y, &g_exit_drag_start_y,
-                                    &g_exit_dragging, &ts_d, tetris_row_types);
-            if (drag_ret == 1) {
-                g_exit_sliding = 1;
-            } else if (drag_ret == 2) {
-                menu_clear_exit_area_to(g_exit_drag_y);
-                g_exit_menu_visible = 0;
-                g_exit_sliding = 0;
-                g_exit_dragging = 0;
-                g_state = g_state_before_menu;
-                g_board_dirty = 2;
-                g_sidebar_dirty = 1;
-                g_preview_dirty = 1;
-                g_gameover_drawn = 0;
-                g_touch_down = 0;
-                g_menu_cooldown = 15;
-            }
-            return 0;
-        }
-
-        /* 退出菜单滑入: 手指松开, 自动滑入 */
-        if (g_exit_sliding) {
-            g_exit_drag_y += MENU_SLIDE_SPEED;
-            if (g_exit_drag_y >= MENU_Y) {
-                g_exit_drag_y = MENU_Y;
-                g_exit_sliding = 0;
-                g_touch_down = 0;
-            }
-            menu_draw_nrow_frame_only(g_exit_drag_y, tetris_row_types, 6);
-            return 0;
-        }
-
-        TouchState ts;
-        uint8_t ret = game_exit_menu_poll(tetris_exit_map, &g_prev_pressed, &ts);
-        if (ret == EXIT_RET_BACK) {
-            menu_exit_back_cleanup();
-            g_state = g_state_before_menu;
-            g_board_dirty = 2;
-            g_sidebar_dirty = 1;
-            g_preview_dirty = 1;
-            g_gameover_drawn = 0;
-            return 0;
-        }
-        if (ret != EXIT_RET_NONE) {
-            g_exit_menu_visible = 0;
-            g_state = TETRIS_STATE_PLAYING;
-            return ret;
-        }
-        return 0;
-    }
-
-    /* ---- 重开菜单模式 ---- */
-    if (g_state == TETRIS_STATE_RESTART_MENU) {
-        /* 重绘菜单背景: 从游戏画面开始绘制 */
-        if (g_board_dirty >= 2) {
-            tetris_draw_menu_scene();
-        }
-        if (!g_restart_dragging && !g_restart_sliding) {
-            game_battery_icon_update(184, 40, 0);
-            menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
-        }
-        TouchState ts;
-
-        if (g_restart_dragging) {
-            Touch_Scan(&ts);
-            uint8_t drag_ret = game_restart_menu_drag_poll(&g_restart_slide_y, g_touch_start_y,
-                                             &g_restart_dragging, &ts);
-            if (drag_ret == 1) {
-                g_restart_sliding = 1;
-                g_touch_down = 0;
-                g_hold_zone = 0;
-                g_prev_pressed = 0;
-            } else if (drag_ret == 2) {
-                goto restart_menu_close;
-            } else if (drag_ret == 3) {
-                goto restart_menu_to_exit;
-            }
-            return 0;
-        }
-
-        if (g_restart_sliding) {
-            g_restart_slide_y -= RESTART_MENU_SLIDE_SPEED;
-            if (g_restart_slide_y <= RESTART_MENU_Y) {
-                g_restart_slide_y = RESTART_MENU_Y;
-                g_restart_sliding = 0;
-                g_prev_pressed = 0;
-            }
-            menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
-            {
-                TouchState ts_d;
-                Touch_Scan(&ts_d);
-                if (game_restart_menu_down_poll(&ts_d, &g_touch_down,
-                                                &g_touch_start_x, &g_touch_start_y))
-                    goto restart_menu_to_exit;
-            }
-            return 0;
-        }
-
-        Touch_Scan(&ts);
-
-        if (game_restart_menu_down_poll(&ts, &g_touch_down,
-                                        &g_touch_start_x, &g_touch_start_y))
-            goto restart_menu_to_exit;
-
-        {
-            static int8_t ph = -1;
-
-            int8_t ch = -1;
-            if (ts.x >= RESTART_MENU_X && ts.x < RESTART_MENU_X + RESTART_MENU_W) {
-                uint16_t yo = ts.y - (RESTART_MENU_Y + RESTART_MENU_BDR);
-                uint16_t ih = (RESTART_MENU_H - 2 * RESTART_MENU_BDR) / 3;
-                if (yo < ih * 3) ch = (int8_t)(yo / ih);
-            }
-
-            if (!g_prev_pressed && ts.pressed) {
-                ph = ch;
-            } else if (g_prev_pressed && !ts.pressed && ch == ph) {
-                if (ph < 0) {
-                    /* 点击菜单外 → 关闭菜单 */
-                    goto restart_menu_close;
-                }
-                if (ph == 0) {
-                    /* 重新开始 */
-                    menu_restart_cleanup();
-                    g_state = TETRIS_STATE_PLAYING;
-                    tetris_init();
-                    g_wait_touch_release = 1;
-                    ph = -1;
-                    g_prev_pressed = 0;
-                    return GAME_RET_INTERACT;
-                }
-                /* 设置 或 返回 */
-                if (ph == 1) {
-                    menu_enter_game_settings();
-                    interacted = EXIT_RET_SETTINGS;
-                } else {
-                    interacted = GAME_RET_INTERACT;
-                }
-                ph = -1;
-                g_prev_pressed = 0;
-                goto restart_menu_close;
-            }
-            if (!ts.pressed) ph = -1;
-            g_prev_pressed = ts.pressed;
-            return 0;
-        }
-        restart_menu_to_exit:
-        g_board_dirty = 2;
-        g_sidebar_dirty = 1;
-        g_preview_dirty = 1;
-        game_menu_restart_to_exit((uint8_t *)&g_state, TETRIS_STATE_EXIT_MENU, ts.y);
-        return 0;
-        restart_menu_close:
-        menu_restart_cleanup();
-        g_state = g_state_before_menu;
-        g_wait_touch_release = 1;
-        g_board_dirty = 2;
-        g_sidebar_dirty = 1;
-        g_preview_dirty = 1;
-        g_gameover_drawn = 0;
-        g_prev_pressed = ts.pressed;
-        return interacted;
     }
 
     /* ---- 游戏结束状态: 显示分数, 等待手势 ---- */

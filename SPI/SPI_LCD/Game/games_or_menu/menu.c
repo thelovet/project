@@ -30,6 +30,8 @@ int16_t  g_restart_slide_y = 240;      /* 重新开始菜单滑动Y位置 */
 uint16_t g_menu_clear_color = LCD_BLACK;  /* 菜单/重开区域清除色(游戏可设为背景色) */
 uint8_t  g_settings_from_game = MAIN_MODE_VIDEO;  /* 从游戏进入设置的来源模式 */
 uint8_t  g_game_enter_exit_menu = 0;  /* 设置菜单中顶部下滑→退出菜单标志 */
+uint8_t  g_prev_pressed;              /* 上一帧触摸按下(各游戏共用, 供 game_menu_command/退出菜单轮询) */
+uint16_t g_touch_start_x;             /* 触摸起点X (与 g_touch_start_y 一致提升为共享全局) */
 #include "tetris.h"        /* tetris_reset_touch, GAME_RET_* */
 #include "klotski.h"       /* klotski_reset_touch */
 #include "adc.h"
@@ -1357,4 +1359,188 @@ void menu_clear_exit_area_to(int16_t y)
     int16_t bottom = y + MENU_H;
     if (y < 0) y = 0;
     LCD_Fill(MENU_X, (uint16_t)y, MENU_X + MENU_W, (uint16_t)bottom, g_menu_clear_color);
+}
+
+/*********************************************************************
+ * @brief  配置驱动游戏退出/重新开始菜单统一状态机 (d2048/klotski/tetris/fish 共用)
+ *         把各游戏 update() 里重复的 EXIT_MENU/RESTART_MENU 状态处理收敛到一处:
+ *         仅通过 GameMenuCfg 传入状态枚举/行类型/映射/阈值/背景重绘回调等差异点.
+ * @return GAME_MENU_CMD_*; 调用方按命令执行 init/设置/切换等游戏侧动作
+ **********************************************************************/
+uint8_t game_menu_command(const GameMenuCfg *cfg, uint8_t *state, uint8_t *out_ret)
+{
+    *out_ret = 0;
+
+    /* ---- 退出菜单 ---- */
+    if (*state == cfg->exit) {
+        /* 背景重绘(依据游戏脏标记), 非拖拽/滑动时再画菜单框 */
+        if (cfg->bg_redraw() && !g_exit_dragging && !g_exit_sliding)
+            menu_draw_nrow_frame_only(g_exit_drag_y, cfg->exit_row_types, 6);
+
+        /* 底部上划打断 → 切换到重新开始菜单 */
+        {
+            uint8_t r = menu_swipe_to_restart_handler(cfg->y_threshold, cfg->release_thresh);
+            if (r) {
+                cfg->mark_dirty();
+                *state = cfg->restart;
+                return (r == 2) ? GAME_MENU_CMD_INTERACT : GAME_MENU_CMD_NONE;
+            }
+        }
+
+        /* 拖拽 */
+        if (g_exit_dragging) {
+            TouchState ts_d;
+            Touch_Scan(&ts_d);
+            uint8_t poll_ret = game_menu_drag_poll(&g_exit_drag_y, &g_exit_drag_start_y,
+                                                    &g_exit_dragging, &ts_d, cfg->exit_row_types);
+            if (poll_ret == 1) {
+                g_exit_sliding = 1;
+            } else if (poll_ret == 2) {
+                menu_clear_exit_area_to(g_exit_drag_y);
+                g_exit_menu_visible = 0;
+                *state = g_state_before_menu;
+                cfg->mark_dirty();
+                g_touch_down = 0;
+                g_menu_cooldown = 15;
+            }
+            return GAME_MENU_CMD_NONE;
+        }
+
+        /* 滑入动画 */
+        if (g_exit_sliding) {
+            g_exit_drag_y += MENU_SLIDE_SPEED;
+            if (g_exit_drag_y >= MENU_Y) {
+                g_exit_drag_y = MENU_Y;
+                g_exit_sliding = 0;
+                g_touch_down = 0;
+            }
+            menu_draw_nrow_frame_only(g_exit_drag_y, cfg->exit_row_types, 6);
+            return GAME_MENU_CMD_NONE;
+        }
+
+        /* 点选 */
+        {
+            TouchState ts;
+            uint8_t ret = game_exit_menu_poll(cfg->exit_map, &g_prev_pressed, &ts);
+            if (ret == EXIT_RET_BACK) {
+                menu_exit_back_cleanup();
+                *state = g_state_before_menu;
+                cfg->mark_dirty();
+                return GAME_MENU_CMD_NONE;
+            }
+            if (ret != EXIT_RET_NONE) {
+                g_exit_menu_visible = 0;
+                *state = cfg->playing;
+                *out_ret = ret;
+                return GAME_MENU_CMD_SWITCH;
+            }
+            return GAME_MENU_CMD_NONE;
+        }
+    }
+
+    /* ---- 重新开始菜单 ---- */
+    if (*state == cfg->restart) {
+        uint8_t close_cmd = GAME_MENU_CMD_RETURN;   /* 默认点空白/取消 → 关闭回原状态 */
+        cfg->bg_redraw();   /* 依据脏标记重绘场景(仅脏时), 返回值此处不用于重开块 */
+
+        /* 静止时: 更新电池图标 + 每帧重绘菜单框(与各游戏原逻辑一致) */
+        if (!g_restart_dragging && !g_restart_sliding) {
+            if (cfg->bat_x != GAME_MENU_BAT_NONE)
+                game_battery_icon_update(cfg->bat_x, cfg->bat_y, 0);
+            menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
+        }
+        TouchState ts;
+
+        /* 拖拽 */
+        if (g_restart_dragging) {
+            Touch_Scan(&ts);
+            uint8_t poll_ret = game_restart_menu_drag_poll(&g_restart_slide_y, g_touch_start_y,
+                                                            &g_restart_dragging, &ts);
+            if (poll_ret == 1) {
+                g_restart_sliding = 1;
+                g_touch_down = 0;   /* 松手复位触摸, 保证下滑打断识别 */
+                g_prev_pressed = 0;
+            } else if (poll_ret == 2) {
+                goto restart_close;
+            } else if (poll_ret == 3) {
+                goto restart_to_exit;
+            }
+            return GAME_MENU_CMD_NONE;
+        }
+
+        /* 滑入动画 */
+        if (g_restart_sliding) {
+            g_restart_slide_y -= RESTART_MENU_SLIDE_SPEED;
+            if (g_restart_slide_y <= RESTART_MENU_Y) {
+                g_restart_slide_y = RESTART_MENU_Y;
+                g_restart_sliding = 0;
+                g_prev_pressed = 0;
+            }
+            menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
+            {
+                TouchState ts_d;
+                Touch_Scan(&ts_d);
+                if (game_restart_menu_down_poll(&ts_d, &g_touch_down,
+                                                &g_touch_start_x, &g_touch_start_y))
+                    goto restart_to_exit;
+            }
+            return GAME_MENU_CMD_NONE;
+        }
+
+        Touch_Scan(&ts);
+
+        if (game_restart_menu_down_poll(&ts, &g_touch_down,
+                                        &g_touch_start_x, &g_touch_start_y))
+            goto restart_to_exit;
+
+        /* 点选重菜 */ 
+        {
+            static int8_t ph = -1;
+            int8_t ch = -1;
+            if (ts.x >= RESTART_MENU_X && ts.x < RESTART_MENU_X + RESTART_MENU_W) {
+                uint16_t yo = ts.y - (RESTART_MENU_Y + RESTART_MENU_BDR);
+                uint16_t ih = (RESTART_MENU_H - 2 * RESTART_MENU_BDR) / 3;
+                if (yo < ih * 3) ch = (int8_t)(yo / ih);
+            }
+            if (!g_prev_pressed && ts.pressed) {
+                ph = ch;
+            } else if (g_prev_pressed && !ts.pressed && ch == ph) {
+                if (ph < 0) {
+                    /* 点击菜单外 → 关闭 */
+                    goto restart_close;
+                }
+                if (ph == 0) {
+                    /* 重新开始 */
+                    menu_restart_cleanup();
+                    *state = cfg->playing;
+                    g_prev_pressed = 0;
+                    ph = -1;
+                    return GAME_MENU_CMD_RESTART;
+                }
+                /* 设置 或 返回 */
+                if (ph == 1)      close_cmd = GAME_MENU_CMD_SETTINGS;
+                else              close_cmd = GAME_MENU_CMD_INTERACT;
+                ph = -1;
+                g_prev_pressed = 0;
+                goto restart_close;
+            }
+            if (!ts.pressed) ph = -1;
+            g_prev_pressed = ts.pressed;
+            return GAME_MENU_CMD_NONE;
+        }
+
+restart_to_exit:
+        game_menu_restart_to_exit((uint8_t *)state, cfg->exit, ts.y);
+        if (cfg->on_to_exit) cfg->on_to_exit();
+        return GAME_MENU_CMD_NONE;
+
+restart_close:
+        g_prev_pressed = ts.pressed;
+        menu_restart_cleanup();
+        *state = g_state_before_menu;
+        cfg->mark_dirty();
+        return close_cmd;
+    }
+
+    return GAME_MENU_CMD_NONE;
 }

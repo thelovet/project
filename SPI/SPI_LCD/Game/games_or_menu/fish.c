@@ -86,10 +86,8 @@ static uint8_t   g_hud_dirty;        /* 顶部信息(分数/进度)需重绘 */
 static uint16_t  g_frame;            /* 帧计数器(用于动画/移动节拍) */
 static uint32_t  g_food_us;          /* 上次小鱼移动的时间戳(微秒, 真实时间节拍) */
 static uint8_t   g_full_redraw;      /* 全屏重绘脏标记 */
-static uint8_t   g_prev_pressed;
 static int16_t   s_last_touch_x;     /* 上一次有效触摸位置(增量拖动用) */
 static int16_t   s_last_touch_y;
-static uint16_t g_touch_start_x;
 
 /* ================================================================
  *  颜色定义 (RGB565)
@@ -664,9 +662,44 @@ void fish_init(void)
  *  更新 (每帧调用)
  *  @return GAME_RET_* 返回值
  * ================================================================ */
+/* ================================================================
+ *  配置驱动菜单状态机的 hook (mark_dirty / bg_redraw / on_to_exit)
+ * ================================================================ */
+/* 关闭/取消菜单后立即重绘场景(结束画面/游戏画面) */
+static void fish_menu_mark_dirty(void)
+{
+    fish_restore_scene_behind();
+}
+
+/* 依据脏标记重绘菜单背景(结束画面/场景): 返回1=本帧已重绘 */
+static uint8_t fish_menu_bg_redraw(void)
+{
+    if (!g_full_redraw) return 0;
+    if (g_state_before_menu == FISH_STATE_OVER) draw_game_over();
+    else fish_draw_scene();
+    g_full_redraw = 0;
+    return 1;
+}
+
+/* 重菜下滑打断进退出菜单后的补充处理: 直接滑入(对齐 game_menu_restart_to_exit) */
+static void fish_menu_on_to_exit(void)
+{
+    g_exit_dragging = 0;
+    g_exit_sliding = 1;
+    g_exit_drag_y = -MENU_H;
+    fish_restore_scene_behind();
+}
+
+static const GameMenuCfg g_fish_menu_cfg = {
+    FISH_STATE_PLAYING, FISH_STATE_EXIT_MENU, FISH_STATE_RESTART_MENU,
+    fish_row_types, fish_exit_map,
+    220, 10,
+    GAME_MENU_BAT_NONE, 0,
+    fish_menu_mark_dirty, fish_menu_bg_redraw, fish_menu_on_to_exit
+};
+
 uint8_t fish_update(void)
 {
-    uint8_t interacted = 0;
 
     /* 菜单冷却 */
     if (g_menu_cooldown > 0) g_menu_cooldown--;
@@ -678,173 +711,17 @@ uint8_t fish_update(void)
         g_full_redraw = 1;
     }
 
-    /* ---- 退出菜单 ---- */
-    if (g_state == FISH_STATE_EXIT_MENU) {
-        /* 从结束画面进入菜单时, 需重绘结束画面作背景 */
-        if (g_full_redraw) {
-            if (g_state_before_menu == FISH_STATE_OVER) draw_game_over();
-            else fish_draw_scene();
-            g_full_redraw = 0;
+    /* ---- 退出菜单 / 重新开始菜单: 配置驱动统一状态机 ---- */
+    if (g_state == FISH_STATE_EXIT_MENU || g_state == FISH_STATE_RESTART_MENU) {
+        uint8_t out_ret;
+        uint8_t cmd = game_menu_command(&g_fish_menu_cfg, (uint8_t *)&g_state, &out_ret);
+        switch (cmd) {
+            case GAME_MENU_CMD_SWITCH:   return out_ret;
+            case GAME_MENU_CMD_RESTART:  fish_init(); return GAME_RET_INTERACT;
+            case GAME_MENU_CMD_SETTINGS: menu_enter_game_settings(); return EXIT_RET_SETTINGS;
+            case GAME_MENU_CMD_INTERACT: return GAME_RET_INTERACT;
+            default:                     return 0;  /* RETURN/关闭 */
         }
-        if (!g_exit_dragging && !g_exit_sliding) {
-            menu_draw_nrow_frame_only(g_exit_drag_y, fish_row_types, 6);
-        }
-        /* 上划打断: 切换到重新开始菜单 */
-        {
-            uint8_t r = menu_swipe_to_restart_handler(220, 10);
-            if (r) {
-                fish_restore_scene_behind();
-                g_state = FISH_STATE_RESTART_MENU;
-                return r - 1;
-            }
-        }
-        /* 拖拽 */
-        if (g_exit_dragging) {
-            TouchState ts_d;
-            Touch_Scan(&ts_d);
-            uint8_t poll_ret = game_menu_drag_poll(&g_exit_drag_y, &g_exit_drag_start_y,
-                                                    &g_exit_dragging, &ts_d, fish_row_types);
-            if (poll_ret == 1) {
-                g_exit_sliding = 1;
-            } else if (poll_ret == 2) {
-                menu_clear_exit_area_to(g_exit_drag_y);
-                g_exit_menu_visible = 0;
-                g_state = g_state_before_menu;
-                fish_restore_scene_behind();
-                g_touch_down = 0;
-                g_menu_cooldown = 15;
-            }
-            return 0;
-        }
-        /* 滑入动画 */
-        if (g_exit_sliding) {
-            g_exit_drag_y += MENU_SLIDE_SPEED;
-            if (g_exit_drag_y >= MENU_Y) {
-                g_exit_drag_y = MENU_Y;
-                g_exit_sliding = 0;
-                g_touch_down = 0;
-            }
-            menu_draw_nrow_frame_only(g_exit_drag_y, fish_row_types, 6);
-            return 0;
-        }
-        /* 点选退出菜单 */
-        {
-            TouchState ts;
-            uint8_t ret = game_exit_menu_poll(fish_exit_map, &g_prev_pressed, &ts);
-            if (ret == EXIT_RET_BACK) {
-                menu_exit_back_cleanup();
-                g_state = g_state_before_menu;
-                fish_restore_scene_behind();
-                return 0;
-            }
-            if (ret != EXIT_RET_NONE) {
-                g_exit_menu_visible = 0;
-                g_state = FISH_STATE_PLAYING;
-                return ret;
-            }
-            return 0;
-        }
-    }
-
-    /* ---- 重开菜单 ---- */
-    if (g_state == FISH_STATE_RESTART_MENU) {
-        if (g_full_redraw) {
-            if (g_state_before_menu == FISH_STATE_OVER) draw_game_over();
-            else fish_draw_scene();
-            g_full_redraw = 0;
-        }
-        if (!g_restart_dragging && !g_restart_sliding) {
-            menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
-        }
-        TouchState ts;
-        if (g_restart_dragging) {
-            Touch_Scan(&ts);
-            uint8_t poll_ret = game_restart_menu_drag_poll(&g_restart_slide_y, g_touch_start_y,
-                                                            &g_restart_dragging, &ts);
-            if (poll_ret == 1) {
-                g_restart_sliding = 1;
-                g_touch_down = 0;   /* 松手复位触摸, 保证随后下滑打断能被识别 */
-                g_prev_pressed = 0;
-            } else if (poll_ret == 2) {
-                goto restart_menu_close;
-            } else if (poll_ret == 3) {
-                goto restart_menu_to_exit;
-            }
-            return 0;
-        }
-        if (g_restart_sliding) {
-            g_restart_slide_y -= RESTART_MENU_SLIDE_SPEED;
-            if (g_restart_slide_y <= RESTART_MENU_Y) {
-                g_restart_slide_y = RESTART_MENU_Y;
-                g_restart_sliding = 0;
-                g_prev_pressed = 0;
-            }
-            menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
-            {
-                TouchState ts_d;
-                Touch_Scan(&ts_d);
-                if (game_restart_menu_down_poll(&ts_d, &g_touch_down,
-                                                &g_touch_start_x, &g_touch_start_y))
-                    goto restart_menu_to_exit;
-            }
-            return 0;
-        }
-        Touch_Scan(&ts);
-        if (game_restart_menu_down_poll(&ts, &g_touch_down,
-                                        &g_touch_start_x, &g_touch_start_y))
-            goto restart_menu_to_exit;
-        {
-            static int8_t ph = -1;
-            int8_t ch = -1;
-            if (ts.x >= RESTART_MENU_X && ts.x < RESTART_MENU_X + RESTART_MENU_W) {
-                uint16_t yo = ts.y - (RESTART_MENU_Y + RESTART_MENU_BDR);
-                uint16_t ih = (RESTART_MENU_H - 2 * RESTART_MENU_BDR) / 3;
-                if (yo < ih * 3) ch = (int8_t)(yo / ih);
-            }
-            if (!g_prev_pressed && ts.pressed) {
-                ph = ch;
-            } else if (g_prev_pressed && !ts.pressed && ch == ph) {
-                if (ph < 0) {
-                    /* 点击菜单外 → 关闭菜单 */
-                    goto restart_menu_close;
-                }
-                if (ph == 0) {
-                    /* 重新开始 */
-                    menu_restart_cleanup();
-                    g_state = FISH_STATE_PLAYING;
-                    fish_init();
-                    ph = -1;
-                    g_prev_pressed = 0;
-                    return GAME_RET_INTERACT;
-                }
-                /* 设置 或 返回 */
-                if (ph == 1) {
-                    menu_enter_game_settings();
-                    interacted = EXIT_RET_SETTINGS;
-                } else {
-                    interacted = GAME_RET_INTERACT;
-                }
-                ph = -1;
-                g_prev_pressed = 0;
-                goto restart_menu_close;
-            }
-            if (!ts.pressed) ph = -1;
-            g_prev_pressed = ts.pressed;
-            return 0;
-        }
-        restart_menu_to_exit:
-        game_menu_restart_to_exit((uint8_t *)&g_state, FISH_STATE_EXIT_MENU, ts.y);
-        g_exit_dragging = 0;   /* 打断后退出菜单直接滑入, 避免跟手拖拽需长划才弹出 */
-        g_exit_sliding = 1;
-        g_exit_drag_y = -MENU_H;
-        fish_restore_scene_behind();
-        return 0;
-        restart_menu_close:
-        menu_restart_cleanup();
-        g_state = g_state_before_menu;
-        fish_restore_scene_behind();
-        g_prev_pressed = ts.pressed;
-        return interacted;
     }
 
     /* ---- 游戏结束: 上滑/下滑呼出菜单 (不再点击任意处重开) ---- */
@@ -1181,23 +1058,126 @@ uint8_t fish_is_menu_visible(void)
 }
 
 /* ================================================================
- *  存档 / 恢复 (最小实现: 存玩家等级/得分/小鱼)
+ *  存档 / 恢复 (存玩家等级/坐标/朝向 + 完整得分/状态 + 每条小鱼位置/速度)
+ *  载荷布局: 玩家 level(1) x(2,y2) y(2) facing(1) + score(4) + state(1)
+ *            然后 FISH_NUM_FOOD 条鱼, 每条 active(1) level(1) x(2) y(2) vx(2) vy(2)
+ *  恢复时原地继续, 避免"鱼被重新生成到屏幕外边缘、短暂无鱼"的问题
  * ================================================================ */
+#define FISH_SAVE_BASE 11   /* 玩家 level+x+y+facing(6) + score(4) + state(1) */
+#define FISH_SAVE_FOOD 9    /* 每条鱼: active+level+x+y+vx+vy */
+#define FISH_SAVE_LEN (FISH_SAVE_BASE + FISH_NUM_FOOD * FISH_SAVE_FOOD)
+
 uint8_t fish_save_state(uint8_t *buf, uint8_t max_len)
 {
-    if (!buf || max_len < 4) return 0;
-    buf[0] = g_player.level;
-    buf[1] = (uint8_t)(g_score >> 8);
-    buf[2] = (uint8_t)(g_score & 0xFF);
-    buf[3] = g_state;
-    return 4;
+    uint8_t i, state;
+    uint8_t *p;
+    if (!buf || max_len < FISH_SAVE_LEN) return 0;
+
+    /* 菜单打开时存进入菜单前的状态 */
+    if (g_state == FISH_STATE_EXIT_MENU || g_state == FISH_STATE_RESTART_MENU)
+        state = g_state_before_menu;
+    else
+        state = g_state;
+    if (state > FISH_STATE_OVER) state = FISH_STATE_PLAYING;
+
+    p = buf;
+    *p++ = g_player.level;
+    p[0] = (uint8_t)(g_player.x & 0xFF); p[1] = (uint8_t)(g_player.x >> 8); p += 2;
+    p[0] = (uint8_t)(g_player.y & 0xFF); p[1] = (uint8_t)(g_player.y >> 8); p += 2;
+    *p++ = g_player.facing;
+    *p++ = (uint8_t)(g_score & 0xFF);
+    *p++ = (uint8_t)((g_score >> 8) & 0xFF);
+    *p++ = (uint8_t)((g_score >> 16) & 0xFF);
+    *p++ = (uint8_t)((g_score >> 24) & 0xFF);
+    *p++ = state;
+
+    for (i = 0; i < FISH_NUM_FOOD; i++) {
+        const FishEntity *f = &g_food[i];
+        *p++ = f->active;
+        *p++ = f->level;
+        p[0] = (uint8_t)(f->x & 0xFF); p[1] = (uint8_t)(f->x >> 8); p += 2;
+        p[0] = (uint8_t)(f->y & 0xFF); p[1] = (uint8_t)(f->y >> 8); p += 2;
+        p[0] = (uint8_t)(f->vx & 0xFF); p[1] = (uint8_t)((uint16_t)f->vx >> 8); p += 2;
+        p[0] = (uint8_t)(f->vy & 0xFF); p[1] = (uint8_t)((uint16_t)f->vy >> 8); p += 2;
+    }
+    return FISH_SAVE_LEN;
 }
 
 uint8_t fish_restore_state(const uint8_t *buf, uint8_t len)
 {
-    if (!buf || len < 4) return 0;
-    g_player.level = buf[0];
-    g_score = (uint16_t)((uint16_t)buf[1] << 8) | buf[2];
-    g_state = (buf[3] == FISH_STATE_OVER) ? FISH_STATE_OVER : FISH_STATE_PLAYING;
+    uint8_t i, state;
+    const uint8_t *p;
+    uint32_t score;
+
+    if (!buf || len < FISH_SAVE_LEN) return 0;
+    p = buf;
+
+    g_player.level = *p++;
+    g_player.x = (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8)); p += 2;
+    g_player.y = (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8)); p += 2;
+    g_player.facing = *p++;
+    score = (uint32_t)p[0] | ((uint32_t)p[1] << 8)
+          | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+    p += 4;
+    state = *p++;
+    if (state > FISH_STATE_OVER) return 0;
+
+    g_score = score;
+    g_won = (g_score >= FISH_WIN_SCORE) ? 1 : 0;
+    g_state = (state == FISH_STATE_OVER) ? FISH_STATE_OVER : FISH_STATE_PLAYING;
+
+    /* 玩家: 恢复坐标, 速度清零(玩家由触摸增量驱动), 其余复位 */
+    g_player.active = 1;
+    g_player.vx = 0;
+    g_player.vy = 0;
+    g_player.prev_x = (int16_t)g_player.x;
+    g_player.prev_y = (int16_t)g_player.y;
+    g_player.prev_level = g_player.level;
+    g_player.drawn = 0;
+    g_player.leaving = 0;
+    g_player.entering = 0;
+    g_player.dir = 0;
+
+    /* 每条小鱼: 曾在场则原地恢复(带速度), 空位则重新生成一条 */
+    for (i = 0; i < FISH_NUM_FOOD; i++) {
+        FishEntity *f = &g_food[i];
+        uint8_t act = *p++;
+        f->level = *p++;
+        f->x = (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8)); p += 2;
+        f->y = (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8)); p += 2;
+        f->vx = (int16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8)); p += 2;
+        f->vy = (int16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8)); p += 2;
+        if (act) {
+            f->active = 1;
+            f->prev_x = (int16_t)f->x;
+            f->prev_y = (int16_t)f->y;
+            f->prev_level = f->level;
+            f->drawn = 0;
+            f->leaving = 0;
+            f->entering = 0;
+        } else {
+            f->drawn = 0;
+            food_respawn(f, 0);
+        }
+    }
+
+    g_menu_clear_color = COLOR_BG;
+    g_hud_dirty = 1;   /* 首帧重绘顶部信息 */
+    g_frame = 0;
+    g_food_us = GetTimerCount();
+    g_full_redraw = 1;
+    g_prev_pressed = 0;
+    g_touch_down = 0;
+    g_menu_cooldown = 0;
+    g_exit_menu_visible = 0;
+    g_restart_menu_visible = 0;
+    g_restart_sliding = 0;
+    g_restart_dragging = 0;
+    g_restart_slide_y = RESTART_MENU_Y + RESTART_MENU_H;
+
+    /* 立即重绘, 避免恢复后黑屏一帧 */
+    LCD_Fill(0, 0, LCD_W, LCD_H, COLOR_BG);
+    if (g_state == FISH_STATE_OVER) draw_game_over();
+    else fish_draw_scene();
     return 1;
 }

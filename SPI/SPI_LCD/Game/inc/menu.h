@@ -360,4 +360,43 @@ void menu_enter_game_settings(void);
 /* 设置菜单中顶部下滑触发: GameSettings_Update设置, 各游戏update检查 */
 extern uint8_t g_game_enter_exit_menu;
 
+/* ---- 共享触摸状态 (从各游戏静态提升为全局, 供 game_menu_command 复用) ---- */
+extern uint8_t  g_prev_pressed;
+extern uint16_t g_touch_start_x;
+
+/* ---- 配置驱动游戏菜单状态机 (d2048/klotski/tetris/fish 共用) ---- */
+typedef struct {
+    uint8_t  playing;              /* 游戏进行中状态值 */
+    uint8_t  exit;                 /* 退出菜单状态值 */
+    uint8_t  restart;              /* 重新开始菜单状态值 */
+    const uint8_t *exit_row_types; /* 退出菜单6行类型数组 */
+    const uint8_t *exit_map;       /* 退出菜单5格→返回码映射表 */
+    uint16_t y_threshold;          /* 底部上划起点Y阈值 (d2048/klotski/tetris=210, fish=220) */
+    uint8_t  release_thresh;       /* 松手上划距离阈值 (tetris=25, 其余=10) */
+    uint16_t bat_x, bat_y;         /* 重菜静止时电池图标位置; 0xFFFF=不绘制 */
+    void (*mark_dirty)(void);      /* 置游戏自身背景脏标记(关闭/取消菜单后需重绘场景) */
+    uint8_t (*bg_redraw)(void);    /* 依据自身脏标记重绘菜单背景(场景/结束画面), 返回1=本帧已重绘 */
+    void (*on_to_exit)(void);      /* 重菜下滑打断进退出菜单后的游戏侧补充处理(可为NULL) */
+} GameMenuCfg;
+
+/* game_menu_command 返回命令 */
+#define GAME_MENU_CMD_NONE      0   /* 菜单已处理, 调用方 return 0 */
+#define GAME_MENU_CMD_RETURN    1   /* 关闭菜单(点空白/返回条): 已回 g_state_before_menu, 调用方 return 0 */
+#define GAME_MENU_CMD_INTERACT  2   /* 需返回 GAME_RET_INTERACT(上划切到重菜/重菜"返回") */
+#define GAME_MENU_CMD_SETTINGS  3   /* 点"设置": 调用方 menu_enter_game_settings() 并 return EXIT_RET_SETTINGS */
+#define GAME_MENU_CMD_RESTART   4   /* 点"重新开始": 已清菜单, 调用方 xxx_init() 并 return GAME_RET_INTERACT */
+#define GAME_MENU_CMD_SWITCH    5   /* 切换游戏: *out_ret = EXIT_RET_*, 调用方 return *out_ret */
+
+/* 供各游戏定义自身 GameMenuCfg 时使用的电池位置哨兵 */
+#define GAME_MENU_BAT_NONE 0xFFFF
+
+/**
+ * @brief  配置驱动游戏退出/重新开始菜单统一状态机 (d2048/klotski/tetris/fish 共用)
+ * @param  cfg       菜单配置 (状态枚举/行类型/映射/阈值/回调)
+ * @param  state     游戏状态指针 (进入时为 EXIT/RESTART 状态, 内部会切回 PLAYING/返回值)
+ * @param  out_ret   切换游戏时输出 EXIT_RET_* 返回值
+ * @return GAME_MENU_CMD_*
+ */
+uint8_t game_menu_command(const GameMenuCfg *cfg, uint8_t *state, uint8_t *out_ret);
+
 #endif
