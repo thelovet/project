@@ -6,6 +6,7 @@
  */
 
 #include "sokoban.h"
+#include "timer.h"
 #include "lcd.h"
 #include "string.h"
 #include "touch.h"
@@ -48,8 +49,9 @@ static const SokobanLevel *g_cur_level;   /* 当前关卡 (只读, 指向关卡数组) */
 #define SOK_RELEASE_THRESHOLD 10 // 松手滑动阈值(像素)
 
 /*关卡切换阈值*/
-#define HOLD_START  100   /* 长按启动阈值 (~1s@60fps) */
-#define HOLD_REPEAT 30   /* 长按重复间隔 (~300ms@60fps) */
+#define HOLD_START_US      1000000UL   /* 长按启动阈值 (~1s, 微秒) */
+#define HOLD_REPEAT_US     300000UL    /* 长按重复间隔 (~300ms, 微秒) */
+#define HOLD_COOLDOWN_FRAMES 100       /* 长按自动切关后菜单冷却帧数(防重复触发) */
 
 /* 退出菜单状态 (MENU_* 定义在 sokoban.h) */
 static uint8_t  s_exit_menu_visible = 0;
@@ -87,7 +89,8 @@ static uint16_t s_touch_start_x, s_touch_start_y;
 static uint16_t s_swipe_origin_y;   // 滑动起始Y坐标(用于退出菜单手势检测)
 static uint8_t  s_menu_cooldown  = 0; // 菜单冷却计数, 防止误触重复打开
 static uint8_t  s_hold_button    = 0;  // 长按按钮: 0=无, 1=上一关, 3=下一关
-static uint16_t s_hold_frames    = 0;  // 长按持续帧数
+static uint32_t s_hold_us        = 0;  // 长按累计时间(us)
+static uint32_t s_hold_last_us   = 0;  // 长按上次计时基准(us)
 static uint8_t  s_drag_btn       = 0;  // 拖拽追踪: 0=无, 1=上一关, 2=重新开始, 3=下一关
 static uint8_t  s_won_transition = 0;  // WON切关后进入menu_visible的标记, 防松手再切
 static uint8_t  s_btn_max_y     = 0;  // 按钮栏拖拽最远Y, 松手回退>5px取消
@@ -429,7 +432,7 @@ static uint8_t sokoban_prepare_level(uint8_t level_index)
     s_level_num = level_index + 1;
     s_drag_btn         = 0;   /* 防旧值导致松手误触发切关 */
     s_hold_button      = 0;   /* 防旧值导致menu_visible误入长按 */
-    s_hold_frames      = 0;
+    s_hold_us      = 0;
     return 1;
 }
 
@@ -678,7 +681,7 @@ static void sokoban_restart_current_level(void)
     s_exit_sliding = 0;
     s_exit_dragging = 0;
     s_hold_button = 0;
-    s_hold_frames = 0;
+    s_hold_us = 0;
     s_drag_btn = 0;
     s_menu_sliding = 0;
     s_menu_slide_y = 240;
@@ -771,7 +774,7 @@ uint8_t sokoban_restore_state(const uint8_t *buf, uint8_t len)
     s_exit_sliding = 0;
     s_exit_dragging = 0;
     s_hold_button = 0;
-    s_hold_frames = 0;
+    s_hold_us = 0;
     s_menu_cooldown = 0;
     sokoban_draw_level(s_current_level);
     if (s_won) {
@@ -862,7 +865,7 @@ uint8_t sokoban_update(void)
 
         if (!s_prev_pressed && ts.pressed) {
             interacted = 1;
-            s_hold_frames = 0;
+            s_hold_us = 0;
             if (ts.x < SOK_BTN1_X + SOK_BTN_W && ts.y >= SOK_BTN_HIT_Y0 && ts.y < SOK_BTN_HIT_Y1) {
                 if (s_current_level > 0) {
                     sokoban_init_level(s_current_level - 1);
@@ -926,7 +929,7 @@ uint8_t sokoban_update(void)
         }
         if (!ts.pressed) {
             s_hold_button = 0;
-            s_hold_frames = 0;
+            s_hold_us = 0;
         }
 
         s_prev_pressed = ts.pressed;
@@ -948,7 +951,7 @@ uint8_t sokoban_update(void)
             s_menu_from_swipe = 0;
             s_prev_pressed = 0;
             s_drag_btn = 0;
-            s_hold_frames = 0;
+            s_hold_us = 0;
             return interacted;
         }
 
@@ -956,7 +959,7 @@ uint8_t sokoban_update(void)
         if (!s_prev_pressed && ts.pressed) {
             interacted = 1;
             s_drag_btn = sok_btn_hit_test(ts.x, ts.y);
-            s_hold_frames = 0;
+            s_hold_us = 0;
             s_hold_button = 0;
             s_prev_pressed = 1;
             s_touch_start_x = ts.x;
@@ -985,7 +988,7 @@ uint8_t sokoban_update(void)
                         dy_move = MENU_DRAG_MAX_STEP;
                     s_exit_drag_y       = -MENU_H + dy_move;
                     s_hold_button       = 0;
-                    s_hold_frames       = 0;
+                    s_hold_us       = 0;
                     /* 清除按钮区域: 先黑底再重绘游戏格子, 防边缘残留 */
                     {
                         int16_t fy;
@@ -1011,14 +1014,17 @@ uint8_t sokoban_update(void)
                 s_drag_btn = sok_btn_hit_test(ts.x, ts.y);
                 if (ts.y > s_btn_max_y) s_btn_max_y = ts.y;
             }
-            /* 锁定按住目标, 防手指微移导致计数归零 */
-            if (s_hold_frames == 0) {
+            /* 锁定按住目标, 防手指微移导致计时归零 */
+            if (s_hold_us == 0) {
                 s_hold_button = (s_drag_btn == 1 || s_drag_btn == 3)
                                 ? s_drag_btn : 0;
+                s_hold_last_us = GetTimerCount();   /* 开始计时基准 */
             }
             if (s_hold_button == 1 || s_hold_button == 3) {
-                s_hold_frames++;
-                if (s_hold_frames >= HOLD_START) {
+                uint32_t now_us = GetTimerCount();  /* 真实时间节拍, 与帧率无关 */
+                s_hold_us += (uint32_t)(now_us - s_hold_last_us);
+                s_hold_last_us = now_us;
+                if (s_hold_us >= HOLD_START_US) {
                     s_won_transition = 0;   /* 自动切关已发生, 清除WON标记 */
                     if (s_hold_button == 1 && s_current_level > 0) {
                         sokoban_init_level(s_current_level - 1);
@@ -1026,7 +1032,7 @@ uint8_t sokoban_update(void)
                         s_hold_button   = 1;    /* 保留, 防prepare_level清零后长按跟踪中断 */
                         s_drag_btn      = 0;    /* 松手不触发重复切关 */
                         s_prev_pressed  = 1;    /* 保持按住态, 防下一帧重新初始化 */
-                        s_menu_cooldown = HOLD_START;  /* 连跳期间永不过期, 松手安全 */
+                        s_menu_cooldown = HOLD_COOLDOWN_FRAMES;  /* 连跳期间永不过期, 松手安全 */
                     } else if (s_hold_button == 3
                                && s_current_level < SOKOBAN_LEVEL_COUNT - 1) {
                         sokoban_init_level(s_current_level + 1);
@@ -1034,12 +1040,12 @@ uint8_t sokoban_update(void)
                         s_hold_button   = 3;    /* 保留, 防prepare_level清零后长按跟踪中断 */
                         s_drag_btn      = 0;    /* 松手不触发重复切关 */
                         s_prev_pressed  = 1;    /* 保持按住态, 防下一帧重新初始化 */
-                        s_menu_cooldown = HOLD_START;  /* 连跳期间永不过期, 松手安全 */
+                        s_menu_cooldown = HOLD_COOLDOWN_FRAMES;  /* 连跳期间永不过期, 松手安全 */
                     }
-                    s_hold_frames = HOLD_START - HOLD_REPEAT;
+                    s_hold_us = HOLD_START_US - HOLD_REPEAT_US;
                 }
             } else {
-                s_hold_frames = 0;
+                s_hold_us = 0;
             }
         }
 
@@ -1049,21 +1055,21 @@ uint8_t sokoban_update(void)
                 s_won_transition = 0;
                 s_drag_btn = 0;
                 s_hold_button = 0;
-                s_hold_frames = 0;
+                s_hold_us = 0;
                 s_prev_pressed = 0;
                 return interacted;
             }
             if (s_menu_cooldown > 0) {  /* 长按自动切关后的冷却期内松手 */
                 s_drag_btn = 0;
                 s_hold_button = 0;
-                s_hold_frames = 0;
+                s_hold_us = 0;
                 s_prev_pressed = 0;
                 return interacted;
             }
-            if (s_hold_button != 0 && s_drag_btn == 0 && s_hold_frames > 0) {  /* 长按自动切关已发生(drag_btn被清零), 松手不做额外操作 */
+            if (s_hold_button != 0 && s_drag_btn == 0 && s_hold_us > 0) {  /* 长按自动切关已发生(drag_btn被清零), 松手不做额外操作 */
                 s_drag_btn = 0;
                 s_hold_button = 0;
-                s_hold_frames = 0;
+                s_hold_us = 0;
                 s_prev_pressed = 0;
                 return interacted;
             }
@@ -1074,7 +1080,7 @@ uint8_t sokoban_update(void)
                 sok_redraw_grid_below(84);
                 s_drag_btn = 0;
                 s_hold_button = 0;
-                s_hold_frames = 0;
+                s_hold_us = 0;
                 s_menu_cooldown = 15;
                 s_prev_pressed = 0;
                 return interacted;
@@ -1098,7 +1104,7 @@ uint8_t sokoban_update(void)
             }
             s_drag_btn = 0;
             s_hold_button = 0;
-            s_hold_frames = 0;
+            s_hold_us = 0;
         }
 
         s_prev_pressed = ts.pressed;
