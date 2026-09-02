@@ -49,8 +49,8 @@ static const SokobanLevel *g_cur_level;   /* 当前关卡 (只读, 指向关卡数组) */
 #define SOK_RELEASE_THRESHOLD 10 // 松手滑动阈值(像素)
 
 /*关卡切换阈值*/
-#define HOLD_START_US      1000000UL   /* 长按启动阈值 (~1s, 微秒) */
-#define HOLD_REPEAT_US     300000UL    /* 长按重复间隔 (~300ms, 微秒) */
+#define HOLD_START_US      200000UL   /* 长按启动阈值 (~200ms, 微秒) */
+#define HOLD_REPEAT_US     130000UL    /* 长按重复间隔 (~130ms, 微秒) */
 #define HOLD_COOLDOWN_FRAMES 100       /* 长按自动切关后菜单冷却帧数(防重复触发) */
 
 /* 退出菜单状态 (MENU_* 定义在 sokoban.h) */
@@ -789,6 +789,55 @@ uint8_t sokoban_restore_state(const uint8_t *buf, uint8_t len)
  * @brief  主更新函数, 每帧调用以处理触摸输入和游戏状态
  * @retval  1=有交互发生, 0=否
  */
+/**
+ * @brief  菜单可见且按住按钮时的长按切关处理 (真实时间节拍)
+ * @note   从 sokoban_update 抽出, 减小超大函数避免 R_RISCV_RVC_JUMP 超范围
+ */
+static void sokoban_hold_update(void)
+{
+    TouchState ts;
+    /* 长按计数中不刷新坐标, 省I2C时间 */
+    if (!s_hold_button) {
+        Touch_UpdateCoords();
+        Touch_Scan(&ts);
+        s_drag_btn = sok_btn_hit_test(ts.x, ts.y);
+        if (ts.y > s_btn_max_y) s_btn_max_y = ts.y;
+    }
+    /* 锁定按住目标, 防手指微移导致计时归零 */
+    if (s_hold_us == 0) {
+        s_hold_button = (s_drag_btn == 1 || s_drag_btn == 3)
+                        ? s_drag_btn : 0;
+        s_hold_last_us = GetTimerCount();   /* 开始计时基准 */
+    }
+    if (s_hold_button == 1 || s_hold_button == 3) {
+        uint32_t now_us = GetTimerCount();  /* 真实时间节拍, 与帧率无关 */
+        s_hold_us += (uint32_t)(now_us - s_hold_last_us);
+        s_hold_last_us = now_us;
+        if (s_hold_us >= HOLD_START_US) {
+            s_won_transition = 0;   /* 自动切关已发生, 清除WON标记 */
+            if (s_hold_button == 1 && s_current_level > 0) {
+                sokoban_init_level(s_current_level - 1);
+                s_menu_visible  = 1;
+                s_hold_button   = 1;    /* 保留, 防prepare_level清零后长按跟踪中断 */
+                s_drag_btn      = 0;    /* 松手不触发重复切关 */
+                s_prev_pressed  = 1;    /* 保持按住态, 防下一帧重新初始化 */
+                s_menu_cooldown = HOLD_COOLDOWN_FRAMES;  /* 连跳期间永不过期, 松手安全 */
+            } else if (s_hold_button == 3
+                       && s_current_level < SOKOBAN_LEVEL_COUNT - 1) {
+                sokoban_init_level(s_current_level + 1);
+                s_menu_visible  = 1;
+                s_hold_button   = 3;    /* 保留, 防prepare_level清零后长按跟踪中断 */
+                s_drag_btn      = 0;    /* 松手不触发重复切关 */
+                s_prev_pressed  = 1;    /* 保持按住态, 防下一帧重新初始化 */
+                s_menu_cooldown = HOLD_COOLDOWN_FRAMES;  /* 连跳期间永不过期, 松手安全 */
+            }
+            s_hold_us = HOLD_START_US - HOLD_REPEAT_US;
+        }
+    } else {
+        s_hold_us = 0;
+    }
+}
+
 uint8_t sokoban_update(void)
 {
     uint8_t interacted = 0;
@@ -1007,46 +1056,7 @@ uint8_t sokoban_update(void)
                     return interacted;
                 }
             }
-            /* 长按计数中不刷新坐标, 省I2C时间 */
-            if (!s_hold_button) {
-                Touch_UpdateCoords();
-                Touch_Scan(&ts);
-                s_drag_btn = sok_btn_hit_test(ts.x, ts.y);
-                if (ts.y > s_btn_max_y) s_btn_max_y = ts.y;
-            }
-            /* 锁定按住目标, 防手指微移导致计时归零 */
-            if (s_hold_us == 0) {
-                s_hold_button = (s_drag_btn == 1 || s_drag_btn == 3)
-                                ? s_drag_btn : 0;
-                s_hold_last_us = GetTimerCount();   /* 开始计时基准 */
-            }
-            if (s_hold_button == 1 || s_hold_button == 3) {
-                uint32_t now_us = GetTimerCount();  /* 真实时间节拍, 与帧率无关 */
-                s_hold_us += (uint32_t)(now_us - s_hold_last_us);
-                s_hold_last_us = now_us;
-                if (s_hold_us >= HOLD_START_US) {
-                    s_won_transition = 0;   /* 自动切关已发生, 清除WON标记 */
-                    if (s_hold_button == 1 && s_current_level > 0) {
-                        sokoban_init_level(s_current_level - 1);
-                        s_menu_visible  = 1;
-                        s_hold_button   = 1;    /* 保留, 防prepare_level清零后长按跟踪中断 */
-                        s_drag_btn      = 0;    /* 松手不触发重复切关 */
-                        s_prev_pressed  = 1;    /* 保持按住态, 防下一帧重新初始化 */
-                        s_menu_cooldown = HOLD_COOLDOWN_FRAMES;  /* 连跳期间永不过期, 松手安全 */
-                    } else if (s_hold_button == 3
-                               && s_current_level < SOKOBAN_LEVEL_COUNT - 1) {
-                        sokoban_init_level(s_current_level + 1);
-                        s_menu_visible  = 1;
-                        s_hold_button   = 3;    /* 保留, 防prepare_level清零后长按跟踪中断 */
-                        s_drag_btn      = 0;    /* 松手不触发重复切关 */
-                        s_prev_pressed  = 1;    /* 保持按住态, 防下一帧重新初始化 */
-                        s_menu_cooldown = HOLD_COOLDOWN_FRAMES;  /* 连跳期间永不过期, 松手安全 */
-                    }
-                    s_hold_us = HOLD_START_US - HOLD_REPEAT_US;
-                }
-            } else {
-                s_hold_us = 0;
-            }
+            sokoban_hold_update();
         }
 
         /* 松手: 执行拖拽目标按钮 */
