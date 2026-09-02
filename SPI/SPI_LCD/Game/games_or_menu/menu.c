@@ -1401,6 +1401,7 @@ uint8_t game_menu_command(const GameMenuCfg *cfg, uint8_t *state, uint8_t *out_r
                 g_exit_menu_visible = 0;
                 *state = g_state_before_menu;
                 cfg->mark_dirty();
+                (void)cfg->bg_redraw();   /* 上划取消退出菜单后立即重绘场景, 防清黑残留 */
                 g_touch_down = 0;
                 g_menu_cooldown = 15;
             }
@@ -1427,6 +1428,7 @@ uint8_t game_menu_command(const GameMenuCfg *cfg, uint8_t *state, uint8_t *out_r
                 menu_exit_back_cleanup();
                 *state = g_state_before_menu;
                 cfg->mark_dirty();
+                (void)cfg->bg_redraw();   /* 立即重绘场景, 防菜单清黑残留到下一帧 */
                 return GAME_MENU_CMD_NONE;
             }
             if (ret != EXIT_RET_NONE) {
@@ -1540,6 +1542,7 @@ restart_close:
         menu_restart_cleanup();
         *state = g_state_before_menu;
         cfg->mark_dirty();
+        (void)cfg->bg_redraw();   /* 立即重绘场景, 防菜单清黑残留到下一帧 */
         return close_cmd;
     }
 

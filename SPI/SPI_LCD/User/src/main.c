@@ -1041,7 +1041,7 @@ static void GameSettings_Update(void)
                          VIDEO_MENU_X + VIDEO_MENU_W, 240, g_menu_clear_color);
             if (s_main_mode == MAIN_MODE_SOKOBAN) { sokoban_full_redraw(); sokoban_update(); }
             else if (s_main_mode == MAIN_MODE_D2048) { d2048_full_redraw(); d2048_update(); }
-            else if (s_main_mode == MAIN_MODE_TETRIS) { tetris_full_redraw(); tetris_update(); }
+            else if (s_main_mode == MAIN_MODE_TETRIS) { tetris_menu_mark_dirty(); tetris_menu_bg_redraw(); }
             else if (s_main_mode == MAIN_MODE_FISH) { fish_full_redraw(); fish_update(); }
             else if (s_main_mode == MAIN_MODE_KLOTSKI) { klotski_full_redraw(); klotski_update(); }
         }

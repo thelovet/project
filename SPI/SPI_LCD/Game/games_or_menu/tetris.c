@@ -955,7 +955,7 @@ static void tetris_draw_menu_scene(void)
 /* ================================================================
  *  配置驱动菜单状态机的 hook (mark_dirty / bg_redraw / on_to_exit)
  * ================================================================ */
-static void tetris_menu_mark_dirty(void)   /* 关闭/取消菜单后需重绘场景 */
+void tetris_menu_mark_dirty(void)   /* 关闭/取消菜单后需重绘场景 */
 {
     g_board_dirty = 2;
     g_sidebar_dirty = 1;
@@ -964,7 +964,7 @@ static void tetris_menu_mark_dirty(void)   /* 关闭/取消菜单后需重绘场景 */
 }
 
 /* 依据脏标记重绘菜单背景(棋盘/结束画面): 返回1=本帧已重绘 */
-static uint8_t tetris_menu_bg_redraw(void)
+uint8_t tetris_menu_bg_redraw(void)
 {
     if (g_board_dirty >= 2) { tetris_draw_menu_scene(); return 1; }
     return 0;
