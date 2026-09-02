@@ -5,6 +5,7 @@
 #include "d2048.h"
 #include "tetris.h"
 #include "klotski.h"
+#include "fish.h"
 
 #define GAME_SAVE_PAGE_ADDR    0x0800FF00UL  /* 内部 Flash 最后一个 256 字节页的起始地址 */
 #define GAME_SAVE_PAGE_SIZE    256           /* 存档页总大小，单位为字节 */
@@ -29,7 +30,8 @@ static MainMode s_game_restore_mode = MAIN_MODE_VIDEO;
 uint8_t GameSave_IsSupportedMode(MainMode mode)
 {
     return mode == MAIN_MODE_SOKOBAN || mode == MAIN_MODE_D2048
-        || mode == MAIN_MODE_TETRIS || mode == MAIN_MODE_KLOTSKI;
+        || mode == MAIN_MODE_TETRIS || mode == MAIN_MODE_KLOTSKI
+        || mode == MAIN_MODE_FISH;
 }
 
 /**
@@ -70,6 +72,8 @@ static uint8_t GameSave_Serialize(MainMode mode, uint8_t *buf)
             return tetris_save_state(buf, GAME_SAVE_PAYLOAD_SIZE);
         case MAIN_MODE_KLOTSKI:
             return klotski_save_state(buf, GAME_SAVE_PAYLOAD_SIZE);
+        case MAIN_MODE_FISH:
+            return fish_save_state(buf, GAME_SAVE_PAYLOAD_SIZE);
         default:
             return 0;
     }
@@ -154,6 +158,8 @@ static uint8_t GameSave_Restore(MainMode mode)
             return tetris_restore_state(page + GAME_SAVE_HEADER_SIZE, len);
         case MAIN_MODE_KLOTSKI:
             return klotski_restore_state(page + GAME_SAVE_HEADER_SIZE, len);
+        case MAIN_MODE_FISH:
+            return fish_restore_state(page + GAME_SAVE_HEADER_SIZE, len);
         default:
             return 0;
     }
