@@ -232,7 +232,6 @@ uint32_t game_rand(void)
     return state;
 }
 
-
 /*********************************************************************
  * @brief  绘制华容道图标 (4x4网格, 右下角留空表示空格)
  **********************************************************************/
@@ -284,32 +283,7 @@ void menu_draw_fish_icon(uint16_t y)
     sok_draw_char_24(ix, iy, font_yu, MENU_TEXT_COLOR);
 }
 
-/*********************************************************************
- * @brief  绘制6行菜单的统一边框 + 分隔线 (主菜单6行版)
- **********************************************************************/
-static void menu_draw_6row_borders(uint16_t r0_y0, uint16_t r1_y0, uint16_t r2_y0,
-                            uint16_t r3_y0, uint16_t r4_y0, uint16_t r5_y0)
-{
-    uint16_t bx0 = MENU_X + (MENU_W - 3 * 24) / 2 - MENU_TEXT_BDR_PAD;
-    uint16_t bx1 = MENU_X + (MENU_W + 3 * 24) / 2 + MENU_TEXT_BDR_PAD - 1;
-    uint16_t by_top = r0_y0 - MENU_TEXT_BDR_PAD;
-    uint16_t by_bot = r5_y0 + 31 + MENU_TEXT_BDR_PAD;
-    uint16_t sep0_y = (r0_y0 + 31 + r1_y0) / 2;
-    uint16_t sep1_y = (r1_y0 + 31 + r2_y0) / 2;
-    uint16_t sep2_y = (r2_y0 + 31 + r3_y0) / 2;
-    uint16_t sep3_y = (r3_y0 + 31 + r4_y0) / 2;
-    uint16_t sep4_y = (r4_y0 + 31 + r5_y0) / 2;
 
-    LCD_Fill(bx0, by_top,                              bx1 + 1, by_top + MENU_TEXT_BDR_W,                MENU_TEXT_BDR_COLOR);
-    LCD_Fill(bx0, by_bot - MENU_TEXT_BDR_W + 1,        bx1 + 1, by_bot + 1,                              MENU_TEXT_BDR_COLOR);
-    LCD_Fill(bx0, by_top,                              bx0 + MENU_TEXT_BDR_W,        by_bot + 1,          MENU_TEXT_BDR_COLOR);
-    LCD_Fill(bx1 + 1 - MENU_TEXT_BDR_W, by_top,        bx1 + 1,                      by_bot + 1,          MENU_TEXT_BDR_COLOR);
-    LCD_Fill(bx0, sep0_y - MENU_TEXT_BDR_W / 2,        bx1 + 1, sep0_y + (MENU_TEXT_BDR_W + 1) / 2,       MENU_TEXT_BDR_COLOR);
-    LCD_Fill(bx0, sep1_y - MENU_TEXT_BDR_W / 2,        bx1 + 1, sep1_y + (MENU_TEXT_BDR_W + 1) / 2,       MENU_TEXT_BDR_COLOR);
-    LCD_Fill(bx0, sep2_y - MENU_TEXT_BDR_W / 2,        bx1 + 1, sep2_y + (MENU_TEXT_BDR_W + 1) / 2,       MENU_TEXT_BDR_COLOR);
-    LCD_Fill(bx0, sep3_y - MENU_TEXT_BDR_W / 2,        bx1 + 1, sep3_y + (MENU_TEXT_BDR_W + 1) / 2,       MENU_TEXT_BDR_COLOR);
-    LCD_Fill(bx0, sep4_y - MENU_TEXT_BDR_W / 2,        bx1 + 1, sep4_y + (MENU_TEXT_BDR_W + 1) / 2,       MENU_TEXT_BDR_COLOR);
-}
 
 /*********************************************************************
  * @brief  绘制菜单外框 (边框 + 纯色背景)
@@ -323,8 +297,6 @@ void menu_draw_frame(void)
     LCD_Fill(MENU_X + MENU_BDR, MENU_Y + MENU_BDR,
              MENU_X + MENU_W - MENU_BDR - 1, MENU_Y + MENU_H - MENU_BDR - 1, MENU_BG_COLOR);
 }
-
-
 
 /*********************************************************************
  * @brief  菜单选项碰撞检测
@@ -344,10 +316,6 @@ int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count)
     uint16_t item_h = (item_end - item_y0) / item_count;
     return (int8_t)((y - item_y0) / item_h);
 }
-
-
-
-
 
 /* 菜单24x24字库: 从外部Flash整体读入RAM缓存(条带渲染需逐行随机访问) */
 static uint8_t s_menu_fonts[22 * 72];   /* 22个常用汉字 x 72字节 */
@@ -386,48 +354,27 @@ static void menu_font_cache_load(void)
     }
 }
 
-
-
 /*********************************************************************
- * @brief  绘制主菜单 (5行: 推箱子/2048/俄罗斯方块/华容道/返回)
+ * @brief  绘制主菜单 (5行: 推箱子/2048/俄罗斯方块/华容道/大鱼吃小鱼)
+ * @note   去掉原"返回(视频)"行, 回视频靠点菜单外 (menu_hit_test 返回 -1)
  **********************************************************************/
+/* 主菜单行类型 (供 main_menu_draw / main_menu_draw_frame_only 共用, 布局一致) */
+static const uint8_t g_main_menu_row_types[5] = {
+    MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH
+};
+
 void main_menu_draw(void)
 {
-    menu_font_cache_load();  /* 确保24x24字库缓存已从外部Flash加载 */
-    menu_draw_frame();
-    /* MENU_Y=5, MENU_H=230, MENU_BDR=5, 6行: gap=(230-10-6*32)/7=4, 行Y=5+4+i*36 */
-    menu_draw_6row_borders(9, 45, 81, 117, 153, 189);
-    menu_draw_tetris_icon(81);
-    menu_draw_klotski_icon(117);
-    menu_draw_fish_icon(153);
-
-    LCD_CS_CLR;
-    uint16_t tx;
-    tx = MENU_X + (MENU_W - 3 * 24) / 2;
-    sok_draw_char_24(tx,       9,  &s_menu_fonts[FLASH_STORE_ID_24_TUI * 72],   MENU_TEXT_COLOR);
-    sok_draw_char_24(tx + 24,  9,  &s_menu_fonts[FLASH_STORE_ID_24_XIANG * 72], MENU_TEXT_COLOR);
-    sok_draw_char_24(tx + 48,  9,  &s_menu_fonts[FLASH_STORE_ID_24_ZI * 72],    MENU_TEXT_COLOR);
-    tx = MENU_X + (MENU_W - 4 * 14) / 2;
-    sok_draw_digit_scaled(tx,       45, 2, MENU_TEXT_COLOR, 14, 28);
-    sok_draw_digit_scaled(tx + 14,  45, 0, MENU_TEXT_COLOR, 14, 28);
-    sok_draw_digit_scaled(tx + 28,  45, 4, MENU_TEXT_COLOR, 14, 28);
-    sok_draw_digit_scaled(tx + 42,  45, 8, MENU_TEXT_COLOR, 14, 28);
-    tx = MENU_X + (MENU_W - 2 * 24) / 2;
-    sok_draw_char_24(tx,       189, &s_menu_fonts[FLASH_STORE_ID_24_FAN * 72], MENU_TEXT_COLOR);
-    sok_draw_char_24(tx + 24,  189, &s_menu_fonts[FLASH_STORE_ID_24_HUI * 72], MENU_TEXT_COLOR);
-    LCD_CS_SET;
+    /* 统一走条带渲染: 边框+分隔线+各图标/文字, 与 main_menu_draw_frame_only 布局一致 */
+    menu_draw_nrow_frame_only(MENU_Y, g_main_menu_row_types, 5);
 }
 
 /*********************************************************************
- * @brief  主菜单动画 (5行: 推箱子/2048/俄罗斯方块/华容道/返回)
+ * @brief  主菜单动画 (5行: 推箱子/2048/俄罗斯方块/华容道/大鱼吃小鱼)
  **********************************************************************/
 void main_menu_draw_frame_only(int16_t y_top)
 {
-    static const uint8_t types[6] = {
-        MENU_ROW_TUI, MENU_ROW_2048,
-        MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH, MENU_ROW_FANHUI
-    };
-    menu_draw_nrow_frame_only(y_top, types, 6);
+    menu_draw_nrow_frame_only(y_top, g_main_menu_row_types, 5);
 }
 
 /* 2048数字条带渲染: 14x28缩放, 32px行内垂直居中 (颜色常量 = MENU_TEXT_COLOR: 0xF81F) */
@@ -822,7 +769,7 @@ uint8_t game_menu_drag_poll(int16_t *drag_y, uint16_t *drag_touch_y,
         gdp_rel_cnt++;
         if (gdp_rel_cnt >= 2) gdp_tracking = 0;  /* 释放后重置起始记录 */
     }
-    menu_draw_nrow_frame_only(*drag_y, row_types, 6);
+    menu_draw_nrow_frame_only(*drag_y, row_types, 5);
     if (!ts->pressed && gdp_rel_cnt >= 2) {
         *dragging = 0;
         gdp_rel_cnt = 0;
@@ -1032,13 +979,13 @@ uint8_t main_menu_handle(uint16_t x, uint16_t y,
  **********************************************************************/
 uint8_t main_menu_hit_test(uint16_t x, uint16_t y)
 {
-    int8_t hit = menu_hit_test(x, y, 6);
-    if (hit < 0 || hit > 5) return MAIN_MENU_ACT_VIDEO;  /* 菜单外→返回视频 */
-    /* 行0=推箱子, 1=2048, 2=俄罗斯方块, 3=华容道, 4=大鱼吃小鱼, 5=返回 */
-    static const uint8_t map[6] = {
+    int8_t hit = menu_hit_test(x, y, 5);
+    if (hit < 0 || hit > 4) return MAIN_MENU_ACT_VIDEO;  /* 菜单外→返回视频 */
+    /* 行0=推箱子, 1=2048, 2=俄罗斯方块, 3=华容道, 4=大鱼吃小鱼 (无返回行) */
+    static const uint8_t map[5] = {
         MAIN_MENU_ACT_SOKOBAN, MAIN_MENU_ACT_D2048,
         MAIN_MENU_ACT_TETRIS, MAIN_MENU_ACT_KLOTSKI,
-        MAIN_MENU_ACT_FISH, MAIN_MENU_ACT_VIDEO
+        MAIN_MENU_ACT_FISH
     };
     return map[hit];
 }
@@ -1121,17 +1068,17 @@ uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t *prev_pressed,
     if (out_ts) *out_ts = ts;
 
     if (!(*prev_pressed) && ts.pressed) {
-        pressed_hit = menu_hit_test(ts.x, ts.y, 6);
+        pressed_hit = menu_hit_test(ts.x, ts.y, 5);
     }
     else if (*prev_pressed && !ts.pressed) {
-        int8_t released_hit = menu_hit_test(ts.x, ts.y, 6);
+        int8_t released_hit = menu_hit_test(ts.x, ts.y, 5);
         uint8_t ret = EXIT_RET_NONE;
 
         if (released_hit == pressed_hit) {
-            if (released_hit >= 0 && released_hit <= 4)
+            if (released_hit >= 0 && released_hit < 5)
                 ret = ret_map[released_hit];
             else
-                ret = EXIT_RET_BACK;  /* hit==4或-1(菜单外)→关闭菜单 */
+                ret = EXIT_RET_BACK;  /* hit==-1(菜单外)→关闭菜单; 无返回行 */
         }
         pressed_hit = -1;
         *prev_pressed = 0;
@@ -1246,8 +1193,6 @@ uint8_t game_menu_enter_restart_drag(const TouchState *ts, uint8_t *state,
                                 &g_restart_dragging, &ts_copy);
     return 1;
 }
-
-
 
 /*********************************************************************
  * @brief  松手时提交退出菜单 (3个游戏共用)
@@ -1376,7 +1321,7 @@ uint8_t game_menu_command(const GameMenuCfg *cfg, uint8_t *state, uint8_t *out_r
     if (*state == cfg->exit) {
         /* 背景重绘(依据游戏脏标记), 非拖拽/滑动时再画菜单框 */
         if (cfg->bg_redraw() && !g_exit_dragging && !g_exit_sliding)
-            menu_draw_nrow_frame_only(g_exit_drag_y, cfg->exit_row_types, 6);
+            menu_draw_nrow_frame_only(g_exit_drag_y, cfg->exit_row_types, 5);
 
         /* 底部上划打断 → 切换到重新开始菜单 */
         {
@@ -1415,8 +1360,9 @@ uint8_t game_menu_command(const GameMenuCfg *cfg, uint8_t *state, uint8_t *out_r
                 g_exit_drag_y = MENU_Y;
                 g_exit_sliding = 0;
                 g_touch_down = 0;
+                g_prev_pressed = 0;  /* 滑入结束重置按下态, 防拖拽松手被误判为点菜单外关闭 */
             }
-            menu_draw_nrow_frame_only(g_exit_drag_y, cfg->exit_row_types, 6);
+            menu_draw_nrow_frame_only(g_exit_drag_y, cfg->exit_row_types, 5);
             return GAME_MENU_CMD_NONE;
         }
 

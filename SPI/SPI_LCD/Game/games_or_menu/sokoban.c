@@ -79,8 +79,8 @@ static uint8_t  s_level_num     = 0;  /* 当前关卡号 (1-based) */
 static uint8_t  g_sok_dirty     = 0;  /* 0=干净, 1=全屏重绘, 2=电池闪灭仅局部 */
 
 /* 退出菜单行类型 (视频/2048/俄罗斯方块/华容道/返回) */
-static const uint8_t sok_row_types[6] = {
-    MENU_ROW_SHIPIN, MENU_ROW_2048, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH, MENU_ROW_FANHUI
+static const uint8_t sok_row_types[5] = {
+    MENU_ROW_SHIPIN, MENU_ROW_2048, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH
 };
 
 /* 触摸输入状态 */
@@ -884,7 +884,7 @@ uint8_t sokoban_update(void)
             }
         } else {
             /* 退出菜单可见：仅重绘菜单框架覆盖电池黑线 */
-            menu_draw_nrow_frame_only(s_exit_drag_y, sok_row_types, 6);
+            menu_draw_nrow_frame_only(s_exit_drag_y, sok_row_types, 5);
         }
         g_sok_dirty = 0;
     }
@@ -1236,8 +1236,9 @@ process_exit_menu:
             if (s_exit_drag_y >= MENU_Y) {
                 s_exit_drag_y = MENU_Y;
                 s_exit_sliding = 0;
+                s_prev_pressed = 0;  /* 滑入结束重置按下态, 防拖拽松手被误判为点菜单外关闭 */
             }
-            menu_draw_nrow_frame_only(s_exit_drag_y, sok_row_types, 6);
+            menu_draw_nrow_frame_only(s_exit_drag_y, sok_row_types, 5);
             return 0;
         }
 

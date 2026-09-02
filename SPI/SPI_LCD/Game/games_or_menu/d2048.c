@@ -57,8 +57,8 @@ static const uint8_t d2048_exit_map[5] = {
 #define SWIPE_THRESH  10   /* 滑动最小阈值 */
 
 /* 退出菜单行类型 (视频/推箱子/俄罗斯方块/华容道/返回) */
-static const uint8_t d2048_row_types[6] = {
-    MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH, MENU_ROW_FANHUI
+static const uint8_t d2048_row_types[5] = {
+    MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH
 };
 
 /* ================================================================

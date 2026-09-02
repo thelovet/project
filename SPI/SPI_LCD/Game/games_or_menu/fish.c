@@ -25,8 +25,8 @@ static const uint8_t fish_exit_map[5] = {
     EXIT_RET_VIDEO, EXIT_RET_SOKOBAN, EXIT_RET_D2048, EXIT_RET_TETRIS, EXIT_RET_KLOTSKI
 };
 /* 退出菜单行类型 (供 menu_draw_nrow_frame_only / game_menu_drag_poll 使用) */
-static const uint8_t fish_row_types[6] = {
-    MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FANHUI
+static const uint8_t fish_row_types[5] = {
+    MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI
 };         /* GetTimerCount: 基于真实时间的移动节拍(与帧率无关) */
 
 /* ================================================================

@@ -44,9 +44,9 @@ static const uint8_t klotski_exit_map[5] = {
 #define SWIPE_THRESH  10   /* 滑动最小阈值(移出空格) */
 
 /* 退出菜单行类型 (klotski专属) */
-static const uint8_t klotski_row_types[6] = {
+static const uint8_t klotski_row_types[5] = {
     MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_2048,
-    MENU_ROW_TETRIS, MENU_ROW_FISH, MENU_ROW_FANHUI
+    MENU_ROW_TETRIS, MENU_ROW_FISH
 };
 
 /* ================================================================

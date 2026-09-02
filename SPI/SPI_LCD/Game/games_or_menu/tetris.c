@@ -155,8 +155,8 @@ static const uint8_t tetris_exit_map[5] = {
 };
 
 /* 退出菜单行类型 (供 menu_draw_nrow_frame_only / game_menu_drag_poll 使用) */
-static const uint8_t tetris_row_types[6] = {
-    MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_KLOTSKI, MENU_ROW_FISH, MENU_ROW_FANHUI
+static const uint8_t tetris_row_types[5] = {
+    MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_KLOTSKI, MENU_ROW_FISH
 };
 
 #define SWIPE_THRESH  25
