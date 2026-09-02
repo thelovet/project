@@ -1180,6 +1180,7 @@ uint8_t game_menu_swipe_up_poll(uint16_t y_threshold, uint8_t release_thresh,
             g_exit_dragging = 0;
             g_exit_sliding = 0;
             g_exit_menu_visible = 0;
+            LCD_CLEAR_MENU_AREA();  /* 释放中断同样清退出菜单区, 否则调回重开菜单时退出菜单大块残留 */
             *dy_out = dy;
             return 2;
         }

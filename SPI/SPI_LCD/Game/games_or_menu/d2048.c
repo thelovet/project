@@ -474,7 +474,7 @@ static const GameMenuCfg g_d2048_menu_cfg = {
     d2048_row_types, d2048_exit_map,
     210, 10,
     164, 22,
-    d2048_menu_mark_dirty, d2048_menu_bg_redraw, NULL
+    d2048_menu_mark_dirty, d2048_menu_bg_redraw, d2048_menu_mark_dirty
 };
 
 uint8_t d2048_update(void)
