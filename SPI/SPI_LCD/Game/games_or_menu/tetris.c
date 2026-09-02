@@ -5,6 +5,7 @@
  */
 
 #include "tetris.h"
+#include "timer.h"
 #include "menu.h"
 #include "sok_img_win.h"
 #include "flash_store.h"   /* 字库资源从外部Flash读取 */
@@ -30,13 +31,23 @@
 #define PREVIEW_Y       110         /* 预览区域Y坐标 (分数下方) */
 #define PREVIEW_CELL    8          /* 预览格像素大小 */
 
-/* 下落速度 (帧数间隔, 越大越慢, 60fps) */
-#define DROP_INTERVAL_INIT  80     /* 初始下落间隔 */
-#define DROP_INTERVAL_MIN    8     /* 最快下落间隔 (难度上限) */
-#define DROP_INTERVAL_HARD   3     /* 硬降间隔 (手动快速下落) */
+/* 下落速度 (帧数间隔, 越大越慢; 运行时按 FRAME_US 换算成微秒, 与真实帧率无关) */
+#define DROP_INTERVAL_INIT  20     /* 初始下落间隔(帧) */
+#define DROP_INTERVAL_MIN    3     /* 最快下落间隔(帧, 难度上限) */
+#define DROP_INTERVAL_HARD   2     /* 硬降间隔(帧, 手动快速下落) */
 #define DROP_ACCEL_STEP      5     /* 每消N行加速的帧数 */
 #define FRAME_DELAY_MS      5      /* 每帧延时(ms), ~60fps */
-#define LOCK_DELAY_FRAMES  60      /* 落地锁定延迟帧数 (~1s@60fps) */
+#define LOCK_DELAY_FRAMES  10      /* 落地初始锁定延迟帧数 (~166ms@60fps) */
+#define LOCK_DELAY_MOVE_FRAMES  30  /* 锁定期内移动/旋转后放宽的锁定帧数 (~500ms@60fps) */
+#define FRAME_US        16667UL    /* 逻辑帧时长(us,~60fps), 帧数计时×它换算成微秒, 与真实帧率无关 */
+
+/* 长按重复 */
+#define HOLD_REPEAT_START  10    /* 按住开始重复的帧数 */
+#define HOLD_REPEAT_RATE    5    /* 重复间隔帧数 */
+
+/* 消行动画 */
+#define CLEAR_FLASH_FRAMES  4     /* 闪烁切换次数 (2白+2正常 = 2次白闪) */
+#define FLASH_HOLD          8     /* 每次切换保持帧数 (~40ms@60fps) */
 
 /* 格子颜色 */
 #define BOARD_BG       0x18E3      /* 深灰绿 */
@@ -117,25 +128,25 @@ static int8_t   g_prev_ghost_y;    /* 上一帧投影Y (增量擦除用) */
 static uint8_t  g_next_type;
 
 /* 自动下落 */
-static uint16_t g_drop_timer;
-static uint16_t g_drop_interval;   /* 帧数间隔 */
-static uint16_t g_saved_interval;  /* 加速前原始速度 */
-static uint8_t  g_lock_delay;     /* 落地锁定延迟计时器 */
+static uint32_t g_drop_timer;      /* 自动下落微秒累计 (≥ interval*FRAME_US 时落一格) */
+static uint16_t g_drop_interval;   /* 帧数间隔 (存档/加速用, 运行时×FRAME_US) */
+static uint16_t g_saved_interval;  /* 加速前原始速度(帧) */
+static uint32_t g_lock_delay;      /* 落地锁定延迟(微秒) */
+static uint32_t g_drop_last_us;    /* 下落计时基准 */
+static uint32_t g_lock_last_us;    /* 锁定计时基准 */
 
 /* 触摸手势 */
 static uint8_t  g_wait_touch_release;
 
 /* 长按重复 */
-#define HOLD_REPEAT_START  30    /* 按住开始重复的帧数 */
-#define HOLD_REPEAT_RATE    10    /* 重复间隔帧数 */
 static uint8_t  g_hold_zone;     /* 0=无, 1=左, 2=右 */
-static uint8_t  g_hold_timer;    /* 重复计时器 */
+static uint32_t g_hold_timer;    /* 长按重复计时(微秒), 0=待触发 */
+static uint32_t g_hold_last_us;  /* 长按计时基准 */
 
 /* 消行动画 */
-#define CLEAR_FLASH_FRAMES  4     /* 闪烁切换次数 (2白+2正常 = 2次白闪) */
-#define FLASH_HOLD          8     /* 每次切换保持帧数 (~40ms@60fps) */
 static uint8_t  g_clear_flash;    /* 剩余切换次数, 0=无动画 */
-static uint8_t  g_flash_hold;     /* 当前状态剩余帧数 */
+static uint32_t g_flash_hold;     /* 当前状态剩余时间(微秒) */
+static uint32_t g_flash_last_us;  /* 闪烁计时基准 */
 static uint32_t g_clear_mask;     /* 要消除的行位掩码 */
 
 /* 退出菜单 (视频/推箱子/2048/华容道/返回, 减当前=俄罗斯方块) */
@@ -649,8 +660,12 @@ void tetris_init(void)
     g_prev_lines = 0;
     g_gameover_drawn = 0;
     g_drop_timer = 0;
+    g_drop_last_us = GetTimerCount();   /* 下落计时基准 */
     g_drop_interval = DROP_INTERVAL_INIT;
     g_saved_interval = 0;
+    g_clear_flash = 0;                 /* 消行动画复位 */
+    g_flash_hold = 0;
+    g_flash_last_us = GetTimerCount();
 
     /* ---- 重置触摸/菜单状态 ---- */
     g_touch_down = 0;
@@ -659,7 +674,9 @@ void tetris_init(void)
     g_wait_touch_release = 0;   /* 重新开始后需松手防抖, 防止误触硬降 */
     g_hold_zone = 0;
     g_hold_timer = 0;
+    g_hold_last_us = GetTimerCount();
     g_lock_delay = 0;
+    g_lock_last_us = GetTimerCount();
     g_exit_menu_visible = 0;
     g_restart_menu_visible = 0;
     g_restart_sliding = 0;
@@ -727,7 +744,7 @@ static void move_piece(int8_t dx, int8_t dy)
         g_piece_x += dx;
         g_piece_y += dy;
         g_board_dirty = 1;
-        if (g_lock_delay > 0) g_lock_delay = LOCK_DELAY_FRAMES;  /* 每次移动重置锁定计时 */
+        if (g_lock_delay > 0) { g_lock_delay = (uint32_t)LOCK_DELAY_MOVE_FRAMES * FRAME_US; g_lock_last_us = GetTimerCount(); }  /* 每次移动重置锁定计时(放宽) */
     }
 }
 
@@ -764,7 +781,7 @@ static void rotate_piece(void)
 
     if (rotated) {
         g_board_dirty = 1;
-        if (g_lock_delay > 0) g_lock_delay = LOCK_DELAY_FRAMES;  /* 每次旋转重置锁定计时 */
+        if (g_lock_delay > 0) { g_lock_delay = (uint32_t)LOCK_DELAY_MOVE_FRAMES * FRAME_US; g_lock_last_us = GetTimerCount(); }  /* 每次旋转重置锁定计时(放宽) */
     }
     /* 旋转失败, 不做任何操作 */
 }
@@ -1103,20 +1120,29 @@ uint8_t tetris_update(void)
             if (dir) {
                 move_piece(dir, 0);
                 g_hold_zone = 1 + (dir > 0);
-                g_hold_timer = HOLD_REPEAT_START;
+                g_hold_timer = (uint32_t)HOLD_REPEAT_START * FRAME_US;
+                g_hold_last_us = GetTimerCount();
                 interacted = 1;
             }
         }
     }
     else if (ts.pressed && g_touch_down && g_hold_zone && g_state == TETRIS_STATE_PLAYING) {
-        /* 长按重复: 持续移动 */
+        /* 长按重复: 持续移动 (真实时间节拍, 与帧率无关) */
         if (g_hold_timer > 0) {
-            g_hold_timer--;
+            uint32_t now_us = GetTimerCount();
+            uint32_t elapsed = (uint32_t)(now_us - g_hold_last_us);
+            g_hold_last_us = now_us;
+            if (elapsed >= g_hold_timer) {
+                g_hold_timer = 0;
+            } else {
+                g_hold_timer -= elapsed;
+            }
         }
         if (g_hold_timer == 0) {
             if (g_hold_zone == 1) move_piece(-1, 0);
             else                   move_piece(1, 0);
-            g_hold_timer = HOLD_REPEAT_RATE;
+            g_hold_timer = (uint32_t)HOLD_REPEAT_RATE * FRAME_US;
+            g_hold_last_us = GetTimerCount();
             interacted = 1;
         }
     }
@@ -1139,6 +1165,8 @@ uint8_t tetris_update(void)
     if (!ts.pressed && g_touch_down) {
         g_touch_down = 0;
         g_hold_zone = 0;
+        g_hold_timer = 0;
+        g_hold_last_us = GetTimerCount();
         int16_t dy = (int16_t)ts.y - (int16_t)g_touch_start_y;
         int16_t dx = (int16_t)ts.x - (int16_t)g_touch_start_x;
         int16_t adx = (dx < 0) ? -dx : dx;
@@ -1159,7 +1187,8 @@ uint8_t tetris_update(void)
                 if (g_saved_interval == 0) {
                     g_saved_interval = g_drop_interval;
                     g_drop_interval = DROP_INTERVAL_HARD;
-                    g_drop_timer = DROP_INTERVAL_HARD;
+                    g_drop_timer = (uint32_t)DROP_INTERVAL_HARD * FRAME_US;
+                    g_drop_last_us = GetTimerCount();
                 }
                 interacted = 1;
             }
@@ -1175,9 +1204,18 @@ uint8_t tetris_update(void)
     /* ---- 消行动画状态机 (锁定时触发) ---- */
     if (g_clear_flash > 0) {
         if (g_flash_hold > 0) {
-            g_flash_hold--;
-        } else {
-            g_flash_hold = FLASH_HOLD;
+            uint32_t now_us = GetTimerCount();
+            uint32_t elapsed = (uint32_t)(now_us - g_flash_last_us);
+            g_flash_last_us = now_us;
+            if (elapsed >= g_flash_hold) {
+                g_flash_hold = 0;
+            } else {
+                g_flash_hold -= elapsed;
+            }
+        }
+        if (g_flash_hold == 0) {
+            g_flash_hold = (uint32_t)FLASH_HOLD * FRAME_US;
+            g_flash_last_us = GetTimerCount();
             g_clear_flash--;
         }
         g_board_dirty = 1;  /* 强制刷新, 闪烁画幅持续 */
@@ -1207,29 +1245,43 @@ uint8_t tetris_update(void)
         }
     }
 
-    /* ---- 自动下落 (锁定前处理) ---- */
-    if (g_state == TETRIS_STATE_PLAYING && g_clear_flash == 0) {
-        g_drop_timer++;
-        if (g_drop_timer >= g_drop_interval) {
-            g_drop_timer = 0;
-            if (!collides(g_piece_type, g_piece_rot, g_piece_x, g_piece_y + 1)) {
-                g_piece_y++;
-                g_board_dirty = 1;
-                g_lock_delay = 0;   /* 下落成功, 重置锁定计时 */
-            } else if (g_lock_delay == 0) {
-                /* 下落失败, 开始锁定延迟 */
-                g_lock_delay = LOCK_DELAY_FRAMES;
+    /* ---- 自动下落 (锁定前处理, 真实时间节拍, 与帧率无关) ---- */
+    if (g_state == TETRIS_STATE_PLAYING) {
+        uint32_t now_us = GetTimerCount();
+        uint32_t elapsed = (uint32_t)(now_us - g_drop_last_us);
+        g_drop_last_us = now_us;   /* 闪烁/暂停期也推进基准, 防闪烁结束后骤增覆盖全量刷新 */
+        if (g_clear_flash == 0) {
+            g_drop_timer += elapsed;
+            if (g_drop_timer >= (uint32_t)g_drop_interval * FRAME_US) {
+                g_drop_timer = 0;
+                g_drop_last_us = GetTimerCount();
+                if (!collides(g_piece_type, g_piece_rot, g_piece_x, g_piece_y + 1)) {
+                    g_piece_y++;
+                    g_board_dirty = 1;
+                    g_lock_delay = 0;   /* 下落成功, 重置锁定计时 */
+                } else if (g_lock_delay == 0) {
+                    /* 下落失败, 开始锁定延迟 */
+                    g_lock_delay = (uint32_t)LOCK_DELAY_FRAMES * FRAME_US;
+                    g_lock_last_us = GetTimerCount();
+                }
             }
         }
     }
 
-    /* ---- 锁定延迟倒计时 ---- */
+    /* ---- 锁定延迟倒计时 (真实时间节拍, 与帧率无关) ---- */
     if (g_lock_delay > 0 && g_state == TETRIS_STATE_PLAYING && g_clear_flash == 0) {
         /* 每次移动/旋转会重置锁定延迟 (防止误触墙壁/落下过快) */
         if (!collides(g_piece_type, g_piece_rot, g_piece_x, g_piece_y + 1)) {
             g_lock_delay = 0;
         } else {
-            g_lock_delay--;
+            uint32_t now_us = GetTimerCount();
+            uint32_t elapsed = (uint32_t)(now_us - g_lock_last_us);
+            g_lock_last_us = now_us;
+            if (elapsed >= g_lock_delay) {
+                g_lock_delay = 0;
+            } else {
+                g_lock_delay -= elapsed;
+            }
             if (g_lock_delay == 0) {
                 /* 延迟到期, 锁定 */
                 lock_piece();
@@ -1256,7 +1308,8 @@ uint8_t tetris_update(void)
 
                 if (g_clear_mask) {
                     g_clear_flash = CLEAR_FLASH_FRAMES;
-                    g_flash_hold = FLASH_HOLD;
+                    g_flash_hold = (uint32_t)FLASH_HOLD * FRAME_US;
+                    g_flash_last_us = GetTimerCount();
                     g_board_dirty = 2;
                 } else {
                     /* 无满行: 锁定后直接生成新方块, 不触发消行动画 */
