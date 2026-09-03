@@ -501,6 +501,19 @@ static void draw_game_over(void)
         sok_draw_char_32(x + 96, y, FlashStore_ResLoad(FLASH_STORE_ID_32_SHU, 0, 128), LCD_RED);
         LCD_CS_SET;
     }
+    /* 通关/结束文字下方显示当前分数 (黄色 16x26, 居中) */
+    {
+        uint8_t digits[8];
+        uint8_t dc = fish_score_digits(g_score, digits);  /* 低位在前 */
+        uint16_t tw = 16, th = 26;
+        uint16_t sx = (uint16_t)((240 - (uint16_t)dc * tw) / 2);
+        uint16_t sy = 150;
+        uint8_t i;
+        LCD_CS_CLR;   /* 前面 LCD_Fill/写字已切 CS, 画数字前须重新拉低片选 */
+        for (i = 0; i < dc; i++)
+            sok_draw_digit_scaled(sx + i * tw, sy, digits[dc - 1 - i], LCD_YELLOW, tw, th);
+        LCD_CS_SET;
+    }
     g_hud_dirty = 1;
     draw_hud();
 }
