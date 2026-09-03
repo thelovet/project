@@ -32,6 +32,9 @@ uint8_t pre_data[PARALLEL_BUFFER_COUNT];//预读数据数组
 #define TARGET_FPS            40    // 目标帧率，改这一个值即可
 #define INIT_FRAME_TIME_US    (1000000 / TARGET_FPS)  // 自动计算每帧微秒数，60FPS=16666us
 
+/* VIDEO_BLINK_WAKE_ENABLE: 1=启用(播放完一遍后允许背光闪烁+触摸切换/唤醒), 0=禁用(播完直接结束循环休眠) */
+#define VIDEO_BLINK_WAKE_ENABLE  1
+
 //当前视频段
 uint8_t current_video_index = 0;
 //最大视频段数
@@ -234,43 +237,47 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 						((uint32_t)*location2 << 8) | (uint32_t)*location1;
 					//Delay_Ms(100);
 					 if (!key_response) {//没有输入响应，播放一遍后闪烁再休眠
-					// 	if (Battery_GetStatus() != BAT_CHARGING) {
-					// 		/* 闪烁前已在按着: I2C触摸状态比PA8脉冲可靠, 跳过检测 */
-					// 		uint8_t blink_check = !g_touch_pressed;
-					// 		if (blink_check) g_touch_int_flag = 0;  /* 未在按, 清旧标志等新按下 */
-					// 		uint8_t b = 2;
-					// 		do {
-					// 			LCD_Backlight_PWM_SetDuty(0);//灭
-					// 		for (uint8_t i = 0; i < 35; i++) {
-					// 			IWDG_ReloadCounter(); Delay_Ms(10);
-					// 			if (Battery_GetStatus() == BAT_CHARGING || Battery_GetStatus() == BAT_FULL) {
-					// 				LCD_Backlight_PWM_SetDuty(g_brightness);
-					// 				goto blink_out;
-					// 			}
-					// 		}
-					// 		LCD_Backlight_PWM_SetDuty(g_brightness);//亮
-					// 		for (uint8_t i = 0; i < 35; i++) {
-					// 			IWDG_ReloadCounter(); Delay_Ms(10);
-					// 			if (blink_check && g_touch_int_flag) {
-					// 				g_touch_int_flag = 0;
-					// 				LCD_Backlight_PWM_SetDuty(g_brightness);
-					// 				blink_touched = 1;
-					// 				current_video_index = (current_video_index + 1) % max_video_count;
-					// 				LoadVideoAddress();
-					// 				key_response = 1;
-					// 				goto blink_out;
-					// 			}
-					// 			if (Battery_GetStatus() == BAT_CHARGING || Battery_GetStatus() == BAT_FULL) {
-					// 				LCD_Backlight_PWM_SetDuty(g_brightness);
-					// 				goto blink_out;
-					// 			}
-					// 		}
-					// 		} while (--b);
-					// 	}
+					 #if VIDEO_BLINK_WAKE_ENABLE
+						if (Battery_GetStatus() != BAT_CHARGING) {
+							/* 闪烁前已在按着: I2C触摸状态比PA8脉冲可靠, 跳过检测 */
+							uint8_t blink_check = !g_touch_pressed;
+							if (blink_check) g_touch_int_flag = 0;  /* 未在按, 清旧标志等新按下 */
+							uint8_t b = 2;
+							do {
+								LCD_Backlight_PWM_SetDuty(0);//灭
+							for (uint8_t i = 0; i < 35; i++) {
+								IWDG_ReloadCounter(); Delay_Ms(10);
+								if (Battery_GetStatus() == BAT_CHARGING || Battery_GetStatus() == BAT_FULL) {
+									LCD_Backlight_PWM_SetDuty(g_brightness);
+									goto blink_out;
+								}
+							}
+							LCD_Backlight_PWM_SetDuty(g_brightness);//亮
+							for (uint8_t i = 0; i < 35; i++) {
+								IWDG_ReloadCounter(); Delay_Ms(10);
+								if (blink_check && g_touch_int_flag) {
+									g_touch_int_flag = 0;
+									LCD_Backlight_PWM_SetDuty(g_brightness);
+									blink_touched = 1;
+									current_video_index = (current_video_index + 1) % max_video_count;
+									LoadVideoAddress();
+									key_response = 1;
+									goto blink_out;
+								}
+								if (Battery_GetStatus() == BAT_CHARGING || Battery_GetStatus() == BAT_FULL) {
+									LCD_Backlight_PWM_SetDuty(g_brightness);
+									goto blink_out;
+								}
+							}
+							} while (--b);
+						}
+					 	#endif
 					 	end_flag = 1;//结束一个循环
 					 }
 					key_response = 0;//清除输入响应标志
-				//blink_out:;
+				#if VIDEO_BLINK_WAKE_ENABLE
+				blink_out:;
+				#endif
 				}
 				while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//等待屏幕刷新完成
 				//while ((SPI2_DMA_TX_CH->CNTR) > 0);//等待SPI2屏幕刷新完成
