@@ -141,10 +141,6 @@ void Set_display_range_DMA() {//读取坐标后配置屏幕显示位置
  * @param location3    待读取的flash位置次高字节
  * @param location2    待读取的flash位置次低字节
  * @param location1    待读取的flash位置低字节
- * @param x_start      LCD显示区域起始X坐标
- * @param y_start      LCD显示区域起始Y坐标
- * @param width        显示区域宽度（像素）
- * @param height       显示区域高度（像素）
  *
  * 功能说明：
  * 1. 从SPI Flash读取自定义压缩格式的图像数据
@@ -276,8 +272,8 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 					key_response = 0;//清除输入响应标志
 				//blink_out:;
 				}
-				//while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//等待屏幕刷新完成
-				while ((SPI2_DMA_TX_CH->CNTR) > 0);//等待SPI2屏幕刷新完成
+				while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//等待屏幕刷新完成
+				//while ((SPI2_DMA_TX_CH->CNTR) > 0);//等待SPI2屏幕刷新完成
 				FLASH_CS_SET;// 释放Flash
 				//FrameTrigger();//触发帧率计算，用于显示帧率——已注释，不需要显示帧率
 				// LCD_ShowNum(GetLowestFPS(), START_Y - SEG_HEIGHT - 4);//显示最低帧率

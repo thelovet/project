@@ -607,6 +607,30 @@ void LoadVideoAddress(void) {
 }
 
 /**
+ * @brief  主菜单关闭返回视频播放 (底部/中间区域上划关闭主菜单)
+ * @note   复位菜单/游戏状态, 重新加载视频第一帧避免黑屏闪烁,
+ *         置 s_m2v_swipe 防止松手帧被误判为"点击切换下一视频"。
+ */
+static void main_menu_close_to_video(void)
+{
+    s_main_mode = MAIN_MODE_VIDEO;
+    s_menu_drawn = 0;
+    s_menu_drag_y_prev = -999;
+    s_touch_started_top = 0;  /* 复位顶部标志, 防误触 */
+    s_game_inited = 0;
+    s_game_sleep_mode = MAIN_MODE_VIDEO;
+    vm_touch_down = 0;      /* 重置上划检测, 避免视频上划误触发 */
+    vm_sliding = 0;
+    /* 视频第一帧为完整帧, 直接填充背景, 避免黑屏闪烁 */
+    LoadVideoAddress();
+    flash_decompress_and_show(&next_bank, &next_higvh,
+                              &next_high, &next_low);
+    s_m2v_swipe = 1;
+    /* 保留 s_touch_down: 在video轮询中vm_touch_down需要它来判断swipe,
+       菜单返回视频时一并重置swipe状态; 此处swipe帧清屏后已保证下一帧不重复 */
+}
+
+/**
  * @brief  处理触摸输入：菜单拖拽、滑动、点击及游戏触摸
  * @return 1 触摸已处理(跳过本帧), 0 正常处理
  */
@@ -646,7 +670,8 @@ static uint8_t Main_HandleTouchInput(void)
         s_touch_start_y = ts.y;
         s_menu_drag_touch_y = ts.y;
         s_touch_started_top =
-            (s_settings_mode == SETTINGS_NONE && ts.y < MENU_SWIPE_START_Y
+            (ts.y < MENU_SWIPE_START_Y
+             && (s_settings_mode == SETTINGS_NONE || !g_settings_from_game)  /* 视频设置页也允许顶部下滑弹主菜单 */
              && s_main_mode != MAIN_MODE_MENU
              && s_main_mode != MAIN_MODE_SOKOBAN
              && s_main_mode != MAIN_MODE_D2048
@@ -697,30 +722,34 @@ static uint8_t Main_HandleTouchInput(void)
                     diff = MENU_DRAG_MAX_STEP;
                 s_menu_drag_y += diff;
                 s_menu_dragging = 1;
+                /* 视频设置页顶部下滑拖主菜单即退出设置页, 背景重载视频第一帧(同视频菜单清背景) */
+                if (s_settings_mode != SETTINGS_NONE && !g_settings_from_game) {
+                    s_settings_mode = SETTINGS_NONE;
+                    LoadVideoAddress();
+                    flash_decompress_and_show(&next_bank, &next_higvh,
+                                              &next_high, &next_low);
+                }
             }
             if (ts.y > s_menu_drag_max_y)
                 s_menu_drag_max_y = ts.y;  /* 更新手指最远位置 */
         }
     }
-    else if (ts.pressed && s_touch_down && s_touch_started_bottom
-             && s_main_mode == MAIN_MODE_MENU
-             && (int16_t)s_touch_start_y - (int16_t)ts.y > 5) {
-        /* 底部上划/游戏/充电场景, 从菜单返回视频模式时此路径处理, 设置上划菜单打断标志 */
-        s_main_mode = MAIN_MODE_VIDEO;
-        s_menu_drawn = 0;
-        s_menu_drag_y_prev = -999;
-        s_touch_started_top = 0;  /* 复位顶部标志, 防误触 */
-        s_game_inited = 0;
-        s_game_sleep_mode = MAIN_MODE_VIDEO;
-        vm_touch_down = 0;      /* 重置上划检测, 避免视频上划误触发 */
-        vm_sliding = 0;
-        /* 视频第一帧为完整帧, 直接填充背景, 避免黑屏闪烁 */
+    else if (ts.pressed && s_touch_down && s_main_mode == MAIN_MODE_MENU
+             && (int16_t)s_touch_start_y - (int16_t)ts.y > MENU_SWIPE_TRIGGER_DIST) {
+        /* 主菜单显示时上划关闭返回视频 (任意起点, 用主菜单自身按下起点检测更可靠) */
+        main_menu_close_to_video();
+        g_menu_cooldown = 15;
+    }
+    else if (ts.pressed && s_touch_down && s_main_mode == MAIN_MODE_VIDEO
+             && s_video_menu_visible && s_settings_mode == SETTINGS_NONE
+             && game_menu_swipe_mid_down_close(MENU_SWIPE_START_Y, MENU_SWIPE_TRIGGER_DIST)) {
+        /* 视频上滑菜单显示时, 中间/底部下滑关闭返回视频; 顶部(起点<40)下滑保留给打开主菜单(上下可打断) */
+        s_video_menu_visible = 0;
+        vm_touch_down = 0;
         LoadVideoAddress();
         flash_decompress_and_show(&next_bank, &next_higvh,
                                   &next_high, &next_low);
         s_m2v_swipe = 1;
-        /* 保留 s_touch_down: 在video轮询中vm_touch_down需要它来判断swipe,
-           菜单返回视频时一并重置swipe状态; 此处swipe帧清屏后已保证下一帧不重复 */
     }
     else if (!ts.pressed && s_touch_down) {
         /* 触摸释放: 处理逻辑 */
@@ -1002,6 +1031,8 @@ static void GameSettings_Update(void)
     if (!g_settings_from_game)
         return;
 
+    if (g_menu_cooldown > 0) g_menu_cooldown--;  /* 设置菜单下滑关闭防重复触发冷却 */
+
     VideoMenu_Update(&ts, 0);
 
     /* 设置页面: 顶部下滑触发退出菜单(游戏切换) */
@@ -1039,6 +1070,17 @@ static void GameSettings_Update(void)
                 }
             }
         }
+    }
+
+    /* 中间/底部区域下滑 → 关闭二级"设置选项"菜单返回游戏 (与四游戏重菜下滑返回一致)
+       仅作用于设置选项菜单(非设置页); 置 s_video_menu_visible=0 后不 return,
+       立即落入下方绘制分支清条带+重绘游戏, 避免闪屏。 */
+    if (s_video_menu_visible && s_settings_mode == SETTINGS_NONE
+        && !s_video_menu_dragging && !vm_sliding
+        && game_menu_swipe_mid_down_close(MENU_SWIPE_START_Y, MENU_SWIPE_TRIGGER_DIST)) {
+        game_menu_fix_release_after_close();  /* 下滑关闭回游戏, 松手不传入游戏 */
+        s_video_menu_visible = 0;
+        s_settings_mode = SETTINGS_NONE;
     }
 
     if (s_video_menu_visible) {
@@ -1127,6 +1169,7 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
             s_menu_drawn = 1;
         }
         /* 菜单已绘制无需重复绘制 */
+        if (g_menu_cooldown > 0) g_menu_cooldown--;  /* 主菜单上划关闭防重复触发冷却 */
     }
     else if (s_main_mode == MAIN_MODE_SOKOBAN) {
         /* 推箱子游戏 */
@@ -1185,6 +1228,7 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
     }
     else {
         /* 视频模式: 上划菜单 + 视频主循环 */
+        if (g_menu_cooldown > 0) g_menu_cooldown--;  /* 菜单/上滑菜单防重复触发冷却 */
         VideoMenu_Update(&ts, 1);
 
         /* 设置界面: 优先处理(返回键由触摸释放处理)

@@ -32,6 +32,7 @@ uint8_t  g_settings_from_game = MAIN_MODE_VIDEO;  /* 从游戏进入设置的来源模式 */
 uint8_t  g_game_enter_exit_menu = 0;  /* 设置菜单中顶部下滑→退出菜单标志 */
 uint8_t  g_prev_pressed;              /* 上一帧触摸按下(各游戏共用, 供 game_menu_command/退出菜单轮询) */
 uint16_t g_touch_start_x;             /* 触摸起点X (与 g_touch_start_y 一致提升为共享全局) */
+uint8_t  g_game_consume_release;      /* 反向滑关闭后的松手吸收标志: 只吸收本次闭合手势的松手, 不误触移动 */
 #include "tetris.h"        /* tetris_reset_touch, GAME_RET_* */
 #include "klotski.h"       /* klotski_reset_touch */
 #include "adc.h"
@@ -1037,6 +1038,7 @@ uint8_t game_handle_ret(uint8_t ret, MainMode *mode, uint8_t *game_inited,
     /* 模式切换只在松手后发生，同时清除主循环触摸状态 */
     *game_inited = 0;
     *touch_down = 0;
+    g_game_consume_release = 0;  /* 模式切换清吸收标志, 防跨游戏残留 */
 
     if (ret == EXIT_RET_VIDEO) {
         /* 返回视频: 不黑屏, main.c视频循环直接渲染第一帧 */
@@ -1133,6 +1135,96 @@ uint8_t game_menu_swipe_up_poll(uint16_t y_threshold, uint8_t release_thresh,
         }
     }
     return 0;
+}
+
+/*********************************************************************
+ * @brief  退出菜单已显示(静止)时, 检测中间区域上划手势 关闭菜单返回游戏
+ *         按起点分流: 底部(y>y_threshold)上划由 game_menu_swipe_up_poll 保留给切重菜,
+ *         中间区域(起点 y 在 [10, y_threshold))上划才由本函数关闭菜单。推箱子不用本函数。
+ * @param  y_threshold   底部切重菜起点阈值(起点<此值才属中间区域)
+ * @param  release_thresh 释放上划距离阈值
+ * @return 1=已检测到中间区域上划(调用方执行关闭菜单), 0=未触发
+ **********************************************************************/
+uint8_t game_menu_swipe_mid_up_close(uint16_t y_threshold, uint8_t release_thresh)
+{
+    static uint8_t  mu_dn = 0;      /* 中间区域上划追踪 */
+    static uint16_t mu_sy = 0;      /* 起点Y */
+    static uint8_t  mu_rel = 0;     /* 释放防抖 */
+    TouchState ts;
+    Touch_Scan(&ts);
+
+    if (!ts.pressed) {
+        if (mu_dn && ++mu_rel < 2) return 0;
+        mu_dn = 0;
+        mu_rel = 0;
+        return 0;
+    }
+    mu_rel = 0;
+    if (!mu_dn) { mu_dn = 1; mu_sy = ts.y; return 0; }
+    /* 起点在中间区域且上划超过阈值 关闭菜单 */
+    if (g_menu_cooldown == 0
+        && mu_sy >= 10 && mu_sy < y_threshold
+        && (int16_t)ts.y - (int16_t)mu_sy < -(int16_t)release_thresh) {
+        mu_dn = 0;
+        mu_rel = 0;
+        g_menu_cooldown = 15;
+        return 1;
+    }
+    return 0;
+}
+
+/*********************************************************************
+ * @brief  检测中间区域下滑关闭上划菜单 (视频上滑菜单/游戏二级设置菜单共用)
+ *         按起点分流: 顶部(起点<MENU_SWIPE_START_Y)下滑由调用方保留给"切换退出菜单",
+ *         中间/底部区域(起点在[MENU_SWIPE_START_Y, 240))下滑才由本函数关闭菜单。
+ * @param  start_min     中间区域起点Y下限(起点>=此值才属可关闭区域)
+ * @param  release_thresh 下滑距离阈值
+ * @return 1=已检测到中间区域下滑(调用方执行关闭菜单), 0=未触发
+ * @note   与 game_menu_swipe_mid_up_close 对称, 独立 static 状态不复用, 防互抢。
+ **********************************************************************/
+uint8_t game_menu_swipe_mid_down_close(uint16_t start_min, uint8_t release_thresh)
+{
+    static uint8_t  md_dn = 0;      /* 中间区域下滑追踪 */
+    static uint16_t md_sy = 0;      /* 起点Y */
+    static uint8_t  md_rel = 0;     /* 释放防抖 */
+    TouchState ts;
+    Touch_Scan(&ts);
+
+    if (!ts.pressed) {
+        if (md_dn && ++md_rel < 2) return 0;
+        md_dn = 0;
+        md_rel = 0;
+        return 0;
+    }
+    md_rel = 0;
+    if (!md_dn) { md_dn = 1; md_sy = ts.y; return 0; }
+    /* 起点在中间/底部区域且下滑超过阈值 关闭菜单 */
+    if (g_menu_cooldown == 0
+        && md_sy >= start_min
+        && (int16_t)ts.y - (int16_t)md_sy > release_thresh) {
+        md_dn = 0;
+        md_rel = 0;
+        g_menu_cooldown = 15;
+        return 1;
+    }
+    return 0;
+}
+
+/**
+ * @brief  反向滑关闭菜单后, 修正游戏共享触摸状态, 使松手不传入游戏
+ * @note   反向滑(上划关闭下滑菜单/下滑关闭上划菜单)触发关闭时手指仍按住,
+ *         游戏恢复后会重录按下起点并把"按下区"的冷却清掉, 导致松手被误判为
+ *         一次滑动/拖动。此处把 g_touch_down 置 1 (视为已按下, 防重录/清冷却),
+ *         并把 g_touch_start_* 记为当前手指位置, 使随后松手的位移≈0。
+ */
+void game_menu_fix_release_after_close(void)
+{
+    TouchState t;
+    Touch_Scan(&t);
+    g_touch_down = t.pressed ? 1 : 0;  /* 手指仍按住则视为已按下(防重录起/清冷却), 已抬起则保持0 */
+    g_touch_start_x = t.x;
+    g_touch_start_y = t.y;
+    g_game_consume_release = t.pressed ? 1 : 0;  /* 仅手指按住(反向滑)才标记吸收本次松手, 点击关闭不标记 */
 }
 
 /*********************************************************************
@@ -1333,6 +1425,18 @@ uint8_t game_menu_command(const GameMenuCfg *cfg, uint8_t *state, uint8_t *out_r
             }
         }
 
+        /* 中间区域上划 → 关闭退出菜单返回游戏 (仅静止可见时, 起点在[10, y_threshold)才判;
+           拖拽/滑入期间不判, 避免下滑刚进入菜单时被误关闭) */
+        if (!g_exit_dragging && !g_exit_sliding
+            && game_menu_swipe_mid_up_close(cfg->y_threshold, cfg->release_thresh)) {
+            menu_exit_back_cleanup();
+            game_menu_fix_release_after_close();  /* 上划关闭, 松手不传入游戏(须在cleanup后, 防其清touche状态) */
+            *state = g_state_before_menu;
+            cfg->mark_dirty();
+            (void)cfg->bg_redraw();   /* 立即重绘场景, 防菜单清黑残留 */
+            return GAME_MENU_CMD_NONE;
+        }
+
         /* 拖拽 */
         if (g_exit_dragging) {
             TouchState ts_d;
@@ -1442,6 +1546,24 @@ uint8_t game_menu_command(const GameMenuCfg *cfg, uint8_t *state, uint8_t *out_r
                                         &g_touch_start_x, &g_touch_start_y))
             goto restart_to_exit;
 
+        /* 中间区域下滑 → 关闭重菜返回游戏 (起点>=MENU_SWIPE_START_Y(40), 顶部下滑留给切退菜) */
+        {
+            static uint8_t  rd_dn = 0;
+            static uint16_t rd_sy = 0;
+            if (!ts.pressed) {
+                rd_dn = 0;
+            } else {
+                if (!rd_dn) { rd_dn = 1; rd_sy = ts.y; }
+                else if (rd_sy >= MENU_SWIPE_START_Y
+                         && (int16_t)ts.y - (int16_t)rd_sy > MENU_SWIPE_TRIGGER_DIST
+                         && g_menu_cooldown == 0) {
+                    rd_dn = 0;
+                    g_menu_cooldown = 15;
+                    goto restart_close;
+                }
+            }
+        }
+
         /* 点选重菜 */ 
         {
             static int8_t ph = -1;
@@ -1486,6 +1608,7 @@ restart_to_exit:
 restart_close:
         g_prev_pressed = ts.pressed;
         menu_restart_cleanup();
+        game_menu_fix_release_after_close();  /* 下滑关闭/点选关闭, 松手不传入游戏(须在cleanup后) */
         *state = g_state_before_menu;
         cfg->mark_dirty();
         (void)cfg->bg_redraw();   /* 立即重绘场景, 防菜单清黑残留到下一帧 */

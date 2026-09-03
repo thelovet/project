@@ -463,6 +463,9 @@ static uint8_t d2048_menu_bg_redraw(void)
     } else {
         draw_grid();
         draw_score();
+        /* draw_score 会整条清黑顶部区域(含电池图标), 此处须立即重绘电池,
+          否则菜单返回/切换时电池消失又回闪(如重菜下滑返回游戏那一下闪) */
+        game_battery_icon_update(164, 22, 1);
     }
     g_grid_dirty = 0;
     g_full_redraw = 0;
@@ -536,6 +539,11 @@ uint8_t d2048_update(void)
     }
     if (!ts.pressed && g_touch_down) {
         g_touch_down = 0;
+        /* 菜单反向滑关闭后的松手不传入游戏: 只吸收本次闭合手势的松手, 下次按下即操作游戏 */
+        if (g_game_consume_release) {
+            g_game_consume_release = 0;
+            return interacted;
+        }
         int16_t dx = (int16_t)ts.x - (int16_t)g_touch_start_x;
         int16_t dy = (int16_t)ts.y - (int16_t)g_touch_start_y;
 

@@ -1164,6 +1164,11 @@ uint8_t tetris_update(void)
     }
     if (!ts.pressed && g_touch_down) {
         g_touch_down = 0;
+        /* 菜单反向滑关闭后的松手不传入游戏: 只吸收本次闭合手势的松手, 下次按下即操作游戏 */
+        if (g_game_consume_release) {
+            g_game_consume_release = 0;
+            return GAME_RET_NONE;
+        }
         g_hold_zone = 0;
         g_hold_timer = 0;
         g_hold_last_us = GetTimerCount();

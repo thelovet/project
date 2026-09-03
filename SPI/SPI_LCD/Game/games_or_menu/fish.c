@@ -824,7 +824,11 @@ uint8_t fish_update(void)
     }
     /* 增量拖动: 按住滑动时, 鱼按手指的位移增量平移(不吸附到手指位置, 松开即停) */
     if (g_state == FISH_STATE_PLAYING && upress) {
-        if (just_pressed) {
+        if (g_game_consume_release) {
+            /* 菜单反向滑关闭后的拖动不传入游戏: 闭合手势按住期间只跟随不移动鱼, 松手即恢复 */
+            s_last_touch_x = (int16_t)ts.x;
+            s_last_touch_y = (int16_t)ts.y;
+        } else if (just_pressed) {
             /* 刚按下: 记录起点, 本帧鱼不动 */
             s_last_touch_x = (int16_t)ts.x;
             s_last_touch_y = (int16_t)ts.y;
@@ -847,6 +851,10 @@ uint8_t fish_update(void)
             g_player.y = (uint16_t)py;
         }
     }
+
+    /* 闭合手势结束(松手)后清除吸收标志, 下一次按下即可正常操作游戏 */
+    if (!upress && g_game_consume_release)
+        g_game_consume_release = 0;
 
     /* 小鱼随机游动 (基于真实时间节拍, 与帧率无关, 防未按下时主循环空转导致狂飙) */
     {

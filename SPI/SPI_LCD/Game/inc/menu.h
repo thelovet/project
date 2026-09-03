@@ -196,6 +196,12 @@ uint8_t menu_swipe_to_restart_handler(uint16_t y_threshold, uint8_t release_thre
                                                  /* 底部上划打断退出菜单→切换重启菜单: 0=无动作 1=拖拽 2=滑入 */
 uint8_t uint_to_digits(uint32_t val, uint8_t *digits);  /* 数字分解为十进制位(LSB先) */
 void menu_exit_back_cleanup(void);  /* 统一退出菜单关闭清理 */
+/* 中间区域上划关闭"下滑"菜单(退出/主菜单), 起点在[10,y_threshold)才判定 */
+uint8_t game_menu_swipe_mid_up_close(uint16_t y_threshold, uint8_t release_thresh);
+/* 中间/底部区域下滑关闭"上滑"菜单(设置菜单/二级菜单), 起点需>=start_min */
+uint8_t game_menu_swipe_mid_down_close(uint16_t start_min, uint8_t release_thresh);
+/* 反向滑关闭菜单后修正共享触摸状态, 使松手不传入游戏(重录起点/清冷却) */
+void game_menu_fix_release_after_close(void);
 
 
 /**
@@ -365,6 +371,9 @@ extern uint8_t g_game_enter_exit_menu;
 /* ---- 共享触摸状态 (从各游戏静态提升为全局, 供 game_menu_command 复用) ---- */
 extern uint8_t  g_prev_pressed;
 extern uint16_t g_touch_start_x;
+
+/* 反向滑关闭后的松手吸收标志: 游戏移动判定处检查, 置1时吸收本次松手不误触移动 */
+extern uint8_t  g_game_consume_release;
 
 /* ---- 配置驱动游戏菜单状态机 (d2048/klotski/tetris/fish 共用) ---- */
 typedef struct {

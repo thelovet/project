@@ -634,7 +634,6 @@ static uint8_t sok_exit_swipe_cancel(void)
     uint8_t poll_ret = game_menu_swipe_up_poll(SOK_SWIPE_Y, MENU_SWIPE_TRIGGER_DIST, &cancel_dy);
     if (!poll_ret) return 0;
 
-    g_touch_down       = 0;   /* 清除全局触摸状态, 防止残留坐标误触发下次检测 */
     g_menu_cooldown    = 15;  /* 全局冷却, 防立即重触发 */
 
     s_exit_menu_visible = 0;
@@ -642,6 +641,8 @@ static uint8_t sok_exit_swipe_cancel(void)
     s_exit_dragging    = 0;
     s_prev_pressed     = 0;
     s_menu_cooldown    = 15;
+    g_touch_down       = 0;   /* 清除全局触摸状态(松手由按钮面板处理, 不设吸收标志防跨游戏残留) */
+    LCD_CLEAR_MENU_AREA();           /* 清退出菜单区(含边框), 防黑色/残留 */
     sok_redraw_grid_below(MENU_Y);
     if (poll_ret == 2) {
         /* 松手打断: 手指已抬起, 自动动画滑入 */
@@ -656,6 +657,39 @@ static uint8_t sok_exit_swipe_cancel(void)
         s_menu_slide_y   = 240;
         s_menu_sliding   = 1;
         s_slide_max_dy   = 0;   /* 复位最远位移, 防旧值导致回退>2误取消 */
+        s_drag_btn       = sok_btn_hit_test(ts_now.x, ts_now.y);
+    }
+    game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 1);
+    return 1;
+}
+
+/**
+ * @brief  中间区域上划关闭推箱子退出菜单 (与四游戏退出菜单上划关闭一致)
+ *         起点在 [10, SOK_SWIPE_Y) 上划即关闭, 与底部上划(sok_exit_swipe_cancel)互补。
+ * @retval 1=已关闭(按钮面板跟手滑入), 0=无操作
+ */
+static uint8_t sok_exit_mid_up_close(void)
+{
+    if (!game_menu_swipe_mid_up_close(SOK_SWIPE_Y, MENU_SWIPE_TRIGGER_DIST))
+        return 0;
+
+    g_touch_down    = 0;   /* 闭合手势松手由按钮面板处理, 不设吸收标志(防跨游戏残留) */
+    s_exit_menu_visible = 0;
+    s_exit_sliding  = 0;
+    s_exit_dragging = 0;
+    s_prev_pressed  = 0;
+    s_menu_cooldown = 15;
+    LCD_CLEAR_MENU_AREA();           /* 清退出菜单区(含边框), 防黑色/残留 */
+    sok_redraw_grid_below(MENU_Y);
+    /* 按钮面板跟手滑入 (与 sok_exit_swipe_cancel 拖拽打断一致) */
+    {
+        TouchState ts_now;
+        Touch_UpdateCoords();
+        Touch_Scan(&ts_now);
+        s_swipe_origin_y = ts_now.y;
+        s_menu_slide_y   = 240;
+        s_menu_sliding   = 1;
+        s_slide_max_dy   = 0;
         s_drag_btn       = sok_btn_hit_test(ts_now.x, ts_now.y);
     }
     game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 1);
@@ -1323,6 +1357,8 @@ process_exit_menu:
 
         /* 上划打断退出菜单(静止态) */
         if (sok_exit_swipe_cancel()) return 0;
+        /* 中间区域上划关闭退出菜单返回按钮面板 */
+        if (sok_exit_mid_up_close()) return 0;
 
         uint8_t ret = game_exit_menu_poll(sokoban_exit_map, &s_prev_pressed, &ts);
         if (ret == EXIT_RET_BACK) {

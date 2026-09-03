@@ -493,6 +493,11 @@ uint8_t klotski_update(void)
     }
     if (!ts.pressed && g_touch_down) {
         g_touch_down = 0;
+        /* 菜单反向滑关闭后的松手不传入游戏: 只吸收本次闭合手势的松手, 下次按下即操作游戏 */
+        if (g_game_consume_release) {
+            g_game_consume_release = 0;
+            return interacted;
+        }
         int16_t dx = (int16_t)ts.x - (int16_t)g_touch_start_x;
         int16_t dy = (int16_t)ts.y - (int16_t)g_touch_start_y;
 
