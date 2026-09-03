@@ -1,3 +1,11 @@
+/**
+ * @file    settings.c
+ * @brief   设置模块: 亮度 / 息屏时间 / 屏幕方向 三个设置页
+ * @note    视频上滑菜单与各游戏的设置二级菜单都复用本模块;
+ *          参数经 BKP 后备寄存器持久化(Settings_SaveAll), 设置页由 main.c
+ *          的 Settings_Update 统一调度, 返回键/下滑返回在 main.c 处理。
+ */
+
 #include "settings.h"
 #include "lcd.h"
 #include "display.h"

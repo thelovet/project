@@ -1,3 +1,12 @@
+/**
+ * @file    game_save.c
+ * @brief   游戏状态存档模块: 将各游戏状态写入内部Flash存档页并在唤醒后恢复
+ * @note    存档页固定 0x0800FF00(最后一个256字节页), 页头: 魔数/版本/模式/长度/CRC16;
+ *          支持推箱子/2048/俄罗斯方块/华容道/大鱼吃小鱼(GameSave_IsSupportedMode)。
+ *          唤醒恢复走 BKP 后备寄存器记恢复标志(视频/游戏), GameSave_RestoreWakeState
+ *          读出后由 GameSave_RestorePending 调用各游戏 restore 接口。
+ */
+
 #include "string.h"
 #include "ch32v20x_flash.h"
 #include "game_save.h"
