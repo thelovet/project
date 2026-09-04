@@ -892,10 +892,7 @@ static void main_lowbatt_restore_under_icon(void)
     switch (s_main_mode) {
         case MAIN_MODE_SOKOBAN: sokoban_full_redraw(); break;
         case MAIN_MODE_FISH:    fish_clear_lowbattery(); break;
-        case MAIN_MODE_D2048:
-            if (d2048_is_menu_visible()) d2048_menu_mark_dirty();
-            else d2048_full_redraw();
-            break;
+        case MAIN_MODE_D2048:   d2048_lowbatt_restore(); break;
         case MAIN_MODE_TETRIS:
             if (tetris_is_menu_visible()) tetris_menu_mark_dirty();
             else tetris_full_redraw();

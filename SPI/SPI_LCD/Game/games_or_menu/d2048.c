@@ -394,6 +394,61 @@ uint8_t d2048_is_menu_visible(void)
     return g_exit_menu_visible || g_restart_menu_visible;
 }
 
+/**
+ * @brief  Restore the area covered by the low-battery icon after it clears
+ * @note   Mirror the sokoban approach: LCD_ClearLowBatteryOverlay turns the
+ *         red icon (frame+nub+exclamation) to black, then redraw exactly what
+ *         was beneath it in the same call.
+ *         - Menu visible: redraw the menu frame now (covers the battery body
+ *           outline + exclamation that sit inside the menu area), so the menu
+ *           does NOT flash for one frame.
+ *         - Battery nub (x=195..210, y=104..136) is OUTSIDE the menu frame,
+ *           over grid cells (1,3)/(2,3): redraw them now so the nub does not
+ *           stay black/residue.
+ *         - Dropdown (exit) menu covers the whole screen height, so the opaque
+ *           menu frame directly clears the battery body/exclamation and only
+ *           the nub is restored with grid data (NO draw_grid redraw, otherwise
+ *           grid rows flash one frame inside the battery frame).
+ *         - Restart menu / pure game redraw the grid (the battery top is above
+ *           the restart menu, over the game area).
+ */
+void d2048_lowbatt_restore(void)
+{
+    uint8_t r;
+
+    LCD_ClearLowBatteryOverlay();   /* icon frame+nub+exclamation red->black */
+
+    /* battery nub overlaps grid cells (1,3),(2,3): redraw them first.
+       (Drawn BEFORE the opaque menu frame below because the cell straddles the
+       menu's right edge; the frame redrawn after covers its in-menu part.) */
+    for (r = 1; r <= 2; r++) {
+        uint8_t c = 3;
+        uint16_t val = g_grid[r * D2048_COLS + c];
+        uint8_t ci = (val == 0) ? 0 : get_color_idx(val);
+        uint16_t bg = (val == 0) ? 0xCE59 : tile_colors[ci];
+        draw_tile_bg(r, c, bg);
+        draw_tile_number(r, c, val);
+        g_prev_grid[r * D2048_COLS + c] = val;
+    }
+
+    /* redraw the opaque menu frame on top (covers battery body outline +
+       exclamation + the in-menu part of the nub cells) => no flash / no residue */
+    if (g_exit_menu_visible) {
+        /* dropdown menu: covers the whole battery body/exclamation, so the menu
+           frame directly clears them. NO d2048_full_redraw() here, otherwise
+           bg_redraw draws grid rows1-2 (game) which flashes one frame. */
+        menu_draw_nrow_frame_only(g_exit_drag_y, d2048_row_types, 5);
+    } else if (g_restart_menu_visible) {
+        /* restart menu: battery top (y=79..110) is ABOVE the menu, over the
+           game area -> redraw grid so that area is restored */
+        menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
+        d2048_full_redraw();
+    } else {
+        /* pure game: full grid redraw next frame covers icon border/exclamation */
+        d2048_full_redraw();
+    }
+}
+
 #define D2048_SAVE_LEN  37
 
 uint8_t d2048_save_state(uint8_t *buf, uint8_t max_len)
