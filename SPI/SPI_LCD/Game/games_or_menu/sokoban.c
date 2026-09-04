@@ -903,6 +903,35 @@ static void sokoban_hold_update(void)
     }
 }
 
+/**
+ * @brief  重绘 [x0,x1]x[y0,y1] 范围内覆盖的地图瓦片
+ * @note   电池灭段恢复: 先用 LCD_ClearLowBatteryOverlay 把电池图标整块刷黑(红色像素→黑),
+ *         地图外黑区/凸起变黑即无红色残留; 此处仅重绘电池区地图瓦片盖回被刷黑的形状。
+ * @param  x0,y0,x1,y1  像素矩形范围(不含右/下边界, 与 LCD_Fill 一致)
+ */
+static void sok_redraw_battery_tiles(int16_t x0, int16_t y0, int16_t x1, int16_t y1)
+{
+    int16_t br_start = ((int16_t)y0 - g_oy) / (int16_t)g_tile_size;
+    int16_t br_end   = ((int16_t)y1 - g_oy) / (int16_t)g_tile_size;
+    int16_t bc_start = ((int16_t)x0 - g_ox) / (int16_t)g_tile_size;
+    int16_t bc_end   = ((int16_t)x1 - g_ox) / (int16_t)g_tile_size;
+
+    if (br_start < 0) br_start = 0;
+    if (br_end >= (int16_t)g_level_rows) br_end = (int16_t)g_level_rows - 1;
+    if (bc_start < 0) bc_start = 0;
+    if (bc_end >= (int16_t)g_level_cols) bc_end = (int16_t)g_level_cols - 1;
+
+    if (br_start <= br_end && bc_start <= bc_end) {
+        int16_t r, c;
+        LCD_CS_CLR;
+        for (r = br_start; r <= br_end; r++) {
+            for (c = bc_start; c <= bc_end; c++) {
+                sokoban_draw_cell_at((uint8_t)r, (uint8_t)c);
+            }
+        }
+        LCD_CS_SET;
+    }
+}
 uint8_t sokoban_update(void)
 {
     uint8_t interacted = 0;
@@ -926,31 +955,12 @@ uint8_t sokoban_update(void)
         sokoban_draw_level(s_current_level);   /* 设置下滑已把屏幕刷黑, 需重绘整图 */
     }
 
-    /* ---- 电池闪灭恢复: 仅重绘电池覆盖区域，避免全屏刷新闪烁 ---- */
+    /* ---- 电池闪灭恢复: 整块刷黑图标(红→黑)+重绘该处瓦片 ---- */
     if (g_sok_dirty) {
         if (!s_exit_menu_visible) {
-            /* 退出菜单已用MENU_CYAN覆盖电池区，无需重绘游戏瓦片 */
-            /* 计算低电图标覆盖的瓦片范围 (电池中心区域约 45,79~210,161，包含凸起) */
-            int16_t br_start = ((int16_t)79 - g_oy) / (int16_t)g_tile_size;
-            int16_t br_end   = ((int16_t)161 - g_oy) / (int16_t)g_tile_size;
-            int16_t bc_start = ((int16_t)45 - g_ox) / (int16_t)g_tile_size;
-            int16_t bc_end   = ((int16_t)210 - g_ox) / (int16_t)g_tile_size;  /* 195+15=210 涵盖凸起 */
-
-            if (br_start < 0) br_start = 0;
-            if (br_end >= (int16_t)g_level_rows) br_end = (int16_t)g_level_rows - 1;
-            if (bc_start < 0) bc_start = 0;
-            if (bc_end >= (int16_t)g_level_cols) bc_end = (int16_t)g_level_cols - 1;
-
-            if (br_start <= br_end && bc_start <= bc_end) {
-                int16_t r, c;
-                LCD_CS_CLR;
-                for (r = br_start; r <= br_end; r++) {
-                    for (c = bc_start; c <= bc_end; c++) {
-                        sokoban_draw_cell_at((uint8_t)r, (uint8_t)c);
-                    }
-                }
-                LCD_CS_SET;
-            }
+            /* 非菜单: 先把电池图标整块刷黑(红→黑), 再重绘电池区地图瓦片 */
+            LCD_ClearLowBatteryOverlay();
+            sok_redraw_battery_tiles(45, 79, 210, 161);
             /* 重绘UI覆盖层(导航按钮/通关画面) */
             if (s_menu_visible) {
                 if (s_won) {
@@ -963,7 +973,10 @@ uint8_t sokoban_update(void)
                 }
             }
         } else {
-            /* 退出菜单可见：仅重绘菜单框架覆盖电池黑线 */
+            /* 退出菜单可见: 先整块刷黑图标(红→黑), 再重绘框外凸起瓦片(x=195~210);
+               不重绘框内瓦片(避免擦掉菜单框导致闪); 菜单框架框内部分维持原有绘制 */
+            LCD_ClearLowBatteryOverlay();
+            sok_redraw_battery_tiles(195, 104, 210, 136);
             menu_draw_nrow_frame_only(s_exit_drag_y, sok_row_types, 5);
         }
         g_sok_dirty = 0;

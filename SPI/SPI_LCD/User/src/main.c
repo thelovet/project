@@ -880,6 +880,34 @@ static uint8_t Main_HandleTouchInput(void)
 }
 
 /**
+ * @brief  低电图标灭段(On->Off)后, 恢复被其覆盖的底层内容(游戏场景+当前菜单框)
+ * @note   不用 LCD_ClearLowBatteryOverlay 把图标轮廓刷黑(会在彩色菜单/场景留下黑/红块),
+ *         改为置脏由各游戏自身重绘覆盖: 退出/重开菜单用 *_menu_mark_dirty(置
+ *         game_menu_command 的 bg_redraw 所读的脏, 使其下帧重绘场景+菜单框), 纯游戏用
+ *         *_full_redraw; fish 用局部清除。注意菜单态不能用 *_full_redraw(d2048/klotski
+ *         只置 g_full_redraw 而 bg_redraw 读 g_grid_dirty, 会漏重绘导致红色残留)。
+ */
+static void main_lowbatt_restore_under_icon(void)
+{
+    switch (s_main_mode) {
+        case MAIN_MODE_SOKOBAN: sokoban_full_redraw(); break;
+        case MAIN_MODE_FISH:    fish_clear_lowbattery(); break;
+        case MAIN_MODE_D2048:
+            if (d2048_is_menu_visible()) d2048_menu_mark_dirty();
+            else d2048_full_redraw();
+            break;
+        case MAIN_MODE_TETRIS:
+            if (tetris_is_menu_visible()) tetris_menu_mark_dirty();
+            else tetris_full_redraw();
+            break;
+        case MAIN_MODE_KLOTSKI:
+            if (klotski_is_menu_visible()) klotski_menu_mark_dirty();
+            else klotski_full_redraw();
+            break;
+        default: break;
+    }
+}
+/**
  * @brief  电量0级时低频闪烁低电图标: 灭2秒亮1秒
  * @note   仅4种游戏模式有效, BAT_LEVEL_0时触发
  *         闪烁时叠加LowBattery图标, SPI占用时可能产生撕裂
@@ -911,16 +939,8 @@ static void Main_FlashLowBattery(void)
         if ((uint32_t)(now - s_flash_tick) >= 1000000UL) {
             s_flash_on = 0;
             s_flash_tick = now;
-            /* 灭屏时段 + 低电图标已清除需要重绘 */
-            LCD_ClearLowBatteryOverlay();
-            if (s_main_mode == MAIN_MODE_SOKOBAN)
-                sokoban_full_redraw();
-            else if (s_main_mode == MAIN_MODE_D2048)
-                d2048_full_redraw();
-            else if (s_main_mode == MAIN_MODE_TETRIS)
-                tetris_full_redraw();
-            else
-                klotski_full_redraw();
+            /* 灭屏时段(On->Off): 恢复被低电图标覆盖的底层内容(场景+当前菜单框) */
+            main_lowbatt_restore_under_icon();
         } else {
             LCD_ShowLowBatteryOverlay();
         }
