@@ -34,6 +34,9 @@ uint8_t klotski_update(void);
 void    klotski_reset_touch(void);
 void    klotski_full_redraw(void);
 uint8_t klotski_is_menu_visible(void);
+/* 菜单状态机 hook (供二级设置菜单返回复用, 与一级菜单一致) */
+void klotski_menu_mark_dirty(void);
+uint8_t klotski_menu_bg_redraw(void);
 uint8_t klotski_save_state(uint8_t *buf, uint8_t max_len);
 uint8_t klotski_restore_state(const uint8_t *buf, uint8_t len);
 

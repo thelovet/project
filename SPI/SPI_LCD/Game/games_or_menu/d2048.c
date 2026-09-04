@@ -436,14 +436,14 @@ uint8_t d2048_restore_state(const uint8_t *buf, uint8_t len)
 /* ================================================================
  *  配置驱动菜单状态机的 hook (mark_dirty / bg_redraw)
  * ================================================================ */
-static void d2048_menu_mark_dirty(void)   /* 关闭/取消菜单后需重绘场景 */
+void d2048_menu_mark_dirty(void)   /* 关闭/取消菜单后需重绘场景 */
 {
     g_grid_dirty = 1;
     g_full_redraw = 1;
 }
 
 /* 依据脏标记重绘菜单背景: 返回1=本帧已重绘 */
-static uint8_t d2048_menu_bg_redraw(void)
+uint8_t d2048_menu_bg_redraw(void)
 {
     if (!g_grid_dirty) return 0;
     if (g_grid_dirty == 2) {

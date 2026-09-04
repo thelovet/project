@@ -1494,13 +1494,15 @@ uint8_t game_menu_command(const GameMenuCfg *cfg, uint8_t *state, uint8_t *out_r
     /* ---- 重新开始菜单 ---- */
     if (*state == cfg->restart) {
         uint8_t close_cmd = GAME_MENU_CMD_RETURN;   /* 默认点空白/取消 → 关闭回原状态 */
-        cfg->bg_redraw();   /* 依据脏标记重绘场景(仅脏时), 返回值此处不用于重开块 */
+        uint8_t bg_dirty = cfg->bg_redraw();   /* 依据脏标记重绘场景; 返回脏标志, 供菜单框仅脏时重绘(同退出菜单) */
 
-        /* 静止时: 更新电池图标 + 每帧重绘菜单框(与各游戏原逻辑一致) */
+        /* 静止时: 场景脏才重绘菜单框, 避免每帧重绘与中央低电图标来回覆盖闪;
+           右上角电池图标内部有节流, 每帧调用无害 */
         if (!g_restart_dragging && !g_restart_sliding) {
             if (cfg->bat_x != GAME_MENU_BAT_NONE)
                 game_battery_icon_update(cfg->bat_x, cfg->bat_y, 0);
-            menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
+            if (bg_dirty)
+                menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
         }
         TouchState ts;
 

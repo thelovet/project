@@ -688,9 +688,11 @@ static void fish_menu_mark_dirty(void)
 static uint8_t fish_menu_bg_redraw(void)
 {
     if (!g_full_redraw) return 0;
-    if (g_state_before_menu == FISH_STATE_OVER) draw_game_over();
-    else fish_draw_scene();
     g_full_redraw = 0;
+    /* 菜单打开时低电触发 g_full_redraw: 菜单框架不透明, 重绘它盖住中央的低电图标,
+       不要整屏重绘场景, 否则菜单会闪 (参考 sokoban 菜单可见时仅重绘菜单框架)。
+       凸起区 x=195~210 超出菜单框架右缘(195), 先用鱼背景色填掉避免红色残留 */
+    LCD_Fill(195, 79, 211, 162, COLOR_BG);
     return 1;
 }
 
@@ -996,6 +998,8 @@ uint8_t fish_update(void)
         /* 首次/恢复: 全屏填背景, 所有实体重画 */
         draw_background();
         g_full_redraw = 0;
+        g_hud_dirty = 1;      /* 顶部分数/等级条被背景覆盖, 需重绘 */
+        draw_hud();
         g_player.drawn = 0;
         uint8_t i0;
         for (i0 = 0; i0 < FISH_NUM_FOOD; i0++) g_food[i0].drawn = 0;
@@ -1068,6 +1072,25 @@ void fish_reset_touch(void)
 void fish_full_redraw(void)
 {
     g_full_redraw = 1;
+}
+
+/**
+ * @brief 局部清除低电图标覆盖区, 不整屏重绘(避免游戏画面闪)
+ * @note  菜单可见时交由菜单状态机重绘框架盖住; 游戏界面复用
+ *        clear_entity_rect 填背景并重绘相交实体, 故顶部分数/等级不受影响
+ */
+void fish_clear_lowbattery(void)
+{
+    if (g_state == FISH_STATE_EXIT_MENU || g_state == FISH_STATE_RESTART_MENU) {
+        /* 菜单框架只覆盖 y>=110, 低于电图标(主体x=45~195,y=79~161, 凸起x~210)上方
+           露出一段 y=79~110, 菜单框架盖不到, 需用背景色补掉否则游戏区域残留红图标 */
+        LCD_Fill(45, 79, 211, 110, COLOR_BG);
+        g_full_redraw = 1;   /* 触发菜单框架重绘(盖住 y>=110 部分) */
+        return;
+    }
+    /* 低电图标覆盖区: 中心(127,120), 宽166, 高83 (x=44~209, y=79~161) */
+    static const uint16_t lb_dims[][2] = {{166, 83}};
+    clear_entity_rect(lb_dims, 0, 127, 120);
 }
 
 /* ================================================================

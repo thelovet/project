@@ -41,6 +41,9 @@ uint8_t d2048_update(void);    /* 返回: 0=无交互, 1=有交互, 2=返回视频, 3=切换推
 void    d2048_reset_touch(void);
 void    d2048_full_redraw(void);
 uint8_t d2048_is_menu_visible(void);
+/* 菜单状态机 hook (供二级设置菜单返回复用, 与一级菜单一致) */
+void d2048_menu_mark_dirty(void);
+uint8_t d2048_menu_bg_redraw(void);
 uint8_t d2048_save_state(uint8_t *buf, uint8_t max_len);
 uint8_t d2048_restore_state(const uint8_t *buf, uint8_t len);
 
