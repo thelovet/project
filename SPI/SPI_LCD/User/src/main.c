@@ -887,7 +887,7 @@ static uint8_t Main_HandleTouchInput(void)
  *         *_full_redraw; fish 用局部清除。注意菜单态不能用 *_full_redraw(d2048/klotski
  *         只置 g_full_redraw 而 bg_redraw 读 g_grid_dirty, 会漏重绘导致红色残留)。
  */
-static void main_lowbatt_restore_under_icon(void)
+static void main_restore_game_under_icon(void)
 {
     switch (s_main_mode) {
         case MAIN_MODE_SOKOBAN: sokoban_full_redraw(); break;
@@ -897,6 +897,26 @@ static void main_lowbatt_restore_under_icon(void)
         case MAIN_MODE_KLOTSKI: klotski_lowbatt_restore(); break;
         default: break;
     }
+}
+
+static void main_lowbatt_restore_under_icon(void)
+{
+    if (g_settings_from_game) {
+        /* 设置模式(从游戏进入): 屏幕显示设置界面而非游戏, 恢复时应重绘设置界面.
+           - 二级"设置选项"条带可见, 且已打开设置页: 先重绘设置页再画条带(条带压在页上);
+           - 条带可见但未打开设置页: 恢复游戏场景再画条带(条带压在游戏上);
+           - 设置页显示: 重绘设置页(整屏填充, 覆盖电池区). */
+        if (s_video_menu_visible) {
+            if (s_settings_mode != SETTINGS_NONE) Settings_Redraw();
+            else main_restore_game_under_icon();
+            menu_draw_nrow_frame_only(s_video_menu_slide_y,
+                                      g_video_menu_row_types, 4);
+        } else if (s_settings_mode != SETTINGS_NONE) {
+            Settings_Redraw();
+        }
+        return;
+    }
+    main_restore_game_under_icon();
 }
 /**
  * @brief  电量0级时低频闪烁低电图标: 灭2秒亮1秒
@@ -1039,8 +1059,16 @@ void menu_enter_game_settings_swipe(uint16_t start_y)
  */
 static void GameSettings_Update(void)
 {
-    if (!g_settings_from_game)
+    /* 条带静止态去抖: 仅在滑动动画(位置变化)或刚变可见时重绘, 避免每帧全幅重绘
+       与低电图标闪烁争夺(导致菜单与红色图标飞快交替闪烁)。与游戏菜单保持静态,
+       低电图标才能正常几秒闪一次。离开设置时复位, 保证下次进入强制首个重绘。 */
+    static int16_t s_strip_prev_y = -1;
+    static uint8_t s_strip_prev_vis = 0;
+
+    if (!g_settings_from_game) {
+        s_strip_prev_vis = 0;
         return;
+    }
 
     if (g_menu_cooldown > 0) g_menu_cooldown--;  /* 设置菜单下滑关闭防重复触发冷却 */
 
@@ -1094,14 +1122,24 @@ static void GameSettings_Update(void)
         s_settings_mode = SETTINGS_NONE;
     }
 
+    int16_t strip_now_y = s_video_menu_slide_y;
+
     if (s_video_menu_visible) {
-        if (s_settings_mode == SETTINGS_NONE)
-            menu_draw_nrow_frame_only(s_video_menu_slide_y,
+        if (!s_strip_prev_vis) s_strip_prev_y = -1;  /* 刚变可见: 强制首个重绘 */
+        if (s_settings_mode == SETTINGS_NONE
+            && s_strip_prev_y != strip_now_y) {
+            s_strip_prev_y = strip_now_y;
+            menu_draw_nrow_frame_only(strip_now_y,
                                        g_video_menu_row_types, 4);
+        }
+        s_strip_prev_vis = 1;
     } else {
+        s_strip_prev_vis = 0;
+        s_strip_prev_y = -1;
         /* 跟手拖拽/回滑期间由 VideoMenu_Update 绘制, 不得误判为"退出设置" */
         if (s_video_menu_dragging || vm_sliding)
             return;
+
         if (s_settings_mode != SETTINGS_NONE) {
             IWDG_ReloadCounter();
             Settings_Update();

@@ -39,9 +39,21 @@ static SettingsMode s_mode = SETTINGS_NONE;
 
 /* 前置声明 */
 static void Brightness_Draw(void);
+/* 重绘当前设置页(只重绘、不处理触摸), 供低电图标灭段恢复时调用 */
 static void Brightness_DrawSlider(void);
 static void SleepTime_Draw(void);
 static void Orientation_Draw(void);
+void Settings_Redraw(void)
+{
+    switch (s_mode) {
+    case SETTINGS_BRIGHTNESS:  Brightness_Draw();  break;
+    case SETTINGS_SLEEP_TIME:  SleepTime_Draw();   break;
+    case SETTINGS_ORIENTATION: Orientation_Draw(); break;
+    default: break;
+    }
+}
+
+
 
 #define DIGIT_W 14
 #define DIGIT_H 28
