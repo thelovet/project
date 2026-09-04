@@ -19,32 +19,72 @@ $obj = Join-Path $PSScriptRoot "SPI\SPI_LCD\obj"
 $elf = Join-Path $obj "SPI_LCD.elf"
 Set-Location $obj
 
+$script:buildOk = $false
+$script:flashOk = $false
+$script:hadError = 0
+
+function Show-MemUsage {
+    $line = (& riscv-none-embed-size --format=berkeley SPI_LCD.elf 2>$null |
+             Where-Object { $_ -match '\.elf$' -and $_ -match '\d' } |
+             Select-Object -First 1)
+    if (-not $line) { Write-Host "  未能解析内存占用" -ForegroundColor Yellow; return }
+    $p = ($line.Trim() -split '\s+')
+    $text = [int]$p[0]; $data = [int]$p[1]; $bss = [int]$p[2]
+    $flash = $text + $data
+    $ram   = $data + $bss
+    # 芯片容量: Flash=65280B(0xFF00, 末尾留存档区), RAM=20480B(20K)
+    $flashPct = [math]::Round($flash / 65280.0 * 100, 2)
+    $ramPct   = [math]::Round($ram / 20480.0 * 100, 2)
+    Write-Host ("  Flash 已用: {0} B ({1}% / 65280 B)" -f $flash, $flashPct) -ForegroundColor Yellow
+    Write-Host ("  RAM 已用:   {0} B ({1}% / 20480 B)" -f $ram, $ramPct) -ForegroundColor Yellow
+}
+
 function Do-Build {
     Write-Host "==> make all" -ForegroundColor Cyan
     make all
-    if ($LASTEXITCODE -ne 0) { Write-Host "BUILD FAIL" -ForegroundColor Red; exit 1 }
-    Write-Host "BUILD OK" -ForegroundColor Green
+    if ($LASTEXITCODE -ne 0) { Write-Host "编译失败" -ForegroundColor Red; exit 1 }
+    $script:buildOk = $true
+}
+
+function Show-BuildResult {
+    Write-Host "编译成功" -ForegroundColor Green
+    Show-MemUsage
 }
 
 function Do-Flash {
-    if (-not (Test-Path $elf)) { Write-Host "elf not found: $elf -- build first" -ForegroundColor Red; exit 1 }
-    Write-Host "==> SWD program $elf" -ForegroundColor Cyan
+    if (-not (Test-Path $elf)) { Write-Host "未找到 $elf ，请先编译" -ForegroundColor Red; $script:hadError = 1; return }
+    Write-Host "==> program $elf" -ForegroundColor Cyan
     & $openocd -f $cfg -c "adapter speed 8000" -c "chip_id CH32V20x" -c "program {$elf} reset exit"
-    if ($LASTEXITCODE -ne 0) { Write-Host "FLASH FAIL" -ForegroundColor Red; exit 1 }
-    Write-Host "FLASH OK" -ForegroundColor Green
+    if ($LASTEXITCODE -ne 0) { $script:flashOk = $false } else { $script:flashOk = $true }
+}
+
+function Show-FlashResult {
+    if ($script:flashOk) {
+        Write-Host "烧录成功" -ForegroundColor Green
+    } else {
+        Write-Host "烧录失败" -ForegroundColor Red
+        Write-Host "  可能原因/处理:" -ForegroundColor Yellow
+        Write-Host "  1) 设备待机/没电连不上 -> 先给设备充电, 或点一下屏幕唤醒" -ForegroundColor Yellow
+        Write-Host "  2) 连接异常(DM版本错/读保护) -> 断电重启后再试" -ForegroundColor Yellow
+        Write-Host "  3) 仍不行 -> 进 BOOT 模式(BOOT0=VCC,BOOT1=GND) 用 ISP 烧录" -ForegroundColor Yellow
+        $script:hadError = 1
+    }
 }
 
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 switch ($mode) {
-    "build" { Do-Build }
-    "flash" { Do-Flash }
+    "build" { Do-Build; Show-BuildResult }
+    "flash" { Do-Flash; Show-FlashResult }
     "clean" {
-        Write-Host "==> make clean" -ForegroundColor Cyan
+        Write-Host "==> 清理" -ForegroundColor Cyan
         make clean
         Do-Build
         Do-Flash
+        Show-BuildResult
+        Show-FlashResult
     }
-    default { Do-Build; Do-Flash }
+    default { Do-Build; Do-Flash; Show-BuildResult; Show-FlashResult }
 }
 $sw.Stop()
-Write-Host ("done in {0:N1}s" -f $sw.Elapsed.TotalSeconds) -ForegroundColor Yellow
+Write-Host ("完成, 用时 {0:N1}s" -f $sw.Elapsed.TotalSeconds) -ForegroundColor Yellow
+if ($script:hadError) { exit 1 }
