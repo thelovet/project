@@ -346,6 +346,49 @@ uint8_t klotski_is_menu_visible(void)
     return g_exit_menu_visible || g_restart_menu_visible;
 }
 
+/**
+ * @brief  Restore the area covered by the low-battery icon after it clears
+ * @note   Mirror d2048_lowbatt_restore (sokoban-style redraw).
+ *         - Battery nub (x=195..210, y=104..136) is OUTSIDE the menu frame,
+ *           over grid cells (1,3)/(2,3): redraw them first.
+ *         - Dropdown (exit) menu: redraw ONLY the opaque menu frame on top
+ *           (covers the battery body/exclamation inside the menu area) => no
+ *           grid redraw, otherwise grid rows flash one frame.
+ *         - Restart menu / pure game: klotski_full_redraw redraws only the
+ *           battery-covered grid region (rows1-2), skipping full grid fill.
+ */
+void klotski_lowbatt_restore(void)
+{
+    uint8_t r;
+
+    LCD_ClearLowBatteryOverlay();   /* icon frame+nub+exclamation red->black */
+
+    /* battery nub overlaps grid cells (1,3),(2,3): redraw them first.
+       (BEFORE the opaque menu frame below, because the cell straddles the
+       menu's right edge; the frame redrawn after covers its in-menu part.) */
+    for (r = 1; r <= 2; r++) {
+        uint8_t c = 3;
+        uint8_t val = g_grid[r * KLOTSKI_COLS + c];
+        uint16_t bg = (val == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR;
+        draw_tile_bg(r, c, bg);
+        if (val != 0) draw_tile_number(r, c, val);
+    }
+
+    if (g_exit_menu_visible) {
+        /* dropdown menu covers the whole battery body/exclamation -> the opaque
+           menu frame clears them directly, NO grid redraw (else rows flash) */
+        menu_draw_nrow_frame_only(g_exit_drag_y, klotski_row_types, 5);
+    } else if (g_restart_menu_visible) {
+        /* restart menu: battery top is above the menu over the grid -> redraw
+           battery region (rows1-2), menu frame covers the rest */
+        menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
+        klotski_full_redraw();
+    } else {
+        /* pure game: redraw battery region (rows1-2) only */
+        klotski_full_redraw();
+    }
+}
+
 #define KLOTSKI_SAVE_LEN  21
 
 uint8_t klotski_save_state(uint8_t *buf, uint8_t max_len)

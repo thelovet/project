@@ -978,6 +978,38 @@ static void tetris_menu_on_to_exit(void)
     g_preview_dirty = 1;
 }
 
+/**
+ * @brief  Restore the area covered by the low-battery icon after it clears
+ * @note   Mirror d2048_lowbatt_restore (sokoban-style redraw).
+ *         - Dropdown (exit) menu covers the whole battery body/exclamation and
+ *           the board (menu x=45..195) -> redraw ONLY the opaque menu frame
+ *           (directly clears them), and draw_preview() first to refill the
+ *           battery nub (x=195..210) which lies over the preview area on the
+ *           right (outside the menu). NO board redraw, else the board flashes
+ *           one frame inside the battery frame.
+ *         - Restart menu / pure game -> set g_board_dirty=3 so that only the
+ *           battery-covered board region (rows5-14) is redrawn, NOT the whole
+ *           board (g_board_dirty=2 would flash the whole board); draw_preview()
+ *           refills the nub.
+ */
+void tetris_lowbatt_restore(void)
+{
+    LCD_ClearLowBatteryOverlay();   /* icon frame+nub+exclamation red->black */
+
+    if (g_exit_menu_visible) {
+        /* preview first (straddles the menu's right edge), then the opaque menu
+           frame on top covers its in-menu part */
+        draw_preview();
+        menu_draw_nrow_frame_only(g_exit_drag_y, tetris_row_types, 5);
+    } else {
+        /* restart menu / pure game: only the battery-covered board region is
+           redrawn (g_board_dirty=3) instead of the whole board, so the whole
+           board does not flash; draw_preview refills the nub */
+        draw_preview();
+        g_board_dirty = 3;
+    }
+}
+
 static const GameMenuCfg g_tetris_menu_cfg = {
     TETRIS_STATE_PLAYING, TETRIS_STATE_EXIT_MENU, TETRIS_STATE_RESTART_MENU,
     tetris_row_types, tetris_exit_map,

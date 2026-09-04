@@ -28,6 +28,7 @@ uint8_t tetris_update(void);
 void    tetris_reset_touch(void);
 void    tetris_full_redraw(void);
 uint8_t tetris_is_menu_visible(void);
+void    tetris_lowbatt_restore(void);
 /* 菜单状态机 hook (供二级设置菜单返回复用, 与一级菜单一致) */
 void tetris_menu_mark_dirty(void);
 uint8_t tetris_menu_bg_redraw(void);

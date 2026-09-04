@@ -893,14 +893,8 @@ static void main_lowbatt_restore_under_icon(void)
         case MAIN_MODE_SOKOBAN: sokoban_full_redraw(); break;
         case MAIN_MODE_FISH:    fish_clear_lowbattery(); break;
         case MAIN_MODE_D2048:   d2048_lowbatt_restore(); break;
-        case MAIN_MODE_TETRIS:
-            if (tetris_is_menu_visible()) tetris_menu_mark_dirty();
-            else tetris_full_redraw();
-            break;
-        case MAIN_MODE_KLOTSKI:
-            if (klotski_is_menu_visible()) klotski_menu_mark_dirty();
-            else klotski_full_redraw();
-            break;
+        case MAIN_MODE_TETRIS:  tetris_lowbatt_restore(); break;
+        case MAIN_MODE_KLOTSKI: klotski_lowbatt_restore(); break;
         default: break;
     }
 }
