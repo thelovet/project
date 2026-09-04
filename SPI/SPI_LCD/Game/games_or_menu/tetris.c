@@ -890,9 +890,8 @@ uint8_t tetris_restore_state(const uint8_t *buf, uint8_t len)
     }
     return 1;
 }
-/* Draw the menu background for the exit/restart menu states.
-   If the game was OVER before the menu, show the game-over screen instead of
-   redrawing the board (the board redraw used to wipe the game-over text). */
+/* 绘制退出/重开菜单的背景(棋盘/结束画面)。
+   若进菜单前游戏已结束(OVER), 显示结束画面而非重绘棋盘(重绘棋盘会擦掉结束文字)。 */
 static void tetris_draw_menu_scene(void)
 {
     if (g_state_before_menu == TETRIS_STATE_OVER) {
@@ -978,33 +977,55 @@ static void tetris_menu_on_to_exit(void)
     g_preview_dirty = 1;
 }
 
-/**
- * @brief  Restore the area covered by the low-battery icon after it clears
- * @note   Mirror d2048_lowbatt_restore (sokoban-style redraw).
- *         - Dropdown (exit) menu covers the whole battery body/exclamation and
- *           the board (menu x=45..195) -> redraw ONLY the opaque menu frame
- *           (directly clears them), and draw_preview() first to refill the
- *           battery nub (x=195..210) which lies over the preview area on the
- *           right (outside the menu). NO board redraw, else the board flashes
- *           one frame inside the battery frame.
- *         - Restart menu / pure game -> set g_board_dirty=3 so that only the
- *           battery-covered board region (rows5-14) is redrawn, NOT the whole
- *           board (g_board_dirty=2 would flash the whole board); draw_preview()
- *           refills the nub.
- */
+/* 只重绘重开菜单上方(y<110)的棋盘行(rows5-8), 不重绘压在菜单后的行(rows9+,
+   否则游戏图先于菜单显示一帧 -> 闪). 电池主体/感叹号在菜单上方压棋盘 rows5-8;
+   凸点/预览区由调用方 draw_preview 恢复. */
+static void tetris_restore_board_above_menu(void)
+{
+    uint8_t r, c;
+    LCD_Fill(BOARD_X, BOARD_Y + 5 * CELL_SIZE,
+             BOARD_X + BOARD_W - 1, BOARD_Y + 9 * CELL_SIZE - 1, BOARD_BG);
+    for (c = 0; c <= BOARD_COLS; c++) {
+        uint16_t x = BOARD_X + c * CELL_SIZE;
+        LCD_Fill(x, BOARD_Y + 5 * CELL_SIZE,
+                 x + GRID_WIDTH - 1, BOARD_Y + 9 * CELL_SIZE - 1, BOARD_GRID);
+    }
+    for (r = 6; r <= 9; r++) {
+        uint16_t y = BOARD_Y + r * CELL_SIZE;
+        LCD_Fill(BOARD_X, y, BOARD_X + BOARD_W - 1, y + GRID_WIDTH - 1, BOARD_GRID);
+    }
+    for (r = 5; r <= 8; r++) {
+        for (c = 0; c < BOARD_COLS; c++) {
+            if (g_board[r][c] != 0) draw_cell(c, r, piece_colors[g_board[r][c] - 1]);
+        }
+    }
+    if (g_state == TETRIS_STATE_PLAYING) {
+        if (g_piece_y <= 8)
+            draw_piece_at(g_piece_type, g_piece_rot, g_piece_x, g_piece_y,
+                          piece_colors[g_piece_type]);
+        g_ghost_y = find_ghost_y();
+        if (g_ghost_y != g_piece_y && g_ghost_y <= 8)
+            draw_ghost_at(g_piece_type, g_piece_rot, g_piece_x, g_ghost_y);
+    }
+}
+
+        /* 重开菜单: 只恢复菜单上方(y<110)的棋盘行(rows5-8)+预览, 再画菜单框(不
+          重绘压在菜单后的行, 否则游戏图先于菜单闪一帧) */
 void tetris_lowbatt_restore(void)
 {
-    LCD_ClearLowBatteryOverlay();   /* icon frame+nub+exclamation red->black */
+    LCD_ClearLowBatteryOverlay();   /* 图标边框+凸点+感叹号 红→黑 */
 
     if (g_exit_menu_visible) {
-        /* preview first (straddles the menu's right edge), then the opaque menu
-           frame on top covers its in-menu part */
+        /* 先画预览(横跨菜单右边框), 再画不透明菜单框盖住压在菜单里的部分 */
         draw_preview();
         menu_draw_nrow_frame_only(g_exit_drag_y, tetris_row_types, 5);
+    } else if (g_restart_menu_visible) {
+        /* 重开菜单/纯游戏: 只重绘电池覆盖的棋盘区域(g_board_dirty=3)而非整屏,
+           避免整个棋盘闪; draw_preview 填充凸点 */
+        draw_preview();
+        tetris_restore_board_above_menu();
+        menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
     } else {
-        /* restart menu / pure game: only the battery-covered board region is
-           redrawn (g_board_dirty=3) instead of the whole board, so the whole
-           board does not flash; draw_preview refills the nub */
         draw_preview();
         g_board_dirty = 3;
     }

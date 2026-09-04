@@ -346,45 +346,80 @@ uint8_t klotski_is_menu_visible(void)
     return g_exit_menu_visible || g_restart_menu_visible;
 }
 
+/* klotski_redraw_battery_rows 定义在本文件下方, 此处前向声明 */
+static void klotski_redraw_battery_rows(void);
+
+/* 恢复低电图标伸出到重开菜单上方/外侧的像素(菜单覆盖 y>=RESTART_MENU_Y=110,
+   x=45..195). 只填充这些细条带为网格格底色(格子内部/数字在透明电池体内, 保持完好).
+   重要: 这里不画任何延伸到菜单框后面的完整格子, 否则游戏图会先于菜单显示一帧 -> 闪. */
+static void klotski_restore_above_menu_slivers(void)
+{
+    uint16_t b1[4];
+    uint8_t c;
+    for (c = 0; c < KLOTSKI_COLS; c++)
+        b1[c] = (g_grid[KLOTSKI_COLS + c] == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR;
+    uint16_t b23 = (g_grid[2 * KLOTSKI_COLS + 3] == 0)
+        ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR;
+
+    /* row0 完全在菜单上方: 重画它的格底+数字(盖住电池主体上边框 y=79..80 及
+      row0 处左右边框) */
+    for (c = 0; c < KLOTSKI_COLS; c++) {
+        uint16_t b0 = (g_grid[c] == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR;
+        draw_tile_bg(0, c, b0);
+        if (g_grid[c] != 0) draw_tile_number(0, c, g_grid[c]);
+    }
+
+    /* 电池主体左边框压在 col0 row1 (x=45..46, y=85..109) */
+    LCD_Fill(45, 85, 47, RESTART_MENU_Y, b1[0]);
+    /* 电池主体右边框压在 col3 row1 (x=193..194, y=85..109) */
+    LCD_Fill(193, 85, 195, RESTART_MENU_Y, b1[3]);
+    /* 电池主体上边框已被上面 row0 重绘覆盖 */
+
+    /* 感叹号竖条(x=111..128, y=92..109 在菜单上方)压在 col1/col2 row1 */
+    LCD_Fill(111, 92, 118, RESTART_MENU_Y, b1[1]);   /* col1 右缘 */
+    LCD_Fill(118, 92, 122, RESTART_MENU_Y, LCD_BLACK); /* col1/col2 缝隙 */
+    LCD_Fill(122, 92, 129, RESTART_MENU_Y, b1[2]);   /* col2 左缘 */
+
+   /* 电池凸点(x=195..209)在菜单外(x=195 右侧): 填充其覆盖的格内容 */
+    LCD_Fill(195, 104, 207, 126, b1[3]);            /* (1,3) col3 格 */
+    LCD_Fill(195, 126, 207, 130, LCD_BLACK);        /* row1/row2 缝隙 */
+    LCD_Fill(195, 130, 207, 136, b23);              /* (2,3) col3 格 */
+    LCD_Fill(207, 104, 210, 136, LCD_BLACK);        /* col3 右缝 */
+}
+
 /**
- * @brief  Restore the area covered by the low-battery icon after it clears
- * @note   Mirror d2048_lowbatt_restore (sokoban-style redraw).
- *         - Battery nub (x=195..210, y=104..136) is OUTSIDE the menu frame,
- *           over grid cells (1,3)/(2,3): redraw them first.
- *         - Dropdown (exit) menu: redraw ONLY the opaque menu frame on top
- *           (covers the battery body/exclamation inside the menu area) => no
- *           grid redraw, otherwise grid rows flash one frame.
- *         - Restart menu / pure game: klotski_full_redraw redraws only the
- *           battery-covered grid region (rows1-2), skipping full grid fill.
+ * @brief  低电图标灭段后恢复被其覆盖的底层内容
+ * @note   参照 d2048_lowbatt_restore(推箱子样式).
+ *         - 电池凸点(x=195..210, y=104..136)在菜单框外, 压在网格格(1,3)/(2,3): 先重画.
+ *         - 下滑(退出)菜单: 只重画不透明菜单框(盖住菜单内电池主体/感叹号) => 不重绘
+ *           网格, 否则网格行闪一帧.
+ *         - 重开菜单: 只恢复菜单上方/外侧的图标细条带, 再画菜单框; 不重绘延伸到
+ *           菜单后面的网格行(曾导致游戏图先于菜单显示一帧).
+ *         - 纯游戏: 只重绘电池覆盖的网格区域(rows1-2).
  */
 void klotski_lowbatt_restore(void)
 {
-    uint8_t r;
-
-    LCD_ClearLowBatteryOverlay();   /* icon frame+nub+exclamation red->black */
-
-    /* battery nub overlaps grid cells (1,3),(2,3): redraw them first.
-       (BEFORE the opaque menu frame below, because the cell straddles the
-       menu's right edge; the frame redrawn after covers its in-menu part.) */
-    for (r = 1; r <= 2; r++) {
-        uint8_t c = 3;
-        uint8_t val = g_grid[r * KLOTSKI_COLS + c];
-        uint16_t bg = (val == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR;
-        draw_tile_bg(r, c, bg);
-        if (val != 0) draw_tile_number(r, c, val);
-    }
+    LCD_ClearLowBatteryOverlay();   /* 图标边框+凸点+感叹号 红→黑 */
 
     if (g_exit_menu_visible) {
-        /* dropdown menu covers the whole battery body/exclamation -> the opaque
-           menu frame clears them directly, NO grid redraw (else rows flash) */
+        /* 下滑菜单覆盖整个电池主体/感叹号 -> 不透明菜单框直接盖掉它们; 只填充
+           菜单外侧的凸点. 不重绘网格(否则行闪一帧). */
+        uint8_t r;
+        for (r = 1; r <= 2; r++) {
+            uint8_t c = 3;
+            uint8_t val = g_grid[r * KLOTSKI_COLS + c];
+            uint16_t bg = (val == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR;
+            draw_tile_bg(r, c, bg);
+            if (val != 0) draw_tile_number(r, c, val);
+        }
         menu_draw_nrow_frame_only(g_exit_drag_y, klotski_row_types, 5);
     } else if (g_restart_menu_visible) {
-        /* restart menu: battery top is above the menu over the grid -> redraw
-           battery region (rows1-2), menu frame covers the rest */
+        /* 重开菜单: 只恢复菜单上方/外侧的图标细条带, 再画菜单框(不透明, 盖住
+           其后的电池主体). 不画菜单后面的网格行 => 无"游戏先于菜单"闪. */
+        klotski_restore_above_menu_slivers();
         menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
-        klotski_full_redraw();
     } else {
-        /* pure game: redraw battery region (rows1-2) only */
+        /* 纯游戏: 重绘电池覆盖区域(rows1-2) */
         klotski_full_redraw();
     }
 }
@@ -442,21 +477,28 @@ void klotski_menu_mark_dirty(void)   /* 关闭/取消菜单后需重绘场景 */
     g_grid_dirty = 1;
 }
 
+/* 重绘电池覆盖的网格行(rows1-2); 供菜单背景重绘(g_grid_dirty==2)与
+   klotski_lowbatt_restore(立即区域恢复)共用. */
+static void klotski_redraw_battery_rows(void)
+{
+    uint8_t r, c;
+    for (r = 1; r <= 2; r++) {
+        for (c = 0; c < KLOTSKI_COLS; c++) {
+            uint8_t val = g_grid[r * KLOTSKI_COLS + c];
+            uint16_t bg = (val == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR;
+            draw_tile_bg(r, c, bg);
+            if (val != 0) draw_tile_number(r, c, val);
+        }
+    }
+}
+
 /* 依据脏标记重绘菜单背景: 返回1=本帧已重绘 */
 uint8_t klotski_menu_bg_redraw(void)
 {
     if (!g_grid_dirty) return 0;
     if (g_grid_dirty == 2) {
         /* 电池闪灭: 仅重绘中段行(row1-2)以减少SPI冲突 */
-        uint8_t r, c;
-        for (r = 1; r <= 2; r++) {
-            for (c = 0; c < KLOTSKI_COLS; c++) {
-                uint8_t val = g_grid[r * KLOTSKI_COLS + c];
-                uint16_t bg = (val == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR;
-                draw_tile_bg(r, c, bg);
-                if (val != 0) draw_tile_number(r, c, val);
-            }
-        }
+        klotski_redraw_battery_rows();
     } else {
         draw_grid();
         draw_status();

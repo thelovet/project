@@ -394,33 +394,56 @@ uint8_t d2048_is_menu_visible(void)
     return g_exit_menu_visible || g_restart_menu_visible;
 }
 
+/* 只恢复重开菜单上方/外侧的电池残像素细条带(不画延伸到菜单后的整格, 否则游戏图
+   先于菜单显示一帧 -> 闪). d2048 GRID_Y=36: 电池上边框 y=79..80 落在 row0/row1
+   缝隙(黑色)上无需处理; 菜单上方(y<110=RESTART_MENU_Y)电池主体/感叹号只压 row1,
+   凸点压在菜单右侧(x=195..209, 菜单外). 格子内部数字在透明电池体内, 保持完好. */
+static void d2048_restore_above_menu_slivers(void)
+{
+    uint16_t b1[4], b23;
+    uint8_t c;
+    for (c = 0; c < D2048_COLS; c++) {
+        uint16_t v = g_grid[1 * D2048_COLS + c];
+        b1[c] = (v == 0) ? 0xCE59 : tile_colors[get_color_idx(v)];
+    }
+    b23 = (g_grid[2 * D2048_COLS + 3] == 0)
+        ? 0xCE59 : tile_colors[get_color_idx(g_grid[2 * D2048_COLS + 3])];
+
+    /* 电池主体左边框压在 row1 col0 (x=45..46, y=81..109) */
+    LCD_Fill(45, 81, 47, RESTART_MENU_Y, b1[0]);
+    /* 电池主体右边框压在 row1 col3 (x=193..194, y=81..109) */
+    LCD_Fill(193, 81, 195, RESTART_MENU_Y, b1[3]);
+    /* 感叹号竖条(x=111..128, y=92..109)压在 row1 col1/col2 */
+    LCD_Fill(111, 92, 118, RESTART_MENU_Y, b1[1]);
+    LCD_Fill(118, 92, 122, RESTART_MENU_Y, LCD_BLACK);
+    LCD_Fill(122, 92, 129, RESTART_MENU_Y, b1[2]);
+    /* 电池凸点(x=195..209)在菜单外 */
+    LCD_Fill(195, 104, 207, 121, b1[3]);   /* (1,3) */
+    LCD_Fill(195, 121, 207, 126, LCD_BLACK);   /* row1/row2 缝隙 */
+    LCD_Fill(195, 126, 207, 136, b23);     /* (2,3) */
+    LCD_Fill(207, 104, 210, 136, LCD_BLACK);   /* col3 右缝 */
+}
+
 /**
- * @brief  Restore the area covered by the low-battery icon after it clears
- * @note   Mirror the sokoban approach: LCD_ClearLowBatteryOverlay turns the
- *         red icon (frame+nub+exclamation) to black, then redraw exactly what
- *         was beneath it in the same call.
- *         - Menu visible: redraw the menu frame now (covers the battery body
- *           outline + exclamation that sit inside the menu area), so the menu
- *           does NOT flash for one frame.
- *         - Battery nub (x=195..210, y=104..136) is OUTSIDE the menu frame,
- *           over grid cells (1,3)/(2,3): redraw them now so the nub does not
- *           stay black/residue.
- *         - Dropdown (exit) menu covers the whole screen height, so the opaque
- *           menu frame directly clears the battery body/exclamation and only
- *           the nub is restored with grid data (NO draw_grid redraw, otherwise
- *           grid rows flash one frame inside the battery frame).
- *         - Restart menu / pure game redraw the grid (the battery top is above
- *           the restart menu, over the game area).
+ * @brief  低电图标灭段后恢复被其覆盖的底层内容
+ * @note   参照推箱子的做法: LCD_ClearLowBatteryOverlay 把红色图标(边框+凸点+感叹号)
+ *         刷黑, 然后同帧重画其下方内容.
+ *         - 菜单可见: 立即重画菜单框(盖住电池主体外框+感叹号), 使菜单不闪一帧.
+ *         - 电池凸点(x=195..210, y=104..136)在菜单框外, 压在网格格(1,3)/(2,3):
+ *           立即重画它们, 凸点不留黑/红残留.
+ *         - 下滑(退出)菜单覆盖整屏高, 不透明菜单框直接盖掉电池主体/感叹号, 只恢复
+ *           凸点网格数据(不 draw_grid 重绘, 否则电池框内先闪一帧网格行).
+ *         - 重开菜单/纯游戏重绘网格(电池顶部在重开菜单上方、属游戏区).
  */
 void d2048_lowbatt_restore(void)
 {
     uint8_t r;
 
-    LCD_ClearLowBatteryOverlay();   /* icon frame+nub+exclamation red->black */
+    LCD_ClearLowBatteryOverlay();   /* 图标边框+凸点+感叹号 红→黑 */
 
-    /* battery nub overlaps grid cells (1,3),(2,3): redraw them first.
-       (Drawn BEFORE the opaque menu frame below because the cell straddles the
-       menu's right edge; the frame redrawn after covers its in-menu part.) */
+    /* 电池凸点压在网格格(1,3),(2,3): 先重画它们.
+      (要在下方不透明菜单框之前画, 因格子横跨菜单右边框; 之后重画的菜单框盖住
+      压在菜单里的部分.) */
     for (r = 1; r <= 2; r++) {
         uint8_t c = 3;
         uint16_t val = g_grid[r * D2048_COLS + c];
@@ -431,20 +454,19 @@ void d2048_lowbatt_restore(void)
         g_prev_grid[r * D2048_COLS + c] = val;
     }
 
-    /* redraw the opaque menu frame on top (covers battery body outline +
-       exclamation + the in-menu part of the nub cells) => no flash / no residue */
+    /* 再画不透明菜单框(盖住电池主体外框+感叹号+凸点格压在菜单内的部分)
+      => 不闪/无残留 */
     if (g_exit_menu_visible) {
-        /* dropdown menu: covers the whole battery body/exclamation, so the menu
-           frame directly clears them. NO d2048_full_redraw() here, otherwise
-           bg_redraw draws grid rows1-2 (game) which flashes one frame. */
+        /* 下滑菜单: 覆盖整个电池主体/感叹号, 菜单框直接盖掉它们. 不要在这里调
+           d2048_full_redraw(), 否则 bg_redraw 会重绘网格 rows1-2(游戏)闪一帧. */
         menu_draw_nrow_frame_only(g_exit_drag_y, d2048_row_types, 5);
     } else if (g_restart_menu_visible) {
-        /* restart menu: battery top (y=79..110) is ABOVE the menu, over the
-           game area -> redraw grid so that area is restored */
+        /* 重开菜单: 只恢复菜单上方/外侧的电池残像素细条带, 再画菜单框(不重绘延伸到
+          菜单后的整格, 否则游戏图先于菜单闪一帧) */
+        d2048_restore_above_menu_slivers();
         menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
-        d2048_full_redraw();
     } else {
-        /* pure game: full grid redraw next frame covers icon border/exclamation */
+        /* 纯游戏: 下一帧全网格重绘盖住图标边框/感叹号 */
         d2048_full_redraw();
     }
 }
