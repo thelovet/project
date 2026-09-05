@@ -678,7 +678,8 @@ void fish_init(void)
 /* ================================================================
  *  配置驱动菜单状态机的 hook (mark_dirty / bg_redraw / on_to_exit)
  * ================================================================ */
-/* 关闭/取消菜单后立即重绘场景(结束画面/游戏画面) */
+/* 菜单关闭/取消, 及重菜下滑打断进退出菜单(on_to_exit)后: 立即重绘场景(结束画面/游戏画面)。
+   on_to_exit 与 mark_dirty 当前行为一致(都仅恢复场景), 故 cfg 两个槽位共用此函数省 Flash */
 static void fish_menu_mark_dirty(void)
 {
     fish_restore_scene_behind();
@@ -696,20 +697,12 @@ static uint8_t fish_menu_bg_redraw(void)
     return 1;
 }
 
-/* 重菜下滑打断进退出菜单后的补充处理: 保留 game_menu_restart_to_exit 设的跟手拖拽
-   (g_exit_dragging=1), 只恢复场景; 不强制 g_exit_sliding(否则退出菜单直接滑入, 不跟手)
-   对齐其它游戏 (klotski 等 on_to_exit 只置脏不强制滑入) */
-static void fish_menu_on_to_exit(void)
-{
-    fish_restore_scene_behind();
-}
-
 static const GameMenuCfg g_fish_menu_cfg = {
     FISH_STATE_PLAYING, FISH_STATE_EXIT_MENU, FISH_STATE_RESTART_MENU,
     fish_row_types, fish_exit_map,
     220, 10,
     GAME_MENU_BAT_NONE, 0,
-    fish_menu_mark_dirty, fish_menu_bg_redraw, fish_menu_on_to_exit
+    fish_menu_mark_dirty, fish_menu_bg_redraw, fish_menu_mark_dirty
 };
 
 uint8_t fish_update(void)

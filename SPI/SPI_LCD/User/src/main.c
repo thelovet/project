@@ -1176,6 +1176,20 @@ static void GameSettings_Update(void)
  * @brief  活动模式更新: 菜单/游戏/视频主循环处理
  * @param  charging_game_saved 充电时游戏已存档标志
  */
+/* 统一游戏主循环分支: 首次进入设置背光+init, 进设置(g_settings_from_game)时跳过刷新
+   (由 GameSettings_Update 处理设置界面); update 返回的切换命令交给 game_handle_ret */
+static void main_run_game(void (*init_fn)(void), uint8_t (*update_fn)(void))
+{
+    if (!s_game_inited) {
+        LCD_Backlight_PWM_SetDuty(g_brightness);
+        init_fn();
+        s_game_inited = 1;
+    }
+    if (!g_settings_from_game)
+        game_handle_ret(update_fn(), &s_main_mode, &s_game_inited,
+                        &s_touch_down, &key_response);
+}
+
 static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
 {
     BatteryStatus active_bat = Battery_GetStatus();
@@ -1244,48 +1258,16 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
                             &s_touch_down, &key_response);
     }
     else if (s_main_mode == MAIN_MODE_D2048) {
-        /* 2048游戏 */
-        if (!s_game_inited) {
-            LCD_Backlight_PWM_SetDuty(g_brightness);
-            d2048_init();
-            s_game_inited = 1;
-        }
-        if (!g_settings_from_game)
-            game_handle_ret(d2048_update(), &s_main_mode, &s_game_inited,
-                            &s_touch_down, &key_response);
+        main_run_game(d2048_init, d2048_update);
     }
     else if (s_main_mode == MAIN_MODE_TETRIS) {
-        /* 俄罗斯方块游戏 */
-        if (!s_game_inited) {
-            LCD_Backlight_PWM_SetDuty(g_brightness);
-            tetris_init();
-            s_game_inited = 1;
-        }
-        if (!g_settings_from_game)
-            game_handle_ret(tetris_update(), &s_main_mode, &s_game_inited,
-                            &s_touch_down, &key_response);
+        main_run_game(tetris_init, tetris_update);
     }
     else if (s_main_mode == MAIN_MODE_KLOTSKI) {
-        /* 华容道游戏 */
-        if (!s_game_inited) {
-            LCD_Backlight_PWM_SetDuty(g_brightness);
-            klotski_init();
-            s_game_inited = 1;
-        }
-        if (!g_settings_from_game)
-            game_handle_ret(klotski_update(), &s_main_mode, &s_game_inited,
-                            &s_touch_down, &key_response);
+        main_run_game(klotski_init, klotski_update);
     }
     else if (s_main_mode == MAIN_MODE_FISH) {
-        /* 大鱼吃小鱼游戏 */
-        if (!s_game_inited) {
-            LCD_Backlight_PWM_SetDuty(g_brightness);
-            fish_init();
-            s_game_inited = 1;
-        }
-        if (!g_settings_from_game)
-            game_handle_ret(fish_update(), &s_main_mode, &s_game_inited,
-                            &s_touch_down, &key_response);
+        main_run_game(fish_init, fish_update);
     }
     else {
         /* 视频模式: 上划菜单 + 视频主循环 */
