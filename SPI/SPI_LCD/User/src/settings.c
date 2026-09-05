@@ -43,12 +43,26 @@ static void Brightness_Draw(void);
 static void Brightness_DrawSlider(void);
 static void SleepTime_Draw(void);
 static void Orientation_Draw(void);
+static void Sleep_DrawBody(void);          /* 设置页内容局部重绘(低电区域刷新用) */
+static void Orientation_DrawBody(void);
 void Settings_Redraw(void)
 {
     switch (s_mode) {
     case SETTINGS_BRIGHTNESS:  Brightness_Draw();  break;
     case SETTINGS_SLEEP_TIME:  SleepTime_Draw();   break;
     case SETTINGS_ORIENTATION: Orientation_Draw(); break;
+    default: break;
+    }
+}
+
+/* 低电灭段恢复: 只重绘电池图标覆盖区的当前设置页内容(不整屏清黑, 避免电池消失后整屏闪一下) */
+void Settings_RedrawRegion(void)
+{
+    LCD_ClearLowBatteryOverlay();   /* 清红色图标(红→黑) */
+    switch (s_mode) {
+    case SETTINGS_BRIGHTNESS:  Brightness_DrawSlider();  break;
+    case SETTINGS_SLEEP_TIME:  Sleep_DrawBody();         break;
+    case SETTINGS_ORIENTATION: Orientation_DrawBody();   break;
     default: break;
     }
 }
@@ -244,10 +258,8 @@ static uint8_t Brightness_Update(void)
 /* ================================================================
  *  息屏时间设置
  * ================================================================ */
-static void SleepTime_Draw(void)
+static void Sleep_DrawBody(void)
 {
-    LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
-    DrawBack();
     /* "-" 按钮 */
     LCD_Fill(ST_LX, ST_Y, ST_LX + ST_W, ST_Y + ST_H, 0x07FF);
     LCD_Fill(ST_LX + 12, ST_Y + ST_H/2 - 2, ST_LX + ST_W - 12, ST_Y + ST_H/2 + 2, 0x0000);
@@ -285,6 +297,13 @@ static void SleepTime_Draw(void)
             }
         }
     }
+}
+
+static void SleepTime_Draw(void)
+{
+    LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
+    DrawBack();
+    Sleep_DrawBody();
 }
 
 static uint8_t SleepTime_Update(void)
@@ -327,11 +346,9 @@ static uint8_t SleepTime_Update(void)
 /* ================================================================
  *  屏幕方向设置
  * ================================================================ */
-static void Orientation_Draw(void)
+static void Orientation_DrawBody(void)
 {
     int16_t cx = OR_X, cy = OR_Y, s = OR_SZ;
-    LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
-    DrawBack();
     /* 上箭头+右标记(屏幕方向由MADCTL寄存器旋转) */
     LCD_Fill(cx - 4,  cy,         cx + 4,  cy + s,    0xFFE0);   /* 杆 */
     LCD_Fill(cx + 20, cy - 34,    cx + 26, cy - 28,   0xFFE0);   /* 右标记 */
@@ -339,6 +356,13 @@ static void Orientation_Draw(void)
         LCD_Fill(cx - 4 - i * 6, cy - 40 + i * 8, cx - i * 6,     cy - 32 + i * 8, 0xFFE0);
         LCD_Fill(cx + i * 6,     cy - 40 + i * 8, cx + 4 + i * 6, cy - 32 + i * 8, 0xFFE0);
     }
+}
+
+static void Orientation_Draw(void)
+{
+    LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
+    DrawBack();
+    Orientation_DrawBody();
 }
 
 static uint8_t Orientation_Update(void)

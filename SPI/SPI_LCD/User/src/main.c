@@ -907,12 +907,12 @@ static void main_lowbatt_restore_under_icon(void)
            - 条带可见但未打开设置页: 恢复游戏场景再画条带(条带压在游戏上);
            - 设置页显示: 重绘设置页(整屏填充, 覆盖电池区). */
         if (s_video_menu_visible) {
-            if (s_settings_mode != SETTINGS_NONE) Settings_Redraw();
+            if (s_settings_mode != SETTINGS_NONE) Settings_RedrawRegion();
             else main_restore_game_under_icon();
             menu_draw_nrow_frame_only(s_video_menu_slide_y,
                                       g_video_menu_row_types, 4);
         } else if (s_settings_mode != SETTINGS_NONE) {
-            Settings_Redraw();
+            Settings_RedrawRegion();
         } else {
             /* 推箱子二级菜单跟手滑出期间(s_video_menu_visible=0, 无设置页):
                屏幕显示设置条带+游戏, 凸点在条带外, 须由游戏恢复 */

@@ -27,6 +27,7 @@ extern const uint16_t g_sleep_times[6];
 
 /* API */
 void Settings_Enter(SettingsMode mode);
+void Settings_RedrawRegion(void);
 void Settings_Exit(void);
 uint8_t Settings_Update(void);  /* 返回 0 表示按了返回键, 1 表示仍在设置中 */
 void Settings_Redraw(void);     /* 只重绘当前设置页, 不处理触摸(低电恢复用) */
