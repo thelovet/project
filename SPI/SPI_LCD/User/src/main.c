@@ -890,7 +890,7 @@ static uint8_t Main_HandleTouchInput(void)
 static void main_restore_game_under_icon(void)
 {
     switch (s_main_mode) {
-        case MAIN_MODE_SOKOBAN: sokoban_full_redraw(); break;
+        case MAIN_MODE_SOKOBAN: sokoban_lowbatt_restore(); break;
         case MAIN_MODE_FISH:    fish_clear_lowbattery(); break;
         case MAIN_MODE_D2048:   d2048_lowbatt_restore(); break;
         case MAIN_MODE_TETRIS:  tetris_lowbatt_restore(); break;
@@ -913,6 +913,10 @@ static void main_lowbatt_restore_under_icon(void)
                                       g_video_menu_row_types, 4);
         } else if (s_settings_mode != SETTINGS_NONE) {
             Settings_Redraw();
+        } else {
+            /* 推箱子二级菜单跟手滑出期间(s_video_menu_visible=0, 无设置页):
+               屏幕显示设置条带+游戏, 凸点在条带外, 须由游戏恢复 */
+            main_restore_game_under_icon();
         }
         return;
     }
@@ -1095,9 +1099,17 @@ static void GameSettings_Update(void)
                          && (int16_t)ts.y - (int16_t)gs_sy > MENU_SWIPE_COMMIT_DIST) {
                     gs_t_dn = 0;
                     gs_rel_db = 0;
+                    uint8_t was_strip = s_video_menu_visible;
                     s_video_menu_visible = 0;
                     s_settings_mode = SETTINGS_NONE;
-                    LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
+                    if (was_strip) {
+                        /* 二级设置条带压在游戏上: 只清条带区(条带区外游戏场景保留),
+                           参考一级菜单切换/返回游戏做法, 不整屏刷黑(否则游戏场景丢失→黑闪一帧) */
+                        LCD_Fill_DMA(VIDEO_MENU_X, VIDEO_MENU_Y,
+                                     VIDEO_MENU_X + VIDEO_MENU_W, 240, g_menu_clear_color);
+                    } else {
+                        LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);  /* 设置页整屏: 需清屏 */
+                    }
                     g_settings_from_game = 0;
                     g_game_enter_exit_menu = 1;
                     g_exit_menu_visible = 1;

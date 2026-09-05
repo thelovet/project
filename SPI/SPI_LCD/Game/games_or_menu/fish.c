@@ -696,12 +696,11 @@ static uint8_t fish_menu_bg_redraw(void)
     return 1;
 }
 
-/* 重菜下滑打断进退出菜单后的补充处理: 直接滑入(对齐 game_menu_restart_to_exit) */
+/* 重菜下滑打断进退出菜单后的补充处理: 保留 game_menu_restart_to_exit 设的跟手拖拽
+   (g_exit_dragging=1), 只恢复场景; 不强制 g_exit_sliding(否则退出菜单直接滑入, 不跟手)
+   对齐其它游戏 (klotski 等 on_to_exit 只置脏不强制滑入) */
 static void fish_menu_on_to_exit(void)
 {
-    g_exit_dragging = 0;
-    g_exit_sliding = 1;
-    g_exit_drag_y = -MENU_H;
     fish_restore_scene_behind();
 }
 

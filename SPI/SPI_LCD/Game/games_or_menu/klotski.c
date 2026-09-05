@@ -418,8 +418,20 @@ void klotski_lowbatt_restore(void)
            其后的电池主体). 不画菜单后面的网格行 => 无"游戏先于菜单"闪. */
         klotski_restore_above_menu_slivers();
         menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
+    } else if (g_settings_from_game) {
+        /* 设置模式(二级菜单条带 x=45..195 已盖住电池主体/感叹号): 只重绘凸点格子(1,3)/(2,3),
+           不重绘 rows1-2 -- 否则先画游戏(rows1-2)再画菜单框会闪一帧(同 2048 坑).
+           凸点在菜单框外(x=195..210), 须由游戏网格格恢复; 菜单框内部分由条带覆盖. */
+        uint8_t r;
+        for (r = 1; r <= 2; r++) {
+            uint8_t c = 3;
+            uint8_t val = g_grid[r * KLOTSKI_COLS + c];
+            uint16_t bg = (val == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR;
+            draw_tile_bg(r, c, bg);
+            if (val != 0) draw_tile_number(r, c, val);
+        }
     } else {
-        /* 纯游戏: 重绘电池覆盖区域(rows1-2) */
+        /* 纯游戏(无菜单框): 保持原设脏, 下一帧 klotski_update 重绘电池覆盖行 */
         klotski_full_redraw();
     }
 }

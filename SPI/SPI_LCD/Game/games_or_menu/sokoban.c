@@ -932,6 +932,19 @@ static void sok_redraw_battery_tiles(int16_t x0, int16_t y0, int16_t x1, int16_t
         LCD_CS_SET;
     }
 }
+/* 低电图标灭段恢复(设置模式用): 设置模式下 sokoban_update() 不跑, g_sok_dirty 无人消费,
+   故需立即恢复. 二级菜单条带(x=45..195)已盖住电池主体+感叹号, 只恢复菜单外凸点(x=195..210);
+   非设置模式保持置脏, 由下一帧 sokoban_update() 恢复(覆盖重绘UI). */
+void sokoban_lowbatt_restore(void)
+{
+    if (g_settings_from_game) {
+        LCD_ClearLowBatteryOverlay();
+        sok_redraw_battery_tiles(195, 104, 210, 136);
+    } else {
+        sokoban_full_redraw();
+    }
+}
+
 uint8_t sokoban_update(void)
 {
     uint8_t interacted = 0;
