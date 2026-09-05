@@ -348,6 +348,7 @@ uint8_t klotski_is_menu_visible(void)
 
 /* klotski_redraw_battery_rows 定义在本文件下方, 此处前向声明 */
 static void klotski_redraw_battery_rows(void);
+static void klotski_restore_battery_rows(int16_t menu_top, int16_t menu_h);
 
 /* 恢复低电图标伸出到重开菜单上方/外侧的像素(菜单覆盖 y>=RESTART_MENU_Y=110,
    x=45..195). 只填充这些细条带为网格格底色(格子内部/数字在透明电池体内, 保持完好).
@@ -387,6 +388,31 @@ static void klotski_restore_above_menu_slivers(void)
     LCD_Fill(207, 104, 210, 136, LCD_BLACK);        /* col3 右缝 */
 }
 
+/* 只重绘退出菜单框外露出的电池区: 按行判断, 行完全被菜单框 y 覆盖(框内)则只补
+   恒框外的凸点列(3)(横跨菜单右边框), 否则整行重绘(含凸点). 框内主体由菜单框盖住,
+   避免先棋盘后菜单闪一帧. */
+static void klotski_restore_battery_rows(int16_t menu_top, int16_t menu_h)
+{
+    int16_t menu_bot = menu_top + menu_h;
+    uint8_t r;
+    for (r = 1; r <= 2; r++) {
+        uint16_t ty = tile_y(r);
+        uint16_t tb = ty + (uint16_t)KLOTSKI_TILE_SIZE - 1;
+        uint8_t c;
+        if ((int16_t)ty >= menu_top && (int16_t)tb <= menu_bot) {
+            uint16_t val = g_grid[r * KLOTSKI_COLS + 3];
+            draw_tile_bg(r, 3, (val == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR);
+            if (val != 0) draw_tile_number(r, 3, val);
+        } else {
+            for (c = 0; c < KLOTSKI_COLS; c++) {
+                uint16_t val = g_grid[r * KLOTSKI_COLS + c];
+                draw_tile_bg(r, c, (val == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR);
+                if (val != 0) draw_tile_number(r, c, val);
+            }
+        }
+    }
+}
+
 /**
  * @brief  低电图标灭段后恢复被其覆盖的底层内容
  * @note   参照 d2048_lowbatt_restore(推箱子样式).
@@ -402,13 +428,13 @@ void klotski_lowbatt_restore(void)
     LCD_ClearLowBatteryOverlay();   /* 图标边框+凸点+感叹号 红→黑 */
 
     if (g_exit_menu_visible) {
-        /* 重绘电池覆盖的网格行(rows1-2, 含凸点)再画退出菜单框(盖住菜单内部分)。
-           菜单跟手拖拽/滑入中(未到位)时框外露出的电池区得到恢复, 避免低电残留;
-           到位时 rows1-2 在框内被菜单框盖住, 同帧先网格后框 => 无行闪 */
-        klotski_redraw_battery_rows();
+        /* 退出菜单覆盖整屏(x=45~195): 框内主体由菜单框直接盖住, 不重绘(避免先棋盘后菜单闪);
+           只重绘拖拽中(菜单未盖住)框外露出的行 + 恒框外的凸点列(1,3)/(2,3)(横跨菜单右边框) */
+        klotski_restore_battery_rows(g_exit_drag_y, MENU_H);
         menu_draw_nrow_frame_only(g_exit_drag_y, klotski_row_types, 5);
     } else if (g_restart_menu_visible) {
-        klotski_redraw_battery_rows();
+        /* 重开菜单只盖 y>=110: 只恢复菜单上方/外侧细条带(不重绘延伸到菜单后的整格, 否则闪) */
+        klotski_restore_above_menu_slivers();
         menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
     } else if (g_settings_from_game) {
         /* 设置模式(二级菜单条带 x=45..195 已盖住电池主体/感叹号): 只重绘凸点格子(1,3)/(2,3),

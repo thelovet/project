@@ -424,6 +424,37 @@ static void d2048_restore_above_menu_slivers(void)
     LCD_Fill(207, 104, 210, 136, LCD_BLACK);   /* col3 右缝 */
 }
 
+/* 只重绘退出菜单框外露出的电池区: 按行判断, 行完全被菜单框 y 覆盖(框内)则只补
+   恒框外的凸点列(3)(横跨菜单右边框), 否则整行重绘(含凸点). 框内主体由菜单框盖住,
+   避免先棋盘后菜单闪一帧. */
+static void d2048_restore_battery_rows(int16_t menu_top, int16_t menu_h)
+{
+    int16_t menu_bot = menu_top + menu_h;
+    uint8_t r;
+    for (r = 1; r <= 2; r++) {
+        uint16_t ty = tile_y(r);
+        uint16_t tb = ty + (uint16_t)D2048_TILE_SIZE - 1;
+        uint8_t c;
+        if ((int16_t)ty >= menu_top && (int16_t)tb <= menu_bot) {
+            /* 行完全在框内(菜单盖住): 只补凸点列(3) */
+            uint16_t val = g_grid[r * D2048_COLS + 3];
+            uint8_t ci = (val == 0) ? 0 : get_color_idx(val);
+            draw_tile_bg(r, 3, (val == 0) ? 0xCE59 : tile_colors[ci]);
+            draw_tile_number(r, 3, val);
+            g_prev_grid[r * D2048_COLS + 3] = val;
+        } else {
+            /* 框外(拖拽中菜单未盖住): 整行重绘 */
+            for (c = 0; c < D2048_COLS; c++) {
+                uint16_t val = g_grid[r * D2048_COLS + c];
+                uint8_t ci = (val == 0) ? 0 : get_color_idx(val);
+                draw_tile_bg(r, c, (val == 0) ? 0xCE59 : tile_colors[ci]);
+                draw_tile_number(r, c, val);
+                g_prev_grid[r * D2048_COLS + c] = val;
+            }
+        }
+    }
+}
+
 /**
  * @brief  低电图标灭段后恢复被其覆盖的底层内容
  * @note   参照推箱子的做法: LCD_ClearLowBatteryOverlay 把红色图标(边框+凸点+感叹号)
@@ -437,30 +468,12 @@ static void d2048_restore_above_menu_slivers(void)
  */
 void d2048_lowbatt_restore(void)
 {
-    uint8_t r;
-
     LCD_ClearLowBatteryOverlay();   /* 图标边框+凸点+感叹号 红→黑 */
 
-    /* 电池覆盖的网格行 rows1-2: 重画(含凸点 col3 + 主体 col0-2).
-       菜单跟手拖拽/滑入中(未到位)时, 菜单框盖不住全部电池主体, 框外露出部分靠
-       全行重绘恢复, 避免低电残留; 到位时框内部分被菜单框盖住(同帧先网格后框). */
-    for (r = 1; r <= 2; r++) {
-        uint8_t c;
-        for (c = 0; c < D2048_COLS; c++) {
-            uint16_t val = g_grid[r * D2048_COLS + c];
-            uint8_t ci = (val == 0) ? 0 : get_color_idx(val);
-            uint16_t bg = (val == 0) ? 0xCE59 : tile_colors[ci];
-            draw_tile_bg(r, c, bg);
-            draw_tile_number(r, c, val);
-            g_prev_grid[r * D2048_COLS + c] = val;
-        }
-    }
-
-    /* 再画不透明菜单框(盖住电池主体外框+感叹号+凸点格压在菜单内的部分)
-      => 不闪/无残留 */
     if (g_exit_menu_visible) {
-        /* 下滑菜单: 覆盖整个电池主体/感叹号, 菜单框直接盖掉它们. 不要在这里调
-           d2048_full_redraw(), 否则 bg_redraw 会重绘网格 rows1-2(游戏)闪一帧. */
+        /* 退出菜单覆盖整屏(x=45~195): 框内电池主体由菜单框直接盖住, 不重绘(避免先棋盘后菜单闪);
+           只重绘拖拽中(菜单未盖住)框外露出的行 + 恒框外的凸点列(1,3)/(2,3)(横跨菜单右边框) */
+        d2048_restore_battery_rows(g_exit_drag_y, MENU_H);
         menu_draw_nrow_frame_only(g_exit_drag_y, d2048_row_types, 5);
     } else if (g_restart_menu_visible) {
         /* 重开菜单: 只恢复菜单上方/外侧的电池残像素细条带, 再画菜单框(不重绘延伸到

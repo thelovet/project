@@ -977,27 +977,29 @@ static void tetris_menu_on_to_exit(void)
     g_preview_dirty = 1;
 }
 
-/* 只重绘重开菜单上方(y<110)的棋盘行(rows5-8), 不重绘压在菜单后的行(rows9+,
-   否则游戏图先于菜单显示一帧 -> 闪). 电池主体/感叹号在菜单上方压棋盘 rows5-8;
-   凸点/预览区由调用方 draw_preview 恢复. */
-static void tetris_restore_board_above_menu(void)
+/* 只重绘电池覆盖的棋盘区(row5~14)中未被菜单框 y 覆盖(框外/拖拽中露出)的行, 框内
+   (完全被菜单框 y 覆盖)的行由菜单框盖住, 不重绘(否则先棋盘后菜单闪一帧).
+   电池主体/感叹号在棋盘上, 凸点/预览区由调用方 draw_preview 恢复. */
+static void tetris_restore_board_above_menu(int16_t menu_top, int16_t menu_h)
 {
+    int16_t menu_bot = menu_top + menu_h;
     uint8_t r, c;
-    /* 重绘整个电池覆盖的棋盘区 (row5~14, y=70~169, 电池 y=79~161):
-       菜单跟手拖拽/滑入中(未到位)时, 菜单框盖不住电池全部, 框外露出部分靠此恢复;
-       到位时 row9~14 框内部分被菜单框盖住, 无行闪(同帧先棋盘后框) */
-    LCD_Fill(BOARD_X, BOARD_Y + 5 * CELL_SIZE,
-             BOARD_X + BOARD_W - 1, BOARD_Y + 15 * CELL_SIZE - 1, BOARD_BG);
-    for (c = 0; c <= BOARD_COLS; c++) {
-        uint16_t x = BOARD_X + c * CELL_SIZE;
-        LCD_Fill(x, BOARD_Y + 5 * CELL_SIZE,
-                 x + GRID_WIDTH - 1, BOARD_Y + 15 * CELL_SIZE - 1, BOARD_GRID);
-    }
-    for (r = 6; r <= 15; r++) {
-        uint16_t y = BOARD_Y + r * CELL_SIZE;
-        LCD_Fill(BOARD_X, y, BOARD_X + BOARD_W - 1, y + GRID_WIDTH - 1, BOARD_GRID);
-    }
     for (r = 5; r <= 14; r++) {
+        uint16_t ty = BOARD_Y + (uint16_t)r * CELL_SIZE;
+        uint16_t tb = ty + (uint16_t)CELL_SIZE - 1;
+        if ((int16_t)ty >= menu_top && (int16_t)tb <= menu_bot) continue;  /* 完全框内 */
+        /* 行背景 */
+        LCD_Fill(BOARD_X, ty, BOARD_X + BOARD_W - 1, tb, BOARD_BG);
+        /* 竖网格线 */
+        for (c = 0; c <= BOARD_COLS; c++) {
+            uint16_t x = BOARD_X + c * CELL_SIZE;
+            LCD_Fill(x, ty, x + GRID_WIDTH - 1, tb, BOARD_GRID);
+        }
+        /* 横网格线: 行顶(ty) + 行底(ty+CELL), 与正常棋盘网格线(BOARD_Y+i*CELL)一致 */
+        LCD_Fill(BOARD_X, ty, BOARD_X + BOARD_W - 1, ty + (uint16_t)GRID_WIDTH - 1, BOARD_GRID);
+        LCD_Fill(BOARD_X, ty + (uint16_t)CELL_SIZE, BOARD_X + BOARD_W - 1,
+                 ty + (uint16_t)CELL_SIZE + (uint16_t)GRID_WIDTH - 1, BOARD_GRID);
+        /* 行内方块 */
         for (c = 0; c < BOARD_COLS; c++) {
             if (g_board[r][c] != 0) draw_cell(c, r, piece_colors[g_board[r][c] - 1]);
         }
@@ -1012,23 +1014,20 @@ static void tetris_restore_board_above_menu(void)
     }
 }
 
-        /* 重开菜单: 只恢复菜单上方(y<110)的棋盘行(rows5-8)+预览, 再画菜单框(不
-          重绘压在菜单后的行, 否则游戏图先于菜单闪一帧) */
 void tetris_lowbatt_restore(void)
 {
     LCD_ClearLowBatteryOverlay();   /* 图标边框+凸点+感叹号 红→黑 */
 
     if (g_exit_menu_visible) {
-        /* 先画预览(横跨菜单右边框), 再重绘电池覆盖的棋盘区(rows5-8, 含凸点/活动方块),
-           最后画不透明菜单框盖住菜单内部分; 菜单拖拽中(未到位)框外露出部分得以恢复 */
+        /* 退出菜单覆盖整屏(x=45~195): 框内棋盘由菜单框直接盖住, 不重绘(避免先棋盘后菜单闪);
+           只 draw_preview(跨菜单右边框的凸点/预览), 再画退出菜单框; 拖拽中框外露出由下方恢复 */
         draw_preview();
-        tetris_restore_board_above_menu();
+        tetris_restore_board_above_menu(g_exit_drag_y, MENU_H);
         menu_draw_nrow_frame_only(g_exit_drag_y, tetris_row_types, 5);
     } else if (g_restart_menu_visible) {
-        /* 重开菜单/纯游戏: 只重绘电池覆盖的棋盘区域(g_board_dirty=3)而非整屏,
-           避免整个棋盘闪; draw_preview 填充凸点 */
+        /* 重开菜单只盖 y>=110: 只重绘菜单上方(row<110)棋盘行+预览, 框内由菜单框盖, 不闪 */
         draw_preview();
-        tetris_restore_board_above_menu();
+        tetris_restore_board_above_menu(g_restart_slide_y, RESTART_MENU_H);
         menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
     } else {
         draw_preview();
