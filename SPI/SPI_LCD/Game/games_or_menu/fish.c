@@ -1073,15 +1073,21 @@ void fish_full_redraw(void)
  */
 void fish_clear_lowbattery(void)
 {
-    if (g_state == FISH_STATE_EXIT_MENU || g_state == FISH_STATE_RESTART_MENU) {
-        /* 菜单框架只覆盖 y>=110, 低于电图标(主体x=45~195,y=79~161, 凸起x~210)上方
-           露出一段 y=79~110, 菜单框架盖不到, 需用背景色补掉否则游戏区域残留红图标 */
-        LCD_Fill(45, 79, 211, 110, COLOR_BG);
-        g_full_redraw = 1;   /* 触发菜单框架重绘(盖住 y>=110 部分) */
-        return;
-    }
     /* 低电图标覆盖区: 中心(127,120), 宽166, 高83 (x=44~209, y=79~161) */
     static const uint16_t lb_dims[][2] = {{166, 83}};
+
+    if (g_state == FISH_STATE_EXIT_MENU || g_state == FISH_STATE_RESTART_MENU) {
+        /* 区域刷新(不整屏重绘, 避免游戏画面闪): 清红色低电图标后, 填电池区为背景色
+           并重绘与其相交的玩家/小鱼实体, 再同帧重画菜单框架. 菜单拖拽/滑入中(未到位)
+           时框外露出部分得以恢复, 不残留红/黑不闪; 到位时框内部分由菜单框架盖住. */
+        LCD_ClearLowBatteryOverlay();
+        clear_entity_rect(lb_dims, 0, 127, 120);
+        if (g_state == FISH_STATE_EXIT_MENU)
+            menu_draw_nrow_frame_only(g_exit_drag_y, fish_row_types, 5);
+        else
+            menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
+        return;
+    }
     clear_entity_rect(lb_dims, 0, 127, 120);
 }
 
