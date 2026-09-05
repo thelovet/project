@@ -114,6 +114,7 @@ static int16_t  s_menu_drag_y_prev = -999;  /* 上一帧已绘制的Y (变化检测) */
 static uint16_t s_menu_drag_touch_y = 0;    /* 上一帧拖拽触摸Y */
 static uint16_t s_menu_drag_max_y = 0;     /* 本次拖拽手指到达的最远Y */
 static uint8_t  s_video_menu_dragging = 0;   /* 视频上划菜单拖拽中 */
+uint8_t  g_lowbatt_showing = 0;   /* 低电图标正显示中(亮段), 供菜单重绘跳过电池区 */
 int16_t  s_video_menu_slide_y = 240;  /* 视频上划菜单顶部Y (初始在屏幕底部外) */
 static uint16_t s_video_menu_drag_start_y = 0; /* 视频菜单拖拽起始触摸Y */
 uint8_t  s_video_menu_visible = 0;     /* 视频上划菜单已完全可见 */
@@ -939,11 +940,13 @@ static void Main_FlashLowBattery(void)
         && s_main_mode != MAIN_MODE_KLOTSKI
         && s_main_mode != MAIN_MODE_FISH) {
         s_flash_on = 0;
+        g_lowbatt_showing = 0;
         return;
     }
 
     if (game_battery_icon_get_level() != BAT_LEVEL_0) {
         s_flash_on = 0;
+        g_lowbatt_showing = 0;
         return;
     }
 
@@ -955,12 +958,15 @@ static void Main_FlashLowBattery(void)
             s_flash_on = 0;
             s_flash_tick = now;
             /* 灭屏时段(On->Off): 恢复被低电图标覆盖的底层内容(场景+当前菜单框) */
+            g_lowbatt_showing = 0;
             main_lowbatt_restore_under_icon();
         } else {
             LCD_ShowLowBatteryOverlay();
+            g_lowbatt_showing = 1;
         }
     } else {
         /* 灭屏段，持续2秒 */
+        g_lowbatt_showing = 0;
         if ((uint32_t)(now - s_flash_tick) >= 2000000UL) {
             s_flash_on = 1;
             s_flash_tick = now;

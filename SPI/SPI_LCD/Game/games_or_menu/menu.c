@@ -412,6 +412,39 @@ static void draw_2048_strip(uint8_t *row, uint8_t cr, uint16_t menu_w)
  * @param  row_types  行内容类型数组 (MENU_ROW_*)
  * @param  n_rows     行数 (2=重新开始, 5=主菜单/退出菜单)
  **********************************************************************/
+/* 把低电电池图标(框2px边+感叹号)该行的红色像素写进菜单条带 buf(菜单内坐标),
+   使菜单跟手重绘时电池区内容即为图标(而非被遮蔽再补画), 菜单+图标一次 DMA 一起绘制,
+   消除"菜单每帧清青+图标每帧补红"来回闪. 凸点(x=195~210)在菜单右缘外, 由
+   Main_FlashLowBattery 独立绘制, 本函数不处理. 几何常量与 display.c LowBattery_ComputeGeo 一致. */
+static void lmbat_strip(uint8_t *row, int16_t ay, int16_t mx, uint16_t mw)
+{
+    int16_t bx=45, by=79, bw=150, bh=82;           /* 电池主体(2px边): x=45~195, y=79~161 */
+    int16_t ex0=111, ex1=129;                       /* 感叹号竖条 x=111~129 */
+    int16_t ey0=92,  ey1=128, edy0=137, edy1=155;  /* 感叹号竖条 y=92~128, 点 y=137~155 */
+    int16_t a, b, x, rx;
+    /* 电池框边(2px) */
+    if ((ay >= by && ay < by+2) || (ay >= by+bh-2 && ay < by+bh)) {
+        a = bx; b = bx + bw;
+        for (x = a; x < b; x++) {
+            rx = x - mx;
+            if (rx >= 0 && rx < (int16_t)mw) { row[rx*2]=0xF8; row[rx*2+1]=0x00; }
+        }
+    } else if (ay >= by && ay < by+bh) {
+        a = bx; b = bx + 2;
+        for (x = a; x < b; x++) { rx = x - mx; if (rx >= 0 && rx < (int16_t)mw) { row[rx*2]=0xF8; row[rx*2+1]=0x00; } }
+        a = bx + bw - 2; b = bx + bw;
+        for (x = a; x < b; x++) { rx = x - mx; if (rx >= 0 && rx < (int16_t)mw) { row[rx*2]=0xF8; row[rx*2+1]=0x00; } }
+    }
+    /* 感叹号 */
+    if ((ay >= ey0 && ay <= ey1) || (ay >= edy0 && ay <= edy1)) {
+        a = ex0; b = ex1;
+        for (x = a; x < b; x++) {
+            rx = x - mx;
+            if (rx >= 0 && rx < (int16_t)mw) { row[rx*2]=0xF8; row[rx*2+1]=0x00; }
+        }
+    }
+}
+
 void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
                                 uint8_t n_rows)
 {
@@ -675,6 +708,9 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
                 } break;
                 }
             }
+            /* 低电图标显示(亮段)时, 把电池图标该行像素写进 buf(与菜单一起绘制) */
+            if (g_lowbatt_showing)
+                lmbat_strip(row, (int16_t)(abs_y0 + r), mx, mw);
         }
 
         __asm__ volatile("" ::: "memory");
