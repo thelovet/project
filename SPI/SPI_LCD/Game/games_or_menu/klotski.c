@@ -402,21 +402,13 @@ void klotski_lowbatt_restore(void)
     LCD_ClearLowBatteryOverlay();   /* 图标边框+凸点+感叹号 红→黑 */
 
     if (g_exit_menu_visible) {
-        /* 下滑菜单覆盖整个电池主体/感叹号 -> 不透明菜单框直接盖掉它们; 只填充
-           菜单外侧的凸点. 不重绘网格(否则行闪一帧). */
-        uint8_t r;
-        for (r = 1; r <= 2; r++) {
-            uint8_t c = 3;
-            uint8_t val = g_grid[r * KLOTSKI_COLS + c];
-            uint16_t bg = (val == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR;
-            draw_tile_bg(r, c, bg);
-            if (val != 0) draw_tile_number(r, c, val);
-        }
+        /* 重绘电池覆盖的网格行(rows1-2, 含凸点)再画退出菜单框(盖住菜单内部分)。
+           菜单跟手拖拽/滑入中(未到位)时框外露出的电池区得到恢复, 避免低电残留;
+           到位时 rows1-2 在框内被菜单框盖住, 同帧先网格后框 => 无行闪 */
+        klotski_redraw_battery_rows();
         menu_draw_nrow_frame_only(g_exit_drag_y, klotski_row_types, 5);
     } else if (g_restart_menu_visible) {
-        /* 重开菜单: 只恢复菜单上方/外侧的图标细条带, 再画菜单框(不透明, 盖住
-           其后的电池主体). 不画菜单后面的网格行 => 无"游戏先于菜单"闪. */
-        klotski_restore_above_menu_slivers();
+        klotski_redraw_battery_rows();
         menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
     } else if (g_settings_from_game) {
         /* 设置模式(二级菜单条带 x=45..195 已盖住电池主体/感叹号): 只重绘凸点格子(1,3)/(2,3),

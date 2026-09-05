@@ -441,17 +441,19 @@ void d2048_lowbatt_restore(void)
 
     LCD_ClearLowBatteryOverlay();   /* 图标边框+凸点+感叹号 红→黑 */
 
-    /* 电池凸点压在网格格(1,3),(2,3): 先重画它们.
-      (要在下方不透明菜单框之前画, 因格子横跨菜单右边框; 之后重画的菜单框盖住
-      压在菜单里的部分.) */
+    /* 电池覆盖的网格行 rows1-2: 重画(含凸点 col3 + 主体 col0-2).
+       菜单跟手拖拽/滑入中(未到位)时, 菜单框盖不住全部电池主体, 框外露出部分靠
+       全行重绘恢复, 避免低电残留; 到位时框内部分被菜单框盖住(同帧先网格后框). */
     for (r = 1; r <= 2; r++) {
-        uint8_t c = 3;
-        uint16_t val = g_grid[r * D2048_COLS + c];
-        uint8_t ci = (val == 0) ? 0 : get_color_idx(val);
-        uint16_t bg = (val == 0) ? 0xCE59 : tile_colors[ci];
-        draw_tile_bg(r, c, bg);
-        draw_tile_number(r, c, val);
-        g_prev_grid[r * D2048_COLS + c] = val;
+        uint8_t c;
+        for (c = 0; c < D2048_COLS; c++) {
+            uint16_t val = g_grid[r * D2048_COLS + c];
+            uint8_t ci = (val == 0) ? 0 : get_color_idx(val);
+            uint16_t bg = (val == 0) ? 0xCE59 : tile_colors[ci];
+            draw_tile_bg(r, c, bg);
+            draw_tile_number(r, c, val);
+            g_prev_grid[r * D2048_COLS + c] = val;
+        }
     }
 
     /* 再画不透明菜单框(盖住电池主体外框+感叹号+凸点格压在菜单内的部分)

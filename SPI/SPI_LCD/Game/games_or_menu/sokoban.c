@@ -939,7 +939,9 @@ void sokoban_lowbatt_restore(void)
 {
     if (g_settings_from_game) {
         LCD_ClearLowBatteryOverlay();
-        sok_redraw_battery_tiles(195, 104, 210, 136);
+        /* 二级设置菜单跟手拖拽/滑出中(条带未到位)时, 条带盖不住全部电池区,
+           框外露出的电池主体也需重绘瓦片, 避免低电残留; 到位时条带盖住的部分由条带覆盖 */
+        sok_redraw_battery_tiles(45, 79, 210, 161);
     } else {
         sokoban_full_redraw();
     }
@@ -986,10 +988,11 @@ uint8_t sokoban_update(void)
                 }
             }
         } else {
-            /* 退出菜单可见: 先整块刷黑图标(红→黑), 再重绘框外凸起瓦片(x=195~210);
-               不重绘框内瓦片(避免擦掉菜单框导致闪); 菜单框架框内部分维持原有绘制 */
+            /* 退出菜单可见: 先整块刷黑图标(红→黑), 再重绘电池区全部瓦片(含框外凸点 +
+               框外/拖拽暴露的电池主体), 最后画菜单框盖住菜单内部分;
+               菜单拖拽中(未到位)框外露出部分得以恢复, 避免低电残留 */
             LCD_ClearLowBatteryOverlay();
-            sok_redraw_battery_tiles(195, 104, 210, 136);
+            sok_redraw_battery_tiles(45, 79, 210, 161);
             menu_draw_nrow_frame_only(s_exit_drag_y, sok_row_types, 5);
         }
         g_sok_dirty = 0;
