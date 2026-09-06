@@ -1,12 +1,12 @@
 /**
  * @file    sok_img_next.c
- * @brief   ÏÂÒ»¹ØÍ¼±êÍ¼Æ¬Êı¾İºÍ»æÖÆº¯Êı
+ * @brief   ä¸‹ä¸€å…³å›¾æ ‡å›¾ç‰‡æ•°æ®å’Œç»˜åˆ¶å‡½æ•°
  */
 
 #include "sok_img_next.h"
 #include "sok_img_prev.h"
 #include "lcd.h"
-#include "flash_store.h"   /* Í¼±êÊı¾İ´ÓÍâ²¿Flash¶ÁÈ¡ */
+#include "flash_store.h"   /* å›¾æ ‡æ•°æ®ä»å¤–éƒ¨Flashè¯»å– */
 
 const uint16_t sok_img_next[NEXT_IMG_W * NEXT_IMG_H] = {
         0x0000, 0x0000, 0x2944, 0x6cac, 0x8650, 0x8e51, 0x8e51, 0x9671, 0x8e71, 0x96b2, 0x9ed3, 0xa713,
@@ -90,13 +90,13 @@ const uint16_t sok_img_next[NEXT_IMG_W * NEXT_IMG_H] = {
 };
 
 /**
- * @brief  »æÖÆÏÂÒ»¹ØÍ¼±ê£¨Ìø¹ı0x0000ºÚÉ«±³¾°£¬µş¼ÓÏÔÊ¾£©
- * @param  x  ×óÉÏ½ÇX×ø±ê
- * @param  y  ×óÉÏ½ÇY×ø±ê
+ * @brief  ç»˜åˆ¶ä¸‹ä¸€å…³å›¾æ ‡ï¼ˆè·³è¿‡0x0000é»‘è‰²èƒŒæ™¯ï¼Œå åŠ æ˜¾ç¤ºï¼‰
+ * @param  x  å·¦ä¸Šè§’Xåæ ‡
+ * @param  y  å·¦ä¸Šè§’Yåæ ‡
  */
 void sok_next_draw(uint16_t x, uint16_t y)
 {
-    /* Í¼±êÊı¾İÒÑÉÕÂ¼µ½Íâ²¿Flash, ¶ÁÈë¹²Ïíscratchºó»æÖÆ */
+    /* å›¾æ ‡æ•°æ®å·²çƒ§å½•åˆ°å¤–éƒ¨Flash, è¯»å…¥å…±äº«scratchåç»˜åˆ¶ */
     const uint8_t *img = FlashStore_ResLoad(FLASH_STORE_ID_IMG_NEXT, 0,
                                             NEXT_IMG_W * NEXT_IMG_H * 2);
     if (img) sok_nav_draw_rgb565(x, y, (const uint16_t *)img);

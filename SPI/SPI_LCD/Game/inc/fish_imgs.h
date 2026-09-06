@@ -8,7 +8,7 @@
 #define FISH_0_W  16
 #define FISH_0_H  12
 #define FISH_1_W  20
-#define FISH_1_H  10
+#define FISH_1_H  16
 #define FISH_2_W  24
 #define FISH_2_H  16
 #define FISH_3_W  28
@@ -31,7 +31,7 @@ extern const uint16_t fish_imgs_dim[FISH_COUNT][2];
 
 /* per-fish RGB565 little-endian byte stream, len = w*h*2 */
 extern const uint8_t fish_img_0[16*12*2];
-extern const uint8_t fish_img_1[20*10*2];
+extern const uint8_t fish_img_1[20*16*2];
 extern const uint8_t fish_img_2[24*16*2];
 extern const uint8_t fish_img_3[28*19*2];
 extern const uint8_t fish_img_4[32*19*2];

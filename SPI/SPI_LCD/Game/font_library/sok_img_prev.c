@@ -1,11 +1,11 @@
 /**
  * @file    sok_img_prev.c
- * @brief   ÉÏÒ»¹ØÍ¼±êÍ¼Æ¬Êı¾İºÍ»æÖÆº¯Êı
+ * @brief   ä¸Šä¸€å…³å›¾æ ‡å›¾ç‰‡æ•°æ®å’Œç»˜åˆ¶å‡½æ•°
  */
 
 #include "sok_img_prev.h"
 #include "lcd.h"
-#include "flash_store.h"   /* Í¼±êÊı¾İ´ÓÍâ²¿Flash¶ÁÈ¡ */
+#include "flash_store.h"   /* å›¾æ ‡æ•°æ®ä»å¤–éƒ¨Flashè¯»å– */
 
 const uint16_t sok_img_prev[PREV_IMG_W * PREV_IMG_H] = {
     0x0000, 0x0000, 0x0000, 0x6a8f, 0x8b96, 0x8355, 0x8375, 0x8b55, 0x8b55, 0x8b75, 0x8355, 0x8355,
@@ -89,36 +89,36 @@ const uint16_t sok_img_prev[PREV_IMG_W * PREV_IMG_H] = {
 };
 
 /**
- * @brief  »æÖÆÉÏÒ»¹ØÍ¼±ê£¨Ìø¹ı0x0000ºÚÉ«±³¾°£¬µş¼ÓÏÔÊ¾£©
- * @param  x  ×óÉÏ½ÇX×ø±ê
- * @param  y  ×óÉÏ½ÇY×ø±ê
+ * @brief  ç»˜åˆ¶ä¸Šä¸€å…³å›¾æ ‡ï¼ˆè·³è¿‡0x0000é»‘è‰²èƒŒæ™¯ï¼Œå åŠ æ˜¾ç¤ºï¼‰
+ * @param  x  å·¦ä¸Šè§’Xåæ ‡
+ * @param  y  å·¦ä¸Šè§’Yåæ ‡
  */
 void sok_nav_draw_rgb565(uint16_t x, uint16_t y, const uint16_t *image)
 {
-#define SOK_BTN_SCALE 2  /* Ëõ·Å±¶ÂÊ: 30x30 ¡ú 60x60 */
+#define SOK_BTN_SCALE 2  /* ç¼©æ”¾å€ç‡: 30x30 â†’ 60x60 */
 
     uint16_t r, c, start, sr;
     LCD_CS_CLR;
     for (r = 0; r < PREV_IMG_H; r++) {
-        uint8_t is_last = (r == PREV_IMG_H - 1);  /* ×îºóÒ»ĞĞºÚÉ«, ²»Ìø¹ı0x0000 */
-        for (sr = 0; sr < SOK_BTN_SCALE; sr++) {  /* Ã¿Ô´ĞĞ ¡ú SOK_BTN_SCALE Êä³öĞĞ */
+        uint8_t is_last = (r == PREV_IMG_H - 1);  /* æœ€åä¸€è¡Œé»‘è‰², ä¸è·³è¿‡0x0000 */
+        for (sr = 0; sr < SOK_BTN_SCALE; sr++) {  /* æ¯æºè¡Œ â†’ SOK_BTN_SCALE è¾“å‡ºè¡Œ */
             c = 0;
             while (c < PREV_IMG_W) {
-                /* Ìø¹ıºÚÉ«±³¾°ÏñËØ (×îºóÒ»ĞĞ²»Ìø¹ı, »­´¿ºÚ¸²¸Ç²ĞÁô) */
+                /* è·³è¿‡é»‘è‰²èƒŒæ™¯åƒç´  (æœ€åä¸€è¡Œä¸è·³è¿‡, ç”»çº¯é»‘è¦†ç›–æ®‹ç•™) */
                 if (!is_last) {
                     while (c < PREV_IMG_W && image[r * PREV_IMG_W + c] == 0x0000) c++;
                 }
                 if (c >= PREV_IMG_W) break;
 
                 start = c;
-                /* ÊÕ¼¯Á¬Ğø·ÇºÚÉ«ÏñËØ (×îºóÒ»ĞĞÕûĞĞÈ¡Íê) */
+                /* æ”¶é›†è¿ç»­éé»‘è‰²åƒç´  (æœ€åä¸€è¡Œæ•´è¡Œå–å®Œ) */
                 if (is_last) {
                     c = PREV_IMG_W;
                 } else {
                     while (c < PREV_IMG_W && image[r * PREV_IMG_W + c] != 0x0000) c++;
                 }
 
-                /* Ò»´Î Address_Set »­Ò»Õû¶ÎÁ¬ĞøÏñËØ (Ëõ·Åºó¿í¶È = (c-start)*SOK_BTN_SCALE) */
+                /* ä¸€æ¬¡ Address_Set ç”»ä¸€æ•´æ®µè¿ç»­åƒç´  (ç¼©æ”¾åå®½åº¦ = (c-start)*SOK_BTN_SCALE) */
                 LCD_Address_Set(x + start * SOK_BTN_SCALE, y + r * SOK_BTN_SCALE + sr,
                                 x + c * SOK_BTN_SCALE - 1, y + r * SOK_BTN_SCALE + sr);
                 for (; start < c; start++) {
@@ -135,7 +135,7 @@ void sok_nav_draw_rgb565(uint16_t x, uint16_t y, const uint16_t *image)
 
 void sok_prev_draw(uint16_t x, uint16_t y)
 {
-    /* Í¼±êÊı¾İÒÑÉÕÂ¼µ½Íâ²¿Flash, ¶ÁÈë¹²Ïíscratchºó»æÖÆ */
+    /* å›¾æ ‡æ•°æ®å·²çƒ§å½•åˆ°å¤–éƒ¨Flash, è¯»å…¥å…±äº«scratchåç»˜åˆ¶ */
     const uint8_t *img = FlashStore_ResLoad(FLASH_STORE_ID_IMG_PREV, 0,
                                             PREV_IMG_W * PREV_IMG_H * 2);
     if (img) sok_nav_draw_rgb565(x, y, (const uint16_t *)img);

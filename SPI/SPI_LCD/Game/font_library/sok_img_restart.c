@@ -1,18 +1,18 @@
 /**
  * @file    sok_img_restart.c
- * @brief   ÖØĞÂ¿ªÊ¼Í¼±êÍ¼Æ¬Êı¾İºÍ»æÖÆº¯Êı
+ * @brief   é‡æ–°å¼€å§‹å›¾æ ‡å›¾ç‰‡æ•°æ®å’Œç»˜åˆ¶å‡½æ•°
  */
 
 #include "sok_img_restart.h"
 #include "sok_img_prev.h"
 #include "lcd.h"
-#include "flash_store.h"   /* Í¼±êÊı¾İ´ÓÍâ²¿Flash¶ÁÈ¡ */
+#include "flash_store.h"   /* å›¾æ ‡æ•°æ®ä»å¤–éƒ¨Flashè¯»å– */
 
-/* TFT²ÊÆÁÈ¡Ä£Êı¾İ
- * Í¼Ïñ³ß´ç: 30x30 ÏñËØ
- * ÑÕÉ«¸ñÊ½: RGB565 (16Î»Êä³ö)
- * ×Ö½ÚĞò: Ğ¡¶ËĞò
- * Éú³ÉÊ±¼ä: 2026/7/24 18:38:37
+/* TFTå½©å±å–æ¨¡æ•°æ®
+ * å›¾åƒå°ºå¯¸: 30x30 åƒç´ 
+ * é¢œè‰²æ ¼å¼: RGB565 (16ä½è¾“å‡º)
+ * å­—èŠ‚åº: å°ç«¯åº
+ * ç”Ÿæˆæ—¶é—´: 2026/7/24 18:38:37
  */
 const uint16_t sok_img_restart[RESTART_IMG_W * RESTART_IMG_H] = {
      0x0000, 0x0000, 0x940a, 0xed2d, 0xe50d, 0xe50d, 0xe52d, 0xed4d, 0xed4d, 0xf56d, 0xf56e, 0xf58e,
@@ -96,13 +96,13 @@ const uint16_t sok_img_restart[RESTART_IMG_W * RESTART_IMG_H] = {
 };
 
 /**
- * @brief  »æÖÆÖØĞÂ¿ªÊ¼Í¼±ê£¨Ìø¹ı0x0000ºÚÉ«±³¾°£¬µş¼ÓÏÔÊ¾£©
- * @param  x  ×óÉÏ½ÇX×ø±ê
- * @param  y  ×óÉÏ½ÇY×ø±ê
+ * @brief  ç»˜åˆ¶é‡æ–°å¼€å§‹å›¾æ ‡ï¼ˆè·³è¿‡0x0000é»‘è‰²èƒŒæ™¯ï¼Œå åŠ æ˜¾ç¤ºï¼‰
+ * @param  x  å·¦ä¸Šè§’Xåæ ‡
+ * @param  y  å·¦ä¸Šè§’Yåæ ‡
  */
 void sok_restart_draw(uint16_t x, uint16_t y)
 {
-    /* Í¼±êÊı¾İÒÑÉÕÂ¼µ½Íâ²¿Flash, ¶ÁÈë¹²Ïíscratchºó»æÖÆ */
+    /* å›¾æ ‡æ•°æ®å·²çƒ§å½•åˆ°å¤–éƒ¨Flash, è¯»å…¥å…±äº«scratchåç»˜åˆ¶ */
     const uint8_t *img = FlashStore_ResLoad(FLASH_STORE_ID_IMG_RESTART, 0,
                                             RESTART_IMG_W * RESTART_IMG_H * 2);
     if (img) sok_nav_draw_rgb565(x, y, (const uint16_t *)img);

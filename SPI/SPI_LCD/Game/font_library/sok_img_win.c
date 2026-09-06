@@ -1,18 +1,18 @@
 /**
  * @file    sok_img_win.c
- * @brief   Í¨¹ØÎÄ×ÖÍ¼Æ¬Êı¾İºÍ»æÖÆº¯Êı
+ * @brief   é€šå…³æ–‡å­—å›¾ç‰‡æ•°æ®å’Œç»˜åˆ¶å‡½æ•°
  */
 
 #include "sok_img_win.h"
 #include "lcd.h"
 #include "flash_store.h"
 
-/* µ¥É«×Ö¿â: Ã¿¸ö×Ö32x32, Ã¿Êı¾İĞĞ´ò°ü4¸öÏñËØĞĞ(16×Ö½Ú), MSB=×ó, ¹²128×Ö½Ú/×Ö */
-#define FONT_CHAR_W   16   /* Êı¾İĞĞ×Ö½ÚÊı (4ÏñËØĞĞ¡Á4×Ö½Ú) */
-#define FONT_CHAR_L   8    /* Êı¾İĞĞÊı (32ÏñËØĞĞ¡Â4) */
+/* å•è‰²å­—åº“: æ¯ä¸ªå­—32x32, æ¯æ•°æ®è¡Œæ‰“åŒ…4ä¸ªåƒç´ è¡Œ(16å­—èŠ‚), MSB=å·¦, å…±128å­—èŠ‚/å­— */
+#define FONT_CHAR_W   16   /* æ•°æ®è¡Œå­—èŠ‚æ•° (4åƒç´ è¡ŒÃ—4å­—èŠ‚) */
+#define FONT_CHAR_L   8    /* æ•°æ®è¡Œæ•° (32åƒç´ è¡ŒÃ·4) */
 #define FONT_CHAR_SIZE (FONT_CHAR_L * FONT_CHAR_W)  /* 128 */
 
-// ¹§ 32*32
+// æ­ 32*32
 const uint8_t font_gong[FONT_CHAR_SIZE] = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x1C,0x00,0x00,0x3C,0x3E,0x00,0x00,0x3C,0x3C,0x00,
 0x00,0x3C,0x3C,0x00,0x0F,0xFF,0xFF,0xF0,0x0F,0xFF,0xFF,0xF8,0x0F,0xFF,0xFF,0xF8,
@@ -24,7 +24,7 @@ const uint8_t font_gong[FONT_CHAR_SIZE] = {
 0x06,0x3F,0x8C,0x40,0x00,0x3F,0x80,0x00,0x00,0x1F,0x00,0x00,0x00,0x1C,0x00,0x00
 };
 
-// Ï² 32*32
+// å–œ 32*32
 const uint8_t font_xi[FONT_CHAR_SIZE] = {
 0x00,0x00,0x00,0x00,0x00,0x03,0xC0,0x00,0x00,0x03,0xC0,0x00,0x3F,0xFF,0xFF,0xFC,
 0x3F,0xFF,0xFF,0xFE,0x3F,0xFF,0xFF,0xFE,0x3F,0xFF,0xFF,0xFC,0x07,0xFF,0xFF,0xE0,
@@ -36,7 +36,7 @@ const uint8_t font_xi[FONT_CHAR_SIZE] = {
 0x07,0xFF,0xFF,0xE0,0x07,0xFF,0xFF,0xE0,0x07,0xC0,0x03,0xE0,0x03,0x80,0x00,0x00
 };
 
-// Í¨ 32*32
+// é€š 32*32
 const uint8_t font_tong[FONT_CHAR_SIZE] = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x04,0x3F,0xFF,0xF8,0x1E,0x3F,0xFF,0xF8,
 0x3E,0x3F,0xFF,0xF0,0x1F,0x3D,0xE7,0xE0,0x0F,0x81,0xE7,0xC0,0x0F,0x81,0xFF,0x80,
@@ -48,7 +48,7 @@ const uint8_t font_tong[FONT_CHAR_SIZE] = {
 0x7F,0xFF,0xFF,0xFE,0xF8,0x3F,0xFF,0xFE,0x78,0x07,0xFF,0xFE,0x10,0x00,0x00,0x00
 };
 
-// ¹Ø 32*32
+// å…³ 32*32
 const uint8_t font_guan[FONT_CHAR_SIZE] = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x70,0x1C,0x00,0x00,0xF0,0x1F,0x00,
 0x00,0xF8,0x1F,0x00,0x00,0x7C,0x3E,0x00,0x00,0x3E,0x3C,0x00,0x00,0x3E,0x3C,0x00,
@@ -60,7 +60,7 @@ const uint8_t font_guan[FONT_CHAR_SIZE] = {
 0x3F,0xE0,0x03,0xFC,0x3F,0x80,0x00,0xF8,0x1E,0x00,0x00,0x38,0x08,0x00,0x00,0x00
 };
 
-// ¿¨ 32*32
+// å¡ 32*32
 const uint8_t font_ka[FONT_CHAR_SIZE] = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0xC0,0x00,0x00,0x07,0x80,0x00,
 0x00,0x07,0x80,0x00,0x00,0x07,0x80,0x00,0x00,0x07,0xFF,0xF0,0x00,0x07,0xFF,0xF0,
@@ -72,7 +72,7 @@ const uint8_t font_ka[FONT_CHAR_SIZE] = {
 0x00,0x07,0x80,0x00,0x00,0x07,0xC0,0x00,0x00,0x07,0xC0,0x00,0x00,0x07,0x80,0x00
 };
 
-// ÓÎ 32*32
+// æ¸¸ 32*32
 const uint8_t font_you[FONT_CHAR_SIZE] = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x06,0x00,0x0C,0x18,0x07,0x80,0x0F,0x1E,0x07,0x00,
 0x07,0x8E,0x0E,0x00,0x07,0x8F,0x0E,0x00,0x03,0x86,0x1C,0x1C,0x00,0xC0,0xDF,0xFE,
@@ -84,7 +84,7 @@ const uint8_t font_you[FONT_CHAR_SIZE] = {
 0x03,0x07,0x07,0x80,0x06,0x00,0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
 };
 
-// Ï· 32*32
+// æˆ 32*32
 const uint8_t font_xi3[FONT_CHAR_SIZE] = {
 0x00,0x00,0x00,0x00,0x00,0x00,0xE0,0x00,0x00,0x00,0xF0,0x00,0x00,0x00,0xF6,0x00,
 0x00,0x00,0xF3,0xC0,0x00,0x00,0x71,0xE0,0x00,0x18,0x70,0xF0,0x3F,0xFE,0x70,0xE0,
@@ -96,7 +96,7 @@ const uint8_t font_xi3[FONT_CHAR_SIZE] = {
 0x60,0x18,0x00,0x7E,0x00,0x00,0x00,0x1E,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
 };
 
-// ½á 32*32
+// ç»“ 32*32
 const uint8_t font_jie[FONT_CHAR_SIZE] = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x0C,0x00,0x01,0xC0,0x0F,0x00,0x01,0xC0,0x0E,0x00,
 0x03,0xC0,0x0E,0x00,0x03,0x80,0x0E,0x00,0x03,0x00,0x0E,0x1C,0x07,0x07,0xFF,0xFE,
@@ -108,7 +108,7 @@ const uint8_t font_jie[FONT_CHAR_SIZE] = {
 0x00,0x01,0xC0,0x70,0x00,0x01,0x80,0x20,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
 };
 
-// Êø 32*32
+// æŸ 32*32
 const uint8_t font_shu[FONT_CHAR_SIZE] = {
 0x00,0x00,0x00,0x00,0x00,0x03,0x80,0x00,0x00,0x03,0xC0,0x00,0x00,0x03,0xC0,0x08,
 0x00,0x03,0xC0,0x1C,0x3F,0xFF,0xFF,0xFE,0x00,0x03,0xC0,0x00,0x00,0x03,0xC0,0x00,
@@ -122,7 +122,7 @@ const uint8_t font_shu[FONT_CHAR_SIZE] = {
 
 
 
-/* 16x32 Ë¼Ô´ËÎÌå Êı×Ö×ÖÌå (0-9), Ã¿×Ö64×Ö½Ú, 32ĞĞx2×Ö½Ú/ĞĞ, MSB=×óÏñËØ */
+/* 16x32 æ€æºå®‹ä½“ æ•°å­—å­—ä½“ (0-9), æ¯å­—64å­—èŠ‚, 32è¡Œx2å­—èŠ‚/è¡Œ, MSB=å·¦åƒç´  */
 #define FONT_DIGIT_W   16
 #define FONT_DIGIT_H   32
 #define FONT_DIGIT_BYTES 64
@@ -181,18 +181,18 @@ const uint8_t font_digits[640] = {
 
 
 /**
- * @brief  »æÖÆµ¥¸ö32x32µ¥É«×Ö·û (Êı¾İĞĞ´ò°ü4ÏñËØĞĞ)
- * @param  x     ×óÉÏ½ÇX×ø±ê
- * @param  y     ×óÉÏ½ÇY×ø±ê
- * @param  font  ×ÖÄ£Êı¾İ (128×Ö½Ú, 8Êı¾İĞĞ¡Á16×Ö½Ú, Ã¿Êı¾İĞĞº¬4ÏñËØĞĞ)
- * @param  color Ç°¾°É« (RGB565)
+ * @brief  ç»˜åˆ¶å•ä¸ª32x32å•è‰²å­—ç¬¦ (æ•°æ®è¡Œæ‰“åŒ…4åƒç´ è¡Œ)
+ * @param  x     å·¦ä¸Šè§’Xåæ ‡
+ * @param  y     å·¦ä¸Šè§’Yåæ ‡
+ * @param  font  å­—æ¨¡æ•°æ® (128å­—èŠ‚, 8æ•°æ®è¡ŒÃ—16å­—èŠ‚, æ¯æ•°æ®è¡Œå«4åƒç´ è¡Œ)
+ * @param  color å‰æ™¯è‰² (RGB565)
  */
 void sok_draw_char_32(uint16_t x, uint16_t y, const uint8_t *font, uint16_t color)
 {
     uint8_t py, px;
     for (py = 0; py < 32; py++) {
         uint8_t seg = 0, in = 0;
-        /* Êı¾İĞĞºÅ = py/4, ĞĞÄÚÆ«ÒÆ = (py%4)*4 + px/8 */
+        /* æ•°æ®è¡Œå· = py/4, è¡Œå†…åç§» = (py%4)*4 + px/8 */
         uint8_t line = py >> 2;
         uint8_t off  = (py & 3) << 2;
         for (px = 0; px < 32; px++) {
@@ -212,11 +212,11 @@ void sok_draw_char_32(uint16_t x, uint16_t y, const uint8_t *font, uint16_t colo
 }
 
 /**
- * @brief  »æÖÆ24x24È«¿í×Ö·û: 72×Ö½Ú, 4ÏñËØĞĞ´ò°ü/Êı¾İĞĞ, ÖğĞĞ»æÖÆ
- * @param  x     ×óÉÏ½ÇX×ø±ê
- * @param  y     ×óÉÏ½ÇY×ø±ê
- * @param  font  ×ÖÄ£Êı¾İ (72×Ö½Ú)
- * @param  color ÏÔÊ¾ÑÕÉ« (RGB565)
+ * @brief  ç»˜åˆ¶24x24å…¨å®½å­—ç¬¦: 72å­—èŠ‚, 4åƒç´ è¡Œæ‰“åŒ…/æ•°æ®è¡Œ, é€è¡Œç»˜åˆ¶
+ * @param  x     å·¦ä¸Šè§’Xåæ ‡
+ * @param  y     å·¦ä¸Šè§’Yåæ ‡
+ * @param  font  å­—æ¨¡æ•°æ® (72å­—èŠ‚)
+ * @param  color æ˜¾ç¤ºé¢œè‰² (RGB565)
  */
 void sok_draw_char_24(uint16_t x, uint16_t y, const uint8_t *font, uint16_t color)
 {
@@ -242,9 +242,9 @@ void sok_draw_char_24(uint16_t x, uint16_t y, const uint8_t *font, uint16_t colo
 }
 
 /**
- * @brief  »æÖÆÍ¨¹ØÎÄ×Ö"¹§Ï²Í¨¹Ø"£¨ºìÉ«, Ã¿×Ö32x32½ôÃÜÅÅÁĞ, ×Ü¿í128£©
- * @param  x  ×óÉÏ½ÇX×ø±ê
- * @param  y  ×óÉÏ½ÇY×ø±ê
+ * @brief  ç»˜åˆ¶é€šå…³æ–‡å­—"æ­å–œé€šå…³"ï¼ˆçº¢è‰², æ¯å­—32x32ç´§å¯†æ’åˆ—, æ€»å®½128ï¼‰
+ * @param  x  å·¦ä¸Šè§’Xåæ ‡
+ * @param  y  å·¦ä¸Šè§’Yåæ ‡
  */
 void sok_win_draw(uint16_t x, uint16_t y)
 {
@@ -257,17 +257,17 @@ void sok_win_draw(uint16_t x, uint16_t y)
 }
 
 /**
- * @brief  »æÖÆ16x32°ë¿íÊı×Ö×Ö·û
- *         ×ÖÌå¸ñÊ½: 32ĞĞ x 2×Ö½Ú/ĞĞ, Ã¿ĞĞ: ×ó8ÏñËØ×Ö½Ú + ÓÒ8ÏñËØ×Ö½Ú, MSB=×óÏñËØ
- * @param  x     ×óÉÏ½ÇX×ø±ê
- * @param  y     ×óÉÏ½ÇY×ø±ê
- * @param  digit Êı×Ö (0-9), Ö±½Ó×÷Îª×ÖÌåË÷Òı
- * @param  color Ç°¾°É« (RGB565)
+ * @brief  ç»˜åˆ¶16x32åŠå®½æ•°å­—å­—ç¬¦
+ *         å­—ä½“æ ¼å¼: 32è¡Œ x 2å­—èŠ‚/è¡Œ, æ¯è¡Œ: å·¦8åƒç´ å­—èŠ‚ + å³8åƒç´ å­—èŠ‚, MSB=å·¦åƒç´ 
+ * @param  x     å·¦ä¸Šè§’Xåæ ‡
+ * @param  y     å·¦ä¸Šè§’Yåæ ‡
+ * @param  digit æ•°å­— (0-9), ç›´æ¥ä½œä¸ºå­—ä½“ç´¢å¼•
+ * @param  color å‰æ™¯è‰² (RGB565)
  */
 void sok_draw_digit_16x32(uint16_t x, uint16_t y, uint8_t digit, uint16_t color)
 {
     if (digit > 9) return;
-    /* ÓÅÏÈ´ÓÍâ²¿Flash¶ÁÈ¡×ÖÄ£, ÉÕÂ¼Ä£Ê½ÏÂ»ØÍËÄÚ²¿Flash */
+    /* ä¼˜å…ˆä»å¤–éƒ¨Flashè¯»å–å­—æ¨¡, çƒ§å½•æ¨¡å¼ä¸‹å›é€€å†…éƒ¨Flash */
     const uint8_t *data = FlashStore_ResLoad(FLASH_STORE_ID_DIGITS,
                                              (uint32_t)digit * FONT_DIGIT_BYTES,
                                              FONT_DIGIT_BYTES);
@@ -278,7 +278,7 @@ void sok_draw_digit_16x32(uint16_t x, uint16_t y, uint8_t digit, uint16_t color)
         uint8_t right_byte = data[py * 2 + 1];
         uint8_t seg = 0, in_seg = 0;
         uint8_t start_px = 0;
-        /* ´¦Àí×ó8ÏñËØ (MSB=Î»7¶ÔÓ¦x+0) */
+        /* å¤„ç†å·¦8åƒç´  (MSB=ä½7å¯¹åº”x+0) */
         for (px = 0; px < 8; px++) {
             if (((left_byte >> (7 - px)) & 0x01) && !in_seg) {
                 start_px = px; in_seg = 1;
@@ -293,7 +293,7 @@ void sok_draw_digit_16x32(uint16_t x, uint16_t y, uint8_t digit, uint16_t color)
             for (seg = start_px; seg < 8; seg++) LCD_WR_DATA_16Bit(color);
             in_seg = 0;
         }
-        /* ´¦ÀíÓÒ8ÏñËØ (MSB=Î»7¶ÔÓ¦x+8) */
+        /* å¤„ç†å³8åƒç´  (MSB=ä½7å¯¹åº”x+8) */
         for (px = 0; px < 8; px++) {
             if (((right_byte >> (7 - px)) & 0x01) && !in_seg) {
                 start_px = px; in_seg = 1;
@@ -313,7 +313,7 @@ void sok_draw_digit_16x32(uint16_t x, uint16_t y, uint8_t digit, uint16_t color)
 
 
 /**
- * @brief  »æÖÆ¹Ø¿¨±àºÅ "¹Ø¿¨X" (32x32ÖĞÎÄ + 16x32°ë¿íÊı×Ö, ¾ÓÖĞÏÔÊ¾)
+ * @brief  ç»˜åˆ¶å…³å¡ç¼–å· "å…³å¡X" (32x32ä¸­æ–‡ + 16x32åŠå®½æ•°å­—, å±…ä¸­æ˜¾ç¤º)
  */
 void sok_level_draw(uint8_t level, uint16_t color)
 {
@@ -324,17 +324,17 @@ void sok_level_draw(uint8_t level, uint16_t color)
     uint8_t digit_count = (tens > 0) ? 2 : 1;
     uint8_t digit_w = digit_count * 16 + (digit_count - 1) * 2;
 
-    /* "¹Ø¿¨" Á½¸ö32x32 + Êı×Ö(16x32, ÓëÖĞÎÄÍ¬¸ß) */
+    /* "å…³å¡" ä¸¤ä¸ª32x32 + æ•°å­—(16x32, ä¸ä¸­æ–‡åŒé«˜) */
     uint16_t total_w = 64 + 4 + digit_w;
     uint16_t x = (240 - total_w) / 2;
     uint16_t y = (240 - 32) / 2 - 20;
 
-    /* »æÖÆ "¹Ø" */
+    /* ç»˜åˆ¶ "å…³" */
     sok_draw_char_32(x, y, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), color);
-    /* »æÖÆ "¿¨" */
+    /* ç»˜åˆ¶ "å¡" */
     sok_draw_char_32(x + 32, y, FlashStore_ResLoad(FLASH_STORE_ID_32_KA, 0, FONT_CHAR_SIZE), color);
 
-    /* »æÖÆÊı×Ö (16x32, ÓëÖĞÎÄ¶¥²¿¶ÔÆë) */
+    /* ç»˜åˆ¶æ•°å­— (16x32, ä¸ä¸­æ–‡é¡¶éƒ¨å¯¹é½) */
     uint16_t dx = x + 64 + 4;
     if (tens > 0) {
         sok_draw_digit_16x32(dx, y, tens, color);
@@ -346,20 +346,20 @@ void sok_level_draw(uint8_t level, uint16_t color)
 }
 
 /**
- * @brief  Ëõ·Å»æÖÆ16x32Êı×Ö (×î½üÁÚ²ÉÑù)
- * @param  x       ×óÉÏ½ÇX
- * @param  y       ×óÉÏ½ÇY
- * @param  digit   Êı×Ö (0-9)
- * @param  color   Ç°¾°É«
- * @param  tw      Ä¿±ê¿í¶È (px)
- * @param  th      Ä¿±ê¸ß¶È (px)
+ * @brief  ç¼©æ”¾ç»˜åˆ¶16x32æ•°å­— (æœ€è¿‘é‚»é‡‡æ ·)
+ * @param  x       å·¦ä¸Šè§’X
+ * @param  y       å·¦ä¸Šè§’Y
+ * @param  digit   æ•°å­— (0-9)
+ * @param  color   å‰æ™¯è‰²
+ * @param  tw      ç›®æ ‡å®½åº¦ (px)
+ * @param  th      ç›®æ ‡é«˜åº¦ (px)
  */
 void sok_draw_digit_scaled(uint16_t x, uint16_t y, uint8_t digit,
                            uint16_t color, uint8_t tw, uint8_t th)
 {
     if (digit > 9 || tw == 0 || th == 0) return;
 
-    /* ÓÅÏÈ´ÓÍâ²¿Flash¶ÁÈ¡×ÖÄ£, ÉÕÂ¼Ä£Ê½ÏÂ»ØÍËÄÚ²¿Flash */
+    /* ä¼˜å…ˆä»å¤–éƒ¨Flashè¯»å–å­—æ¨¡, çƒ§å½•æ¨¡å¼ä¸‹å›é€€å†…éƒ¨Flash */
     const uint8_t *data = FlashStore_ResLoad(FLASH_STORE_ID_DIGITS,
                                              (uint32_t)digit * FONT_DIGIT_BYTES,
                                              FONT_DIGIT_BYTES);
