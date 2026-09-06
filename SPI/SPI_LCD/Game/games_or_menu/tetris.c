@@ -1,174 +1,168 @@
 /**
  * @file    tetris.c
- * @brief   ¶íÂŞË¹·½¿éÓÎÏ·Ä£¿é
- *          10¡Á20 ±ê×¼ÆåÅÌ, 7ÖÖ·½¿é, ´¥ÃşÊÖÊÆ¿ØÖÆ
+ * @brief   ä¿„ç½—æ–¯æ–¹å—æ¸¸æˆæ¨¡å—
+ *          10Ã—20 æ ‡å‡†æ£‹ç›˜, 7ç§æ–¹å—, è§¦æ‘¸æ‰‹åŠ¿æ§åˆ¶
  */
 
 #include "tetris.h"
 #include "timer.h"
 #include "menu.h"
 #include "sok_img_win.h"
-#include "flash_store.h"   /* ×Ö¿â×ÊÔ´´ÓÍâ²¿Flash¶ÁÈ¡ */
+#include "flash_store.h"   /* å­—åº“èµ„æºä»å¤–éƒ¨Flashè¯»å– */
 #include "lcd.h"
 #include "display.h"
 #include "touch.h"
 #include "debug.h"
 #include "string.h"
 
-/* ================================================================
- *  ÆåÅÌ²ÎÊı
- * ================================================================ */
-#define BOARD_COLS     13          /* ÆåÅÌÁĞÊı */
-#define BOARD_ROWS     19          /* ÆåÅÌĞĞÊı */
-#define CELL_SIZE      10          /* Ã¿¸ñÏñËØ */
-#define BOARD_X        50          /* ÆåÅÌ×óÉÏ½ÇX (¾ÓÖĞÆ«×ó, ÓÒ²àÁô¸ø²à±ßÀ¸) */
-#define BOARD_Y        20          /* ÆåÅÌ×óÉÏ½ÇY (ÉÏ·½Áô¿Õ) */
+/* æ£‹ç›˜å‚æ•° */
+#define BOARD_COLS     13          /* æ£‹ç›˜åˆ—æ•° */
+#define BOARD_ROWS     19          /* æ£‹ç›˜è¡Œæ•° */
+#define CELL_SIZE      10          /* æ¯æ ¼åƒç´  */
+#define BOARD_X        50          /* æ£‹ç›˜å·¦ä¸Šè§’X (å±…ä¸­åå·¦, å³ä¾§ç•™ç»™ä¾§è¾¹æ ) */
+#define BOARD_Y        20          /* æ£‹ç›˜å·¦ä¸Šè§’Y (ä¸Šæ–¹ç•™ç©º) */
 #define BOARD_W        (BOARD_COLS * CELL_SIZE)   /* 110 */
 #define BOARD_H        (BOARD_ROWS * CELL_SIZE)   /* 220 */
 
-/* Ô¤ÀÀÇøÓò (ÆåÅÌÓÒ²à) */
-#define PREVIEW_X      190         /* Ô¤ÀÀÇøÓòX×ø±ê */
-#define PREVIEW_Y       110         /* Ô¤ÀÀÇøÓòY×ø±ê (·ÖÊıÏÂ·½) */
-#define PREVIEW_CELL    8          /* Ô¤ÀÀ¸ñÏñËØ´óĞ¡ */
+/* é¢„è§ˆåŒºåŸŸ (æ£‹ç›˜å³ä¾§) */
+#define PREVIEW_X      190         /* é¢„è§ˆåŒºåŸŸXåæ ‡ */
+#define PREVIEW_Y       110         /* é¢„è§ˆåŒºåŸŸYåæ ‡ (åˆ†æ•°ä¸‹æ–¹) */
+#define PREVIEW_CELL    8          /* é¢„è§ˆæ ¼åƒç´ å¤§å° */
 
-/* ÏÂÂäËÙ¶È (Ö¡Êı¼ä¸ô, Ô½´óÔ½Âı; ÔËĞĞÊ±°´ FRAME_US »»Ëã³ÉÎ¢Ãë, ÓëÕæÊµÖ¡ÂÊÎŞ¹Ø) */
-#define DROP_INTERVAL_INIT  20     /* ³õÊ¼ÏÂÂä¼ä¸ô(Ö¡) */
-#define DROP_INTERVAL_MIN    3     /* ×î¿ìÏÂÂä¼ä¸ô(Ö¡, ÄÑ¶ÈÉÏÏŞ) */
-#define DROP_INTERVAL_HARD   2     /* Ó²½µ¼ä¸ô(Ö¡, ÊÖ¶¯¿ìËÙÏÂÂä) */
-#define DROP_ACCEL_STEP      5     /* Ã¿ÏûNĞĞ¼ÓËÙµÄÖ¡Êı */
-#define FRAME_DELAY_MS      5      /* Ã¿Ö¡ÑÓÊ±(ms), ~60fps */
-#define LOCK_DELAY_FRAMES  10      /* ÂäµØ³õÊ¼Ëø¶¨ÑÓ³ÙÖ¡Êı (~166ms@60fps) */
-#define LOCK_DELAY_MOVE_FRAMES  30  /* Ëø¶¨ÆÚÄÚÒÆ¶¯/Ğı×ªºó·Å¿íµÄËø¶¨Ö¡Êı (~500ms@60fps) */
-#define FRAME_US        16667UL    /* Âß¼­Ö¡Ê±³¤(us,~60fps), Ö¡Êı¼ÆÊ±¡ÁËü»»Ëã³ÉÎ¢Ãë, ÓëÕæÊµÖ¡ÂÊÎŞ¹Ø */
+/* ä¸‹è½é€Ÿåº¦ (å¸§æ•°é—´éš”, è¶Šå¤§è¶Šæ…¢; è¿è¡Œæ—¶æŒ‰ FRAME_US æ¢ç®—æˆå¾®ç§’, ä¸çœŸå®å¸§ç‡æ— å…³) */
+#define DROP_INTERVAL_INIT  20     /* åˆå§‹ä¸‹è½é—´éš”(å¸§) */
+#define DROP_INTERVAL_MIN    3     /* æœ€å¿«ä¸‹è½é—´éš”(å¸§, éš¾åº¦ä¸Šé™) */
+#define DROP_INTERVAL_HARD   2     /* ç¡¬é™é—´éš”(å¸§, æ‰‹åŠ¨å¿«é€Ÿä¸‹è½) */
+#define DROP_ACCEL_STEP      5     /* æ¯æ¶ˆNè¡ŒåŠ é€Ÿçš„å¸§æ•° */
+#define FRAME_DELAY_MS      5      /* æ¯å¸§å»¶æ—¶(ms), ~60fps */
+#define LOCK_DELAY_FRAMES  10      /* è½åœ°åˆå§‹é”å®šå»¶è¿Ÿå¸§æ•° (~166ms@60fps) */
+#define LOCK_DELAY_MOVE_FRAMES  30  /* é”å®šæœŸå†…ç§»åŠ¨/æ—‹è½¬åæ”¾å®½çš„é”å®šå¸§æ•° (~500ms@60fps) */
+#define FRAME_US        16667UL    /* é€»è¾‘å¸§æ—¶é•¿(us,~60fps), å¸§æ•°è®¡æ—¶Ã—å®ƒæ¢ç®—æˆå¾®ç§’, ä¸çœŸå®å¸§ç‡æ— å…³ */
 
-/* ³¤°´ÖØ¸´ */
-#define HOLD_REPEAT_START  10    /* °´×¡¿ªÊ¼ÖØ¸´µÄÖ¡Êı */
-#define HOLD_REPEAT_RATE    5    /* ÖØ¸´¼ä¸ôÖ¡Êı */
+/* é•¿æŒ‰é‡å¤ */
+#define HOLD_REPEAT_START  10    /* æŒ‰ä½å¼€å§‹é‡å¤çš„å¸§æ•° */
+#define HOLD_REPEAT_RATE    5    /* é‡å¤é—´éš”å¸§æ•° */
 
-/* ÏûĞĞ¶¯»­ */
-#define CLEAR_FLASH_FRAMES  4     /* ÉÁË¸ÇĞ»»´ÎÊı (2°×+2Õı³£ = 2´Î°×ÉÁ) */
-#define FLASH_HOLD          8     /* Ã¿´ÎÇĞ»»±£³ÖÖ¡Êı (~40ms@60fps) */
+/* æ¶ˆè¡ŒåŠ¨ç”» */
+#define CLEAR_FLASH_FRAMES  4     /* é—ªçƒåˆ‡æ¢æ¬¡æ•° (2ç™½+2æ­£å¸¸ = 2æ¬¡ç™½é—ª) */
+#define FLASH_HOLD          8     /* æ¯æ¬¡åˆ‡æ¢ä¿æŒå¸§æ•° (~40ms@60fps) */
 
-/* ¸ñ×ÓÑÕÉ« */
-#define BOARD_BG       0x18E3      /* Éî»ÒÂÌ */
-#define BOARD_GRID     0x4228      /* Íø¸ñÏß (ÖĞ»Ò) */
+/* æ ¼å­é¢œè‰² */
+#define BOARD_BG       0x18E3      /* æ·±ç°ç»¿ */
+#define BOARD_GRID     0x4228      /* ç½‘æ ¼çº¿ (ä¸­ç°) */
 
-/* Íø¸ñÏß¿í¶È (ÏñËØ) */
+/* ç½‘æ ¼çº¿å®½åº¦ (åƒç´ ) */
 #define GRID_WIDTH     2
-#define BOARD_EMPTY    0x0861      /* ¿Õ¸ñµ×É« */
+#define BOARD_EMPTY    0x0861      /* ç©ºæ ¼åº•è‰² */
 
-/* ·½¿éÑÕÉ« */
-#define CLR_I          0x07FF      /* ÇàÉ« */
-#define CLR_O          0xFFE0      /* »ÆÉ« */
-#define CLR_T          0x8010      /* ×ÏÉ« */
-#define CLR_S          0x07E0      /* ÂÌÉ« */
-#define CLR_Z          0xF800      /* ºìÉ« */
-#define CLR_J          0x001F      /* À¶É« */
-#define CLR_L          0xFD20      /* ³ÈÉ« */
+/* æ–¹å—é¢œè‰² */
+#define CLR_I          0x07FF      /* é’è‰² */
+#define CLR_O          0xFFE0      /* é»„è‰² */
+#define CLR_T          0x8010      /* ç´«è‰² */
+#define CLR_S          0x07E0      /* ç»¿è‰² */
+#define CLR_Z          0xF800      /* çº¢è‰² */
+#define CLR_J          0x001F      /* è“è‰² */
+#define CLR_L          0xFD20      /* æ©™è‰² */
 
 static uint16_t piece_colors[7] = {
     CLR_I, CLR_O, CLR_T, CLR_S, CLR_Z, CLR_J, CLR_L
 };
 
-/* ================================================================
- *  ·½¿é¶¨Òå: 7ÖÖ ¡Á 4Ğı×ª ¡Á 4ĞĞ(Ã¿ĞĞ4Î»=ÁĞ0~3, LSB=ÁĞ0)
- *  ÓÃ1DÊı×éÄ£Äâ3DÊı×é, Ã¿ĞĞÓÃÒ»¸ö8Î»ÊıµÄµÍ4Î»±íÊ¾
- *  ·ÃÎÊ: PIECES[piece*16 + rotation*4 + row]
- * ================================================================ */
+/* æ–¹å—å®šä¹‰: 7ç§ Ã— 4æ—‹è½¬ Ã— 4è¡Œ(æ¯è¡Œ4ä½=åˆ—0~3, LSB=åˆ—0)
+   ç”¨1Dæ•°ç»„æ¨¡æ‹Ÿ3Dæ•°ç»„, æ¯è¡Œç”¨ä¸€ä¸ª8ä½æ•°çš„ä½4ä½è¡¨ç¤º
+   è®¿é—®: PIECES[piece*16 + rotation*4 + row] */
 static uint8_t PIECES[7 * 4 * 4] = {
-    /* I 0¶È */  0x00,0x0F,0x00,0x00, /* I 90¶È */ 0x02,0x02,0x02,0x02,
-    /* I 180¶È*/ 0x00,0x00,0x0F,0x00, /* I 270¶È*/ 0x04,0x04,0x04,0x04,
-    /* O 0¶È */  0x06,0x06,0x00,0x00, /* O 90¶È */ 0x06,0x06,0x00,0x00,
-    /* O 180¶È*/ 0x06,0x06,0x00,0x00, /* O 270¶È*/ 0x06,0x06,0x00,0x00,
-    /* T 0¶È */  0x02,0x07,0x00,0x00, /* T 90¶È */ 0x02,0x06,0x02,0x00,
-    /* T 180¶È*/ 0x00,0x07,0x02,0x00, /* T 270¶È*/ 0x02,0x03,0x02,0x00,
-    /* S 0¶È */  0x06,0x03,0x00,0x00, /* S 90¶È */ 0x02,0x06,0x04,0x00,
-    /* S 180¶È*/ 0x00,0x06,0x03,0x00, /* S 270¶È*/ 0x01,0x03,0x02,0x00,
-    /* Z 0¶È */  0x03,0x06,0x00,0x00, /* Z 90¶È */ 0x04,0x06,0x02,0x00,
-    /* Z 180¶È*/ 0x00,0x03,0x06,0x00, /* Z 270¶È*/ 0x02,0x03,0x01,0x00,
-    /* J 0¶È */  0x01,0x07,0x00,0x00, /* J 90¶È */ 0x06,0x02,0x02,0x00,
-    /* J 180¶È*/ 0x00,0x07,0x04,0x00, /* J 270¶È*/ 0x02,0x02,0x03,0x00,
-    /* L 0¶È */  0x04,0x07,0x00,0x00, /* L 90¶È */ 0x02,0x02,0x06,0x00,
-    /* L 180¶È*/ 0x00,0x07,0x01,0x00, /* L 270¶È*/ 0x03,0x02,0x02,0x00,
+    /* I 0åº¦ */  0x00,0x0F,0x00,0x00, /* I 90åº¦ */ 0x02,0x02,0x02,0x02,
+    /* I 180åº¦*/ 0x00,0x00,0x0F,0x00, /* I 270åº¦*/ 0x04,0x04,0x04,0x04,
+    /* O 0åº¦ */  0x06,0x06,0x00,0x00, /* O 90åº¦ */ 0x06,0x06,0x00,0x00,
+    /* O 180åº¦*/ 0x06,0x06,0x00,0x00, /* O 270åº¦*/ 0x06,0x06,0x00,0x00,
+    /* T 0åº¦ */  0x02,0x07,0x00,0x00, /* T 90åº¦ */ 0x02,0x06,0x02,0x00,
+    /* T 180åº¦*/ 0x00,0x07,0x02,0x00, /* T 270åº¦*/ 0x02,0x03,0x02,0x00,
+    /* S 0åº¦ */  0x06,0x03,0x00,0x00, /* S 90åº¦ */ 0x02,0x06,0x04,0x00,
+    /* S 180åº¦*/ 0x00,0x06,0x03,0x00, /* S 270åº¦*/ 0x01,0x03,0x02,0x00,
+    /* Z 0åº¦ */  0x03,0x06,0x00,0x00, /* Z 90åº¦ */ 0x04,0x06,0x02,0x00,
+    /* Z 180åº¦*/ 0x00,0x03,0x06,0x00, /* Z 270åº¦*/ 0x02,0x03,0x01,0x00,
+    /* J 0åº¦ */  0x01,0x07,0x00,0x00, /* J 90åº¦ */ 0x06,0x02,0x02,0x00,
+    /* J 180åº¦*/ 0x00,0x07,0x04,0x00, /* J 270åº¦*/ 0x02,0x02,0x03,0x00,
+    /* L 0åº¦ */  0x04,0x07,0x00,0x00, /* L 90åº¦ */ 0x02,0x02,0x06,0x00,
+    /* L 180åº¦*/ 0x00,0x07,0x01,0x00, /* L 270åº¦*/ 0x03,0x02,0x02,0x00,
 };
 
-/* ¸¨Öúºê: ½« piece/rot/row ×ªÎª1DË÷Òı */
+/* è¾…åŠ©å®: å°† piece/rot/row è½¬ä¸º1Dç´¢å¼• */
 #define PIECE_IDX(piece, rot, row)  ((piece) * 16 + (rot) * 4 + (row))
 
-/* ================================================================
- *  ÓÎÏ·×´Ì¬
- * ================================================================ */
-static uint16_t g_board[BOARD_ROWS][BOARD_COLS];  /* 0=¿Õ, 1~7=ÑÕÉ«Ë÷Òı */
+/* æ¸¸æˆçŠ¶æ€ */
+static uint16_t g_board[BOARD_ROWS][BOARD_COLS];  /* 0=ç©º, 1~7=é¢œè‰²ç´¢å¼• */
 static uint32_t g_score;
 static uint32_t g_lines;
 static uint16_t g_level;
 static TetrisState g_state;
-static uint8_t  g_board_dirty;     /* 1=ÔöÁ¿¸üĞÂ, 2=È«Á¿ÖØ»æ */
-static uint8_t  g_preview_dirty;   /* Ô¤ÀÀĞèÒª¸üĞÂÊ±²ÅÖÃ1 */
-static uint8_t  g_sidebar_dirty;   /* ²à±ßÀ¸ĞèÒª¸üĞÂ */
-static uint32_t g_prev_score;      /* ÉÏ´Î»æÖÆµÄ·ÖÊı */
-static uint32_t g_prev_lines;      /* ÉÏ´Î»æÖÆµÄĞĞÊı */
-static uint8_t  g_gameover_drawn;  /* ½áÊø»­ÃæÒÑ»æÖÆ */
+static uint8_t  g_board_dirty;     /* 1=å¢é‡æ›´æ–°, 2=å…¨é‡é‡ç»˜ */
+static uint8_t  g_preview_dirty;   /* é¢„è§ˆéœ€è¦æ›´æ–°æ—¶æ‰ç½®1 */
+static uint8_t  g_sidebar_dirty;   /* ä¾§è¾¹æ éœ€è¦æ›´æ–° */
+static uint32_t g_prev_score;      /* ä¸Šæ¬¡ç»˜åˆ¶çš„åˆ†æ•° */
+static uint32_t g_prev_lines;      /* ä¸Šæ¬¡ç»˜åˆ¶çš„è¡Œæ•° */
+static uint8_t  g_gameover_drawn;  /* ç»“æŸç”»é¢å·²ç»˜åˆ¶ */
 
-/* µ±Ç°·½¿é */
+/* å½“å‰æ–¹å— */
 static uint8_t  g_piece_type;      /* 0~6 */
 static uint8_t  g_piece_rot;       /* 0~3 */
-static int8_t   g_piece_x;         /* ÁĞ (0~9) */
-static int8_t   g_piece_y;         /* ĞĞ (0~19) */
+static int8_t   g_piece_x;         /* åˆ— (0~9) */
+static int8_t   g_piece_y;         /* è¡Œ (0~19) */
 
-/* ÉÏÒ»Ö¡·½¿éÎ»ÖÃ (ÔöÁ¿²Á³ıÓÃ) */
+/* ä¸Šä¸€å¸§æ–¹å—ä½ç½® (å¢é‡æ“¦é™¤ç”¨) */
 static int8_t   g_prev_px, g_prev_py;
 static uint8_t  g_prev_type, g_prev_rot;
 
-/* Í¶Ó°·½¿é (ÏÔÊ¾Âäµã) */
-static int8_t   g_ghost_y;         /* Í¶Ó°Y×ø±ê */
-static int8_t   g_prev_ghost_y;    /* ÉÏÒ»Ö¡Í¶Ó°Y (ÔöÁ¿²Á³ıÓÃ) */
+/* æŠ•å½±æ–¹å— (æ˜¾ç¤ºè½ç‚¹) */
+static int8_t   g_ghost_y;         /* æŠ•å½±Yåæ ‡ */
+static int8_t   g_prev_ghost_y;    /* ä¸Šä¸€å¸§æŠ•å½±Y (å¢é‡æ“¦é™¤ç”¨) */
 
-/* ÏÂÒ»¸ö·½¿é */
+/* ä¸‹ä¸€ä¸ªæ–¹å— */
 static uint8_t  g_next_type;
 
-/* ×Ô¶¯ÏÂÂä */
-static uint32_t g_drop_timer;      /* ×Ô¶¯ÏÂÂäÎ¢ÃëÀÛ¼Æ (¡İ interval*FRAME_US Ê±ÂäÒ»¸ñ) */
-static uint16_t g_drop_interval;   /* Ö¡Êı¼ä¸ô (´æµµ/¼ÓËÙÓÃ, ÔËĞĞÊ±¡ÁFRAME_US) */
-static uint16_t g_saved_interval;  /* ¼ÓËÙÇ°Ô­Ê¼ËÙ¶È(Ö¡) */
-static uint32_t g_lock_delay;      /* ÂäµØËø¶¨ÑÓ³Ù(Î¢Ãë) */
-static uint32_t g_drop_last_us;    /* ÏÂÂä¼ÆÊ±»ù×¼ */
-static uint32_t g_lock_last_us;    /* Ëø¶¨¼ÆÊ±»ù×¼ */
+/* è‡ªåŠ¨ä¸‹è½ */
+static uint32_t g_drop_timer;      /* è‡ªåŠ¨ä¸‹è½å¾®ç§’ç´¯è®¡ (â‰¥ interval*FRAME_US æ—¶è½ä¸€æ ¼) */
+static uint16_t g_drop_interval;   /* å¸§æ•°é—´éš” (å­˜æ¡£/åŠ é€Ÿç”¨, è¿è¡Œæ—¶Ã—FRAME_US) */
+static uint16_t g_saved_interval;  /* åŠ é€Ÿå‰åŸå§‹é€Ÿåº¦(å¸§) */
+static uint32_t g_lock_delay;      /* è½åœ°é”å®šå»¶è¿Ÿ(å¾®ç§’) */
+static uint32_t g_drop_last_us;    /* ä¸‹è½è®¡æ—¶åŸºå‡† */
+static uint32_t g_lock_last_us;    /* é”å®šè®¡æ—¶åŸºå‡† */
 
-/* ´¥ÃşÊÖÊÆ */
+/* è§¦æ‘¸æ‰‹åŠ¿ */
 static uint8_t  g_wait_touch_release;
 
-/* ³¤°´ÖØ¸´ */
-static uint8_t  g_hold_zone;     /* 0=ÎŞ, 1=×ó, 2=ÓÒ */
-static uint32_t g_hold_timer;    /* ³¤°´ÖØ¸´¼ÆÊ±(Î¢Ãë), 0=´ı´¥·¢ */
-static uint32_t g_hold_last_us;  /* ³¤°´¼ÆÊ±»ù×¼ */
+/* é•¿æŒ‰é‡å¤ */
+static uint8_t  g_hold_zone;     /* 0=æ— , 1=å·¦, 2=å³ */
+static uint32_t g_hold_timer;    /* é•¿æŒ‰é‡å¤è®¡æ—¶(å¾®ç§’), 0=å¾…è§¦å‘ */
+static uint32_t g_hold_last_us;  /* é•¿æŒ‰è®¡æ—¶åŸºå‡† */
 
-/* ÏûĞĞ¶¯»­ */
-static uint8_t  g_clear_flash;    /* Ê£ÓàÇĞ»»´ÎÊı, 0=ÎŞ¶¯»­ */
-static uint32_t g_flash_hold;     /* µ±Ç°×´Ì¬Ê£ÓàÊ±¼ä(Î¢Ãë) */
-static uint32_t g_flash_last_us;  /* ÉÁË¸¼ÆÊ±»ù×¼ */
-static uint32_t g_clear_mask;     /* ÒªÏû³ıµÄĞĞÎ»ÑÚÂë */
+/* æ¶ˆè¡ŒåŠ¨ç”» */
+static uint8_t  g_clear_flash;    /* å‰©ä½™åˆ‡æ¢æ¬¡æ•°, 0=æ— åŠ¨ç”» */
+static uint32_t g_flash_hold;     /* å½“å‰çŠ¶æ€å‰©ä½™æ—¶é—´(å¾®ç§’) */
+static uint32_t g_flash_last_us;  /* é—ªçƒè®¡æ—¶åŸºå‡† */
+static uint32_t g_clear_mask;     /* è¦æ¶ˆé™¤çš„è¡Œä½æ©ç  */
 
-/* ÍË³ö²Ëµ¥ (ÊÓÆµ/ÍÆÏä×Ó/2048/»ªÈİµÀ/·µ»Ø, ¼õµ±Ç°=¶íÂŞË¹·½¿é) */
+/* é€€å‡ºèœå• (è§†é¢‘/æ¨ç®±å­/2048/åå®¹é“/è¿”å›, å‡å½“å‰=ä¿„ç½—æ–¯æ–¹å—) */
 static const uint8_t tetris_exit_map[5] = {
     EXIT_RET_VIDEO, EXIT_RET_SOKOBAN, EXIT_RET_D2048, EXIT_RET_KLOTSKI, EXIT_RET_FISH
 };
 
-/* ÍË³ö²Ëµ¥ĞĞÀàĞÍ (¹© menu_draw_nrow_frame_only / game_menu_drag_poll Ê¹ÓÃ) */
+/* é€€å‡ºèœå•è¡Œç±»å‹ (ä¾› menu_draw_nrow_frame_only / game_menu_drag_poll ä½¿ç”¨) */
 static const uint8_t tetris_row_types[5] = {
     MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_KLOTSKI, MENU_ROW_FISH
 };
 
 #define SWIPE_THRESH  25
-#define TAP_THRESH    8    /* Ğ¡ÓÚ´Ë¾àÀëÊÓÎªµã»÷(Ğı×ª) */
+#define TAP_THRESH    8    /* å°äºæ­¤è·ç¦»è§†ä¸ºç‚¹å‡»(æ—‹è½¬) */
 
 /**
- * @brief  Åö×²¼ì²â: ·½¿éÔÚÖ¸¶¨Î»ÖÃÊÇ·ñÓëÆåÅÌ/±ß½ç³åÍ»
- * @param  type  ·½¿éÀàĞÍ (0~6)
- * @param  rot   Ğı×ª×´Ì¬ (0~3)
- * @param  px    ÁĞ×ø±ê (0~12)
- * @param  py    ĞĞ×ø±ê (-1~18)
- * @retval 1=³åÍ», 0=ÎŞ³åÍ»
+ * @brief  ç¢°æ’æ£€æµ‹: æ–¹å—åœ¨æŒ‡å®šä½ç½®æ˜¯å¦ä¸æ£‹ç›˜/è¾¹ç•Œå†²çª
+ * @param  type  æ–¹å—ç±»å‹ (0~6)
+ * @param  rot   æ—‹è½¬çŠ¶æ€ (0~3)
+ * @param  px    åˆ—åæ ‡ (0~12)
+ * @param  py    è¡Œåæ ‡ (-1~18)
+ * @retval 1=å†²çª, 0=æ— å†²çª
  */
 static uint8_t collides(uint8_t type, uint8_t rot, int8_t px, int8_t py)
 {
@@ -189,7 +183,7 @@ static uint8_t collides(uint8_t type, uint8_t rot, int8_t px, int8_t py)
 }
 
 /**
- * @brief  ½«µ±Ç°»î¶¯·½¿éËø¶¨µ½ÆåÅÌ, ½«g_board¶ÔÓ¦¸ñĞ´Èë·½¿éÑÕÉ«
+ * @brief  å°†å½“å‰æ´»åŠ¨æ–¹å—é”å®šåˆ°æ£‹ç›˜, å°†g_boardå¯¹åº”æ ¼å†™å…¥æ–¹å—é¢œè‰²
  */
 static void lock_piece(void)
 {
@@ -209,8 +203,8 @@ static void lock_piece(void)
 }
 
 /**
- * @brief  ÏûĞĞ¼ì²é: ÕÒ³öÂúĞĞ²¢ÏÂÒÆÉÏ·½ĞĞ, ·µ»ØÏû³ıĞĞÊı
- * @return Ïû³ıµÄĞĞÊı
+ * @brief  æ¶ˆè¡Œæ£€æŸ¥: æ‰¾å‡ºæ»¡è¡Œå¹¶ä¸‹ç§»ä¸Šæ–¹è¡Œ, è¿”å›æ¶ˆé™¤è¡Œæ•°
+ * @return æ¶ˆé™¤çš„è¡Œæ•°
  */
 static uint8_t clear_lines(void)
 {
@@ -223,7 +217,7 @@ static uint8_t clear_lines(void)
             if (g_board[r][c] == 0) { full = 0; break; }
         }
         if (full) {
-            /* °ÑÉÏ·½ĞĞÈ«²¿ÏÂÒÆ */
+            /* æŠŠä¸Šæ–¹è¡Œå…¨éƒ¨ä¸‹ç§» */
             int8_t sr;
             for (sr = r; sr > 0; sr--) {
                 uint8_t sc;
@@ -231,28 +225,28 @@ static uint8_t clear_lines(void)
                     g_board[sr][sc] = g_board[sr - 1][sc];
                 }
             }
-            /* µÚ0ĞĞÇå¿Õ */
+            /* ç¬¬0è¡Œæ¸…ç©º */
             {
                 uint8_t sc;
                 for (sc = 0; sc < BOARD_COLS; sc++) g_board[0][sc] = 0;
             }
             cleared++;
-            r++;  /* ÖØĞÂ¼ì²éµ±Ç°ĞĞ */
+            r++;  /* é‡æ–°æ£€æŸ¥å½“å‰è¡Œ */
         }
     }
     return cleared;
 }
 
 /**
- * @brief  Éú³ÉĞÂ·½¿é: ½«Ô¤ÀÀ·½¿é±äÎªµ±Ç°, Ëæ»úÉú³ÉÏÂÒ»¸öÔ¤ÀÀ, ´Ó¶¥²¿ÖĞ¼äÏÂÂä
+ * @brief  ç”Ÿæˆæ–°æ–¹å—: å°†é¢„è§ˆæ–¹å—å˜ä¸ºå½“å‰, éšæœºç”Ÿæˆä¸‹ä¸€ä¸ªé¢„è§ˆ, ä»é¡¶éƒ¨ä¸­é—´ä¸‹è½
  */
 static void spawn_piece(void)
 {
     g_piece_type = g_next_type;
     g_next_type = game_rand() % 7;
     g_piece_rot = 0;
-    g_piece_x = 3;   /* ´ÓÖĞ¼äÁĞ¿ªÊ¼ */
-    g_piece_y = -1;  /* ´ÓÆÁÄ»¶¥²¿Íâ¿ªÊ¼ */
+    g_piece_x = 3;   /* ä»ä¸­é—´åˆ—å¼€å§‹ */
+    g_piece_y = -1;  /* ä»å±å¹•é¡¶éƒ¨å¤–å¼€å§‹ */
     g_preview_dirty = 1;
 
     if (collides(g_piece_type, g_piece_rot, g_piece_x, g_piece_y)) {
@@ -261,8 +255,8 @@ static void spawn_piece(void)
 }
 
 /**
- * @brief  ¼ÆËãÍ¶Ó°Y×ø±ê: µ±Ç°·½¿éÄÜÏÂÂäµ½µÄ×îµÍÎ»
- * @return Í¶Ó°ËùÔÚĞĞºÅ
+ * @brief  è®¡ç®—æŠ•å½±Yåæ ‡: å½“å‰æ–¹å—èƒ½ä¸‹è½åˆ°çš„æœ€ä½ä½
+ * @return æŠ•å½±æ‰€åœ¨è¡Œå·
  */
 static int8_t find_ghost_y(void)
 {
@@ -276,11 +270,11 @@ static int8_t find_ghost_y(void)
 static void draw_cell(int8_t col, int8_t row, uint16_t color);
 
 /**
- * @brief  »æÖÆÍ¶Ó°·½¿é: ½ö»æÖÆÍâ¿ò + ÖĞĞÄ¹á´©2pxºáÏß, ÊÓ¾õ2px´Ö±ß¿ò
- * @param  type  ·½¿éÀàĞÍ
- * @param  rot   Ğı×ª×´Ì¬
- * @param  px    ÁĞ×ø±ê
- * @param  py    ĞĞ×ø±ê
+ * @brief  ç»˜åˆ¶æŠ•å½±æ–¹å—: ä»…ç»˜åˆ¶å¤–æ¡† + ä¸­å¿ƒè´¯ç©¿2pxæ¨ªçº¿, è§†è§‰2pxç²—è¾¹æ¡†
+ * @param  type  æ–¹å—ç±»å‹
+ * @param  rot   æ—‹è½¬çŠ¶æ€
+ * @param  px    åˆ—åæ ‡
+ * @param  py    è¡Œåæ ‡
  */
 static void draw_ghost_at(uint8_t type, uint8_t rot, int8_t px, int8_t py)
 {
@@ -299,17 +293,17 @@ static void draw_ghost_at(uint8_t type, uint8_t rot, int8_t px, int8_t py)
             uint16_t x = BOARD_X + bx * CELL_SIZE;
             uint16_t y = BOARD_Y + by * CELL_SIZE;
 
-            /* ÖĞĞÄºáÏß 2px: x+3..x+6, y+4..y+5 (¹á´©) */
+            /* ä¸­å¿ƒæ¨ªçº¿ 2px: x+3..x+6, y+4..y+5 (è´¯ç©¿) */
             LCD_Fill(x + 3, y + 4, x + CELL_SIZE - 4, y + 5, color);
 
-            /* ÉÏ±ß 2px: x+1..x+8, y+1..y+2 */
+            /* ä¸Šè¾¹ 2px: x+1..x+8, y+1..y+2 */
             LCD_Fill(x + 1, y + 1, x + CELL_SIZE - 2, y + 2, color);
-            /* ÏÂ±ß 2px: x+1..x+8, y+7..y+8 */
+            /* ä¸‹è¾¹ 2px: x+1..x+8, y+7..y+8 */
             LCD_Fill(x + 1, y + CELL_SIZE - 3,
                      x + CELL_SIZE - 2, y + CELL_SIZE - 2, color);
-            /* ×ó±ß 2px: x+1..x+2, y+3..y+6 */
+            /* å·¦è¾¹ 2px: x+1..x+2, y+3..y+6 */
             LCD_Fill(x + 1, y + 3, x + 2, y + CELL_SIZE - 3, color);
-            /* ÓÒ±ß 2px: x+7..x+8, y+3..y+6 */
+            /* å³è¾¹ 2px: x+7..x+8, y+3..y+6 */
             LCD_Fill(x + CELL_SIZE - 3, y + 3,
                      x + CELL_SIZE - 2, y + CELL_SIZE - 3, color);
         }
@@ -317,7 +311,7 @@ static void draw_ghost_at(uint8_t type, uint8_t rot, int8_t px, int8_t py)
 }
 
 /**
- * @brief  »æÖÆÆåÅÌ±³¾°: Ìî³äµ×É« + »æÖÆÍø¸ñÏß
+ * @brief  ç»˜åˆ¶æ£‹ç›˜èƒŒæ™¯: å¡«å……åº•è‰² + ç»˜åˆ¶ç½‘æ ¼çº¿
  */
 static void draw_board_bg(void)
 {
@@ -325,7 +319,7 @@ static void draw_board_bg(void)
     LCD_Fill(BOARD_X, BOARD_Y,
              BOARD_X + BOARD_W - 1, BOARD_Y + BOARD_H - 1, BOARD_BG);
 
-    /* »æÖÆÍø¸ñÏß */
+    /* ç»˜åˆ¶ç½‘æ ¼çº¿ */
     for (i = 0; i <= BOARD_COLS; i++) {
         uint16_t x = BOARD_X + i * CELL_SIZE;
         LCD_Fill(x, BOARD_Y, x + GRID_WIDTH - 1, BOARD_Y + BOARD_H - 1, BOARD_GRID);
@@ -337,27 +331,27 @@ static void draw_board_bg(void)
 }
 
 /**
- * @brief  »æÖÆµ¥¸ö¸ñ×Ó: Ìî³äÖ¸¶¨ÑÕÉ«µÄ·½¿é, Áô1px±ß¾à²»¸²¸ÇÍø¸ñÏß
- * @param  col   ÁĞ×ø±ê
- * @param  row   ĞĞ×ø±ê
- * @param  color Ìî³äÑÕÉ«
+ * @brief  ç»˜åˆ¶å•ä¸ªæ ¼å­: å¡«å……æŒ‡å®šé¢œè‰²çš„æ–¹å—, ç•™1pxè¾¹è·ä¸è¦†ç›–ç½‘æ ¼çº¿
+ * @param  col   åˆ—åæ ‡
+ * @param  row   è¡Œåæ ‡
+ * @param  color å¡«å……é¢œè‰²
  */
 static void draw_cell(int8_t col, int8_t row, uint16_t color)
 {
     if (row < 0 || col < 0 || col >= BOARD_COLS || row >= BOARD_ROWS) return;
     uint16_t x = BOARD_X + col * CELL_SIZE;
     uint16_t y = BOARD_Y + row * CELL_SIZE;
-    /* ·½¿é¸²¸ÇÍø¸ñ, Áô1px±ß¾à */
+    /* æ–¹å—è¦†ç›–ç½‘æ ¼, ç•™1pxè¾¹è· */
     LCD_Fill(x + 1, y + 1, x + CELL_SIZE - 2, y + CELL_SIZE - 2, color);
 }
 
 /**
- * @brief  ²Á³ı»ò»æÖÆÒ»¸öÍêÕû·½¿é (4x4¸ñ×Ó, ²»º¬Íø¸ñÏß)
- * @param  type   ·½¿éÀàĞÍ
- * @param  rot    Ğı×ª×´Ì¬
- * @param  px     ÆğÊ¼ÁĞ×ø±ê
- * @param  py     ÆğÊ¼ĞĞ×ø±ê
- * @param  color  Ìî³äÑÕÉ« (BOARD_BG=²Á³ı, piece_colors[type]=»æÖÆ)
+ * @brief  æ“¦é™¤æˆ–ç»˜åˆ¶ä¸€ä¸ªå®Œæ•´æ–¹å— (4x4æ ¼å­, ä¸å«ç½‘æ ¼çº¿)
+ * @param  type   æ–¹å—ç±»å‹
+ * @param  rot    æ—‹è½¬çŠ¶æ€
+ * @param  px     èµ·å§‹åˆ—åæ ‡
+ * @param  py     èµ·å§‹è¡Œåæ ‡
+ * @param  color  å¡«å……é¢œè‰² (BOARD_BG=æ“¦é™¤, piece_colors[type]=ç»˜åˆ¶)
  */
 static void draw_piece_at(uint8_t type, uint8_t rot, int8_t px, int8_t py, uint16_t color)
 {
@@ -373,19 +367,19 @@ static void draw_piece_at(uint8_t type, uint8_t rot, int8_t px, int8_t py, uint1
 }
 
 /**
- * @brief  »æÖÆÍêÕûÆåÅÌ: ±³¾°Íø¸ñ + ÒÑËø·½¿é + Í¶Ó°/»î¶¯·½¿é + ÏûĞĞ¶¯»­
- * @note   g_board_dirty==2 Ê±È«Á¿ÖØ»æ, ==1 Ê±ÔöÁ¿²Á³ıÖØ»æ, ==3 Ê±½ö¾Ö²¿ÖØ»æµç³ØÇøÓò
+ * @brief  ç»˜åˆ¶å®Œæ•´æ£‹ç›˜: èƒŒæ™¯ç½‘æ ¼ + å·²é”æ–¹å— + æŠ•å½±/æ´»åŠ¨æ–¹å— + æ¶ˆè¡ŒåŠ¨ç”»
+ * @note   g_board_dirty==2 æ—¶å…¨é‡é‡ç»˜, ==1 æ—¶å¢é‡æ“¦é™¤é‡ç»˜, ==3 æ—¶ä»…å±€éƒ¨é‡ç»˜ç”µæ± åŒºåŸŸ
  */
 static void draw_board(void)
 {
     uint8_t r, c;
 
     if (g_board_dirty >= 2) {
-        /* g_board_dirty==3: Ö»ÖØ»æµç³ØÍ¼±ê¸²¸ÇµÄÆåÅÌÇøÓò (ÁĞ0~10, ĞĞ5~14) */
+        /* g_board_dirty==3: åªé‡ç»˜ç”µæ± å›¾æ ‡è¦†ç›–çš„æ£‹ç›˜åŒºåŸŸ (åˆ—0~10, è¡Œ5~14) */
         if (g_board_dirty == 2) {
             draw_board_bg();
         } else {
-            /* µç³ØÇøÓòÓëÆåÅÌ½»¼¯ x:50~179, y:79~161 */
+            /* ç”µæ± åŒºåŸŸä¸æ£‹ç›˜äº¤é›† x:50~179, y:79~161 */
             uint16_t fill_x1 = BOARD_X;
             uint16_t fill_y1 = BOARD_Y + 5 * CELL_SIZE + 1;
             uint16_t fill_x2 = BOARD_X + BOARD_W - 1;
@@ -409,7 +403,7 @@ static void draw_board(void)
             }
         }
         if (g_state == TETRIS_STATE_PLAYING) {
-            /* Í¶Ó°¿é */
+            /* æŠ•å½±å— */
             g_ghost_y = find_ghost_y();
             if (g_ghost_y != g_piece_y) {
                 draw_ghost_at(g_piece_type, g_piece_rot,
@@ -421,22 +415,22 @@ static void draw_board(void)
         }
         g_prev_ghost_y = g_ghost_y;
     } else {
-        /* ÔöÁ¿¸üĞÂ: ²Á³ıÉÏÒ»Ö¡·½¿é+Í¶Ó°, ÔÙÖØĞÂ»æÖÆ, ²¢ĞŞ²¹Íø¸ñÏß+±³¾° */
+        /* å¢é‡æ›´æ–°: æ“¦é™¤ä¸Šä¸€å¸§æ–¹å—+æŠ•å½±, å†é‡æ–°ç»˜åˆ¶, å¹¶ä¿®è¡¥ç½‘æ ¼çº¿+èƒŒæ™¯ */
         g_ghost_y = find_ghost_y();
 
-        /* ²Á³ı¾É·½¿éÎ»ÖÃ (±³¾°É«¸²¸Ç) */
+        /* æ“¦é™¤æ—§æ–¹å—ä½ç½® (èƒŒæ™¯è‰²è¦†ç›–) */
         draw_piece_at(g_prev_type, g_prev_rot,
                       g_prev_px, g_prev_py, BOARD_BG);
-        /* ²Á³ı¾ÉÍ¶Ó° (Î»ÖÃ»ò·½¿éÃ»±ä»¯Ê±) */
+        /* æ“¦é™¤æ—§æŠ•å½± (ä½ç½®æˆ–æ–¹å—æ²¡å˜åŒ–æ—¶) */
         if (g_prev_ghost_y != g_prev_py
             && (g_prev_ghost_y != g_ghost_y || g_prev_px != g_piece_x || g_prev_rot != g_piece_rot)) {
             draw_piece_at(g_prev_type, g_prev_rot,
                           g_prev_px, g_prev_ghost_y, BOARD_BG);
         }
-        /* ĞŞ¸´¾ÉÎ»ÖÃÏÂ·½±»¸²¸ÇµÄ±³¾°¸ñ×Ó */
+        /* ä¿®å¤æ—§ä½ç½®ä¸‹æ–¹è¢«è¦†ç›–çš„èƒŒæ™¯æ ¼å­ */
         {
             uint8_t rr, cc;
-            /* ±»¾É·½¿éÕÚµ²µÄ±³¾° */
+            /* è¢«æ—§æ–¹å—é®æŒ¡çš„èƒŒæ™¯ */
             for (rr = 0; rr < 4; rr++) {
                 uint8_t row_bits = PIECES[PIECE_IDX(g_prev_type, g_prev_rot, rr)];
                 for (cc = 0; cc < 4; cc++) {
@@ -451,7 +445,7 @@ static void draw_board(void)
                     }
                 }
             }
-            /* ±»¾ÉÍ¶Ó°ÕÚµ²µÄ±³¾° (Í¶Ó°Î»ÖÃ/·½¿é±ä»¯) */
+            /* è¢«æ—§æŠ•å½±é®æŒ¡çš„èƒŒæ™¯ (æŠ•å½±ä½ç½®/æ–¹å—å˜åŒ–) */
             if (g_prev_ghost_y != g_prev_py && g_prev_ghost_y != g_piece_y
                 && (g_prev_ghost_y != g_ghost_y || g_prev_px != g_piece_x || g_prev_rot != g_piece_rot)) {
                 for (rr = 0; rr < 4; rr++) {
@@ -470,14 +464,14 @@ static void draw_board(void)
                 }
             }
         }
-        /* »æÖÆĞÂ·½¿éÎ»ÖÃ */
+        /* ç»˜åˆ¶æ–°æ–¹å—ä½ç½® */
         if (g_state == TETRIS_STATE_PLAYING) {
-            /* Í¶Ó° (ÓÄÁé·½¿é, ²»¸²¸Ç»î¶¯·½¿é) */
+            /* æŠ•å½± (å¹½çµæ–¹å—, ä¸è¦†ç›–æ´»åŠ¨æ–¹å—) */
             if (g_ghost_y != g_piece_y) {
                 draw_ghost_at(g_piece_type, g_piece_rot,
                               g_piece_x, g_ghost_y);
             }
-            /* »æÖÆ»î¶¯·½¿é */
+            /* ç»˜åˆ¶æ´»åŠ¨æ–¹å— */
             draw_piece_at(g_piece_type, g_piece_rot,
                           g_piece_x, g_piece_y,
                           piece_colors[g_piece_type]);
@@ -485,25 +479,25 @@ static void draw_board(void)
         g_prev_ghost_y = g_ghost_y;
     }
 
-    /* ±£´æµ±Ç°Î»ÖÃ¹©ÏÂÒ»Ö¡ÔöÁ¿Ê¹ÓÃ */
+    /* ä¿å­˜å½“å‰ä½ç½®ä¾›ä¸‹ä¸€å¸§å¢é‡ä½¿ç”¨ */
     g_prev_px = g_piece_x;
     g_prev_py = g_piece_y;
     g_prev_type = g_piece_type;
     g_prev_rot = g_piece_rot;
 
-    /* ÏûĞĞ¶¯»­: ÉÁË¸ÒªÏû³ıµÄĞĞ */
+    /* æ¶ˆè¡ŒåŠ¨ç”»: é—ªçƒè¦æ¶ˆé™¤çš„è¡Œ */
     if (g_clear_flash > 0) {
         uint8_t rr;
         for (rr = 0; rr < BOARD_ROWS; rr++) {
             if (g_clear_mask & (1UL << rr)) {
                 uint16_t ry = BOARD_Y + (uint16_t)rr * CELL_SIZE;
                 if (!(g_clear_flash & 1)) {
-                    /* °×ÉÁ: ÕûĞĞ»­°×É« (²»´¥¼°Íø¸ñÏß) */
+                    /* ç™½é—ª: æ•´è¡Œç”»ç™½è‰² (ä¸è§¦åŠç½‘æ ¼çº¿) */
                     LCD_Fill(BOARD_X + 1, ry + 1,
                              BOARD_X + BOARD_W - 2, ry + CELL_SIZE - 2,
                              LCD_WHITE);
                 } else {
-                    /* Õı³£: »Ö¸´Îª±³¾°É« (Ïû³ıĞ§¹û) */
+                    /* æ­£å¸¸: æ¢å¤ä¸ºèƒŒæ™¯è‰² (æ¶ˆé™¤æ•ˆæœ) */
                     LCD_Fill(BOARD_X + 1, ry + 1,
                              BOARD_X + BOARD_W - 2, ry + CELL_SIZE - 2,
                              LCD_BLACK);
@@ -514,19 +508,19 @@ static void draw_board(void)
 }
 
 /**
- * @brief  »æÖÆ²à±ßÀ¸: ·ÖÊıºÍÏûĞĞÊı (ÆåÅÌÓÒ²à, X=180~239)
- * @note   ½öÔÚ g_sidebar_dirty ÎªÕæÊ±»æÖÆ, ½ÚÊ¡ SPI ´ø¿í
+ * @brief  ç»˜åˆ¶ä¾§è¾¹æ : åˆ†æ•°å’Œæ¶ˆè¡Œæ•° (æ£‹ç›˜å³ä¾§, X=180~239)
+ * @note   ä»…åœ¨ g_sidebar_dirty ä¸ºçœŸæ—¶ç»˜åˆ¶, èŠ‚çœ SPI å¸¦å®½
  */
 static void draw_sidebar(void)
 {
     if (!g_sidebar_dirty) return;
 
-    uint16_t sx = BOARD_X + BOARD_W;  /* ²à±ßÀ¸ÆğÊ¼X = 180 */
+    uint16_t sx = BOARD_X + BOARD_W;  /* ä¾§è¾¹æ èµ·å§‹X = 180 */
 
-    /* Çå³ı²à±ßÀ¸ÉÏ°ëÇøÓò */
+    /* æ¸…é™¤ä¾§è¾¹æ ä¸ŠåŠåŒºåŸŸ */
     LCD_Fill(sx, 0, 239, PREVIEW_Y - 1, LCD_BLACK);
 
-    /* ·ÖÊı: 8x14 ÓÒ¶ÔÆëÊı×Ö´®, ÓÒ¶ÔÆë (°¤×Å dx<=225 ±ß½ç) */
+    /* åˆ†æ•°: 8x14 å³å¯¹é½æ•°å­—ä¸², å³å¯¹é½ (æŒ¨ç€ dx<=225 è¾¹ç•Œ) */
     {
         LCD_CS_CLR;
         uint8_t digits[8];
@@ -541,7 +535,7 @@ static void draw_sidebar(void)
         LCD_CS_SET;
     }
 
-    /* ÏûĞĞ¼ÆÊı: 8x14 ÓÒ¶ÔÆëÊı×Ö´® */
+    /* æ¶ˆè¡Œè®¡æ•°: 8x14 å³å¯¹é½æ•°å­—ä¸² */
     {
         LCD_CS_CLR;
         uint8_t digits[8];
@@ -563,19 +557,19 @@ static void draw_sidebar(void)
 }
 
 /**
- * @brief  »æÖÆÏÂÒ»¸ö·½¿éÔ¤ÀÀ (ÆåÅÌÓÒ²à, X=190, Y=110)
+ * @brief  ç»˜åˆ¶ä¸‹ä¸€ä¸ªæ–¹å—é¢„è§ˆ (æ£‹ç›˜å³ä¾§, X=190, Y=110)
  */
 static void draw_preview(void)
 {
     uint8_t r, c;
-    /* Çå³ıÔ¤ÀÀÇøÓò */
+    /* æ¸…é™¤é¢„è§ˆåŒºåŸŸ */
     LCD_Fill(PREVIEW_X, PREVIEW_Y,
              PREVIEW_X + 4 * PREVIEW_CELL - 1,
              PREVIEW_Y + 4 * PREVIEW_CELL - 1, BOARD_BG);
 
     uint16_t pcolor = piece_colors[g_next_type];
     for (r = 0; r < 4; r++) {
-        uint8_t row_bits = PIECES[PIECE_IDX(g_next_type, 0, r)];  /* Ğı×ª0 */
+        uint8_t row_bits = PIECES[PIECE_IDX(g_next_type, 0, r)];  /* æ—‹è½¬0 */
         for (c = 0; c < 4; c++) {
             if (row_bits & (1 << c)) {
                 uint16_t px = PREVIEW_X + c * PREVIEW_CELL;
@@ -589,19 +583,19 @@ static void draw_preview(void)
 }
 
 /**
- * @brief  »æÖÆÓÎÏ·½áÊø»­Ãæ: ¾ÓÖĞÏÔÊ¾"ÓÎÏ·½áÊø" 32x32ÎÄ×Ö + 16x32Êı×ÖµÃ·Ö
+ * @brief  ç»˜åˆ¶æ¸¸æˆç»“æŸç”»é¢: å±…ä¸­æ˜¾ç¤º"æ¸¸æˆç»“æŸ" 32x32æ–‡å­— + 16x32æ•°å­—å¾—åˆ†
  */
 static void draw_game_over(void)
 {
-    /* È«ºÚ±³¾°: ¸²¸ÇÆåÅÌÇøÓò */
+    /* å…¨é»‘èƒŒæ™¯: è¦†ç›–æ£‹ç›˜åŒºåŸŸ */
     LCD_Fill(BOARD_X, BOARD_Y,
              BOARD_X + BOARD_W - 1, BOARD_Y + BOARD_H - 1, LCD_BLACK);
 
-    /* ¾ÓÖĞÏÔÊ¾ "ÓÎÏ·½áÊø" (4×Ö, 32x32) */
+    /* å±…ä¸­æ˜¾ç¤º "æ¸¸æˆç»“æŸ" (4å­—, 32x32) */
     {
         uint16_t gw = 4 * 32;
         uint16_t gx = BOARD_X + (BOARD_W - gw) / 2;
-        uint16_t gy = 75;  /* ÉÏ·½, ¸ø·ÖÊıÁô³ö¿Õ¼ä */
+        uint16_t gy = 75;  /* ä¸Šæ–¹, ç»™åˆ†æ•°ç•™å‡ºç©ºé—´ */
         LCD_CS_CLR;
         sok_draw_char_32(gx,       gy, FlashStore_ResLoad(FLASH_STORE_ID_32_YOU,  0, FONT_CHAR_SIZE), LCD_WHITE);
         sok_draw_char_32(gx + 32,  gy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI3,  0, FONT_CHAR_SIZE), LCD_WHITE);
@@ -610,7 +604,7 @@ static void draw_game_over(void)
         LCD_CS_SET;
     }
 
-    /* ÏÂ·½ÏÔÊ¾µÃ·ÖÊı (16x32 Êı×Ö) */
+    /* ä¸‹æ–¹æ˜¾ç¤ºå¾—åˆ†æ•° (16x32 æ•°å­—) */
     {
         uint8_t digits[8];
         uint8_t dc = uint_to_digits(g_score, digits);
@@ -628,50 +622,50 @@ static void draw_game_over(void)
 }
 
 /**
- * @brief  ÇåÀíÆåÅÌÉÏ·½ÇøÓò: ÖĞÏßÉÏ·½ÇåºÚ, ·ÀÖ¹²ĞÁôÉÏÒ»»­ÃæÄÚÈİ
+ * @brief  æ¸…ç†æ£‹ç›˜ä¸Šæ–¹åŒºåŸŸ: ä¸­çº¿ä¸Šæ–¹æ¸…é»‘, é˜²æ­¢æ®‹ç•™ä¸Šä¸€ç”»é¢å†…å®¹
  */
 static void draw_score_area(void)
 {
-    /* ½«ÆåÅÌÖĞÏßÉÏ·½ÇøÓòÇåºÚ (±ÜÃâ²ĞÁôÉÏÒ»»­Ãæ) */
+    /* å°†æ£‹ç›˜ä¸­çº¿ä¸Šæ–¹åŒºåŸŸæ¸…é»‘ (é¿å…æ®‹ç•™ä¸Šä¸€ç”»é¢) */
     LCD_Fill(0, 0, BOARD_X + BOARD_W - 1, BOARD_Y - 1, LCD_BLACK);
 }
 
 /**
- * @brief  ³õÊ¼»¯¶íÂŞË¹·½¿éÓÎÏ·: Çå¿ÕÆåÅÌ, ÖØÖÃ×´Ì¬, Éú³ÉÊ×¸ö·½¿é, È«ÆÁ»æÖÆ
+ * @brief  åˆå§‹åŒ–ä¿„ç½—æ–¯æ–¹å—æ¸¸æˆ: æ¸…ç©ºæ£‹ç›˜, é‡ç½®çŠ¶æ€, ç”Ÿæˆé¦–ä¸ªæ–¹å—, å…¨å±ç»˜åˆ¶
  */
 void tetris_init(void)
 {
-    /* ---- Çå¿ÕÆåÅÌ ---- */
+    /* ---- æ¸…ç©ºæ£‹ç›˜ ---- */
     uint8_t r, c;
     for (r = 0; r < BOARD_ROWS; r++) {
         for (c = 0; c < BOARD_COLS; c++) {
             g_board[r][c] = 0;
         }
     }
-    /* ---- ÖØÖÃÓÎÏ·×´Ì¬ ---- */
+    /* ---- é‡ç½®æ¸¸æˆçŠ¶æ€ ---- */
     g_score = 0;
     g_lines = 0;
     g_level = 0;
     g_state = TETRIS_STATE_PLAYING;
-    g_board_dirty = 2;   /* 2=Ê×´ÎÈ«Á¿ÖØ»æ, Çø±ğÓÚ1=ÔöÁ¿½öÖØ»æ±ä»¯¸ñ×Ó */
+    g_board_dirty = 2;   /* 2=é¦–æ¬¡å…¨é‡é‡ç»˜, åŒºåˆ«äº1=å¢é‡ä»…é‡ç»˜å˜åŒ–æ ¼å­ */
     g_preview_dirty = 1;
     g_sidebar_dirty = 1;
     g_prev_score = 0;
     g_prev_lines = 0;
     g_gameover_drawn = 0;
     g_drop_timer = 0;
-    g_drop_last_us = GetTimerCount();   /* ÏÂÂä¼ÆÊ±»ù×¼ */
+    g_drop_last_us = GetTimerCount();   /* ä¸‹è½è®¡æ—¶åŸºå‡† */
     g_drop_interval = DROP_INTERVAL_INIT;
     g_saved_interval = 0;
-    g_clear_flash = 0;                 /* ÏûĞĞ¶¯»­¸´Î» */
+    g_clear_flash = 0;                 /* æ¶ˆè¡ŒåŠ¨ç”»å¤ä½ */
     g_flash_hold = 0;
     g_flash_last_us = GetTimerCount();
 
-    /* ---- ÖØÖÃ´¥Ãş/²Ëµ¥×´Ì¬ ---- */
+    /* ---- é‡ç½®è§¦æ‘¸/èœå•çŠ¶æ€ ---- */
     g_touch_down = 0;
     g_prev_pressed = 0;
     g_menu_cooldown = 0;
-    g_wait_touch_release = 0;   /* ÖØĞÂ¿ªÊ¼ºóĞèËÉÊÖ·À¶¶, ·ÀÖ¹Îó´¥Ó²½µ */
+    g_wait_touch_release = 0;   /* é‡æ–°å¼€å§‹åéœ€æ¾æ‰‹é˜²æŠ–, é˜²æ­¢è¯¯è§¦ç¡¬é™ */
     g_hold_zone = 0;
     g_hold_timer = 0;
     g_hold_last_us = GetTimerCount();
@@ -685,11 +679,11 @@ void tetris_init(void)
     g_ghost_y = 0;
     g_prev_ghost_y = 0;
 
-    /* ---- Éú³ÉµÚÒ»¸ö·½¿é ---- */
+    /* ---- ç”Ÿæˆç¬¬ä¸€ä¸ªæ–¹å— ---- */
     g_next_type = game_rand() % 7;
     spawn_piece();
 
-    /* ---- È«ÆÁ»æÖÆ ---- */
+    /* ---- å…¨å±ç»˜åˆ¶ ---- */
     LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
     draw_board();
     draw_sidebar();
@@ -701,7 +695,7 @@ void tetris_init(void)
 }
 
 /**
- * @brief  ÖØÖÃ´¥Ãş×´Ì¬: ´ÓÆäËûÓÎÏ··µ»ØÊ±µ÷ÓÃ, ÊÍ·Å´¥ÃşÌ¬²¢±ê¼ÇµÈ´ıËÉÊÖ
+ * @brief  é‡ç½®è§¦æ‘¸çŠ¶æ€: ä»å…¶ä»–æ¸¸æˆè¿”å›æ—¶è°ƒç”¨, é‡Šæ”¾è§¦æ‘¸æ€å¹¶æ ‡è®°ç­‰å¾…æ¾æ‰‹
  */
 void tetris_reset_touch(void)
 {
@@ -714,19 +708,19 @@ void tetris_reset_touch(void)
 }
 
 /**
- * @brief  ´ÓÆäËûÓÎÏ··µ»ØÊ±£¬±ê¼ÇËùÓĞÇøÓòÎªÔàÇ¿ÖÆÈ«Á¿ÖØ»æ
- * @note   µ÷ÓÃ tetris_update() ÏÂÒ»Ö¡»áÖØ»æËùÓĞÇøÓò£¬ÎŞĞèÁ¢¼´»æÖÆ
+ * @brief  ä»å…¶ä»–æ¸¸æˆè¿”å›æ—¶ï¼Œæ ‡è®°æ‰€æœ‰åŒºåŸŸä¸ºè„å¼ºåˆ¶å…¨é‡é‡ç»˜
+ * @note   è°ƒç”¨ tetris_update() ä¸‹ä¸€å¸§ä¼šé‡ç»˜æ‰€æœ‰åŒºåŸŸï¼Œæ— éœ€ç«‹å³ç»˜åˆ¶
  */
 void tetris_full_redraw(void)
 {
-    g_board_dirty = 2;     /* ÍêÕûÖØ»æ: Ìî³äÆåÅÌ±³¾°+Íø¸ñ+ËùÓĞËø¶¨¸ñ */
+    g_board_dirty = 2;     /* å®Œæ•´é‡ç»˜: å¡«å……æ£‹ç›˜èƒŒæ™¯+ç½‘æ ¼+æ‰€æœ‰é”å®šæ ¼ */
     g_sidebar_dirty = 1;
     g_preview_dirty = 1;
 }
 
 /**
- * @brief  ÅĞ¶ÏÍË³ö/ÖØ¿ª²Ëµ¥ÊÇ·ñÕıÔÚÏÔÊ¾
- * @retval 1=²Ëµ¥¿É¼û, 0=²»¿É¼û
+ * @brief  åˆ¤æ–­é€€å‡º/é‡å¼€èœå•æ˜¯å¦æ­£åœ¨æ˜¾ç¤º
+ * @retval 1=èœå•å¯è§, 0=ä¸å¯è§
  */
 uint8_t tetris_is_menu_visible(void)
 {
@@ -734,9 +728,9 @@ uint8_t tetris_is_menu_visible(void)
 }
 
 /**
- * @brief  ÒÆ¶¯µ±Ç°·½¿é: ÈôÎŞÅö×²Ôò¸üĞÂÎ»ÖÃ²¢ÖØÖÃËø¶¨ÑÓ³Ù
- * @param  dx  ÁĞÆ«ÒÆ (-1=×ó, 1=ÓÒ, 0=ÎŞ)
- * @param  dy  ĞĞÆ«ÒÆ (Í¨³£Îª0»ò1)
+ * @brief  ç§»åŠ¨å½“å‰æ–¹å—: è‹¥æ— ç¢°æ’åˆ™æ›´æ–°ä½ç½®å¹¶é‡ç½®é”å®šå»¶è¿Ÿ
+ * @param  dx  åˆ—åç§» (-1=å·¦, 1=å³, 0=æ— )
+ * @param  dy  è¡Œåç§» (é€šå¸¸ä¸º0æˆ–1)
  */
 static void move_piece(int8_t dx, int8_t dy)
 {
@@ -744,24 +738,24 @@ static void move_piece(int8_t dx, int8_t dy)
         g_piece_x += dx;
         g_piece_y += dy;
         g_board_dirty = 1;
-        if (g_lock_delay > 0) { g_lock_delay = (uint32_t)LOCK_DELAY_MOVE_FRAMES * FRAME_US; g_lock_last_us = GetTimerCount(); }  /* Ã¿´ÎÒÆ¶¯ÖØÖÃËø¶¨¼ÆÊ±(·Å¿í) */
+        if (g_lock_delay > 0) { g_lock_delay = (uint32_t)LOCK_DELAY_MOVE_FRAMES * FRAME_US; g_lock_last_us = GetTimerCount(); }  /* æ¯æ¬¡ç§»åŠ¨é‡ç½®é”å®šè®¡æ—¶(æ”¾å®½) */
     }
 }
 
 /**
- * @brief  Ğı×ªµ±Ç°·½¿é: Ë³Ê±Õë90¶È, Ö§³ÖÌßÇ½Æ«ÒÆ (×ó/ÓÒ1~2¸ñ)
+ * @brief  æ—‹è½¬å½“å‰æ–¹å—: é¡ºæ—¶é’ˆ90åº¦, æ”¯æŒè¸¢å¢™åç§» (å·¦/å³1~2æ ¼)
  */
 static void rotate_piece(void)
 {
     uint8_t new_rot = (g_piece_rot + 1) & 3;
     uint8_t rotated = 0;
 
-    /* ³¢ÊÔÖ±½ÓĞı×ª */
+    /* å°è¯•ç›´æ¥æ—‹è½¬ */
     if (!collides(g_piece_type, new_rot, g_piece_x, g_piece_y)) {
         g_piece_rot = new_rot;
         rotated = 1;
     }
-    /* ÌßÇ½: ³¢ÊÔ×óÓÒÆ«ÒÆ */
+    /* è¸¢å¢™: å°è¯•å·¦å³åç§» */
     else if (!collides(g_piece_type, new_rot, g_piece_x - 1, g_piece_y)) {
         g_piece_x -= 1; g_piece_rot = new_rot;
         rotated = 1;
@@ -781,21 +775,21 @@ static void rotate_piece(void)
 
     if (rotated) {
         g_board_dirty = 1;
-        if (g_lock_delay > 0) { g_lock_delay = (uint32_t)LOCK_DELAY_MOVE_FRAMES * FRAME_US; g_lock_last_us = GetTimerCount(); }  /* Ã¿´ÎĞı×ªÖØÖÃËø¶¨¼ÆÊ±(·Å¿í) */
+        if (g_lock_delay > 0) { g_lock_delay = (uint32_t)LOCK_DELAY_MOVE_FRAMES * FRAME_US; g_lock_last_us = GetTimerCount(); }  /* æ¯æ¬¡æ—‹è½¬é‡ç½®é”å®šè®¡æ—¶(æ”¾å®½) */
     }
-    /* Ğı×ªÊ§°Ü, ²»×öÈÎºÎ²Ù×÷ */
+    /* æ—‹è½¬å¤±è´¥, ä¸åšä»»ä½•æ“ä½œ */
 }
 
-/* Flash ´æµµ½Ó¿Ú */
+/* Flash å­˜æ¡£æ¥å£ */
 #define TETRIS_BOARD_CELLS  (BOARD_ROWS * BOARD_COLS)
 #define TETRIS_BOARD_BYTES  ((TETRIS_BOARD_CELLS + 1) / 2)
 #define TETRIS_SAVE_LEN     (TETRIS_BOARD_BYTES + 18)
 
 /**
- * @brief  ±£´æ¶íÂŞË¹·½¿é´æµµ: ÆåÅÌ(3bit/¸ñÑ¹Ëõ) + ·ÖÊı + ·½¿é×´Ì¬
- * @param  buf      Êä³ö»º³åÇø
- * @param  max_len  »º³åÇø×î´ó³¤¶È
- * @return Êµ¼ÊĞ´Èë³¤¶È, 0=Ê§°Ü
+ * @brief  ä¿å­˜ä¿„ç½—æ–¯æ–¹å—å­˜æ¡£: æ£‹ç›˜(3bit/æ ¼å‹ç¼©) + åˆ†æ•° + æ–¹å—çŠ¶æ€
+ * @param  buf      è¾“å‡ºç¼“å†²åŒº
+ * @param  max_len  ç¼“å†²åŒºæœ€å¤§é•¿åº¦
+ * @return å®é™…å†™å…¥é•¿åº¦, 0=å¤±è´¥
  */
 uint8_t tetris_save_state(uint8_t *buf, uint8_t max_len)
 {
@@ -833,10 +827,10 @@ uint8_t tetris_save_state(uint8_t *buf, uint8_t max_len)
 }
 
 /**
- * @brief  »Ö¸´¶íÂŞË¹·½¿é´æµµ: »¹Ô­ÆåÅÌ¡¢·ÖÊı¡¢·½¿é×´Ì¬²¢È«Á¿ÖØ»æ
- * @param  buf  ´æµµÊı¾İ»º³åÇø
- * @param  len  Êı¾İ³¤¶È
- * @retval 1=»Ö¸´³É¹¦, 0=Ê§°Ü
+ * @brief  æ¢å¤ä¿„ç½—æ–¯æ–¹å—å­˜æ¡£: è¿˜åŸæ£‹ç›˜ã€åˆ†æ•°ã€æ–¹å—çŠ¶æ€å¹¶å…¨é‡é‡ç»˜
+ * @param  buf  å­˜æ¡£æ•°æ®ç¼“å†²åŒº
+ * @param  len  æ•°æ®é•¿åº¦
+ * @retval 1=æ¢å¤æˆåŠŸ, 0=å¤±è´¥
  */
 uint8_t tetris_restore_state(const uint8_t *buf, uint8_t len)
 {
@@ -890,9 +884,10 @@ uint8_t tetris_restore_state(const uint8_t *buf, uint8_t len)
     }
     return 1;
 }
+
 /**
- * @brief  »æÖÆÍË³ö/ÖØ¿ª²Ëµ¥µÄ±³¾°(ÆåÅÌ/½áÊø»­Ãæ)¡£
- * @note   ½ø²Ëµ¥Ç°ÈôÓÎÏ·ÒÑ½áÊø(OVER), ÏÔÊ¾½áÊø»­Ãæ¶ø·ÇÖØ»æÆåÅÌ(ÖØ»æÆåÅÌ»á²Áµô½áÊøÎÄ×Ö)¡£
+ * @brief  ç»˜åˆ¶é€€å‡º/é‡å¼€èœå•çš„èƒŒæ™¯(æ£‹ç›˜/ç»“æŸç”»é¢)ã€‚
+ * @note   è¿›èœå•å‰è‹¥æ¸¸æˆå·²ç»“æŸ(OVER), æ˜¾ç¤ºç»“æŸç”»é¢è€Œéé‡ç»˜æ£‹ç›˜(é‡ç»˜æ£‹ç›˜ä¼šæ“¦æ‰ç»“æŸæ–‡å­—)ã€‚
  */
 static void tetris_draw_menu_scene(void)
 {
@@ -949,11 +944,9 @@ static void tetris_draw_menu_scene(void)
 }
 
 
-/* ================================================================
- *  ÅäÖÃÇı¶¯²Ëµ¥×´Ì¬»úµÄ hook (mark_dirty / bg_redraw / on_to_exit)
- * ================================================================ */
+/* é…ç½®é©±åŠ¨èœå•çŠ¶æ€æœºçš„ hook (mark_dirty / bg_redraw / on_to_exit) */
 /**
- * @brief  ¹Ø±Õ/È¡Ïû²Ëµ¥ºóÖÃÔà, ÒÔ±ãÏÂÒ»Ö¡ÖØ»æÓÎÏ·³¡¾°¡£
+ * @brief  å…³é—­/å–æ¶ˆèœå•åç½®è„, ä»¥ä¾¿ä¸‹ä¸€å¸§é‡ç»˜æ¸¸æˆåœºæ™¯ã€‚
  */
 void tetris_menu_mark_dirty(void)
 {
@@ -964,8 +957,8 @@ void tetris_menu_mark_dirty(void)
 }
 
 /**
- * @brief  ÒÀ¾İÔà±ê¼ÇÖØ»æ²Ëµ¥±³¾°(ÆåÅÌ/½áÊø»­Ãæ)¡£
- * @return 1=±¾Ö¡ÒÑÖØ»æ; 0=ÎŞÔàÎ´ÖØ»æ¡£
+ * @brief  ä¾æ®è„æ ‡è®°é‡ç»˜èœå•èƒŒæ™¯(æ£‹ç›˜/ç»“æŸç”»é¢)ã€‚
+ * @return 1=æœ¬å¸§å·²é‡ç»˜; 0=æ— è„æœªé‡ç»˜ã€‚
  */
 uint8_t tetris_menu_bg_redraw(void)
 {
@@ -974,7 +967,7 @@ uint8_t tetris_menu_bg_redraw(void)
 }
 
 /**
- * @brief  ÖØ¿ª²Ëµ¥ÏÂ»¬´ò¶Ï½øÍË³ö²Ëµ¥ºóµÄ²¹³ä´¦Àí: ÖÃÔàÒÔ±ãÖØ»æ³¡¾°¡£
+ * @brief  é‡å¼€èœå•ä¸‹æ»‘æ‰“æ–­è¿›é€€å‡ºèœå•åçš„è¡¥å……å¤„ç†: ç½®è„ä»¥ä¾¿é‡ç»˜åœºæ™¯ã€‚
  */
 static void tetris_menu_on_to_exit(void)
 {
@@ -984,10 +977,10 @@ static void tetris_menu_on_to_exit(void)
 }
 
 /**
- * @brief  Ö»ÖØ»æµç³Ø¸²¸ÇµÄÆåÅÌÇø(row5~14)ÖĞÎ´±»²Ëµ¥¿ò¸²¸Ç(¿òÍâ/ÍÏ×§ÖĞÂ¶³ö)µÄĞĞ¡£
- * @param  menu_top ²Ëµ¥¿ò¶¥ Y
- * @param  menu_h   ²Ëµ¥¿ò¸ß
- * @note   ¿òÄÚ(ÍêÈ«±»²Ëµ¥¿ò y ¸²¸Ç)µÄĞĞÓÉ²Ëµ¥¿ò¸Ç×¡²»ÖØ»æ, ·ñÔòÏÈÆåÅÌºó²Ëµ¥»áÉÁÒ»Ö¡; Í¹µã/Ô¤ÀÀÇøÓÉµ÷ÓÃ·½ draw_preview »Ö¸´¡£
+ * @brief  åªé‡ç»˜ç”µæ± è¦†ç›–çš„æ£‹ç›˜åŒº(row5~14)ä¸­æœªè¢«èœå•æ¡†è¦†ç›–(æ¡†å¤–/æ‹–æ‹½ä¸­éœ²å‡º)çš„è¡Œã€‚
+ * @param  menu_top èœå•æ¡†é¡¶ Y
+ * @param  menu_h   èœå•æ¡†é«˜
+ * @note   æ¡†å†…(å®Œå…¨è¢«èœå•æ¡† y è¦†ç›–)çš„è¡Œç”±èœå•æ¡†ç›–ä½ä¸é‡ç»˜, å¦åˆ™å…ˆæ£‹ç›˜åèœå•ä¼šé—ªä¸€å¸§; å‡¸ç‚¹/é¢„è§ˆåŒºç”±è°ƒç”¨æ–¹ draw_preview æ¢å¤ã€‚
  */
 static void tetris_restore_board_above_menu(int16_t menu_top, int16_t menu_h)
 {
@@ -996,19 +989,19 @@ static void tetris_restore_board_above_menu(int16_t menu_top, int16_t menu_h)
     for (r = 5; r <= 14; r++) {
         uint16_t ty = BOARD_Y + (uint16_t)r * CELL_SIZE;
         uint16_t tb = ty + (uint16_t)CELL_SIZE - 1;
-        if ((int16_t)ty >= menu_top && (int16_t)tb <= menu_bot) continue;  /* ÍêÈ«¿òÄÚ */
-        /* ĞĞ±³¾° */
+        if ((int16_t)ty >= menu_top && (int16_t)tb <= menu_bot) continue;  /* å®Œå…¨æ¡†å†… */
+        /* è¡ŒèƒŒæ™¯ */
         LCD_Fill(BOARD_X, ty, BOARD_X + BOARD_W - 1, tb, BOARD_BG);
-        /* ÊúÍø¸ñÏß */
+        /* ç«–ç½‘æ ¼çº¿ */
         for (c = 0; c <= BOARD_COLS; c++) {
             uint16_t x = BOARD_X + c * CELL_SIZE;
             LCD_Fill(x, ty, x + GRID_WIDTH - 1, tb, BOARD_GRID);
         }
-        /* ºáÍø¸ñÏß: ĞĞ¶¥(ty) + ĞĞµ×(ty+CELL), ÓëÕı³£ÆåÅÌÍø¸ñÏß(BOARD_Y+i*CELL)Ò»ÖÂ */
+        /* æ¨ªç½‘æ ¼çº¿: è¡Œé¡¶(ty) + è¡Œåº•(ty+CELL), ä¸æ­£å¸¸æ£‹ç›˜ç½‘æ ¼çº¿(BOARD_Y+i*CELL)ä¸€è‡´ */
         LCD_Fill(BOARD_X, ty, BOARD_X + BOARD_W - 1, ty + (uint16_t)GRID_WIDTH - 1, BOARD_GRID);
         LCD_Fill(BOARD_X, ty + (uint16_t)CELL_SIZE, BOARD_X + BOARD_W - 1,
                  ty + (uint16_t)CELL_SIZE + (uint16_t)GRID_WIDTH - 1, BOARD_GRID);
-        /* ĞĞÄÚ·½¿é */
+        /* è¡Œå†…æ–¹å— */
         for (c = 0; c < BOARD_COLS; c++) {
             if (g_board[r][c] != 0) draw_cell(c, r, piece_colors[g_board[r][c] - 1]);
         }
@@ -1024,21 +1017,21 @@ static void tetris_restore_board_above_menu(int16_t menu_top, int16_t menu_h)
 }
 
 /**
- * @brief  µÍµçÍ¼±êÃğ¶Î»Ö¸´: °´²Ëµ¥¸²¸Ç·¶Î§»Ö¸´µç³Ø¸²¸ÇµÄÆåÅÌ/Ô¤ÀÀÇø¡£
- * @note   ÍË³ö²Ëµ¥¸²¸ÇÕûÆÁ(¿òÄÚÆåÅÌÓÉ²Ëµ¥¿ò¸Ç×¡²»ÖØ»æ); ÖØ¿ª²Ëµ¥Ö»¸Ç y>=110; ´¿ÓÎÏ·ÓÃÈ«Á¿ÖØ»æ¡£
+ * @brief  ä½ç”µå›¾æ ‡ç­æ®µæ¢å¤: æŒ‰èœå•è¦†ç›–èŒƒå›´æ¢å¤ç”µæ± è¦†ç›–çš„æ£‹ç›˜/é¢„è§ˆåŒºã€‚
+ * @note   é€€å‡ºèœå•è¦†ç›–æ•´å±(æ¡†å†…æ£‹ç›˜ç”±èœå•æ¡†ç›–ä½ä¸é‡ç»˜); é‡å¼€èœå•åªç›– y>=110; çº¯æ¸¸æˆç”¨å…¨é‡é‡ç»˜ã€‚
  */
 void tetris_lowbatt_restore(void)
 {
-    LCD_ClearLowBatteryOverlay();   /* Í¼±ê±ß¿ò+Í¹µã+¸ĞÌ¾ºÅ ºì¡úºÚ */
+    LCD_ClearLowBatteryOverlay();   /* å›¾æ ‡è¾¹æ¡†+å‡¸ç‚¹+æ„Ÿå¹å· çº¢â†’é»‘ */
 
     if (g_exit_menu_visible) {
-        /* ÍË³ö²Ëµ¥¸²¸ÇÕûÆÁ(x=45~195): ¿òÄÚÆåÅÌÓÉ²Ëµ¥¿òÖ±½Ó¸Ç×¡, ²»ÖØ»æ(±ÜÃâÏÈÆåÅÌºó²Ëµ¥ÉÁ);
-           Ö» draw_preview(¿ç²Ëµ¥ÓÒ±ß¿òµÄÍ¹µã/Ô¤ÀÀ), ÔÙ»­ÍË³ö²Ëµ¥¿ò; ÍÏ×§ÖĞ¿òÍâÂ¶³öÓÉÏÂ·½»Ö¸´ */
+        /* é€€å‡ºèœå•è¦†ç›–æ•´å±(x=45~195): æ¡†å†…æ£‹ç›˜ç”±èœå•æ¡†ç›´æ¥ç›–ä½, ä¸é‡ç»˜(é¿å…å…ˆæ£‹ç›˜åèœå•é—ª);
+           åª draw_preview(è·¨èœå•å³è¾¹æ¡†çš„å‡¸ç‚¹/é¢„è§ˆ), å†ç”»é€€å‡ºèœå•æ¡†; æ‹–æ‹½ä¸­æ¡†å¤–éœ²å‡ºç”±ä¸‹æ–¹æ¢å¤ */
         draw_preview();
         tetris_restore_board_above_menu(g_exit_drag_y, MENU_H);
         menu_draw_nrow_frame_only(g_exit_drag_y, tetris_row_types, 5);
     } else if (g_restart_menu_visible) {
-        /* ÖØ¿ª²Ëµ¥Ö»¸Ç y>=110: Ö»ÖØ»æ²Ëµ¥ÉÏ·½(row<110)ÆåÅÌĞĞ+Ô¤ÀÀ, ¿òÄÚÓÉ²Ëµ¥¿ò¸Ç, ²»ÉÁ */
+        /* é‡å¼€èœå•åªç›– y>=110: åªé‡ç»˜èœå•ä¸Šæ–¹(row<110)æ£‹ç›˜è¡Œ+é¢„è§ˆ, æ¡†å†…ç”±èœå•æ¡†ç›–, ä¸é—ª */
         draw_preview();
         tetris_restore_board_above_menu(g_restart_slide_y, RESTART_MENU_H);
         menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
@@ -1057,17 +1050,17 @@ static const GameMenuCfg g_tetris_menu_cfg = {
 };
 
 /**
- * @brief  ¶íÂŞË¹·½¿éÃ¿Ö¡¸üĞÂ: ´¦Àí´¥ÃşÊÖÊÆ¡¢²Ëµ¥½»»¥¡¢×Ô¶¯ÏÂÂä¡¢ÏûĞĞ¶¯»­ºÍäÖÈ¾
- * @return GAME_RET_NONE=ÎŞ½»»¥, GAME_RET_INTERACT=ÓĞ½»»¥, ÆäËû=ÍË³öµ½Ö¸¶¨ÓÎÏ·/ÊÓÆµ¡£
+ * @brief  ä¿„ç½—æ–¯æ–¹å—æ¯å¸§æ›´æ–°: å¤„ç†è§¦æ‘¸æ‰‹åŠ¿ã€èœå•äº¤äº’ã€è‡ªåŠ¨ä¸‹è½ã€æ¶ˆè¡ŒåŠ¨ç”»å’Œæ¸²æŸ“
+ * @return GAME_RET_NONE=æ— äº¤äº’, GAME_RET_INTERACT=æœ‰äº¤äº’, å…¶ä»–=é€€å‡ºåˆ°æŒ‡å®šæ¸¸æˆ/è§†é¢‘ã€‚
  */
 uint8_t tetris_update(void)
 {
     uint8_t interacted = 0;
 
-    /* ²Ëµ¥ÀäÈ´ */
+    /* èœå•å†·å´ */
     if (g_menu_cooldown > 0) g_menu_cooldown--;
 
-    /* ÉèÖÃÒ³ÃæÏÂ»¬¡úÍË³ö²Ëµ¥ */
+    /* è®¾ç½®é¡µé¢ä¸‹æ»‘â†’é€€å‡ºèœå• */
     if (g_game_enter_exit_menu) {
         g_game_enter_exit_menu = 0;
         g_state = TETRIS_STATE_EXIT_MENU;
@@ -1076,7 +1069,7 @@ uint8_t tetris_update(void)
         g_preview_dirty = 1;
     }
 
-    /* ---- ÍË³ö²Ëµ¥ / ÖØĞÂ¿ªÊ¼²Ëµ¥: ÅäÖÃÇı¶¯Í³Ò»×´Ì¬»ú ---- */
+    /* ---- é€€å‡ºèœå• / é‡æ–°å¼€å§‹èœå•: é…ç½®é©±åŠ¨ç»Ÿä¸€çŠ¶æ€æœº ---- */
     if (g_state == TETRIS_STATE_EXIT_MENU || g_state == TETRIS_STATE_RESTART_MENU) {
         uint8_t out_ret;
         uint8_t cmd = game_menu_command(&g_tetris_menu_cfg, (uint8_t *)&g_state, &out_ret);
@@ -1085,11 +1078,11 @@ uint8_t tetris_update(void)
             case GAME_MENU_CMD_RESTART:  g_wait_touch_release = 1; tetris_init(); return GAME_RET_INTERACT;
             case GAME_MENU_CMD_SETTINGS: g_wait_touch_release = 1; menu_enter_game_settings(); return EXIT_RET_SETTINGS;
             case GAME_MENU_CMD_INTERACT: g_wait_touch_release = 1; return GAME_RET_INTERACT;
-            default:                     g_wait_touch_release = 1; return 0;  /* RETURN/¹Ø±Õ */
+            default:                     g_wait_touch_release = 1; return 0;  /* RETURN/å…³é—­ */
         }
     }
 
-    /* ---- ÓÎÏ·½áÊø×´Ì¬: ÏÔÊ¾·ÖÊı, µÈ´ıÊÖÊÆ ---- */
+    /* ---- æ¸¸æˆç»“æŸçŠ¶æ€: æ˜¾ç¤ºåˆ†æ•°, ç­‰å¾…æ‰‹åŠ¿ ---- */
     if (g_state == TETRIS_STATE_OVER) {
         TouchState ts;
         Touch_Scan(&ts);
@@ -1099,7 +1092,7 @@ uint8_t tetris_update(void)
             g_touch_start_x = ts.x;
             g_touch_start_y = ts.y;
             if (ts.y <= 210)
-                g_menu_cooldown = 0;  /* ½öÔÚ·ÇÉÏ»®ÇøÇåÀäÈ´£¬·ÀÖ¹È¡ÏûºóÖØ´¥·¢ */
+                g_menu_cooldown = 0;  /* ä»…åœ¨éä¸Šåˆ’åŒºæ¸…å†·å´ï¼Œé˜²æ­¢å–æ¶ˆåé‡è§¦å‘ */
         }
         else if (ts.pressed && g_touch_down
                  && g_touch_start_y < MENU_SWIPE_START_Y) {
@@ -1134,7 +1127,7 @@ uint8_t tetris_update(void)
             g_touch_down = 0;
             int16_t dy = (int16_t)ts.y - (int16_t)g_touch_start_y;
 
-            /* µ×²¿ÉÏ»¬ ¡ú ÖØ¿ª */
+            /* åº•éƒ¨ä¸Šæ»‘ â†’ é‡å¼€ */
             if (g_touch_start_y > 210 && dy < -SWIPE_THRESH) {
                 g_state_before_menu = TETRIS_STATE_OVER;
                 g_state = TETRIS_STATE_RESTART_MENU;
@@ -1146,7 +1139,7 @@ uint8_t tetris_update(void)
                     g_restart_slide_y = RESTART_MENU_Y + RESTART_MENU_RELEASE_GAP;
                 return GAME_RET_INTERACT;
             }
-            /* ¶¥²¿ÏÂ»¬ ¡ú ÍË³ö */
+            /* é¡¶éƒ¨ä¸‹æ»‘ â†’ é€€å‡º */
             if (g_touch_start_y < MENU_SWIPE_START_Y
                 && dy >= MENU_SWIPE_COMMIT_DIST) {
                 g_state_before_menu = TETRIS_STATE_OVER;
@@ -1161,7 +1154,7 @@ uint8_t tetris_update(void)
         goto render_only;
     }
 
-    /* ---- Õı³£ÓÎÏ·: ´¥ÃşÊÖÊÆ + ×Ô¶¯ÏÂÂä ---- */
+    /* ---- æ­£å¸¸æ¸¸æˆ: è§¦æ‘¸æ‰‹åŠ¿ + è‡ªåŠ¨ä¸‹è½ ---- */
     TouchState ts;
     Touch_Scan(&ts);
 
@@ -1178,9 +1171,9 @@ uint8_t tetris_update(void)
         g_touch_start_x = ts.x;
         g_touch_start_y = ts.y;
         if (ts.y <= 210)
-            g_menu_cooldown = 0;  /* ½öÔÚ·ÇÉÏ»®ÇøÇåÀäÈ´£¬·ÀÖ¹È¡ÏûºóÖØ´¥·¢ */
+            g_menu_cooldown = 0;  /* ä»…åœ¨éä¸Šåˆ’åŒºæ¸…å†·å´ï¼Œé˜²æ­¢å–æ¶ˆåé‡è§¦å‘ */
 
-        /* ´¥Ãş·ÖÇø: ×óÓÒ¹á´©ÉÏÖĞ¶Î, ÖĞ¼äĞı×ª(ËÉ¿ª´¥·¢), ÏÂ¶ÎÓ²½µ */
+        /* è§¦æ‘¸åˆ†åŒº: å·¦å³è´¯ç©¿ä¸Šä¸­æ®µ, ä¸­é—´æ—‹è½¬(æ¾å¼€è§¦å‘), ä¸‹æ®µç¡¬é™ */
         if (g_menu_cooldown == 0 && g_state == TETRIS_STATE_PLAYING
             && ts.y >= 20 && ts.y < 180) {
             int8_t dir = 0;
@@ -1201,7 +1194,7 @@ uint8_t tetris_update(void)
         }
     }
     else if (ts.pressed && g_touch_down && g_hold_zone && g_state == TETRIS_STATE_PLAYING) {
-        /* ³¤°´ÖØ¸´: ³ÖĞøÒÆ¶¯ (ÕæÊµÊ±¼ä½ÚÅÄ, ÓëÖ¡ÂÊÎŞ¹Ø) */
+        /* é•¿æŒ‰é‡å¤: æŒç»­ç§»åŠ¨ (çœŸå®æ—¶é—´èŠ‚æ‹, ä¸å¸§ç‡æ— å…³) */
         if (g_hold_timer > 0) {
             uint32_t now_us = GetTimerCount();
             uint32_t elapsed = (uint32_t)(now_us - g_hold_last_us);
@@ -1220,16 +1213,16 @@ uint8_t tetris_update(void)
             interacted = 1;
         }
     }
-    /* ¶¥²¿ÏÂ»¬: ½øÈëÍË³ö²Ëµ¥ÍÏ×§ */
+    /* é¡¶éƒ¨ä¸‹æ»‘: è¿›å…¥é€€å‡ºèœå•æ‹–æ‹½ */
     if (game_menu_enter_exit_drag(&ts, (uint8_t *)&g_state,
                                    TETRIS_STATE_PLAYING, TETRIS_STATE_EXIT_MENU))
         return 0;
-    /* µ×²¿ÉÏ»®: ½øÈëÖØĞÂ¿ªÊ¼²Ëµ¥ÍÏ×§ */
+    /* åº•éƒ¨ä¸Šåˆ’: è¿›å…¥é‡æ–°å¼€å§‹èœå•æ‹–æ‹½ */
     if (game_menu_enter_restart_drag(&ts, (uint8_t *)&g_state,
                                       TETRIS_STATE_PLAYING, TETRIS_STATE_RESTART_MENU, 210))
         return 0;
 
-    /* ÊÍ·Å·À¶¶: Á¬¶ª1Ö¡²ÅÈ·ÈÏËÉ¿ª, ·ÀÖ¹´¥ÃşIC¿ìËÙ»¬¶¯Ê±Å¼·¢¶ªÖ¡ */
+    /* é‡Šæ”¾é˜²æŠ–: è¿ä¸¢1å¸§æ‰ç¡®è®¤æ¾å¼€, é˜²æ­¢è§¦æ‘¸ICå¿«é€Ÿæ»‘åŠ¨æ—¶å¶å‘ä¸¢å¸§ */
     {
         static uint8_t rel_db = 0;
         if (ts.pressed) { rel_db = 0; }
@@ -1238,7 +1231,7 @@ uint8_t tetris_update(void)
     }
     if (!ts.pressed && g_touch_down) {
         g_touch_down = 0;
-        /* ²Ëµ¥·´Ïò»¬¹Ø±ÕºóµÄËÉÊÖ²»´«ÈëÓÎÏ·: Ö»ÎüÊÕ±¾´Î±ÕºÏÊÖÊÆµÄËÉÊÖ, ÏÂ´Î°´ÏÂ¼´²Ù×÷ÓÎÏ· */
+        /* èœå•åå‘æ»‘å…³é—­åçš„æ¾æ‰‹ä¸ä¼ å…¥æ¸¸æˆ: åªå¸æ”¶æœ¬æ¬¡é—­åˆæ‰‹åŠ¿çš„æ¾æ‰‹, ä¸‹æ¬¡æŒ‰ä¸‹å³æ“ä½œæ¸¸æˆ */
         if (g_game_consume_release) {
             g_game_consume_release = 0;
             return GAME_RET_NONE;
@@ -1251,11 +1244,11 @@ uint8_t tetris_update(void)
         int16_t adx = (dx < 0) ? -dx : dx;
         int16_t ady = (dy < 0) ? -dy : dy;
 
-        /* ¶¥²¿ÏÂ»¬ËÉÊÖ: Ìá½»ÍË³ö²Ëµ¥ */
+        /* é¡¶éƒ¨ä¸‹æ»‘æ¾æ‰‹: æäº¤é€€å‡ºèœå• */
         if (game_menu_commit_exit(dy, (uint8_t *)&g_state, TETRIS_STATE_EXIT_MENU))
             return GAME_RET_INTERACT;
 
-        /* µ×²¿ÉÏ»®ËÉÊÖ: Ìá½»ÖØĞÂ¿ªÊ¼²Ëµ¥ */
+        /* åº•éƒ¨ä¸Šåˆ’æ¾æ‰‹: æäº¤é‡æ–°å¼€å§‹èœå• */
         if (game_menu_commit_restart(dy, (uint8_t *)&g_state,
                                       TETRIS_STATE_RESTART_MENU, 210, 25))
             return GAME_RET_INTERACT;
@@ -1280,7 +1273,7 @@ uint8_t tetris_update(void)
     }
     g_prev_pressed = ts.pressed;
 
-    /* ---- ÏûĞĞ¶¯»­×´Ì¬»ú (Ëø¶¨Ê±´¥·¢) ---- */
+    /* ---- æ¶ˆè¡ŒåŠ¨ç”»çŠ¶æ€æœº (é”å®šæ—¶è§¦å‘) ---- */
     if (g_clear_flash > 0) {
         if (g_flash_hold > 0) {
             uint32_t now_us = GetTimerCount();
@@ -1297,15 +1290,15 @@ uint8_t tetris_update(void)
             g_flash_last_us = GetTimerCount();
             g_clear_flash--;
         }
-        g_board_dirty = 1;  /* Ç¿ÖÆË¢ĞÂ, ÉÁË¸»­·ù³ÖĞø */
+        g_board_dirty = 1;  /* å¼ºåˆ¶åˆ·æ–°, é—ªçƒç”»å¹…æŒç»­ */
         if (g_clear_flash == 0) {
-            /* ÉÁË¸½áÊø, ÕæÕıÖ´ĞĞÏûĞĞ²¢Éú³ÉĞÂ·½¿é */
+            /* é—ªçƒç»“æŸ, çœŸæ­£æ‰§è¡Œæ¶ˆè¡Œå¹¶ç”Ÿæˆæ–°æ–¹å— */
             uint8_t cleared = clear_lines();
             if (cleared > 0) {
                 g_lines += cleared;
                 static const uint16_t line_scores[] = {0, 100, 300, 500, 800};
                 if (cleared <= 4) g_score += line_scores[cleared];
-                /* ¼Ó·Ö: ĞĞÔ½¸ß·ÖÔ½¶à */
+                /* åŠ åˆ†: è¡Œè¶Šé«˜åˆ†è¶Šå¤š */
                 {
                     uint8_t r;
                     for (r = 0; r < BOARD_ROWS; r++) {
@@ -1320,15 +1313,15 @@ uint8_t tetris_update(void)
                 }
             }
             spawn_piece();
-            g_board_dirty = 2;  /* ÏûĞĞºóÈ«Á¿Ë¢ĞÂ */
+            g_board_dirty = 2;  /* æ¶ˆè¡Œåå…¨é‡åˆ·æ–° */
         }
     }
 
-    /* ---- ×Ô¶¯ÏÂÂä (Ëø¶¨Ç°´¦Àí, ÕæÊµÊ±¼ä½ÚÅÄ, ÓëÖ¡ÂÊÎŞ¹Ø) ---- */
+    /* ---- è‡ªåŠ¨ä¸‹è½ (é”å®šå‰å¤„ç†, çœŸå®æ—¶é—´èŠ‚æ‹, ä¸å¸§ç‡æ— å…³) ---- */
     if (g_state == TETRIS_STATE_PLAYING) {
         uint32_t now_us = GetTimerCount();
         uint32_t elapsed = (uint32_t)(now_us - g_drop_last_us);
-        g_drop_last_us = now_us;   /* ÉÁË¸/ÔİÍ£ÆÚÒ²ÍÆ½ø»ù×¼, ·ÀÉÁË¸½áÊøºóÖèÔö¸²¸ÇÈ«Á¿Ë¢ĞÂ */
+        g_drop_last_us = now_us;   /* é—ªçƒ/æš‚åœæœŸä¹Ÿæ¨è¿›åŸºå‡†, é˜²é—ªçƒç»“æŸåéª¤å¢è¦†ç›–å…¨é‡åˆ·æ–° */
         if (g_clear_flash == 0) {
             g_drop_timer += elapsed;
             if (g_drop_timer >= (uint32_t)g_drop_interval * FRAME_US) {
@@ -1337,9 +1330,9 @@ uint8_t tetris_update(void)
                 if (!collides(g_piece_type, g_piece_rot, g_piece_x, g_piece_y + 1)) {
                     g_piece_y++;
                     g_board_dirty = 1;
-                    g_lock_delay = 0;   /* ÏÂÂä³É¹¦, ÖØÖÃËø¶¨¼ÆÊ± */
+                    g_lock_delay = 0;   /* ä¸‹è½æˆåŠŸ, é‡ç½®é”å®šè®¡æ—¶ */
                 } else if (g_lock_delay == 0) {
-                    /* ÏÂÂäÊ§°Ü, ¿ªÊ¼Ëø¶¨ÑÓ³Ù */
+                    /* ä¸‹è½å¤±è´¥, å¼€å§‹é”å®šå»¶è¿Ÿ */
                     g_lock_delay = (uint32_t)LOCK_DELAY_FRAMES * FRAME_US;
                     g_lock_last_us = GetTimerCount();
                 }
@@ -1347,9 +1340,9 @@ uint8_t tetris_update(void)
         }
     }
 
-    /* ---- Ëø¶¨ÑÓ³Ùµ¹¼ÆÊ± (ÕæÊµÊ±¼ä½ÚÅÄ, ÓëÖ¡ÂÊÎŞ¹Ø) ---- */
+    /* ---- é”å®šå»¶è¿Ÿå€’è®¡æ—¶ (çœŸå®æ—¶é—´èŠ‚æ‹, ä¸å¸§ç‡æ— å…³) ---- */
     if (g_lock_delay > 0 && g_state == TETRIS_STATE_PLAYING && g_clear_flash == 0) {
-        /* Ã¿´ÎÒÆ¶¯/Ğı×ª»áÖØÖÃËø¶¨ÑÓ³Ù (·ÀÖ¹Îó´¥Ç½±Ú/ÂäÏÂ¹ı¿ì) */
+        /* æ¯æ¬¡ç§»åŠ¨/æ—‹è½¬ä¼šé‡ç½®é”å®šå»¶è¿Ÿ (é˜²æ­¢è¯¯è§¦å¢™å£/è½ä¸‹è¿‡å¿«) */
         if (!collides(g_piece_type, g_piece_rot, g_piece_x, g_piece_y + 1)) {
             g_lock_delay = 0;
         } else {
@@ -1362,16 +1355,16 @@ uint8_t tetris_update(void)
                 g_lock_delay -= elapsed;
             }
             if (g_lock_delay == 0) {
-                /* ÑÓ³Ùµ½ÆÚ, Ëø¶¨ */
+                /* å»¶è¿Ÿåˆ°æœŸ, é”å®š */
                 lock_piece();
 
-                /* »Ö¸´Ô­Ê¼ÏÂÂäËÙ¶È */
+                /* æ¢å¤åŸå§‹ä¸‹è½é€Ÿåº¦ */
                 if (g_saved_interval) {
                     g_drop_interval = g_saved_interval;
                     g_saved_interval = 0;
                 }
 
-                /* ¼ì²éÂúĞĞ */
+                /* æ£€æŸ¥æ»¡è¡Œ */
                 {
                     int8_t r;
                     g_clear_mask = 0;
@@ -1391,16 +1384,16 @@ uint8_t tetris_update(void)
                     g_flash_last_us = GetTimerCount();
                     g_board_dirty = 2;
                 } else {
-                    /* ÎŞÂúĞĞ: Ëø¶¨ºóÖ±½ÓÉú³ÉĞÂ·½¿é, ²»´¥·¢ÏûĞĞ¶¯»­ */
+                    /* æ— æ»¡è¡Œ: é”å®šåç›´æ¥ç”Ÿæˆæ–°æ–¹å—, ä¸è§¦å‘æ¶ˆè¡ŒåŠ¨ç”» */
                     spawn_piece();
                     g_board_dirty = 1;
                 }
             }
         }
     }
-    /* ---- äÖÈ¾ ---- */
+    /* ---- æ¸²æŸ“ ---- */
     if (g_board_dirty) {
-        Main_ClearLowBattSaveFlag();  /* ÆåÅÌÓĞ±ä»¯Ê±Çå³ıµÍµçÁ¿±£´æ±êÖ¾ */
+        Main_ClearLowBattSaveFlag();  /* æ£‹ç›˜æœ‰å˜åŒ–æ—¶æ¸…é™¤ä½ç”µé‡ä¿å­˜æ ‡å¿— */
         draw_board();
         draw_score_area();
         g_board_dirty = 0;

@@ -1,110 +1,117 @@
 /**
  * @file    d2048.c
- * @brief   2048 ÓÎÏ·Ä£¿é
- *          4x4 Íø¸ñ»¬¶¯, Êı×ÖºÏ²¢, ´¥ÃşÊÖÊÆ»¬¶¯¿ØÖÆ
+ * @brief   2048 æ¸¸æˆæ¨¡å—
+ *          4x4 ç½‘æ ¼æ»‘åŠ¨, æ•°å­—åˆå¹¶, è§¦æ‘¸æ‰‹åŠ¿æ»‘åŠ¨æ§åˆ¶
  */
 #include "d2048.h"
-#include "tetris.h"        /* GAME_RET_* */
-#include "menu.h"          /* ²Ëµ¥/ÍË³ö/ÖØ¿ª */
-#include "sok_img_win.h"   /* sok_draw_digit_16x32 */
-#include "flash_store.h"   /* ×Ö¿â×ÊÔ´´ÓÍâ²¿Flash¶ÁÈ¡ */
+#include "tetris.h"        /* æ¸¸æˆè¿”å›ç  */
+#include "menu.h"          /* èœå•/é€€å‡º/é‡å¼€ */
+#include "sok_img_win.h"   /* 16x32 æ•°å­—å­—æ¨¡ */
+#include "flash_store.h"   /* å­—åº“èµ„æºä»å¤–éƒ¨Flashè¯»å– */
 #include "lcd.h"
 #include "display.h"
 #include "touch.h"
 #include "string.h"
 
-/* ================================================================
- *  ¸ñ×ÓÑÕÉ«±í (Ö¸Êı2¶ÔÓ¦Ë÷Òı1)
- * ================================================================ */
+ /* æ ¼å­é¢œè‰²è¡¨ (æŒ‡æ•°2å¯¹åº”ç´¢å¼•1) */
 static const uint16_t tile_colors[] = {
-    0,              /* 0 (¿Õ) */
-    0xFF9A,         /* 2   - Å¯»ÆÉ« (248,242,215) */
-    0xF735,         /* 4   - Ç³³ÈÉ« (245,228,175) */
-    0xF64F,         /* 8   - ³ÈÉ«   (240,202,122) */
-    0xED4A,         /* 16  - Éî³È   (232,168,84)  */
-    0xDC09,         /* 32  - ×Ø³ÈÉ« (218,130,76)  */
-    0xCB0A,         /* 64  - ºì×ØÉ« (200,98,82)   */
-    0xAA8D,         /* 128 - ×ÏºìÉ« (174,82,110)  */
-    0x9250,         /* 256 - ×ÏÉ«   (144,74,133)  */
-    0x6A52,         /* 512 - Éî×ÏÉ« (108,72,146)  */
-    0x4AB3,         /* 1024- À¶×ÏÉ«   (72,86,156)   */
-    0x2B74,         /* 2048- À¶É«   (46,110,162)  */
-    0x2453,         /* 4096- ÇàÀ¶É« (34,138,154)  */
-    0x2510,         /* 8192- ÇàÂÌÉ« (32,162,134)  */
-    0x258D,         /* 16384-ÂÌÉ«   (36,178,104)  */
-    0x2DC9,         /* 32768-»ÆÂÌÉ« (44,186,72)   */
+    0,              /* 0 (ç©º) */
+    0xFF9A,         /* 2   - æš–é»„è‰² (248,242,215) */
+    0xF735,         /* 4   - æµ…æ©™è‰² (245,228,175) */
+    0xF64F,         /* 8   - æ©™è‰²   (240,202,122) */
+    0xED4A,         /* 16  - æ·±æ©™   (232,168,84)  */
+    0xDC09,         /* 32  - æ£•æ©™è‰² (218,130,76)  */
+    0xCB0A,         /* 64  - çº¢æ£•è‰² (200,98,82)   */
+    0xAA8D,         /* 128 - ç´«çº¢è‰² (174,82,110)  */
+    0x9250,         /* 256 - ç´«è‰²   (144,74,133)  */
+    0x6A52,         /* 512 - æ·±ç´«è‰² (108,72,146)  */
+    0x4AB3,         /* 1024- è“ç´«è‰²   (72,86,156)   */
+    0x2B74,         /* 2048- è“è‰²   (46,110,162)  */
+    0x2453,         /* 4096- é’è“è‰² (34,138,154)  */
+    0x2510,         /* 8192- é’ç»¿è‰² (32,162,134)  */
+    0x258D,         /* 16384-ç»¿è‰²   (36,178,104)  */
+    0x2DC9,         /* 32768-é»„ç»¿è‰² (44,186,72)   */
 };
 
-#define D2048_DEBUG  0    /* µ÷ÊÔ¿ª¹Ø: 1=ĞÂ¿éÊ¼ÖÕÉú³É×î¸ßÖµ, 0=Õı³£ */
+#define D2048_DEBUG  0        /* è°ƒè¯•å¼€å…³: 1=æ–°å—å§‹ç»ˆç”Ÿæˆæœ€é«˜å€¼, 0=æ­£å¸¸ */
+#define D2048_SAVE_LEN  37    /* å­˜æ¡£ç¼“å†²é•¿åº¦: ç½‘æ ¼32 + åˆ†æ•°4 + çŠ¶æ€1 = 37 */
 
-/* ================================================================
- *  ÓÎÏ·×´Ì¬
- * ================================================================ */
-static uint16_t g_grid[16];         /* 4x4 ÓÎÏ·¸ñ×Ó: grid[r*4+c] */
-static uint16_t g_prev_grid[16];    /* ÉÏÒ»Ö¡¸ñ×Ó¿ìÕÕ, ÓÃÓÚÔöÁ¿»æÖÆ */
+/* æ¸¸æˆçŠ¶æ€ */
+static uint16_t g_grid[16];         /* 4x4 æ¸¸æˆæ ¼å­: grid[r*4+c] */
+static uint16_t g_prev_grid[16];    /* ä¸Šä¸€å¸§æ ¼å­å¿«ç…§, ç”¨äºå¢é‡ç»˜åˆ¶ */
 static uint32_t g_score;
 static D2048State g_state;
-static uint8_t  g_grid_dirty;       /* ¸ñ×ÓÔà±ê¼Ç */
-static uint8_t  g_full_redraw;      /* È«ÆÁÖØ»æ/µç³ØÉÁÃğºóÔà±ê¼Ç */
+static uint8_t  g_grid_dirty;       /* æ ¼å­è„æ ‡è®° */
+static uint8_t  g_full_redraw;      /* å…¨å±é‡ç»˜/ç”µæ± é—ªç­åè„æ ‡è®° */
 
-/* ´¥Ãş×´Ì¬: g_touch_start_x / g_prev_pressed ÌáÉıÎª menu.c ¹²ÏíÈ«¾Ö */
+/* è§¦æ‘¸çŠ¶æ€: g_touch_start_x / g_prev_pressed æå‡ä¸º menu.c å…±äº«å…¨å±€ */
 
-/* ÏÂ»®²Ëµ¥ÓÎÏ·Ó³Éä (Ë³Ğò: ÊÓÆµ/ÍÆÏä×Ó/¶íÂŞË¹·½¿é/»ªÈİµÀ) */
+/* ä¸‹åˆ’èœå•æ¸¸æˆæ˜ å°„ (é¡ºåº: è§†é¢‘/æ¨ç®±å­/ä¿„ç½—æ–¯æ–¹å—/åå®¹é“) */
 static const uint8_t d2048_exit_map[5] = {
     EXIT_RET_VIDEO, EXIT_RET_SOKOBAN, EXIT_RET_TETRIS, EXIT_RET_KLOTSKI, EXIT_RET_FISH
 };
 
-#define SWIPE_THRESH  10   /* »¬¶¯×îĞ¡ãĞÖµ */
+#define SWIPE_THRESH  10   /* æ»‘åŠ¨æœ€å°é˜ˆå€¼ */
 
-/* ÍË³ö²Ëµ¥ĞĞÀàĞÍ (ÊÓÆµ/ÍÆÏä×Ó/¶íÂŞË¹·½¿é/»ªÈİµÀ/·µ»Ø) */
+/* é€€å‡ºèœå•è¡Œç±»å‹ (è§†é¢‘/æ¨ç®±å­/ä¿„ç½—æ–¯æ–¹å—/åå®¹é“/è¿”å›) */
 static const uint8_t d2048_row_types[5] = {
     MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH
 };
 
-/* ================================================================
- *  ¸ù¾İÊıÖµ»ñÈ¡ÑÕÉ«Ë÷Òı (2¡ú1, 4¡ú2, 8¡ú3, ...)
- * ================================================================ */
-static uint8_t get_color_idx(uint16_t val)
-{
+/**
+ * @brief  æ ¹æ®æ•°å€¼è·å–é¢œè‰²ç´¢å¼• (2â†’1, 4â†’2, 8â†’3, ...)
+ * @param  val æ•°å€¼
+ * @return é¢œè‰²ç´¢å¼•(1~15)
+ */
+static uint8_t get_color_idx(uint16_t val) {
     uint8_t i = 0;
     uint16_t v = 1;
     while (v < val && i < 15) { v <<= 1; i++; }
     return (i <= 15) ? i : 15;
 }
 
-/* ================================================================
- *  ¸ñ×Ó×óÉÏ½Ç×ø±ê
- * ================================================================ */
-static uint16_t tile_x(uint8_t col) { return D2048_GRID_X + col * (D2048_TILE_SIZE + D2048_GAP); }
 /**
- * @brief  ĞĞºÅ×ª¸ñ×Ó¶¥²¿ Y ×ø±ê¡£
- * @param  row ĞĞºÅ(0~3)
- * @return ¸ÃĞĞ¶¥²¿ Y ÏñËØ
+ * @brief  åˆ—å·è½¬æ ¼å­å·¦ä¸Šè§’ X åæ ‡ã€‚
+ * @param  col åˆ—å·(0~3)
+ * @return è¯¥åˆ—å·¦ä¸Šè§’ X åƒç´ 
  */
-static uint16_t tile_y(uint8_t row) { return D2048_GRID_Y + row * (D2048_TILE_SIZE + D2048_GAP); }
+static uint16_t tile_x(uint8_t col) {
+    return D2048_GRID_X + col * (D2048_TILE_SIZE + D2048_GAP);
+}
 
-/* ================================================================
- *  »æÖÆ¸ñ×Ó±³¾° (º¬Ô²½ÇÊÓ¾õĞ§¹û)
- * ================================================================ */
-static void draw_tile_bg(uint8_t row, uint8_t col, uint16_t color)
-{
+/**
+ * @brief  è¡Œå·è½¬æ ¼å­é¡¶éƒ¨ Y åæ ‡ã€‚
+ * @param  row è¡Œå·(0~3)
+ * @return è¯¥è¡Œé¡¶éƒ¨ Y åƒç´ 
+ */
+static uint16_t tile_y(uint8_t row) {
+    return D2048_GRID_Y + row * (D2048_TILE_SIZE + D2048_GAP);
+}
+
+/**
+ * @brief  ç»˜åˆ¶æ ¼å­èƒŒæ™¯ (å«åœ†è§’è§†è§‰æ•ˆæœ)
+ * @param  row   è¡Œå·(0~3)
+ * @param  col   åˆ—å·(0~3)
+ * @param  color èƒŒæ™¯è‰²
+ */
+static void draw_tile_bg(uint8_t row, uint8_t col, uint16_t color) {
     uint16_t x = tile_x(col);
     uint16_t y = tile_y(row);
     LCD_Fill(x, y, x + D2048_TILE_SIZE - 1, y + D2048_TILE_SIZE - 1, color);
 }
 
-
-
-/* ================================================================
- *  »æÖÆ¸ñ×ÓÖĞµÄÊı×Ö (´óÓÚµÈÓÚ1024ÓÃ8x16Ğ¡×ÖÌå)
- * ================================================================ */
-static void draw_tile_number(uint8_t row, uint8_t col, uint16_t val)
-{
+/**
+ * @brief  ç»˜åˆ¶æ ¼å­ä¸­çš„æ•°å­— (å¤§äºç­‰äº1024ç”¨8x16å°å­—ä½“)
+ * @param  row è¡Œå·(0~3)
+ * @param  col åˆ—å·(0~3)
+ * @param  val æ•°å€¼
+ */
+static void draw_tile_number(uint8_t row, uint8_t col, uint16_t val) {
     if (val == 0) return;
 
     uint16_t text_color = (val <= 32) ? LCD_BLACK : LCD_WHITE;
 
-    /* ×ªÊı×ÖÊı×é²¢¾ÓÖĞ */
+    /* è½¬æ•°å­—æ•°ç»„å¹¶å±…ä¸­ */
     uint8_t digits[8];
     uint8_t dc = uint_to_digits(val, digits);
 
@@ -112,20 +119,21 @@ static void draw_tile_number(uint8_t row, uint8_t col, uint16_t val)
     uint8_t i;
 
     if (dc >= 4) {
-        /* 4+Î»ÊıÓÃËõ·Åµ½ÊÊÅäĞ¡×ÖÌå */
+        /* 4+ä½æ•°ç”¨ç¼©æ”¾åˆ°é€‚é…å°å­—ä½“ */
         uint8_t tw, th, gap;
-        if (dc == 4)      { tw = 9;  th = 18; gap = 1; }  /* 39px */
+        if (dc == 4) { tw = 9;  th = 18; gap = 1; }  /* 39px */
         else if (dc == 5) { tw = 7;  th = 14; gap = 1; }  /* 39px */
-        else              { tw = 6;  th = 12; gap = 0; }  /* 6Î» 36px */
+        else { tw = 6;  th = 12; gap = 0; }  /* 6ä½ 36px */
         uint16_t total_w = dc * tw + (dc - 1) * gap;
         uint16_t start_x = tile_x(col) + (D2048_TILE_SIZE - total_w) / 2;
-        uint16_t y       = tile_y(row) + (D2048_TILE_SIZE - th) / 2;
+        uint16_t y = tile_y(row) + (D2048_TILE_SIZE - th) / 2;
         for (i = 0; i < dc; i++) {
             uint8_t d = digits[dc - 1 - i];
             sok_draw_digit_scaled(start_x + i * (tw + gap), y, d, text_color, tw, th);
         }
-    } else {
-        /* 1~3Î»ÓÃ16x32´ó×ÖÌå */
+    }
+    else {
+        /* 1~3ä½ç”¨16x32å¤§å­—ä½“ */
         uint8_t  gap;
         if (dc == 1)      gap = 0;
         else if (dc == 2) gap = 16;
@@ -141,39 +149,37 @@ static void draw_tile_number(uint8_t row, uint8_t col, uint16_t val)
     LCD_CS_SET;
 }
 
-/* ================================================================
- *  »æÖÆÕû¸öÍø¸ñ (Ö»»­±ä»¯µÄ¸ñ×Ó)
- * ================================================================ */
-static void draw_grid(void)
-{
+/**
+ * @brief  ç»˜åˆ¶æ•´ä¸ªç½‘æ ¼ (åªç”»å˜åŒ–çš„æ ¼å­)
+ */
+static void draw_grid(void) {
     uint8_t r, c;
     for (r = 0; r < D2048_ROWS; r++) {
         for (c = 0; c < D2048_COLS; c++) {
             uint8_t idx = r * D2048_COLS + c;
-            if (!g_full_redraw && g_grid[idx] == g_prev_grid[idx]) continue;  /* Î´±ä»¯, Ìø¹ı */
+            if (!g_full_redraw && g_grid[idx] == g_prev_grid[idx]) continue;  /* æœªå˜åŒ–, è·³è¿‡ */
 
             uint16_t val = g_grid[idx];
             uint8_t ci = (val == 0) ? 0 : get_color_idx(val);
-            uint16_t bg = (val == 0) ? 0xCE59 : tile_colors[ci];  /* ¿Õ¸ñÓÃÇ³»ÒÉ« */
+            uint16_t bg = (val == 0) ? 0xCE59 : tile_colors[ci];  /* ç©ºæ ¼ç”¨æµ…ç°è‰² */
             draw_tile_bg(r, c, bg);
             draw_tile_number(r, c, val);
         }
     }
-    /* ¸üĞÂ¿ìÕÕ */
+    /* æ›´æ–°å¿«ç…§ */
     uint8_t i;
     for (i = 0; i < 16; i++) g_prev_grid[i] = g_grid[i];
     g_full_redraw = 0;
 }
 
-/* ================================================================
- *  »æÖÆ·ÖÊı
- * ================================================================ */
-static void draw_score(void)
-{
-    /* "SCORE:" ±êÌâÒÑÔÚ³õÊ¼»¯Ê±»æÖÆ, ´Ë´¦½ö¸üĞÂÊı×Ö */
+/**
+ * @brief  ç»˜åˆ¶åˆ†æ•°
+ */
+static void draw_score(void) {
+    /* "SCORE:" æ ‡é¢˜å·²åœ¨åˆå§‹åŒ–æ—¶ç»˜åˆ¶, æ­¤å¤„ä»…æ›´æ–°æ•°å­— */
     LCD_Fill(0, 0, 239, D2048_GRID_Y - 1, LCD_BLACK);
 
-    /* ÓÒ¶ÔÆë»æÖÆ·ÖÊıÊı×Ö */
+    /* å³å¯¹é½ç»˜åˆ¶åˆ†æ•°æ•°å­— */
     uint8_t digits[8];
     uint8_t dc = uint_to_digits(g_score, digits);
 
@@ -190,11 +196,10 @@ static void draw_score(void)
     LCD_CS_SET;
 }
 
-/* ================================================================
- *  Ëæ»úÉú³ÉÒ»¸öĞÂ·½¿é (2: 90%, 4: 10%)
- * ================================================================ */
-static void spawn_tile(void)
-{
+/**
+ * @brief  éšæœºç”Ÿæˆä¸€ä¸ªæ–°æ–¹å— (2: 90%, 4: 10%)
+ */
+static void spawn_tile(void) {
     uint8_t empties[16];
     uint8_t ec = 0;
     uint8_t i;
@@ -216,26 +221,26 @@ static void spawn_tile(void)
 #endif
 }
 
-/* ================================================================
- *  µ¥ĞĞ»¬¶¯ºÏ²¢ (´ÓstartÏòend·½Ïò)
- *  ·µ»Ø1±íÊ¾ÓĞ±ä»¯
- * ================================================================ */
-static uint8_t slide_row(uint16_t row[4])
-{
+/**
+ * @brief  å•è¡Œæ»‘åŠ¨åˆå¹¶ (ä»startå‘endæ–¹å‘)
+ * @param  row ä¸€è¡Œ4æ ¼æ•°æ®
+ * @return 1=æœ‰å˜åŒ–, 0=æ— 
+ */
+static uint8_t slide_row(uint16_t row[4]) {
     uint8_t moved = 0;
     int8_t i, j;
 
-    /* µÚÒ»²½: È¥³ı0 */
-    uint16_t tmp[4] = {0};
+    /* ç¬¬ä¸€æ­¥: å»é™¤0 */
+    uint16_t tmp[4] = { 0 };
     j = 0;
     for (i = 0; i < 4; i++) {
         if (row[i] != 0) { tmp[j++] = row[i]; }
     }
     if (j == 0) return 0;
 
-    /* µÚ¶ş²½: ºÏ²¢ */
-    uint16_t merged[4] = {0};
-    uint8_t merged_flags[4] = {0};
+    /* ç¬¬äºŒæ­¥: åˆå¹¶ */
+    uint16_t merged[4] = { 0 };
+    uint8_t merged_flags[4] = { 0 };
     uint8_t k = 0;
     for (i = 0; i < j; i++) {
         if (i < j - 1 && tmp[i] == tmp[i + 1] && !merged_flags[i]) {
@@ -246,12 +251,13 @@ static uint8_t slide_row(uint16_t row[4])
             k++;
             i++;  /* skip next */
             moved = 1;
-        } else if (!merged_flags[i]) {
+        }
+        else if (!merged_flags[i]) {
             merged[k++] = tmp[i];
         }
     }
 
-    /* ±È½ÏÊÇ·ñ±ä»¯ */
+    /* æ¯”è¾ƒæ˜¯å¦å˜åŒ– */
     for (i = 0; i < 4; i++) {
         if (row[i] != merged[i]) moved = 1;
     }
@@ -260,56 +266,60 @@ static uint8_t slide_row(uint16_t row[4])
     return moved;
 }
 
-/* ================================================================
- *  °´·½ÏòÌáÈ¡Ò»ĞĞ (´¦Àí4¸ö·½ÏòµÄ·­×ª)
- * ================================================================ */
-static void get_row(uint8_t idx, uint16_t row[4], uint8_t dir)
-{
+/**
+ * @brief  æŒ‰æ–¹å‘æå–ä¸€è¡Œ (å¤„ç†4ä¸ªæ–¹å‘çš„ç¿»è½¬)
+ * @param  idx è¡Œ/åˆ—ç´¢å¼•
+ * @param  row è¾“å‡ºç¼“å†²
+ * @param  dir æ–¹å‘(0=å·¦ 1=å³ 2=ä¸Š 3=ä¸‹)
+ */
+static void get_row(uint8_t idx, uint16_t row[4], uint8_t dir) {
     uint8_t i;
     switch (dir) {
-    case 0: /* LEFT: ´Ó×óµ½ÓÒ */
+    case 0: /* LEFT: ä»å·¦åˆ°å³ */
         for (i = 0; i < 4; i++) row[i] = g_grid[idx * 4 + i];
         break;
-    case 1: /* RIGHT: ´ÓÓÒµ½×ó, ·­×ª¶ÁÈ¡ */
+    case 1: /* RIGHT: ä»å³åˆ°å·¦, ç¿»è½¬è¯»å– */
         for (i = 0; i < 4; i++) row[i] = g_grid[idx * 4 + 3 - i];
         break;
-    case 2: /* UP: ´ÓÉÏµ½ÏÂ */
+    case 2: /* UP: ä»ä¸Šåˆ°ä¸‹ */
         for (i = 0; i < 4; i++) row[i] = g_grid[i * 4 + idx];
         break;
-    case 3: /* DOWN: ´ÓÏÂµ½ÉÏ, ·­×ª¶ÁÈ¡ */
+    case 3: /* DOWN: ä»ä¸‹åˆ°ä¸Š, ç¿»è½¬è¯»å– */
         for (i = 0; i < 4; i++) row[i] = g_grid[(3 - i) * 4 + idx];
         break;
     }
 }
 
-/* ================================================================
- *  °´·½ÏòĞ´»ØÒ»ĞĞ
- * ================================================================ */
-static void set_row(uint8_t idx, uint16_t row[4], uint8_t dir)
-{
+/**
+ * @brief  æŒ‰æ–¹å‘å†™å›ä¸€è¡Œ
+ * @param  idx è¡Œ/åˆ—ç´¢å¼•
+ * @param  row ä¸€è¡Œ4æ ¼æ•°æ®
+ * @param  dir æ–¹å‘(0=å·¦ 1=å³ 2=ä¸Š 3=ä¸‹)
+ */
+static void set_row(uint8_t idx, uint16_t row[4], uint8_t dir) {
     uint8_t i;
     switch (dir) {
     case 0: /* LEFT */
         for (i = 0; i < 4; i++) g_grid[idx * 4 + i] = row[i];
         break;
-    case 1: /* RIGHT: ·­×ªĞ´»Ø */
+    case 1: /* RIGHT: ç¿»è½¬å†™å› */
         for (i = 0; i < 4; i++) g_grid[idx * 4 + 3 - i] = row[i];
         break;
     case 2: /* UP */
         for (i = 0; i < 4; i++) g_grid[i * 4 + idx] = row[i];
         break;
-    case 3: /* DOWN: ·­×ªĞ´»Ø */
+    case 3: /* DOWN: ç¿»è½¬å†™å› */
         for (i = 0; i < 4; i++) g_grid[(3 - i) * 4 + idx] = row[i];
         break;
     }
 }
 
-/* ================================================================
- *  Ö´ĞĞÒÆ¶¯ (dir: 0=×ó, 1=ÓÒ, 2=ÉÏ, 3=ÏÂ)
- *  ·µ»Ø1±íÊ¾ÓĞ±ä»¯
- * ================================================================ */
-static uint8_t do_move(uint8_t dir)
-{
+/**
+ * @brief  æ‰§è¡Œç§»åŠ¨ (dir: 0=å·¦, 1=å³, 2=ä¸Š, 3=ä¸‹)
+ * @param  dir æ–¹å‘
+ * @return 1=æœ‰å˜åŒ–, 0=æ— 
+ */
+static uint8_t do_move(uint8_t dir) {
     uint8_t moved = 0;
     uint8_t i;
     for (i = 0; i < 4; i++) {
@@ -321,40 +331,40 @@ static uint8_t do_move(uint8_t dir)
     return moved;
 }
 
-/* ================================================================
- *  ¼ì²éÊÇ·ñ»¹ÓĞ¿ÉÓÃÒÆ¶¯
- * ================================================================ */
-static uint8_t can_move(void)
-{
+/**
+ * @brief  æ£€æŸ¥æ˜¯å¦è¿˜æœ‰å¯ç”¨ç§»åŠ¨
+ * @return 1=ä»æœ‰å¯ç”¨ç§»åŠ¨, 0=æ— æ³•å†ç§»åŠ¨
+ */
+static uint8_t can_move(void) {
     uint8_t r, c;
     for (r = 0; r < 4; r++) {
         for (c = 0; c < 4; c++) {
-            if (g_grid[r * 4 + c] == 0) return 1;  /* ÓĞ¿ÕÎ» */
-            if (c < 3 && g_grid[r * 4 + c] == g_grid[r * 4 + c + 1]) return 1;  /* ºáÏò¿ÉºÏ²¢ */
-            if (r < 3 && g_grid[r * 4 + c] == g_grid[(r + 1) * 4 + c]) return 1;  /* ×İÏò¿ÉºÏ²¢ */
+            if (g_grid[r * 4 + c] == 0) return 1;  /* æœ‰ç©ºä½ */
+            if (c < 3 && g_grid[r * 4 + c] == g_grid[r * 4 + c + 1]) return 1;  /* æ¨ªå‘å¯åˆå¹¶ */
+            if (r < 3 && g_grid[r * 4 + c] == g_grid[(r + 1) * 4 + c]) return 1;  /* çºµå‘å¯åˆå¹¶ */
         }
     }
     return 0;
 }
 
-/* ================================================================
- *  »¬¶¯·½Ïò¼ì²â
- * ================================================================ */
-static uint8_t detect_swipe(int16_t dx, int16_t dy)
-{
+/**
+ * @brief  æ»‘åŠ¨æ–¹å‘æ£€æµ‹
+ * @param  dx Xä½ç§»
+ * @param  dy Yä½ç§»
+ * @return 0=å·¦ 1=å³ 2=ä¸Š 3=ä¸‹, 0xFF=æ— æ•ˆ
+ */
+static uint8_t detect_swipe(int16_t dx, int16_t dy) {
     int16_t adx = (dx < 0) ? -dx : dx;
     int16_t ady = (dy < 0) ? -dy : dy;
-    if (adx < SWIPE_THRESH && ady < SWIPE_THRESH) return 0xFF;  /* ÎŞĞ§»¬¶¯ */
-    if (adx > ady) return (dx > 0) ? 1 : 0;   /* ÓÒ / ×ó */
-    else           return (dy > 0) ? 3 : 2;   /* ÏÂ / ÉÏ */
+    if (adx < SWIPE_THRESH && ady < SWIPE_THRESH) return 0xFF;  /* æ— æ•ˆæ»‘åŠ¨ */
+    if (adx > ady) return (dx > 0) ? 1 : 0;   /* å³ / å·¦ */
+    else           return (dy > 0) ? 3 : 2;   /* ä¸‹ / ä¸Š */
 }
 
-/* ================================================================
- *  Íâ²¿½Ó¿Ú
- * ================================================================ */
-
-void d2048_init(void)
-{
+/**
+ * @brief  åˆå§‹åŒ– 2048 æ¸¸æˆ (æ¸…ç©ºç½‘æ ¼/é‡ç½®çŠ¶æ€)
+ */
+void d2048_init(void) {
     uint8_t i;
     for (i = 0; i < 16; i++) { g_grid[i] = 0; g_prev_grid[i] = 0; }
     g_score = 0;
@@ -370,17 +380,16 @@ void d2048_init(void)
     g_restart_dragging = 0;
     g_restart_slide_y = RESTART_MENU_Y + RESTART_MENU_H;
 
-    /* ¿ª¾ÖÉú³É2¸ö·½¿é */
+    /* å¼€å±€ç”Ÿæˆ2ä¸ªæ–¹å— */
     spawn_tile();
     spawn_tile();
 }
-/**
- * @brief  ÖØÖÃ´¥Ãş×´Ì¬(´ÓÆäËûÓÎÏ··µ»ØÊ±µ÷ÓÃ)¡£
- */
 
-void d2048_reset_touch(void)
-{
-    g_prev_pressed = 1;      /* ÉèÎª1·ÀÖ¹½øÈëÊ±´¥·¢ÊÍ·Å, ´ıÊ×Ö¡ÇåÁã */
+/**
+ * @brief  é‡ç½®è§¦æ‘¸çŠ¶æ€(ä»å…¶ä»–æ¸¸æˆè¿”å›æ—¶è°ƒç”¨)ã€‚
+ */
+void d2048_reset_touch(void) {
+    g_prev_pressed = 1;      /* è®¾ä¸º1é˜²æ­¢è¿›å…¥æ—¶è§¦å‘é‡Šæ”¾, å¾…é¦–å¸§æ¸…é›¶ */
     g_touch_down = 0;
     g_touch_start_x = 0;
     g_touch_start_y = 0;
@@ -388,33 +397,28 @@ void d2048_reset_touch(void)
 }
 
 /**
- * @brief  2048È«ÆÁÖØ»æ£¬ÓÃÓÚµç³ØÉÁÃğ»Ö¸´£¬±ÜÃâÈ«ÆÁLCD_FillÉÁË¸
- * @note   ÓÉ d2048_update() ÏÂÒ»Ö¡Ö´ĞĞÍêÕûgridÖØ»æÒÔ½µµÍSPIÕ¼ÓÃ
+ * @brief  2048å…¨å±é‡ç»˜ï¼Œç”¨äºç”µæ± é—ªç­æ¢å¤ï¼Œé¿å…å…¨å±LCD_Fillé—ªçƒ
+ * @note   ç”± d2048_update() ä¸‹ä¸€å¸§æ‰§è¡Œå®Œæ•´gridé‡ç»˜ä»¥é™ä½SPIå ç”¨
  */
-void d2048_full_redraw(void)
-{
+void d2048_full_redraw(void) {
     g_full_redraw = 1;
-    g_grid_dirty = 2;  /* µç³ØÉÁÃğÖØ»æ£¬Ìø¹ıÈ«ÆÁ´óÌî³ä */
+    g_grid_dirty = 2;  /* ç”µæ± é—ªç­é‡ç»˜ï¼Œè·³è¿‡å…¨å±å¤§å¡«å…… */
 }
-/**
- * @brief  ÅĞ¶Ïµ±Ç°ÊÇ·ñÏÔÊ¾²Ëµ¥(ÍË³ö/ÖØ¿ª)¡£
- * @return 1=ÓĞ²Ëµ¥, 0=ÎŞ
- */
 
-uint8_t d2048_is_menu_visible(void)
-{
+/**
+ * @brief  åˆ¤æ–­å½“å‰æ˜¯å¦æ˜¾ç¤ºèœå•(é€€å‡º/é‡å¼€)ã€‚
+ * @return 1=æœ‰èœå•, 0=æ— 
+ */
+uint8_t d2048_is_menu_visible(void) {
     return g_exit_menu_visible || g_restart_menu_visible;
 }
 
-/* Ö»»Ö¸´ÖØ¿ª²Ëµ¥ÉÏ·½/Íâ²àµÄµç³Ø²ĞÏñËØÏ¸Ìõ´ø(²»»­ÑÓÉìµ½²Ëµ¥ºóµÄÕû¸ñ, ·ñÔòÓÎÏ·Í¼
-   ÏÈÓÚ²Ëµ¥ÏÔÊ¾Ò»Ö¡ -> ÉÁ). d2048 GRID_Y=36: µç³ØÉÏ±ß¿ò y=79..80 ÂäÔÚ row0/row1
-   ·ìÏ¶(ºÚÉ«)ÉÏÎŞĞè´¦Àí; ²Ëµ¥ÉÏ·½(y<110=RESTART_MENU_Y)µç³ØÖ÷Ìå/¸ĞÌ¾ºÅÖ»Ñ¹ row1,
-   Í¹µãÑ¹ÔÚ²Ëµ¥ÓÒ²à(x=195..209, ²Ëµ¥Íâ). ¸ñ×ÓÄÚ²¿Êı×ÖÔÚÍ¸Ã÷µç³ØÌåÄÚ, ±£³ÖÍêºÃ. */
 /**
- * @brief  »Ö¸´ÖØ¿ª²Ëµ¥ÉÏ·½µÄÏ¸Ìõ´ø(²Ëµ¥¸²¸Ç y>=110 Ö®ÍâµÄÍø¸ñµ×É«)¡£
+ * @brief  æ¢å¤é‡å¼€èœå•ä¸Šæ–¹çš„ç»†æ¡å¸¦(èœå•è¦†ç›– y>=110 ä¹‹å¤–çš„ç½‘æ ¼åº•è‰²)ã€‚
+ * @note   ä¸ç”»å»¶ä¼¸åˆ°èœå•åçš„æ•´æ ¼(å¦åˆ™æ¸¸æˆå›¾å…ˆäºèœå•æ˜¾ç¤ºä¸€å¸§ä¼šé—ª); ä»…åœ¨èœå•æ¡†å¤–æ¢å¤
+ *         ç”µæ± ä¸»ä½“è¾¹æ¡†/æ„Ÿå¹å·/å‡¸ç‚¹æ‰€å‹çš„è¡Œ, ä¸é‡ç»˜æ•´æ ¼ã€‚å‡¸ç‚¹å‹åœ¨èœå•å³ä¾§(x=195..209)ã€‚
  */
-static void d2048_restore_above_menu_slivers(void)
-{
+static void d2048_restore_above_menu_slivers(void) {
     uint16_t b1[4], b23;
     uint8_t c;
     for (c = 0; c < D2048_COLS; c++) {
@@ -424,31 +428,29 @@ static void d2048_restore_above_menu_slivers(void)
     b23 = (g_grid[2 * D2048_COLS + 3] == 0)
         ? 0xCE59 : tile_colors[get_color_idx(g_grid[2 * D2048_COLS + 3])];
 
-    /* µç³ØÖ÷Ìå×ó±ß¿òÑ¹ÔÚ row1 col0 (x=45..46, y=81..109) */
+    /* ç”µæ± ä¸»ä½“å·¦è¾¹æ¡†å‹åœ¨ row1 col0 (x=45..46, y=81..109) */
     LCD_Fill(45, 81, 47, RESTART_MENU_Y, b1[0]);
-    /* µç³ØÖ÷ÌåÓÒ±ß¿òÑ¹ÔÚ row1 col3 (x=193..194, y=81..109) */
+    /* ç”µæ± ä¸»ä½“å³è¾¹æ¡†å‹åœ¨ row1 col3 (x=193..194, y=81..109) */
     LCD_Fill(193, 81, 195, RESTART_MENU_Y, b1[3]);
-    /* ¸ĞÌ¾ºÅÊúÌõ(x=111..128, y=92..109)Ñ¹ÔÚ row1 col1/col2 */
+    /* æ„Ÿå¹å·ç«–æ¡(x=111..128, y=92..109)å‹åœ¨ row1 col1/col2 */
     LCD_Fill(111, 92, 118, RESTART_MENU_Y, b1[1]);
     LCD_Fill(118, 92, 122, RESTART_MENU_Y, LCD_BLACK);
     LCD_Fill(122, 92, 129, RESTART_MENU_Y, b1[2]);
-    /* µç³ØÍ¹µã(x=195..209)ÔÚ²Ëµ¥Íâ */
+    /* ç”µæ± å‡¸ç‚¹(x=195..209)åœ¨èœå•å¤– */
     LCD_Fill(195, 104, 207, 121, b1[3]);   /* (1,3) */
-    LCD_Fill(195, 121, 207, 126, LCD_BLACK);   /* row1/row2 ·ìÏ¶ */
+    LCD_Fill(195, 121, 207, 126, LCD_BLACK);   /* row1/row2 ç¼éš™ */
     LCD_Fill(195, 126, 207, 136, b23);     /* (2,3) */
-    LCD_Fill(207, 104, 210, 136, LCD_BLACK);   /* col3 ÓÒ·ì */
+    LCD_Fill(207, 104, 210, 136, LCD_BLACK);   /* col3 å³ç¼ */
 }
 
-/* Ö»ÖØ»æÍË³ö²Ëµ¥¿òÍâÂ¶³öµÄµç³ØÇø: °´ĞĞÅĞ¶Ï, ĞĞÍêÈ«±»²Ëµ¥¿ò y ¸²¸Ç(¿òÄÚ)ÔòÖ»²¹
-   ºã¿òÍâµÄÍ¹µãÁĞ(3)(ºá¿ç²Ëµ¥ÓÒ±ß¿ò), ·ñÔòÕûĞĞÖØ»æ(º¬Í¹µã). ¿òÄÚÖ÷ÌåÓÉ²Ëµ¥¿ò¸Ç×¡,
-   ±ÜÃâÏÈÆåÅÌºó²Ëµ¥ÉÁÒ»Ö¡. */
 /**
- * @brief  »Ö¸´µç³Ø¸²¸ÇµÄÍø¸ñĞĞ(¿òÍâÂ¶³ö²¿·Ö, ¿òÄÚÓÉ²Ëµ¥¿ò¸Ç×¡)¡£
- * @param  menu_top ²Ëµ¥¿ò¶¥ Y
- * @param  menu_h   ²Ëµ¥¿ò¸ß
+ * @brief  æ¢å¤ç”µæ± è¦†ç›–çš„ç½‘æ ¼è¡Œ(æ¡†å¤–éœ²å‡ºéƒ¨åˆ†, æ¡†å†…ç”±èœå•æ¡†ç›–ä½)ã€‚
+ * @param  menu_top èœå•æ¡†é¡¶ Y
+ * @param  menu_h   èœå•æ¡†é«˜
+ * @note   è¡Œå®Œå…¨è¢«èœå•æ¡†è¦†ç›–åˆ™åªè¡¥æ’æ¡†å¤–çš„å‡¸ç‚¹åˆ—(3)(æ¨ªè·¨èœå•å³è¾¹æ¡†), å¦åˆ™æ•´è¡Œé‡ç»˜
+ *         (å«å‡¸ç‚¹). æ¡†å†…ä¸»ä½“ç”±èœå•æ¡†ç›–ä½, é¿å…å…ˆæ£‹ç›˜åèœå•é—ªä¸€å¸§ã€‚
  */
-static void d2048_restore_battery_rows(int16_t menu_top, int16_t menu_h)
-{
+static void d2048_restore_battery_rows(int16_t menu_top, int16_t menu_h) {
     int16_t menu_bot = menu_top + menu_h;
     uint8_t r;
     for (r = 1; r <= 2; r++) {
@@ -456,14 +458,15 @@ static void d2048_restore_battery_rows(int16_t menu_top, int16_t menu_h)
         uint16_t tb = ty + (uint16_t)D2048_TILE_SIZE - 1;
         uint8_t c;
         if ((int16_t)ty >= menu_top && (int16_t)tb <= menu_bot) {
-            /* ĞĞÍêÈ«ÔÚ¿òÄÚ(²Ëµ¥¸Ç×¡): Ö»²¹Í¹µãÁĞ(3) */
+            /* è¡Œå®Œå…¨åœ¨æ¡†å†…(èœå•ç›–ä½): åªè¡¥å‡¸ç‚¹åˆ—(3) */
             uint16_t val = g_grid[r * D2048_COLS + 3];
             uint8_t ci = (val == 0) ? 0 : get_color_idx(val);
             draw_tile_bg(r, 3, (val == 0) ? 0xCE59 : tile_colors[ci]);
             draw_tile_number(r, 3, val);
             g_prev_grid[r * D2048_COLS + 3] = val;
-        } else {
-            /* ¿òÍâ(ÍÏ×§ÖĞ²Ëµ¥Î´¸Ç×¡): ÕûĞĞÖØ»æ */
+        }
+        else {
+            /* æ¡†å¤–(æ‹–æ‹½ä¸­èœå•æœªç›–ä½): æ•´è¡Œé‡ç»˜ */
             for (c = 0; c < D2048_COLS; c++) {
                 uint16_t val = g_grid[r * D2048_COLS + c];
                 uint8_t ci = (val == 0) ? 0 : get_color_idx(val);
@@ -476,46 +479,44 @@ static void d2048_restore_battery_rows(int16_t menu_top, int16_t menu_h)
 }
 
 /**
- * @brief  µÍµçÍ¼±êÃğ¶Îºó»Ö¸´±»Æä¸²¸ÇµÄµ×²ãÄÚÈİ
- * @note   ²ÎÕÕÍÆÏä×ÓµÄ×ö·¨: LCD_ClearLowBatteryOverlay °ÑºìÉ«Í¼±ê(±ß¿ò+Í¹µã+¸ĞÌ¾ºÅ)
- *         Ë¢ºÚ, È»ºóÍ¬Ö¡ÖØ»­ÆäÏÂ·½ÄÚÈİ.
- *         - ²Ëµ¥¿É¼û: Á¢¼´ÖØ»­²Ëµ¥¿ò(¸Ç×¡µç³ØÖ÷ÌåÍâ¿ò+¸ĞÌ¾ºÅ), Ê¹²Ëµ¥²»ÉÁÒ»Ö¡.
- *         - µç³ØÍ¹µã(x=195..210, y=104..136)ÔÚ²Ëµ¥¿òÍâ, Ñ¹ÔÚÍø¸ñ¸ñ(1,3)/(2,3):
- *           Á¢¼´ÖØ»­ËüÃÇ, Í¹µã²»ÁôºÚ/ºì²ĞÁô.
- *         - ÏÂ»¬(ÍË³ö)²Ëµ¥¸²¸ÇÕûÆÁ¸ß, ²»Í¸Ã÷²Ëµ¥¿òÖ±½Ó¸Çµôµç³ØÖ÷Ìå/¸ĞÌ¾ºÅ, Ö»»Ö¸´
- *           Í¹µãÍø¸ñÊı¾İ(²» draw_grid ÖØ»æ, ·ñÔòµç³Ø¿òÄÚÏÈÉÁÒ»Ö¡Íø¸ñĞĞ).
- *         - ÖØ¿ª²Ëµ¥/´¿ÓÎÏ·ÖØ»æÍø¸ñ(µç³Ø¶¥²¿ÔÚÖØ¿ª²Ëµ¥ÉÏ·½¡¢ÊôÓÎÏ·Çø).
+ * @brief  ä½ç”µå›¾æ ‡ç­æ®µåæ¢å¤è¢«å…¶è¦†ç›–çš„åº•å±‚å†…å®¹
+ * @note   å‚ç…§æ¨ç®±å­çš„åšæ³•: LCD_ClearLowBatteryOverlay æŠŠçº¢è‰²å›¾æ ‡(è¾¹æ¡†+å‡¸ç‚¹+æ„Ÿå¹å·)
+ *         åˆ·é»‘, ç„¶ååŒå¸§é‡ç”»å…¶ä¸‹æ–¹å†…å®¹.
+ *         - èœå•å¯è§: ç«‹å³é‡ç”»èœå•æ¡†(ç›–ä½ç”µæ± ä¸»ä½“å¤–æ¡†+æ„Ÿå¹å·), ä½¿èœå•ä¸é—ªä¸€å¸§.
+ *         - ç”µæ± å‡¸ç‚¹(x=195..210, y=104..136)åœ¨èœå•æ¡†å¤–, å‹åœ¨ç½‘æ ¼æ ¼(1,3)/(2,3):
+ *           ç«‹å³é‡ç”»å®ƒä»¬, å‡¸ç‚¹ä¸ç•™é»‘/çº¢æ®‹ç•™.
+ *         - ä¸‹æ»‘(é€€å‡º)èœå•è¦†ç›–æ•´å±é«˜, ä¸é€æ˜èœå•æ¡†ç›´æ¥ç›–æ‰ç”µæ± ä¸»ä½“/æ„Ÿå¹å·, åªæ¢å¤
+ *           å‡¸ç‚¹ç½‘æ ¼æ•°æ®(ä¸ draw_grid é‡ç»˜, å¦åˆ™ç”µæ± æ¡†å†…å…ˆé—ªä¸€å¸§ç½‘æ ¼è¡Œ).
+ *         - é‡å¼€èœå•/çº¯æ¸¸æˆé‡ç»˜ç½‘æ ¼(ç”µæ± é¡¶éƒ¨åœ¨é‡å¼€èœå•ä¸Šæ–¹ã€å±æ¸¸æˆåŒº).
  */
-void d2048_lowbatt_restore(void)
-{
-    LCD_ClearLowBatteryOverlay();   /* Í¼±ê±ß¿ò+Í¹µã+¸ĞÌ¾ºÅ ºì¡úºÚ */
+void d2048_lowbatt_restore(void) {
+    LCD_ClearLowBatteryOverlay();   /* å›¾æ ‡è¾¹æ¡†+å‡¸ç‚¹+æ„Ÿå¹å· çº¢â†’é»‘ */
 
     if (g_exit_menu_visible) {
-        /* ÍË³ö²Ëµ¥¸²¸ÇÕûÆÁ(x=45~195): ¿òÄÚµç³ØÖ÷ÌåÓÉ²Ëµ¥¿òÖ±½Ó¸Ç×¡, ²»ÖØ»æ(±ÜÃâÏÈÆåÅÌºó²Ëµ¥ÉÁ);
-           Ö»ÖØ»æÍÏ×§ÖĞ(²Ëµ¥Î´¸Ç×¡)¿òÍâÂ¶³öµÄĞĞ + ºã¿òÍâµÄÍ¹µãÁĞ(1,3)/(2,3)(ºá¿ç²Ëµ¥ÓÒ±ß¿ò) */
+        /* é€€å‡ºèœå•è¦†ç›–æ•´å±(x=45~195): æ¡†å†…ç”µæ± ä¸»ä½“ç”±èœå•æ¡†ç›´æ¥ç›–ä½, ä¸é‡ç»˜(é¿å…å…ˆæ£‹ç›˜åèœå•é—ª);
+           åªé‡ç»˜æ‹–æ‹½ä¸­(èœå•æœªç›–ä½)æ¡†å¤–éœ²å‡ºçš„è¡Œ + æ’æ¡†å¤–çš„å‡¸ç‚¹åˆ—(1,3)/(2,3)(æ¨ªè·¨èœå•å³è¾¹æ¡†) */
         d2048_restore_battery_rows(g_exit_drag_y, MENU_H);
         menu_draw_nrow_frame_only(g_exit_drag_y, d2048_row_types, 5);
-    } else if (g_restart_menu_visible) {
-        /* ÖØ¿ª²Ëµ¥: Ö»»Ö¸´²Ëµ¥ÉÏ·½/Íâ²àµÄµç³Ø²ĞÏñËØÏ¸Ìõ´ø, ÔÙ»­²Ëµ¥¿ò(²»ÖØ»æÑÓÉìµ½
-          ²Ëµ¥ºóµÄÕû¸ñ, ·ñÔòÓÎÏ·Í¼ÏÈÓÚ²Ëµ¥ÉÁÒ»Ö¡) */
+    }
+    else if (g_restart_menu_visible) {
+        /* é‡å¼€èœå•: åªæ¢å¤èœå•ä¸Šæ–¹/å¤–ä¾§çš„ç”µæ± æ®‹åƒç´ ç»†æ¡å¸¦, å†ç”»èœå•æ¡†(ä¸é‡ç»˜å»¶ä¼¸åˆ°
+          èœå•åçš„æ•´æ ¼, å¦åˆ™æ¸¸æˆå›¾å…ˆäºèœå•é—ªä¸€å¸§) */
         d2048_restore_above_menu_slivers();
         menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
-    } else {
-        /* ´¿ÓÎÏ·: ÏÂÒ»Ö¡È«Íø¸ñÖØ»æ¸Ç×¡Í¼±ê±ß¿ò/¸ĞÌ¾ºÅ */
+    }
+    else {
+        /* çº¯æ¸¸æˆ: ä¸‹ä¸€å¸§å…¨ç½‘æ ¼é‡ç»˜ç›–ä½å›¾æ ‡è¾¹æ¡†/æ„Ÿå¹å· */
         d2048_full_redraw();
     }
 }
 
-#define D2048_SAVE_LEN  37
 /**
- * @brief  ĞòÁĞ»¯ 2048 µ±Ç°×´Ì¬µ½´æµµ»º³å¡£
- * @param  buf     Êä³ö»º³å
- * @param  max_len »º³åÉÏÏŞ
- * @return Ğ´Èë×Ö½ÚÊı
+ * @brief  åºåˆ—åŒ– 2048 å½“å‰çŠ¶æ€åˆ°å­˜æ¡£ç¼“å†²ã€‚
+ * @param  buf     è¾“å‡ºç¼“å†²
+ * @param  max_len ç¼“å†²ä¸Šé™
+ * @return å†™å…¥å­—èŠ‚æ•°
  */
-
-uint8_t d2048_save_state(uint8_t *buf, uint8_t max_len)
-{
+uint8_t d2048_save_state(uint8_t* buf, uint8_t max_len) {
     D2048State state = g_state;
 
     if (max_len < D2048_SAVE_LEN) return 0;
@@ -529,15 +530,14 @@ uint8_t d2048_save_state(uint8_t *buf, uint8_t max_len)
     buf[sizeof(g_grid) + sizeof(g_score)] = (uint8_t)state;
     return D2048_SAVE_LEN;
 }
-/**
- * @brief  ´Ó´æµµ»º³å»Ö¸´ 2048 ×´Ì¬²¢ÖØ»æ¡£
- * @param  buf ´æµµ»º³å
- * @param  len ³¤¶È
- * @return 1=³É¹¦, 0=Ê§°Ü
- */
 
-uint8_t d2048_restore_state(const uint8_t *buf, uint8_t len)
-{
+/**
+ * @brief  ä»å­˜æ¡£ç¼“å†²æ¢å¤ 2048 çŠ¶æ€å¹¶é‡ç»˜ã€‚
+ * @param  buf å­˜æ¡£ç¼“å†²
+ * @param  len é•¿åº¦
+ * @return 1=æˆåŠŸ, 0=å¤±è´¥
+ */
+uint8_t d2048_restore_state(const uint8_t* buf, uint8_t len) {
     uint8_t state;
 
     if (len != D2048_SAVE_LEN) return 0;
@@ -557,25 +557,22 @@ uint8_t d2048_restore_state(const uint8_t *buf, uint8_t len)
     return 1;
 }
 
-/* ================================================================
- *  ÅäÖÃÇı¶¯²Ëµ¥×´Ì¬»úµÄ hook (mark_dirty / bg_redraw)
- * ================================================================ */
-void d2048_menu_mark_dirty(void)   /* ¹Ø±Õ/È¡Ïû²Ëµ¥ºóĞèÖØ»æ³¡¾° */
-{
+/**
+ * @brief  å…³é—­/å–æ¶ˆèœå•åæ ‡è®°éœ€é‡ç»˜åœºæ™¯
+ */
+void d2048_menu_mark_dirty(void) {
     g_grid_dirty = 1;
     g_full_redraw = 1;
 }
 
-/* ÒÀ¾İÔà±ê¼ÇÖØ»æ²Ëµ¥±³¾°: ·µ»Ø1=±¾Ö¡ÒÑÖØ»æ */
 /**
- * @brief  ÒÀ¾İÔà±ê¼ÇÖØ»æ²Ëµ¥±³¾°(Íø¸ñ/·ÖÊı)¡£
- * @return 1=ÒÑÖØ»æ, 0=ÎŞÔà
+ * @brief  ä¾æ®è„æ ‡è®°é‡ç»˜èœå•èƒŒæ™¯(ç½‘æ ¼/åˆ†æ•°)ã€‚
+ * @return 1=å·²é‡ç»˜, 0=æ— è„
  */
-uint8_t d2048_menu_bg_redraw(void)
-{
+uint8_t d2048_menu_bg_redraw(void) {
     if (!g_grid_dirty) return 0;
     if (g_grid_dirty == 2) {
-        /* µç³ØÉÁÃğ: ½öÖØ»æµÚ2¡¢3ĞĞ(µç³ØÏÂ·½), ±ÜÃâ´óÃæ»ıLCD_FillÉÁË¸ */
+        /* ç”µæ± é—ªç­: ä»…é‡ç»˜ç¬¬2ã€3è¡Œ(ç”µæ± ä¸‹æ–¹), é¿å…å¤§é¢ç§¯LCD_Fillé—ªçƒ */
         uint8_t r, c;
         for (r = 1; r <= 2; r++) {
             for (c = 0; c < D2048_COLS; c++) {
@@ -588,11 +585,12 @@ uint8_t d2048_menu_bg_redraw(void)
                 g_prev_grid[idx] = val;
             }
         }
-    } else {
+    }
+    else {
         draw_grid();
         draw_score();
-        /* draw_score »áÕûÌõÇåºÚ¶¥²¿ÇøÓò(º¬µç³ØÍ¼±ê), ´Ë´¦ĞëÁ¢¼´ÖØ»æµç³Ø,
-          ·ñÔò²Ëµ¥·µ»Ø/ÇĞ»»Ê±µç³ØÏûÊ§ÓÖ»ØÉÁ(ÈçÖØ²ËÏÂ»¬·µ»ØÓÎÏ·ÄÇÒ»ÏÂÉÁ) */
+        /* draw_score ä¼šæ•´æ¡æ¸…é»‘é¡¶éƒ¨åŒºåŸŸ(å«ç”µæ± å›¾æ ‡), æ­¤å¤„é¡»ç«‹å³é‡ç»˜ç”µæ± ,
+          å¦åˆ™èœå•è¿”å›/åˆ‡æ¢æ—¶ç”µæ± æ¶ˆå¤±åˆå›é—ª(å¦‚é‡èœä¸‹æ»‘è¿”å›æ¸¸æˆé‚£ä¸€ä¸‹é—ª) */
         game_battery_icon_update(164, 22, 1);
     }
     g_grid_dirty = 0;
@@ -600,6 +598,12 @@ uint8_t d2048_menu_bg_redraw(void)
     return 1;
 }
 
+/**
+ * @brief  2048 èœå•é…ç½®è¡¨, ä¾› menu.c çš„ç»Ÿä¸€èœå•çŠ¶æ€æœº(game_menu_command)ä½¿ç”¨ã€‚
+ * @note   ä¾æ¬¡ä¸º: è¿›å…¥èœå•å‰çš„çŠ¶æ€ / é€€èœå•çŠ¶æ€ / é‡å¼€èœå•çŠ¶æ€,
+ *         èœå•è¡Œç±»å‹/ä¸‹åˆ’æ¸¸æˆæ˜ å°„, èœå•æ¡†åæ ‡ä¸é«˜, ç”µæ± å›¾æ ‡ä½ç½®,
+ *         ä»¥åŠ ç½®è„/é‡ç»˜èƒŒæ™¯/æ‰“æ–­é€€å‡º ä¸‰ä¸ªå›è°ƒ(å–å‡½æ•°åœ°å€, æ•…é¡»å®šä¹‰åœ¨æœ¬è¡¨ä¹‹å)ã€‚
+ */
 static const GameMenuCfg g_d2048_menu_cfg = {
     D2048_STATE_PLAYING, D2048_STATE_EXIT_MENU, D2048_STATE_RESTART_MENU,
     d2048_row_types, d2048_exit_map,
@@ -607,20 +611,19 @@ static const GameMenuCfg g_d2048_menu_cfg = {
     164, 22,
     d2048_menu_mark_dirty, d2048_menu_bg_redraw, d2048_menu_mark_dirty
 };
-/**
- * @brief  2048 Ã¿Ö¡¸üĞÂ: ´¦Àí´¥Ãş¡¢²Ëµ¥¡¢»¬¶¯ÓëäÖÈ¾¡£
- * @return GAME_RET_* ·µ»ØÃüÁî
- */
 
-uint8_t d2048_update(void)
-{
+/**
+ * @brief  2048 æ¯å¸§æ›´æ–°: å¤„ç†è§¦æ‘¸ã€èœå•ã€æ»‘åŠ¨ä¸æ¸²æŸ“ã€‚
+ * @return GAME_RET_* è¿”å›å‘½ä»¤
+ */
+uint8_t d2048_update(void) {
     uint8_t interacted = 0;
     uint8_t battery_redraw = 0;
 
-    /* ÀäÈ´¼õ1 */
+    /* å†·å´å‡1 */
     if (g_menu_cooldown > 0) g_menu_cooldown--;
 
-    /* Íâ²¿ÇëÇó½øÈëÍË³ö²Ëµ¥ */
+    /* å¤–éƒ¨è¯·æ±‚è¿›å…¥é€€å‡ºèœå• */
     if (g_game_enter_exit_menu) {
         g_game_enter_exit_menu = 0;
         g_state = D2048_STATE_EXIT_MENU;
@@ -628,20 +631,20 @@ uint8_t d2048_update(void)
         g_full_redraw = 1;
     }
 
-    /* ---- ÍË³ö²Ëµ¥ / ÖØĞÂ¿ªÊ¼²Ëµ¥: ÅäÖÃÇı¶¯Í³Ò»×´Ì¬»ú ---- */
+    /* ---- é€€å‡ºèœå• / é‡æ–°å¼€å§‹èœå•: é…ç½®é©±åŠ¨ç»Ÿä¸€çŠ¶æ€æœº ---- */
     if (g_state == D2048_STATE_EXIT_MENU || g_state == D2048_STATE_RESTART_MENU) {
         uint8_t out_ret;
-        uint8_t cmd = game_menu_command(&g_d2048_menu_cfg, (uint8_t *)&g_state, &out_ret);
+        uint8_t cmd = game_menu_command(&g_d2048_menu_cfg, (uint8_t*)&g_state, &out_ret);
         switch (cmd) {
-            case GAME_MENU_CMD_SWITCH:   return out_ret;
-            case GAME_MENU_CMD_RESTART:  d2048_init(); return GAME_RET_INTERACT;
-            case GAME_MENU_CMD_SETTINGS: menu_enter_game_settings(); return EXIT_RET_SETTINGS;
-            case GAME_MENU_CMD_INTERACT: return GAME_RET_INTERACT;
-            default:                     return 0;
+        case GAME_MENU_CMD_SWITCH:   return out_ret;
+        case GAME_MENU_CMD_RESTART:  d2048_init(); return GAME_RET_INTERACT;
+        case GAME_MENU_CMD_SETTINGS: menu_enter_game_settings(); return EXIT_RET_SETTINGS;
+        case GAME_MENU_CMD_INTERACT: return GAME_RET_INTERACT;
+        default:                     return 0;
         }
     }
 
-    /* ---- ÓÎÏ·½øĞĞÖĞ ---- */
+    /* ---- æ¸¸æˆè¿›è¡Œä¸­ ---- */
     TouchState ts;
     Touch_Scan(&ts);
 
@@ -650,19 +653,19 @@ uint8_t d2048_update(void)
         g_touch_start_x = ts.x;
         g_touch_start_y = ts.y;
         if (ts.y <= 210)
-            g_menu_cooldown = 0;  /* ´¥ÃşÉÏ°ëÇøÊ±½â³ı²Ëµ¥ÀäÈ´, ÔÊĞíÁ¢¿ÌÉÏ»® */
+            g_menu_cooldown = 0;  /* è§¦æ‘¸ä¸ŠåŠåŒºæ—¶è§£é™¤èœå•å†·å´, å…è®¸ç«‹åˆ»ä¸Šåˆ’ */
     }
 
-    /* ÓÎÏ·½øĞĞÖĞ: ÏÂ»¬´¥·¢ÍË³ö²Ëµ¥ÍÏ×§ */
-    if (game_menu_enter_exit_drag(&ts, (uint8_t *)&g_state,
-                                   D2048_STATE_PLAYING, D2048_STATE_EXIT_MENU))
+    /* æ¸¸æˆè¿›è¡Œä¸­: ä¸‹æ»‘è§¦å‘é€€å‡ºèœå•æ‹–æ‹½ */
+    if (game_menu_enter_exit_drag(&ts, (uint8_t*)&g_state,
+        D2048_STATE_PLAYING, D2048_STATE_EXIT_MENU))
         return 0;
-    /* ÓÎÏ·½øĞĞÖĞ: ÉÏ»®´¥·¢ÖØĞÂ¿ªÊ¼²Ëµ¥ */
-    if (game_menu_enter_restart_drag(&ts, (uint8_t *)&g_state,
-                                      D2048_STATE_PLAYING, D2048_STATE_RESTART_MENU, 210))
+    /* æ¸¸æˆè¿›è¡Œä¸­: ä¸Šåˆ’è§¦å‘é‡æ–°å¼€å§‹èœå• */
+    if (game_menu_enter_restart_drag(&ts, (uint8_t*)&g_state,
+        D2048_STATE_PLAYING, D2048_STATE_RESTART_MENU, 210))
         return 0;
 
-    /* ËÉÊÖ·À¶¶: Á¬Ğø¶ª2Ö¡²ÅÈ·ÈÏÊÍ·Å, ·ÀÖ¹´¥ÃşIC¶¶¶¯Îó´¥·¢ */
+    /* æ¾æ‰‹é˜²æŠ–: è¿ç»­ä¸¢2å¸§æ‰ç¡®è®¤é‡Šæ”¾, é˜²æ­¢è§¦æ‘¸ICæŠ–åŠ¨è¯¯è§¦å‘ */
     {
         static uint8_t rel_db = 0;
         if (ts.pressed) { rel_db = 0; }
@@ -671,7 +674,7 @@ uint8_t d2048_update(void)
     }
     if (!ts.pressed && g_touch_down) {
         g_touch_down = 0;
-        /* ²Ëµ¥·´Ïò»¬¹Ø±ÕºóµÄËÉÊÖ²»´«ÈëÓÎÏ·: Ö»ÎüÊÕ±¾´Î±ÕºÏÊÖÊÆµÄËÉÊÖ, ÏÂ´Î°´ÏÂ¼´²Ù×÷ÓÎÏ· */
+        /* èœå•åå‘æ»‘å…³é—­åçš„æ¾æ‰‹ä¸ä¼ å…¥æ¸¸æˆ: åªå¸æ”¶æœ¬æ¬¡é—­åˆæ‰‹åŠ¿çš„æ¾æ‰‹, ä¸‹æ¬¡æŒ‰ä¸‹å³æ“ä½œæ¸¸æˆ */
         if (g_game_consume_release) {
             g_game_consume_release = 0;
             return interacted;
@@ -679,13 +682,13 @@ uint8_t d2048_update(void)
         int16_t dx = (int16_t)ts.x - (int16_t)g_touch_start_x;
         int16_t dy = (int16_t)ts.y - (int16_t)g_touch_start_y;
 
-        /* ËÉÊÖÈ·ÈÏ: ÍË³ö²Ëµ¥ */
-        if (game_menu_commit_exit(dy, (uint8_t *)&g_state, D2048_STATE_EXIT_MENU))
+        /* æ¾æ‰‹ç¡®è®¤: é€€å‡ºèœå• */
+        if (game_menu_commit_exit(dy, (uint8_t*)&g_state, D2048_STATE_EXIT_MENU))
             return 1;
 
-        /* ËÉÊÖÈ·ÈÏ: ÖØĞÂ¿ªÊ¼²Ëµ¥ */
-        if (game_menu_commit_restart(dy, (uint8_t *)&g_state,
-                                      D2048_STATE_RESTART_MENU, 210, 10))
+        /* æ¾æ‰‹ç¡®è®¤: é‡æ–°å¼€å§‹èœå• */
+        if (game_menu_commit_restart(dy, (uint8_t*)&g_state,
+            D2048_STATE_RESTART_MENU, 210, 10))
             return 1;
 
         uint8_t dir = detect_swipe(dx, dy);
@@ -693,11 +696,11 @@ uint8_t d2048_update(void)
             uint8_t moved = do_move(dir);
             if (moved) {
                 interacted = 1;
-                Main_ClearLowBattSaveFlag();  /* ÓĞ²Ù×÷±ä»¯Ê±Çå³ıµÍµç±£´æ±ê¼Ç */
+                Main_ClearLowBattSaveFlag();  /* æœ‰æ“ä½œå˜åŒ–æ—¶æ¸…é™¤ä½ç”µä¿å­˜æ ‡è®° */
                 spawn_tile();
                 g_grid_dirty = 1;
 
-                /* ¼ì²éÊ¤Àû/Ê§°Ü */
+                /* æ£€æŸ¥èƒœåˆ©/å¤±è´¥ */
                 uint8_t r, c;
                 for (r = 0; r < 4; r++) {
                     for (c = 0; c < 4; c++) {
@@ -712,32 +715,32 @@ uint8_t d2048_update(void)
             }
         }
     }
-    /* ---- »æÖÆ ---- */
+    /* ---- ç»˜åˆ¶ ---- */
     if (g_grid_dirty) {
         battery_redraw = 1;
         draw_grid();
         draw_score();
         g_grid_dirty = 0;
 
-        /* ÓÎÏ·½áÊø ÏÔÊ¾ÖĞÎÄÌáÊ¾ */
+        /* æ¸¸æˆç»“æŸ æ˜¾ç¤ºä¸­æ–‡æç¤º */
         if (g_state == D2048_STATE_LOST) {
             uint16_t cx = (240 - 128) / 2;
             uint16_t cy = 108;
             LCD_CS_CLR;
-            sok_draw_char_32(cx,       cy, FlashStore_ResLoad(FLASH_STORE_ID_32_YOU,  0, FONT_CHAR_SIZE), LCD_RED);
-            sok_draw_char_32(cx + 32,  cy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI3,  0, FONT_CHAR_SIZE), LCD_RED);
-            sok_draw_char_32(cx + 64,  cy, FlashStore_ResLoad(FLASH_STORE_ID_32_JIE,  0, FONT_CHAR_SIZE), LCD_RED);
-            sok_draw_char_32(cx + 96,  cy, FlashStore_ResLoad(FLASH_STORE_ID_32_SHU,  0, FONT_CHAR_SIZE), LCD_RED);
+            sok_draw_char_32(cx, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_YOU, 0, FONT_CHAR_SIZE), LCD_RED);
+            sok_draw_char_32(cx + 32, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI3, 0, FONT_CHAR_SIZE), LCD_RED);
+            sok_draw_char_32(cx + 64, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_JIE, 0, FONT_CHAR_SIZE), LCD_RED);
+            sok_draw_char_32(cx + 96, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_SHU, 0, FONT_CHAR_SIZE), LCD_RED);
             LCD_CS_SET;
         }
 
-        /* Í¨¹Ø ÏÔÊ¾"¹§Ï²Í¨¹Ø" (4¸ö32x32ºº×Ö) */
+        /* é€šå…³ æ˜¾ç¤º"æ­å–œé€šå…³" (4ä¸ª32x32æ±‰å­—) */
         if (g_state == D2048_STATE_WON) {
-            uint16_t cx = (240 - 128) / 2;   /* 4¸ö×Öx32=128, ¾ÓÖĞ */
+            uint16_t cx = (240 - 128) / 2;   /* 4ä¸ªå­—x32=128, å±…ä¸­ */
             uint16_t cy = 108;
             LCD_CS_CLR;
             sok_draw_char_32(cx, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_GONG, 0, FONT_CHAR_SIZE), LCD_RED);
-            sok_draw_char_32(cx + 32, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI,   0, FONT_CHAR_SIZE), LCD_RED);
+            sok_draw_char_32(cx + 32, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI, 0, FONT_CHAR_SIZE), LCD_RED);
             sok_draw_char_32(cx + 64, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_TONG, 0, FONT_CHAR_SIZE), LCD_RED);
             sok_draw_char_32(cx + 96, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), LCD_RED);
             LCD_CS_SET;

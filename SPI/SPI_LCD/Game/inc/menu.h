@@ -6,239 +6,127 @@
 #include "sok_img_win.h"
 #include "touch.h"
 #include "battery.h"
+#include "chinese_fonts.h"   /* 24x24ä¸­æ–‡å­—åº“å£°æ˜ */
 
-/* ---- Ö÷Ä£Ê½Ã¶¾Ù (Ä£¿éÄ£Ê½ÇĞ»») ---- */
+/* ========================= ç±»å‹å®šä¹‰ ========================= */
+
+/* ä¸»æ¨¡å¼æšä¸¾ (æ¨¡å—æ¨¡å¼åˆ‡æ¢) */
 typedef enum {
-    MAIN_MODE_VIDEO = 0,   /* ÊÓÆµ: ÊÓÆµ²¥·Å */
-    MAIN_MODE_MENU,        /* Ö÷²Ëµ¥½çÃæ */
-    MAIN_MODE_SOKOBAN,     /* ÍÆÏä×ÓÓÎÏ· */
-    MAIN_MODE_D2048,       /* 2048ÓÎÏ· */
-    MAIN_MODE_TETRIS,      /* ¶íÂŞË¹·½¿éÓÎÏ· */
-    MAIN_MODE_KLOTSKI,     /* »ªÈİµÀÓÎÏ· */
-    MAIN_MODE_FISH,        /* ´óÓã³ÔĞ¡ÓãÓÎÏ· */
+    MAIN_MODE_VIDEO = 0,   /* è§†é¢‘: è§†é¢‘æ’­æ”¾ */
+    MAIN_MODE_MENU,        /* ä¸»èœå•ç•Œé¢ */
+    MAIN_MODE_SOKOBAN,     /* æ¨ç®±å­æ¸¸æˆ */
+    MAIN_MODE_D2048,       /* 2048æ¸¸æˆ */
+    MAIN_MODE_TETRIS,      /* ä¿„ç½—æ–¯æ–¹å—æ¸¸æˆ */
+    MAIN_MODE_KLOTSKI,     /* åå®¹é“æ¸¸æˆ */
+    MAIN_MODE_FISH,        /* å¤§é±¼åƒå°é±¼æ¸¸æˆ */
 } MainMode;
 
-uint32_t game_rand(void);
-void game_battery_icon_reset(void);
-void game_battery_icon_update(uint16_t x, uint16_t y, uint8_t force_redraw);
-BatteryLevel game_battery_icon_get_level(void);
-void game_battery_set_charge_flash(uint8_t enable);
+/* é…ç½®é©±åŠ¨æ¸¸æˆèœå•çŠ¶æ€æœº (d2048/klotski/tetris/fish å…±ç”¨) */
+typedef struct {
+    uint8_t  playing;              /* æ¸¸æˆè¿›è¡Œä¸­çŠ¶æ€å€¼ */
+    uint8_t  exit;                 /* é€€å‡ºèœå•çŠ¶æ€å€¼ */
+    uint8_t  restart;              /* é‡æ–°å¼€å§‹èœå•çŠ¶æ€å€¼ */
+    const uint8_t *exit_row_types; /* é€€å‡ºèœå•6è¡Œç±»å‹æ•°ç»„ */
+    const uint8_t *exit_map;       /* é€€å‡ºèœå•5æ ¼â†’è¿”å›ç æ˜ å°„è¡¨ */
+    uint16_t y_threshold;          /* åº•éƒ¨ä¸Šåˆ’èµ·ç‚¹Yé˜ˆå€¼ (d2048/klotski/tetris=210, fish=220) */
+    uint8_t  release_thresh;       /* æ¾æ‰‹ä¸Šåˆ’è·ç¦»é˜ˆå€¼ (tetris=25, å…¶ä½™=10) */
+    uint16_t bat_x, bat_y;         /* é‡èœé™æ­¢æ—¶ç”µæ± å›¾æ ‡ä½ç½®; 0xFFFF=ä¸ç»˜åˆ¶ */
+    void (*mark_dirty)(void);      /* ç½®æ¸¸æˆè‡ªèº«èƒŒæ™¯è„æ ‡è®°(å…³é—­/å–æ¶ˆèœå•åéœ€é‡ç»˜åœºæ™¯) */
+    uint8_t (*bg_redraw)(void);    /* ä¾æ®è‡ªèº«è„æ ‡è®°é‡ç»˜èœå•èƒŒæ™¯(åœºæ™¯/ç»“æŸç”»é¢), è¿”å›1=æœ¬å¸§å·²é‡ç»˜ */
+    void (*on_to_exit)(void);      /* é‡èœä¸‹æ»‘æ‰“æ–­è¿›é€€å‡ºèœå•åçš„æ¸¸æˆä¾§è¡¥å……å¤„ç†(å¯ä¸ºNULL) */
+} GameMenuCfg;
 
-/* ²Ëµ¥³ß´ç³£Á¿ (²¼¾Ö & Î»ÖÃ¼ÆËã) */
-#define MENU_W      150  /* ²Ëµ¥×Ü¿í¶È */
-#define MENU_H      230  /* ²Ëµ¥¸ß¶È (5ĞĞ²Ëµ¥) */
-#define MENU_BDR    5    /* ±ß¿ò¿í¶È */
-#define MENU_X      ((240 - MENU_W) / 2)  /* ²Ëµ¥×óÉÏ½ÇX */
-#define MENU_Y      ((240 - MENU_H) / 2)  /* ²Ëµ¥×óÉÏ½ÇY */
+/* ===================== å¸¸é‡: å°ºå¯¸/åæ ‡ ===================== */
 
-/* ÑÕÉ«¶¨Òå */
-#define MENU_BORDER_COLOR  LCD_GREEN  /* ²Ëµ¥±ß¿òÉ« */
-#define MENU_BG_COLOR      LCD_CYAN   /* ²Ëµ¥±³¾°É« */
-#define MENU_TEXT_COLOR    LCD_BRED   /* ²Ëµ¥ÎÄ×ÖÉ« */
-#define MENU_TEXT_BDR_COLOR LCD_BLUE  /* ÎÄ×Ö±ß¿òÉ« */
-#define MENU_TEXT_BDR_W     5         /* ±ß¿òÏß¿í */
-#define MENU_TEXT_BDR_PAD   10         /* ÎÄ×Ö¾à±ß¾à */
+/* ä¸»èœå•å°ºå¯¸å¸¸é‡ (å¸ƒå±€ & ä½ç½®è®¡ç®—) */
+#define MENU_W      150  /* èœå•æ€»å®½åº¦ */
+#define MENU_H      230  /* èœå•é«˜åº¦ (5è¡Œèœå•) */
+#define MENU_BDR    5    /* è¾¹æ¡†å®½åº¦ */
+#define MENU_X      ((240 - MENU_W) / 2)  /* èœå•å·¦ä¸Šè§’X */
+#define MENU_Y      ((240 - MENU_H) / 2)  /* èœå•å·¦ä¸Šè§’Y */
 
-/* ²Ëµ¥"ÖØĞÂ¿ªÊ¼"×Ó½çÃæ */
-/* ÖØĞÂ¿ªÊ¼²Ëµ¥³ß´ç (3ĞĞ: "ÖØĞÂ¿ªÊ¼" + "ÉèÖÃ" + "·µ»Ø") */
-#define RESTART_MENU_W  150  /* ²Ëµ¥¿í¶È */
-#define RESTART_MENU_H  130  /* ²Ëµ¥¸ß¶È (Óë3ĞĞÊÓÆµ²Ëµ¥ÏàÍ¬) */
-#define RESTART_MENU_BDR 5   /* ±ß¿ò¿í¶È */
-#define RESTART_MENU_X  ((240 - RESTART_MENU_W) / 2)  /* ²Ëµ¥×óÉÏ½ÇX (¾ÓÖĞ) */
-#define RESTART_MENU_Y  (240 - RESTART_MENU_H)        /* ²Ëµ¥Ìùµ×, ÉÏ»®µ¯³ö, =110 */
-#define RESTART_MENU_GAP 7             /* ĞĞ¼ä¾à (2ĞĞÊ±Ê¹ÓÃ, 3ĞĞÊ±ÓÉÄÚ²¿¼ÆËã) */
-#define RESTART_MENU_DRAG_MAX_STEP 3   /* ÉÏ»®ÍÏ×§Ã¿Ö¡×î´óÎ»ÒÆ (ÓëÊÓÆµ²Ëµ¥Ò»ÖÂ) */
-#define RESTART_MENU_RELEASE_GAP 36    /* ËÉÊÖºó×îĞ¡ÉÏ»®¾àÀë */
+/* "é‡æ–°å¼€å§‹"èœå•å°ºå¯¸ (3è¡Œ: "é‡æ–°å¼€å§‹" + "è®¾ç½®" + "è¿”å›") */
+#define RESTART_MENU_W  150  /* èœå•å®½åº¦ */
+#define RESTART_MENU_H  130  /* èœå•é«˜åº¦ (ä¸3è¡Œè§†é¢‘èœå•ç›¸åŒ) */
+#define RESTART_MENU_BDR 5   /* è¾¹æ¡†å®½åº¦ */
+#define RESTART_MENU_X  ((240 - RESTART_MENU_W) / 2)  /* èœå•å·¦ä¸Šè§’X (å±…ä¸­) */
+#define RESTART_MENU_Y  (240 - RESTART_MENU_H)        /* èœå•è´´åº•, ä¸Šåˆ’å¼¹å‡º, =110 */
+#define RESTART_MENU_GAP 7             /* è¡Œé—´è· (2è¡Œæ—¶ä½¿ç”¨, 3è¡Œæ—¶ç”±å†…éƒ¨è®¡ç®—) */
+#define RESTART_MENU_DRAG_MAX_STEP 3   /* ä¸Šåˆ’æ‹–æ‹½æ¯å¸§æœ€å¤§ä½ç§» (ä¸è§†é¢‘èœå•ä¸€è‡´) */
+#define RESTART_MENU_RELEASE_GAP 36    /* æ¾æ‰‹åæœ€å°ä¸Šåˆ’è·ç¦» */
 
-/* ²Ëµ¥ÇøÓò¿ì½İÇåÆÁ (DMA µÍ×èÈû, Çå³ıÉ«¿É±»ÓÎÏ·ÉèÎª±³¾°É«, ±ÜÃâÇĞ²Ëµ¥ºÚÉÁ) */
+/* è§†é¢‘ä¸Šæ»‘èœå•å°ºå¯¸ */
+#define VIDEO_MENU_W   150
+#define VIDEO_MENU_H   130  /* 3è¡Œ: 2*5 + 3*32 + 4*6 = 130 */
+#define VIDEO_MENU_H4  188  /* 4è¡Œ: 2*5 + 4*32 + 5*10 = 188 (åŒä¸»èœå•é—´è·) */
+#define VIDEO_MENU_BDR 5
+#define VIDEO_MENU_X   ((240 - VIDEO_MENU_W) / 2)
+#define VIDEO_MENU_Y   (240 - VIDEO_MENU_H4)  /* åº•éƒ¨å¯¹é½, 4è¡Œé¡¶éƒ¨Y=72 */
+
+/* "é‡æ–°å¼€å§‹"èœå•è¡ŒYåæ ‡ */
+#define RESTART_MENU_ROW0_Y (RESTART_MENU_Y + RESTART_MENU_BDR + RESTART_MENU_GAP)       /* ç¬¬1è¡ŒY ("é‡æ–°å¼€å§‹") */
+#define RESTART_MENU_ROW1_Y (RESTART_MENU_ROW0_Y + 32 + RESTART_MENU_GAP)                /* ç¬¬2è¡ŒY ("è®¾ç½®") */
+#define RESTART_MENU_ROW2_Y (RESTART_MENU_ROW1_Y + 32 + RESTART_MENU_GAP)                /* ç¬¬3è¡ŒY ("è¿”å›") */
+
+/* ====================== å¸¸é‡: é¢œè‰² ====================== */
+
+/* é¢œè‰²å®šä¹‰ */
+#define MENU_BORDER_COLOR  LCD_GREEN  /* èœå•è¾¹æ¡†è‰² */
+#define MENU_BG_COLOR      LCD_CYAN   /* èœå•èƒŒæ™¯è‰² */
+#define MENU_TEXT_COLOR    LCD_BRED   /* èœå•æ–‡å­—è‰² */
+#define MENU_TEXT_BDR_COLOR LCD_BLUE  /* æ–‡å­—è¾¹æ¡†è‰² */
+#define MENU_TEXT_BDR_W     5         /* è¾¹æ¡†çº¿å®½ */
+#define MENU_TEXT_BDR_PAD   10        /* æ–‡å­—è·è¾¹è· */
+
+/* ================= å¸¸é‡: æ»‘åŠ¨/æ‹–æ‹½é˜ˆå€¼ ================= */
+
+#define MENU_SWIPE_START_Y      40 /* ä¸‹æ»‘èœå•è§¦å‘åŒºåŸŸYä¸Šé™ */
+#define MENU_SWIPE_TRIGGER_DIST  5 /* å¼€å§‹æ‹–æ‹½æ‰€éœ€æ»‘åŠ¨è·ç¦» */
+#define MENU_SWIPE_COMMIT_DIST  20 /* æ¾æ‰‹ç¡®è®¤å±•å¼€æ‰€éœ€æ»‘åŠ¨è·ç¦» */
+#define MENU_SLIDE_SPEED          3 /* èœå•è‡ªåŠ¨æ»‘åŠ¨é€Ÿåº¦ (æ¯å¸§åƒç´ ) */
+#define MENU_DRAG_MAX_STEP        4 /* ä¸‹æ»‘èœå•æ‹–æ‹½æ—¶æ¯å¸§æœ€å¤§ä½ç§» */
+#define MENU_RELEASE_GAP         36 /* æ¾æ‰‹åèœå•æœ€å°ä¸‹æ»‘è·ç¦» */
+#define RESTART_MENU_SLIDE_SPEED 2  /* ä¸Šæ»‘èœå•ç§»åŠ¨é€Ÿåº¦ (æ¯å¸§åƒç´ , ä¸è§†é¢‘èœå•ä¸€è‡´) */
+
+/* ================= å¸¸é‡: æ¸…å±å® ================= */
+
+/* èœå•åŒºåŸŸå¿«æ·æ¸…å± (DMA ä½é˜»å¡, æ¸…é™¤è‰²å¯è¢«æ¸¸æˆè®¾ä¸ºèƒŒæ™¯è‰², é¿å…åˆ‡èœå•é»‘é—ª) */
 #define LCD_CLEAR_MENU_AREA() \
     LCD_Fill_DMA(MENU_X, 0, MENU_X + MENU_W, MENU_Y + MENU_H, g_menu_clear_color)
 #define LCD_CLEAR_RESTART_AREA() \
     LCD_Fill_DMA(RESTART_MENU_X, g_restart_slide_y, \
              RESTART_MENU_X + RESTART_MENU_W, 240, g_menu_clear_color)
-#define RESTART_MENU_ROW0_Y (RESTART_MENU_Y + RESTART_MENU_BDR + RESTART_MENU_GAP)       /* µÚ1ĞĞY ("ÖØĞÂ¿ªÊ¼") */
-#define RESTART_MENU_ROW1_Y (RESTART_MENU_ROW0_Y + 32 + RESTART_MENU_GAP)                /* µÚ2ĞĞY ("ÉèÖÃ") */
-#define RESTART_MENU_ROW2_Y (RESTART_MENU_ROW1_Y + 32 + RESTART_MENU_GAP)                /* µÚ3ĞĞY ("·µ»Ø") */
 
-/* 5ĞĞ¶¯Ì¬²Ëµ¥ĞĞÀàĞÍ (µ÷ÓÃ menu_draw_5row_frame_only) */
-#define MENU_ROW_2048    0  /* "2048" 4Î»Êı×Ö */
-#define MENU_ROW_TUI     1  /* "ÍÆÏä×Ó" */
-#define MENU_ROW_SHIPIN  2  /* "ÊÓÆµ" */
-#define MENU_ROW_FANHUI  3  /* "·µ»Ø" */
-#define MENU_ROW_TETRIS  4  /* ¶íÂŞË¹·½¿éTÍ¼±ê */
-#define MENU_ROW_KLOTSKI   5  /* »ªÈİµÀ4x4Í¼±ê */
-#define MENU_ROW_FISH      6  /* ´óÓã³ÔĞ¡ÓãÍ¼±ê */
-#define MENU_ROW_CHONGXIN  7  /* "ÖØĞÂ¿ªÊ¼" 4×Ö */
-#define MENU_ROW_LDSZ      8  /* "ÁÁ¶ÈÉèÖÃ" 4×Ö */
-#define MENU_ROW_XPSJ      9  /* "Ï¢ÆÁÊ±¼ä" 4×Ö */
-#define MENU_ROW_PMFX     10  /* "ÆÁÄ»·½Ïò" 4×Ö */
-#define MENU_ROW_SHEZHI   11  /* "ÉèÖÃ" 2×Ö */
+/* ================= å¸¸é‡: èœå•è¡Œç±»å‹ ================= */
 
-/* ÖØĞÂ¿ªÊ¼²Ëµ¥ĞĞÀàĞÍÊı×é (3ĞĞ: "ÖØĞÂ¿ªÊ¼" + "ÉèÖÃ" + "·µ»Ø") */
-extern const uint8_t g_restart_row_types[3];
+/* 5è¡ŒåŠ¨æ€èœå•è¡Œç±»å‹ (è°ƒç”¨ menu_draw_5row_frame_only) */
+#define MENU_ROW_2048    0  /* "2048" 4ä½æ•°å­— */
+#define MENU_ROW_TUI     1  /* "æ¨ç®±å­" */
+#define MENU_ROW_SHIPIN  2  /* "è§†é¢‘" */
+#define MENU_ROW_FANHUI  3  /* "è¿”å›" */
+#define MENU_ROW_TETRIS  4  /* ä¿„ç½—æ–¯æ–¹å—Tå›¾æ ‡ */
+#define MENU_ROW_KLOTSKI   5  /* åå®¹é“4x4å›¾æ ‡ */
+#define MENU_ROW_FISH      6  /* å¤§é±¼åƒå°é±¼å›¾æ ‡ */
+#define MENU_ROW_CHONGXIN  7  /* "é‡æ–°å¼€å§‹" 4å­— */
+#define MENU_ROW_LDSZ      8  /* "äº®åº¦è®¾ç½®" 4å­— */
+#define MENU_ROW_XPSJ      9  /* "æ¯å±æ—¶é—´" 4å­— */
+#define MENU_ROW_PMFX     10  /* "å±å¹•æ–¹å‘" 4å­— */
+#define MENU_ROW_SHEZHI   11  /* "è®¾ç½®" 2å­— */
 
-/* ÊÓÆµÉÏ»¬ÉèÖÃ²Ëµ¥ĞĞÀàĞÍÊı×é (4ĞĞ: ÁÁ¶ÈÉèÖÃ/Ï¢ÆÁÊ±¼ä/ÆÁÄ»·½Ïò/·µ»Ø) */
-extern const uint8_t g_video_menu_row_types[4];
+/* ================= å¸¸é‡: è¿”å›å€¼/å‘½ä»¤ ================= */
 
-/* ÊÓÆµÉÏ»¬²Ëµ¥³ß´ç */
-#define VIDEO_MENU_W   150
-#define VIDEO_MENU_H   130  /* 3ĞĞ: 2*5 + 3*32 + 4*6 = 130 */
-#define VIDEO_MENU_H4  188  /* 4ĞĞ: 2*5 + 4*32 + 5*10 = 188 (Í¬Ö÷²Ëµ¥¼ä¾à) */
-#define VIDEO_MENU_BDR 5
-#define VIDEO_MENU_X   ((240 - VIDEO_MENU_W) / 2)
-#define VIDEO_MENU_Y   (240 - VIDEO_MENU_H4)  /* µ×²¿¶ÔÆë, 4ĞĞ¶¥²¿Y=72 */
-
-#define MENU_SWIPE_START_Y      40 /* ÏÂ»¬²Ëµ¥´¥·¢ÇøÓòYÉÏÏŞ */
-#define MENU_SWIPE_TRIGGER_DIST  5 /* ¿ªÊ¼ÍÏ×§ËùĞè»¬¶¯¾àÀë */
-#define MENU_SWIPE_COMMIT_DIST  20 /* ËÉÊÖÈ·ÈÏÕ¹¿ªËùĞè»¬¶¯¾àÀë */
-#define MENU_SLIDE_SPEED          3 /* ²Ëµ¥×Ô¶¯»¬¶¯ËÙ¶È (Ã¿Ö¡ÏñËØ) */
-#define MENU_DRAG_MAX_STEP        4 /* ÏÂ»¬²Ëµ¥ÍÏ×§Ê±Ã¿Ö¡×î´óÎ»ÒÆ */
-#define MENU_RELEASE_GAP         36 /* ËÉÊÖºó²Ëµ¥×îĞ¡ÏÂ»¬¾àÀë */
-#define RESTART_MENU_SLIDE_SPEED 2  /* ÉÏ»¬²Ëµ¥ÒÆ¶¯ËÙ¶È (Ã¿Ö¡ÏñËØ, ÓëÊÓÆµ²Ëµ¥Ò»ÖÂ) */
-
-/* 24x24ÖĞÎÄ×Ö¿âÉùÃ÷ (Î»ÓÚ chinese_fonts.h) */
-#include "chinese_fonts.h"
-
-/**
- * @brief  »æÖÆ²Ëµ¥±ß¿ò (±ß¿ò + ÑÕÉ«±³¾°)
- *         ¹«¹²¹¤¾ßº¯Êı, ²»»æÖÆ²Ëµ¥ÄÚÈİ
- */
-void menu_draw_frame(void);
-
-/**
- * @brief  »æÖÆÖ÷²Ëµ¥ (5ĞĞ: 2048/ÍÆÏä×Ó/¶íÂŞË¹·½¿é/»ªÈİµÀ/ÊÓÆµ)
- */
-void main_menu_draw(void);
-
-/**
- * @brief  ½ö»æÖÆÖ÷²Ëµ¥±ß¿òºÍ¾²Ì¬ÄÚÈİ (ÍÏ×§/ÏÂ»¬¶¯»­ÓÃ, ²»º¬¶¯Ì¬ÔªËØ)
- * @param  y_top  ²Ëµ¥¶¥²¿Y×ø±ê
- */
-void main_menu_draw_frame_only(int16_t y_top);
-
-/**
- * @brief  Í¨ÓÃnĞĞ¶¯Ì¬²Ëµ¥äÖÈ¾ (½ö±ß¿ò, ÓÃÓÚÖ÷²Ëµ¥/ÓÎÏ·ÍË³ö²Ëµ¥/ÖØĞÂ¿ªÊ¼²Ëµ¥)
- * @param  y_top      ²Ëµ¥¶¥²¿Y×ø±ê
- * @param  row_types  ĞĞÀàĞÍÃèÊöÊı×é (MENU_ROW_*, n_rows¸öÔªËØ)
- * @param  n_rows     ĞĞÊı (2=ÖØĞÂ¿ªÊ¼, 5=Ö÷²Ëµ¥/ÍË³ö²Ëµ¥)
- */
-void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
-                                uint8_t n_rows);
-
-/**
- * @brief  ÓÎÏ·ÍË³ö²Ëµ¥ÍÏ×§¸úÊÖÂÖÑ¯ (Ã¿¸öÓÎÏ·¸´ÓÃ)
- * @param  drag_y       ÍÏ×§Î»ÖÃ (ÊäÈë´«³ö, -MENU_H ~ MENU_Y)
- * @param  drag_touch_y ÉÏÒ»Ö¡´¥ÃşY (ÊäÈë´«³ö)
- * @param  dragging     ÍÏ×§ÖĞ±êÖ¾ (Êä³ö: ÊÍ·ÅºóÇåÁã)
- * @param  ts           µ±Ç°´¥Ãş×´Ì¬
- * @param  row_types    5ĞĞĞĞÀàĞÍÊı×é
- * @return 0=ÍÏ×§ÖĞ(ÒÑ´¦Àí), 1=ÒÑÊÍ·Å(µ÷ÓÃ·½´¦Àí´¥ÃşÇĞ»»Âß¼­)
- */
-uint8_t game_menu_drag_poll(int16_t *drag_y, uint16_t *drag_touch_y,
-                             uint8_t *dragging, const TouchState *ts,
-                             const uint8_t row_types[6]);
-
-/**
- * @brief  ÖØÖÃ game_menu_drag_poll ÄÚ²¿×´Ì¬£¬È·±£ÏÂ´ÎÍÏ×§´Ó¸É¾»×´Ì¬Æô¶¯
- */
-void game_menu_drag_reset(void);
-
-/**
- * @brief  ÖØĞÂ¿ªÊ¼²Ëµ¥µÄÉÏ»¬ÍÏ×§ÂÖÑ¯
- * @return 0=ÍÏ×§ÖĞ, 1=ÒÑÊÍ·Å-Ìá½», 2=ÒÑÊÍ·Å-È¡Ïû
- */
-uint8_t game_restart_menu_drag_poll(int16_t *slide_y, uint16_t drag_start_y,
-                                     uint8_t *dragging, const TouchState *ts);
-
-/**
- * @brief  ¼ì²âÖØĞÂ¿ªÊ¼²Ëµ¥ÖĞµÄµ×²¿ÉÏ»¬ÊÖÊÆ
- * @return 1 ±íÊ¾¼ì²âµ½ÓĞĞ§ÉÏ»¬, 0 ±íÊ¾Î´¼ì²âµ½
- */
-uint8_t game_restart_menu_down_poll(const TouchState *ts, uint8_t *touch_down,
-                                    uint16_t *start_x, uint16_t *start_y);
-
-/**
- * @brief  ÊÓÆµÉÏ»¬ÉèÖÃ²Ëµ¥ÍÏ×§ÂÖÑ¯
- * @param  slide_y     ²Ëµ¥¶¥²¿Y×ø±ê (ÊäÈë´«³ö)
- * @param  drag_start_y ÍÏ×§ÆğÊ¼´¥ÃşY
- * @param  dragging    ÍÏ×§ÖĞ±êÖ¾ (ÊäÈë´«³ö)
- * @param  ts          µ±Ç°´¥Ãş×´Ì¬
- * @return 0=ÍÏ×§ÖĞ(ÒÑ´¦Àí), 1=ÒÑÊÍ·Å
- */
-uint8_t video_menu_drag_poll(int16_t *slide_y, uint16_t drag_start_y,
-                              uint8_t *dragging, const TouchState *ts);
-
-/**
- * @brief  ¼ì²âÊÓÆµÄ£Ê½ÏÂµÄÉÏ»¬ÊÖÊÆ (µ×²¿ÇøÓò)
- * @return 1 ±íÊ¾¼ì²âµ½ÓĞĞ§ÉÏ»¬, 0 ±íÊ¾Î´¼ì²âµ½
- */
-uint8_t video_menu_swipe_up_poll(const TouchState *ts, uint8_t *touch_down,
-                                  uint16_t *start_x, uint16_t *start_y);
-
-/**
- * @brief  »æÖÆ»ªÈİµÀÍ¼±ê (4x4¸ñ×Ó, È±Ò»½Ç)
- * @param  y  ĞĞ»æÖÆY×ø±ê
- */
-void menu_draw_klotski_icon(uint16_t y);
-
-/**
- * @brief  »æÖÆ¶íÂŞË¹·½¿é T ×ÖÍ¼±ê
- * @param  y  ĞĞ»æÖÆY×ø±ê
- */
-void menu_draw_tetris_icon(uint16_t y);
-void menu_draw_fish_icon(uint16_t y);   /* ´óÓã³ÔĞ¡ÓãÍ¼±ê */
-
-void menu_clear_exit_area_to(int16_t y);  /* °´ÍÏ×§Î»ÖÃÇåÍË³ö²Ëµ¥¿É¼ûÇøÓò */
-void menu_restart_cleanup(void);  /* Í³Ò»ÖØÆô²Ëµ¥¹Ø±ÕÇåÀí */
-void game_menu_restart_to_exit(uint8_t *state, uint8_t exit_state,
-                                uint16_t touch_y);  /* ÉÏ»®²Ëµ¥ÏÂ»¬´ò¶Ï¡ú½øÈëÍË³ö²Ëµ¥ */
-uint8_t menu_swipe_to_restart_handler(uint16_t y_threshold, uint8_t release_thresh);
-                                                 /* µ×²¿ÉÏ»®´ò¶ÏÍË³ö²Ëµ¥¡úÇĞ»»ÖØÆô²Ëµ¥: 0=ÎŞ¶¯×÷ 1=ÍÏ×§ 2=»¬Èë */
-uint8_t uint_to_digits(uint32_t val, uint8_t *digits);  /* Êı×Ö·Ö½âÎªÊ®½øÖÆÎ»(LSBÏÈ) */
-void menu_exit_back_cleanup(void);  /* Í³Ò»ÍË³ö²Ëµ¥¹Ø±ÕÇåÀí */
-/* ÖĞ¼äÇøÓòÉÏ»®¹Ø±Õ"ÏÂ»¬"²Ëµ¥(ÍË³ö/Ö÷²Ëµ¥), ÆğµãÔÚ[10,y_threshold)²ÅÅĞ¶¨ */
-uint8_t game_menu_swipe_mid_up_close(uint16_t y_threshold, uint8_t release_thresh);
-/* ÖĞ¼ä/µ×²¿ÇøÓòÏÂ»¬¹Ø±Õ"ÉÏ»¬"²Ëµ¥(ÉèÖÃ²Ëµ¥/¶ş¼¶²Ëµ¥), ÆğµãĞè>=start_min */
-uint8_t game_menu_swipe_mid_down_close(uint16_t start_min, uint8_t release_thresh);
-/* ·´Ïò»¬¹Ø±Õ²Ëµ¥ºóĞŞÕı¹²Ïí´¥Ãş×´Ì¬, Ê¹ËÉÊÖ²»´«ÈëÓÎÏ·(ÖØÂ¼Æğµã/ÇåÀäÈ´) */
-void game_menu_fix_release_after_close(void);
-
-
-/**
- * @brief  ²Ëµ¥Åö×²¼ì²â
- * @param  x, y        ´¥Ãş×ø±ê
- * @param  item_count  ²Ëµ¥ÏîÊıÁ¿ (2 »ò 3)
- * @return ÃüÖĞµÄ²Ëµ¥ÏîË÷Òı (0-based), -1 ±íÊ¾Î´ÃüÖĞÈÎºÎÏî
- */
-int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count);
-
-
-/* ---- ÓÎÏ·ÍË³ö²Ëµ¥·µ»ØÖµ ---- */
+/* æ¸¸æˆé€€å‡ºèœå•è¿”å›å€¼ */
+#define EXIT_RET_NONE     0
 #define EXIT_RET_VIDEO    2
 #define EXIT_RET_D2048    3
 #define EXIT_RET_SOKOBAN  4
 #define EXIT_RET_TETRIS   5
 #define EXIT_RET_KLOTSKI  6
-#define EXIT_RET_FISH     7   /* ´óÓã³ÔĞ¡Óã */
-#define EXIT_RET_SETTINGS 8   /* ÓÎÏ·ÄÚµã»÷"ÉèÖÃ"°´Å¥ */
+#define EXIT_RET_FISH     7   /* å¤§é±¼åƒå°é±¼ */
+#define EXIT_RET_SETTINGS 8   /* æ¸¸æˆå†…ç‚¹å‡»"è®¾ç½®"æŒ‰é’® */
+#define EXIT_RET_BACK     0xFF  /* å†…éƒ¨"å…³é—­èœå•"ä¿¡å· */
 
-#define EXIT_RET_NONE     0
-#define EXIT_RET_BACK     0xFF  /* ÄÚ²¿"¹Ø±Õ²Ëµ¥"ĞÅºÅ */
-
-/**
- * @brief  ÍË³ö²Ëµ¥´¥ÃşÂÖÑ¯ (Í¨ÓÃ: 4¸öÓÎÏ·¹²ÓÃÖØ¸´µÄ´úÂë)
- *         °´ÏÂÊ±¼ÇÂ¼²Ëµ¥ĞĞ£¬ËÉÊÖÈÔÔÚÍ¬Ò»ĞĞ²Å´¥·¢
- * @param  ret_map       hitË÷Òı(0-3)µ½·µ»ØÖµµÄÓ³Éä±í (4ÔªËØÊı×é)
- * @param  prev_pressed  ÉÏÒ»Ö¡´¥Ãş×´Ì¬Ö¸Õë
- * @param  out_ts        µ±Ç°Ö¡´¥ÃşÊä³ö (ÓÃÓÚ"¹Ø±Õ"°´Å¥²â¾à)
- * @return EXIT_RET_NONE(0) = ÎŞ²Ù×÷
- *         EXIT_RET_BACK(0xFF) = µã»÷"¹Ø±Õ"
- *         ÆäËû = EXIT_RET_* ÇĞ»»Ä¿±ê
- */
-uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t *prev_pressed,
-                            TouchState *out_ts);
-
-/* ---- Ö÷²Ëµ¥¶¯×÷·µ»ØÖµ ---- */
+/* ä¸»èœå•åŠ¨ä½œè¿”å›å€¼ */
 #define MAIN_MENU_ACT_NONE    0
 #define MAIN_MENU_ACT_D2048   1
 #define MAIN_MENU_ACT_SOKOBAN 2
@@ -247,16 +135,262 @@ uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t *prev_pressed,
 #define MAIN_MENU_ACT_FISH    5
 #define MAIN_MENU_ACT_VIDEO   6
 
+/* game_menu_command è¿”å›å‘½ä»¤ */
+#define GAME_MENU_CMD_NONE      0   /* èœå•å·²å¤„ç†, è°ƒç”¨æ–¹ return 0 */
+#define GAME_MENU_CMD_RETURN    1   /* å…³é—­èœå•(ç‚¹ç©ºç™½/è¿”å›æ¡): å·²å› g_state_before_menu, è°ƒç”¨æ–¹ return 0 */
+#define GAME_MENU_CMD_INTERACT  2   /* éœ€è¿”å› GAME_RET_INTERACT(ä¸Šåˆ’åˆ‡åˆ°é‡èœ/é‡èœ"è¿”å›") */
+#define GAME_MENU_CMD_SETTINGS  3   /* ç‚¹"è®¾ç½®": è°ƒç”¨æ–¹ menu_enter_game_settings() å¹¶ return EXIT_RET_SETTINGS */
+#define GAME_MENU_CMD_RESTART   4   /* ç‚¹"é‡æ–°å¼€å§‹": å·²æ¸…èœå•, è°ƒç”¨æ–¹ xxx_init() å¹¶ return GAME_RET_INTERACT */
+#define GAME_MENU_CMD_SWITCH    5   /* åˆ‡æ¢æ¸¸æˆ: *out_ret = EXIT_RET_*, è°ƒç”¨æ–¹ return *out_ret */
+
+/* ä¾›å„æ¸¸æˆå®šä¹‰è‡ªèº« GameMenuCfg æ—¶ä½¿ç”¨çš„ç”µæ± ä½ç½®å“¨å…µ */
+#define GAME_MENU_BAT_NONE 0xFFFF
+
+/* ===================== å¤–éƒ¨æ•°ç»„/å˜é‡ ===================== */
+
+/* é‡æ–°å¼€å§‹èœå•è¡Œç±»å‹æ•°ç»„ (3è¡Œ: "é‡æ–°å¼€å§‹" + "è®¾ç½®" + "è¿”å›") */
+extern const uint8_t g_restart_row_types[3];
+
+/* è§†é¢‘ä¸Šæ»‘è®¾ç½®èœå•è¡Œç±»å‹æ•°ç»„ (4è¡Œ: äº®åº¦è®¾ç½®/æ¯å±æ—¶é—´/å±å¹•æ–¹å‘/è¿”å›) */
+extern const uint8_t g_video_menu_row_types[4];
+
+/* æ¸¸æˆé€€å‡º/é‡æ–°å¼€å§‹èœå•å…±ç”¨å˜é‡ */
+extern uint8_t  g_touch_down;
+extern uint16_t g_touch_start_y;
+extern uint8_t  g_menu_cooldown;
+extern uint8_t  g_exit_menu_visible;
+extern uint8_t  g_exit_dragging;
+extern uint8_t  g_exit_sliding;
+extern uint8_t  g_state_before_menu;     /* è¿›å…¥èœå•å‰çš„æ¸¸æˆçŠ¶æ€ */
+extern int16_t  g_exit_drag_y;           /* é€€å‡ºèœå•æ‹–æ‹½Yåç§» */
+extern uint16_t g_exit_drag_start_y;     /* é€€å‡ºèœå•æ‹–æ‹½èµ·å§‹è§¦æ‘¸Y */
+extern uint8_t  g_restart_menu_visible;  /* é‡æ–°å¼€å§‹èœå•å¯è§ */
+extern uint8_t  g_restart_sliding;       /* é‡æ–°å¼€å§‹èœå•æ»‘åŠ¨ä¸­ */
+extern uint8_t  g_restart_dragging;      /* é‡æ–°å¼€å§‹èœå•æ‹–æ‹½ä¸­ */
+extern int16_t  g_restart_slide_y;       /* é‡æ–°å¼€å§‹èœå•æ»‘åŠ¨Yä½ç½® */
+
+/* èœå•/é‡å¼€åŒºåŸŸæ¸…é™¤è‰² (æ¸¸æˆå¯è®¾ä¸ºè‡ªèº«èƒŒæ™¯è‰², é¿å…æ¸…èœå•é»‘é—ª) */
+extern uint16_t g_menu_clear_color;
+extern uint8_t  g_lowbatt_showing;   /* ä½ç”µå›¾æ ‡æ­£æ˜¾ç¤ºä¸­(äº®æ®µ), èœå•é‡ç»˜è·³è¿‡ç”µæ± åŒº */
+
+/* ä»æ¸¸æˆè¿›å…¥è®¾ç½®çš„æ ‡å¿— (MAIN_MODE_VIDEO=æ— , å…¶ä»–=æ¥æºæ¸¸æˆæ¨¡å¼) */
+extern uint8_t  g_settings_from_game;
+
+/* è§†é¢‘è®¾ç½®èœå•çŠ¶æ€ (main.cå®šä¹‰, æ¸¸æˆè®¾ç½®è·¯å¾„ç›´æ¥è®¿é—®) */
+extern uint8_t  s_video_menu_visible;
+extern int16_t  s_video_menu_slide_y;
+extern uint8_t  vm_touch_down;
+
+/* è®¾ç½®èœå•ä¸­é¡¶éƒ¨ä¸‹æ»‘è§¦å‘: GameSettings_Updateè®¾ç½®, å„æ¸¸æˆupdateæ£€æŸ¥ */
+extern uint8_t g_game_enter_exit_menu;
+
+/* å…±äº«è§¦æ‘¸çŠ¶æ€ (ä»å„æ¸¸æˆé™æ€æå‡ä¸ºå…¨å±€, ä¾› game_menu_command å¤ç”¨) */
+extern uint8_t  g_prev_pressed;
+extern uint16_t g_touch_start_x;
+
+/* åå‘æ»‘å…³é—­åçš„æ¾æ‰‹å¸æ”¶æ ‡å¿—: æ¸¸æˆç§»åŠ¨åˆ¤å®šå¤„æ£€æŸ¥, ç½®1æ—¶å¸æ”¶æœ¬æ¬¡æ¾æ‰‹ä¸è¯¯è§¦ç§»åŠ¨ */
+extern uint8_t  g_game_consume_release;
+
+/* ===================== å‡½æ•°å£°æ˜ ===================== */
+
+/* ---- éšæœºæ•°/ç”µæ± å›¾æ ‡ ---- */
+uint32_t game_rand(void);
+void game_battery_icon_reset(void);
+void game_battery_icon_update(uint16_t x, uint16_t y, uint8_t force_redraw);
+BatteryLevel game_battery_icon_get_level(void);
+void game_battery_set_charge_flash(uint8_t enable);
+
+/* ---- èœå•è¾¹æ¡†/ç»˜åˆ¶ ---- */
 /**
- * @brief  Ö÷²Ëµ¥´¥Ãş´¦Àí + Ä£Ê½ÇĞ»» (5ĞĞ: 2048/ÍÆÏä×Ó/¶íÂŞË¹·½¿é/»ªÈİµÀ/ÊÓÆµ)
- *         ·â×° menu_hit_test + Ä£Ê½ÇĞ»» (LCD_Clear/²Ëµ¥/ÓÎÏ·³õÊ¼»¯)
- * @param  x, y        ´¥Ãş×ø±ê
- * @param  mode        µ±Ç°Ä£Ê½Ö¸Õë (s_main_mode)
- * @param  menu_drawn  ²Ëµ¥ÒÑ»æÖÆ±êÖ¾Ö¸Õë
- * @param  game_inited ÓÎÏ·ÒÑ³õÊ¼»¯±êÖ¾Ö¸Õë
- * @param  touch_down  ´¥Ãş°´ÏÂ×´Ì¬Ö¸Õë
- * @param  key_resp    °´¼üÏìÓ¦±êÖ¾Ö¸Õë
- * @return 1 = ÒÑ´¦Àí, 0 = Î´´¦Àí
+ * @brief  ç»˜åˆ¶èœå•è¾¹æ¡† (è¾¹æ¡† + é¢œè‰²èƒŒæ™¯)
+ *         å…¬å…±å·¥å…·å‡½æ•°, ä¸ç»˜åˆ¶èœå•å†…å®¹
+ */
+void menu_draw_frame(void);
+
+/**
+ * @brief  ç»˜åˆ¶ä¸»èœå• (5è¡Œ: 2048/æ¨ç®±å­/ä¿„ç½—æ–¯æ–¹å—/åå®¹é“/è§†é¢‘)
+ */
+void main_menu_draw(void);
+
+/**
+ * @brief  ä»…ç»˜åˆ¶ä¸»èœå•è¾¹æ¡†å’Œé™æ€å†…å®¹ (æ‹–æ‹½/ä¸‹æ»‘åŠ¨ç”»ç”¨, ä¸å«åŠ¨æ€å…ƒç´ )
+ * @param  y_top  èœå•é¡¶éƒ¨Yåæ ‡
+ */
+void main_menu_draw_frame_only(int16_t y_top);
+
+/**
+ * @brief  é€šç”¨nè¡ŒåŠ¨æ€èœå•æ¸²æŸ“ (ä»…è¾¹æ¡†, ç”¨äºä¸»èœå•/æ¸¸æˆé€€å‡ºèœå•/é‡æ–°å¼€å§‹èœå•)
+ * @param  y_top      èœå•é¡¶éƒ¨Yåæ ‡
+ * @param  row_types  è¡Œç±»å‹æè¿°æ•°ç»„ (MENU_ROW_*, n_rowsä¸ªå…ƒç´ )
+ * @param  n_rows     è¡Œæ•° (2=é‡æ–°å¼€å§‹, 5=ä¸»èœå•/é€€å‡ºèœå•)
+ */
+void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
+                                uint8_t n_rows);
+
+/**
+ * @brief  ç»˜åˆ¶åå®¹é“å›¾æ ‡ (4x4æ ¼å­, ç¼ºä¸€è§’)
+ * @param  y  è¡Œç»˜åˆ¶Yåæ ‡
+ */
+void menu_draw_klotski_icon(uint16_t y);
+
+/**
+ * @brief  ç»˜åˆ¶ä¿„ç½—æ–¯æ–¹å— T å­—å›¾æ ‡
+ * @param  y  è¡Œç»˜åˆ¶Yåæ ‡
+ */
+void menu_draw_tetris_icon(uint16_t y);
+
+/**
+ * @brief  ç»˜åˆ¶å¤§é±¼åƒå°é±¼å›¾æ ‡
+ * @param  y  è¡Œç»˜åˆ¶Yåæ ‡
+ */
+void menu_draw_fish_icon(uint16_t y);
+
+/* ---- èœå•æ‹–æ‹½/æ»‘åŠ¨è½®è¯¢ ---- */
+/**
+ * @brief  æ¸¸æˆé€€å‡ºèœå•æ‹–æ‹½è·Ÿæ‰‹è½®è¯¢ (æ¯ä¸ªæ¸¸æˆå¤ç”¨)
+ * @param  drag_y       æ‹–æ‹½ä½ç½® (è¾“å…¥ä¼ å‡º, -MENU_H ~ MENU_Y)
+ * @param  drag_touch_y ä¸Šä¸€å¸§è§¦æ‘¸Y (è¾“å…¥ä¼ å‡º)
+ * @param  dragging     æ‹–æ‹½ä¸­æ ‡å¿— (è¾“å‡º: é‡Šæ”¾åæ¸…é›¶)
+ * @param  ts           å½“å‰è§¦æ‘¸çŠ¶æ€
+ * @param  row_types    5è¡Œè¡Œç±»å‹æ•°ç»„
+ * @return 0=æ‹–æ‹½ä¸­(å·²å¤„ç†), 1=å·²é‡Šæ”¾(è°ƒç”¨æ–¹å¤„ç†è§¦æ‘¸åˆ‡æ¢é€»è¾‘)
+ */
+uint8_t game_menu_drag_poll(int16_t *drag_y, uint16_t *drag_touch_y,
+                             uint8_t *dragging, const TouchState *ts,
+                             const uint8_t row_types[6]);
+
+/**
+ * @brief  é‡ç½® game_menu_drag_poll å†…éƒ¨çŠ¶æ€ï¼Œç¡®ä¿ä¸‹æ¬¡æ‹–æ‹½ä»å¹²å‡€çŠ¶æ€å¯åŠ¨
+ */
+void game_menu_drag_reset(void);
+
+/**
+ * @brief  é‡æ–°å¼€å§‹èœå•çš„ä¸Šæ»‘æ‹–æ‹½è½®è¯¢
+ * @return 0=æ‹–æ‹½ä¸­, 1=å·²é‡Šæ”¾-æäº¤, 2=å·²é‡Šæ”¾-å–æ¶ˆ
+ */
+uint8_t game_restart_menu_drag_poll(int16_t *slide_y, uint16_t drag_start_y,
+                                     uint8_t *dragging, const TouchState *ts);
+
+/**
+ * @brief  æ£€æµ‹é‡æ–°å¼€å§‹èœå•ä¸­çš„åº•éƒ¨ä¸Šæ»‘æ‰‹åŠ¿
+ * @return 1 è¡¨ç¤ºæ£€æµ‹åˆ°æœ‰æ•ˆä¸Šæ»‘, 0 è¡¨ç¤ºæœªæ£€æµ‹åˆ°
+ */
+uint8_t game_restart_menu_down_poll(const TouchState *ts, uint8_t *touch_down,
+                                    uint16_t *start_x, uint16_t *start_y);
+
+/**
+ * @brief  è§†é¢‘ä¸Šæ»‘è®¾ç½®èœå•æ‹–æ‹½è½®è¯¢
+ * @param  slide_y     èœå•é¡¶éƒ¨Yåæ ‡ (è¾“å…¥ä¼ å‡º)
+ * @param  drag_start_y æ‹–æ‹½èµ·å§‹è§¦æ‘¸Y
+ * @param  dragging    æ‹–æ‹½ä¸­æ ‡å¿— (è¾“å…¥ä¼ å‡º)
+ * @param  ts          å½“å‰è§¦æ‘¸çŠ¶æ€
+ * @return 0=æ‹–æ‹½ä¸­(å·²å¤„ç†), 1=å·²é‡Šæ”¾
+ */
+uint8_t video_menu_drag_poll(int16_t *slide_y, uint16_t drag_start_y,
+                              uint8_t *dragging, const TouchState *ts);
+
+/**
+ * @brief  æ£€æµ‹è§†é¢‘æ¨¡å¼ä¸‹çš„ä¸Šæ»‘æ‰‹åŠ¿ (åº•éƒ¨åŒºåŸŸ)
+ * @return 1 è¡¨ç¤ºæ£€æµ‹åˆ°æœ‰æ•ˆä¸Šæ»‘, 0 è¡¨ç¤ºæœªæ£€æµ‹åˆ°
+ */
+uint8_t video_menu_swipe_up_poll(const TouchState *ts, uint8_t *touch_down,
+                                  uint16_t *start_x, uint16_t *start_y);
+
+/* ---- èœå•åˆ‡æ¢/æ¸…ç† ---- */
+/**
+ * @brief  æŒ‰æ‹–æ‹½ä½ç½®æ¸…é€€å‡ºèœå•å¯è§åŒºåŸŸ
+ * @param  y  å½“å‰æ‹–æ‹½Y
+ */
+void menu_clear_exit_area_to(int16_t y);
+
+/**
+ * @brief  ç»Ÿä¸€é‡å¯èœå•å…³é—­æ¸…ç†
+ */
+void menu_restart_cleanup(void);
+
+/**
+ * @brief  ä¸Šåˆ’èœå•ä¸‹æ»‘æ‰“æ–­â†’è¿›å…¥é€€å‡ºèœå•
+ * @param  state       æ¸¸æˆçŠ¶æ€æŒ‡é’ˆ
+ * @param  exit_state  é€€å‡ºèœå•çŠ¶æ€å€¼
+ * @param  touch_y     å½“å‰è§¦æ‘¸Y
+ */
+void game_menu_restart_to_exit(uint8_t *state, uint8_t exit_state,
+                                uint16_t touch_y);
+
+/**
+ * @brief  åº•éƒ¨ä¸Šåˆ’æ‰“æ–­é€€å‡ºèœå•â†’åˆ‡æ¢é‡å¯èœå•
+ * @param  y_threshold   è§¦æ‘¸èµ·ç‚¹Yé˜ˆå€¼
+ * @param  release_thresh é‡Šæ”¾æ»‘åŠ¨è·ç¦»é˜ˆå€¼
+ * @return 0=æ— åŠ¨ä½œ 1=æ‹–æ‹½ 2=æ»‘å…¥
+ */
+uint8_t menu_swipe_to_restart_handler(uint16_t y_threshold, uint8_t release_thresh);
+
+/**
+ * @brief  æ•°å­—åˆ†è§£ä¸ºåè¿›åˆ¶ä½
+ * @param  val     æ•°å€¼
+ * @param  digits  è¾“å‡ºç¼“å†²(ä¸ªä½åœ¨å‰)
+ * @return ä½æ•°
+ */
+uint8_t uint_to_digits(uint32_t val, uint8_t *digits);
+
+/**
+ * @brief  ç»Ÿä¸€é€€å‡ºèœå•å…³é—­æ¸…ç†
+ */
+void menu_exit_back_cleanup(void);
+
+/**
+ * @brief  ä¸­é—´åŒºåŸŸä¸Šåˆ’å…³é—­"ä¸‹æ»‘"èœå•(é€€å‡º/ä¸»èœå•), èµ·ç‚¹åœ¨[10,y_threshold)æ‰åˆ¤å®š
+ * @param  y_threshold    åˆ¤å®šèµ·ç‚¹Yä¸Šé™
+ * @param  release_thresh é‡Šæ”¾æ»‘åŠ¨è·ç¦»é˜ˆå€¼
+ * @return 1=å·²æ£€æµ‹åˆ°å¹¶å¤„ç†, 0=æœªæ£€æµ‹åˆ°
+ */
+uint8_t game_menu_swipe_mid_up_close(uint16_t y_threshold, uint8_t release_thresh);
+
+/**
+ * @brief  ä¸­é—´/åº•éƒ¨åŒºåŸŸä¸‹æ»‘å…³é—­"ä¸Šæ»‘"èœå•(è®¾ç½®èœå•/äºŒçº§èœå•), èµ·ç‚¹éœ€>=start_min
+ * @param  start_min      åˆ¤å®šèµ·ç‚¹Yä¸‹é™
+ * @param  release_thresh é‡Šæ”¾æ»‘åŠ¨è·ç¦»é˜ˆå€¼
+ * @return 1=å·²æ£€æµ‹åˆ°å¹¶å¤„ç†, 0=æœªæ£€æµ‹åˆ°
+ */
+uint8_t game_menu_swipe_mid_down_close(uint16_t start_min, uint8_t release_thresh);
+
+/**
+ * @brief  åå‘æ»‘å…³é—­èœå•åä¿®æ­£å…±äº«è§¦æ‘¸çŠ¶æ€, ä½¿æ¾æ‰‹ä¸ä¼ å…¥æ¸¸æˆ(é‡å½•èµ·ç‚¹/æ¸…å†·å´)
+ */
+void game_menu_fix_release_after_close(void);
+
+/* ---- èœå•ç¢°æ’/å¤„ç† ---- */
+/**
+ * @brief  èœå•ç¢°æ’æ£€æµ‹
+ * @param  x, y        è§¦æ‘¸åæ ‡
+ * @param  item_count  èœå•é¡¹æ•°é‡ (2 æˆ– 3)
+ * @return å‘½ä¸­çš„èœå•é¡¹ç´¢å¼• (0-based), -1 è¡¨ç¤ºæœªå‘½ä¸­ä»»ä½•é¡¹
+ */
+int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count);
+
+/**
+ * @brief  é€€å‡ºèœå•è§¦æ‘¸è½®è¯¢ (é€šç”¨: 4ä¸ªæ¸¸æˆå…±ç”¨é‡å¤çš„ä»£ç )
+ *         æŒ‰ä¸‹æ—¶è®°å½•èœå•è¡Œï¼Œæ¾æ‰‹ä»åœ¨åŒä¸€è¡Œæ‰è§¦å‘
+ * @param  ret_map       hitç´¢å¼•(0-3)åˆ°è¿”å›å€¼çš„æ˜ å°„è¡¨ (4å…ƒç´ æ•°ç»„)
+ * @param  prev_pressed  ä¸Šä¸€å¸§è§¦æ‘¸çŠ¶æ€æŒ‡é’ˆ
+ * @param  out_ts        å½“å‰å¸§è§¦æ‘¸è¾“å‡º (ç”¨äº"å…³é—­"æŒ‰é’®æµ‹è·)
+ * @return EXIT_RET_NONE(0) = æ— æ“ä½œ
+ *         EXIT_RET_BACK(0xFF) = ç‚¹å‡»"å…³é—­"
+ *         å…¶ä»– = EXIT_RET_* åˆ‡æ¢ç›®æ ‡
+ */
+uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t *prev_pressed,
+                            TouchState *out_ts);
+
+/**
+ * @brief  ä¸»èœå•è§¦æ‘¸å¤„ç† + æ¨¡å¼åˆ‡æ¢ (5è¡Œ: 2048/æ¨ç®±å­/ä¿„ç½—æ–¯æ–¹å—/åå®¹é“/è§†é¢‘)
+ *         å°è£… menu_hit_test + æ¨¡å¼åˆ‡æ¢ (LCD_Clear/èœå•/æ¸¸æˆåˆå§‹åŒ–)
+ * @param  x, y        è§¦æ‘¸åæ ‡
+ * @param  mode        å½“å‰æ¨¡å¼æŒ‡é’ˆ (s_main_mode)
+ * @param  menu_drawn  èœå•å·²ç»˜åˆ¶æ ‡å¿—æŒ‡é’ˆ
+ * @param  game_inited æ¸¸æˆå·²åˆå§‹åŒ–æ ‡å¿—æŒ‡é’ˆ
+ * @param  touch_down  è§¦æ‘¸æŒ‰ä¸‹çŠ¶æ€æŒ‡é’ˆ
+ * @param  key_resp    æŒ‰é”®å“åº”æ ‡å¿—æŒ‡é’ˆ
+ * @return 1 = å·²å¤„ç†, 0 = æœªå¤„ç†
  */
 uint8_t main_menu_handle(uint16_t x, uint16_t y,
                           MainMode *mode, uint8_t *menu_drawn,
@@ -264,149 +398,92 @@ uint8_t main_menu_handle(uint16_t x, uint16_t y,
                           uint8_t *key_resp);
 
 /**
- * @brief  Í³Ò»ÓÎÏ··µ»ØÖµ´¦Àí (4¸öÓÎÏ·¹²ÓÃ)
- *         ¸ù¾İ GAME_RET_* À´Ö´ĞĞ LCDÇåÆÁ/Ä£Ê½ÇĞ»»/ÊÓÆµ»Ö¸´
- * @param  ret        ÓÎÏ· update ·µ»ØÖµ
- * @param  mode       s_main_mode Ö¸Õë
- * @param  game_inited s_game_inited Ö¸Õë
- * @param  touch_down s_touch_down Ö¸Õë
- * @param  key_resp   key_response Ö¸Õë
- * @return Ô­Öµ ret
+ * @brief  ç»Ÿä¸€æ¸¸æˆè¿”å›å€¼å¤„ç† (4ä¸ªæ¸¸æˆå…±ç”¨)
+ *         æ ¹æ® GAME_RET_* æ¥æ‰§è¡Œ LCDæ¸…å±/æ¨¡å¼åˆ‡æ¢/è§†é¢‘æ¢å¤
+ * @param  ret        æ¸¸æˆ update è¿”å›å€¼
+ * @param  mode       s_main_mode æŒ‡é’ˆ
+ * @param  game_inited s_game_inited æŒ‡é’ˆ
+ * @param  touch_down s_touch_down æŒ‡é’ˆ
+ * @param  key_resp   key_response æŒ‡é’ˆ
+ * @return åŸå€¼ ret
  */
 uint8_t game_handle_ret(uint8_t ret, MainMode *mode, uint8_t *game_inited,
                          uint8_t *touch_down, uint8_t *key_resp);
 
+/* ---- æ¸¸æˆæ»‘åŠ¨è§¦å‘èœå•çš„å…¬å…±å‡½æ•° ---- */
 /**
- * @brief  ¼ì²âµ×²¿ÉÏ»®´ò¶ÏÍË³ö²Ëµ¥ (d2048/tetris/klotski ¹²ÓÃ)
- *         ÄÚ²¿Î¬»¤ g_touch_down/g_touch_start_y£¬¼ì²âµ×²¿µ½¶¥²¿»¬¶¯
- * @param  y_threshold    ´¥ÃşÆğµãYãĞÖµ (d2048/klotski=220, tetris=210)
- * @param  release_thresh ÊÍ·ÅÉÏ»®¾àÀëãĞÖµ (d2048/klotski=10, tetris=25)
- * @param  dy_out         ÊÍ·ÅÂ·¾¶µÄÊä³ö»¬¶¯¾àÀë
- * @return 0=ÎŞ¶¯×÷, 1=ÍÏ×§ÖĞ¶Ï(ÒÑÇåÆÁ), 2=ÊÍ·ÅÖĞ¶Ï(ÒÑÇåÆÁ)
+ * @brief  æ£€æµ‹åº•éƒ¨ä¸Šåˆ’æ‰“æ–­é€€å‡ºèœå• (d2048/tetris/klotski å…±ç”¨)
+ *         å†…éƒ¨ç»´æŠ¤ g_touch_down/g_touch_start_yï¼Œæ£€æµ‹åº•éƒ¨åˆ°é¡¶éƒ¨æ»‘åŠ¨
+ * @param  y_threshold    è§¦æ‘¸èµ·ç‚¹Yé˜ˆå€¼ (d2048/klotski=220, tetris=210)
+ * @param  release_thresh é‡Šæ”¾ä¸Šåˆ’è·ç¦»é˜ˆå€¼ (d2048/klotski=10, tetris=25)
+ * @param  dy_out         é‡Šæ”¾è·¯å¾„çš„è¾“å‡ºæ»‘åŠ¨è·ç¦»
+ * @return 0=æ— åŠ¨ä½œ, 1=æ‹–æ‹½ä¸­æ–­(å·²æ¸…å±), 2=é‡Šæ”¾ä¸­æ–­(å·²æ¸…å±)
  */
 uint8_t game_menu_swipe_up_poll(uint16_t y_threshold, uint8_t release_thresh,
                                 int16_t *dy_out);
 
-/* ---- ÓÎÏ·»¬¶¯´¥·¢²Ëµ¥µÄ¹«¹²º¯Êı ---- */
-
 /**
- * @brief  ¶¥²¿ÏÂ»¬ÍÏ×§ÖĞ´¥·¢ÍË³ö²Ëµ¥
- * @param  ts            µ±Ç°´¥Ãş×´Ì¬
- * @param  state         ÓÎÏ·×´Ì¬±äÁ¿Ö¸Õë
- * @param  playing_state ÓÎÏ·µÄPLAYING×´Ì¬Öµ
- * @param  exit_state    ÓÎÏ·µÄEXIT_MENU×´Ì¬Öµ
- * @return 1=ÒÑ½øÈëÍË³ö²Ëµ¥ÍÏ×§Ä£Ê½, 0=Î´´¥·¢
+ * @brief  é¡¶éƒ¨ä¸‹æ»‘æ‹–æ‹½ä¸­è§¦å‘é€€å‡ºèœå•
+ * @param  ts            å½“å‰è§¦æ‘¸çŠ¶æ€
+ * @param  state         æ¸¸æˆçŠ¶æ€å˜é‡æŒ‡é’ˆ
+ * @param  playing_state æ¸¸æˆçš„PLAYINGçŠ¶æ€å€¼
+ * @param  exit_state    æ¸¸æˆçš„EXIT_MENUçŠ¶æ€å€¼
+ * @return 1=å·²è¿›å…¥é€€å‡ºèœå•æ‹–æ‹½æ¨¡å¼, 0=æœªè§¦å‘
  */
 uint8_t game_menu_enter_exit_drag(const TouchState *ts, uint8_t *state,
                                    uint8_t playing_state, uint8_t exit_state);
 
 /**
- * @brief  µ×²¿ÉÏ»®ÍÏ×§ÖĞ´¥·¢ÖØĞÂ¿ªÊ¼²Ëµ¥
- * @param  ts             µ±Ç°´¥Ãş×´Ì¬
- * @param  state          ÓÎÏ·×´Ì¬±äÁ¿Ö¸Õë
- * @param  playing_state  ÓÎÏ·µÄPLAYING×´Ì¬Öµ
- * @param  restart_state  ÓÎÏ·µÄRESTART_MENU×´Ì¬Öµ
- * @param  y_threshold    µ×²¿´¥ÃşÆğµãYãĞÖµ (d2048/klotski=220, tetris=210)
- * @return 1=ÒÑ½øÈëÖØĞÂ¿ªÊ¼²Ëµ¥ÍÏ×§Ä£Ê½, 0=Î´´¥·¢
+ * @brief  åº•éƒ¨ä¸Šåˆ’æ‹–æ‹½ä¸­è§¦å‘é‡æ–°å¼€å§‹èœå•
+ * @param  ts             å½“å‰è§¦æ‘¸çŠ¶æ€
+ * @param  state          æ¸¸æˆçŠ¶æ€å˜é‡æŒ‡é’ˆ
+ * @param  playing_state  æ¸¸æˆçš„PLAYINGçŠ¶æ€å€¼
+ * @param  restart_state  æ¸¸æˆçš„RESTART_MENUçŠ¶æ€å€¼
+ * @param  y_threshold    åº•éƒ¨è§¦æ‘¸èµ·ç‚¹Yé˜ˆå€¼ (d2048/klotski=220, tetris=210)
+ * @return 1=å·²è¿›å…¥é‡æ–°å¼€å§‹èœå•æ‹–æ‹½æ¨¡å¼, 0=æœªè§¦å‘
  */
 uint8_t game_menu_enter_restart_drag(const TouchState *ts, uint8_t *state,
                                       uint8_t playing_state, uint8_t restart_state,
                                       uint16_t y_threshold);
 
 /**
- * @brief  ËÉÊÖÊ±³¢ÊÔÌá½»ÍË³ö²Ëµ¥
- * @param  dy          ´¥ÃşY×ÜÎ»ÒÆ (ts.y - g_touch_start_y)
- * @param  state       ÓÎÏ·×´Ì¬±äÁ¿Ö¸Õë
- * @param  exit_state  ÓÎÏ·µÄEXIT_MENU×´Ì¬Öµ
- * @return 1=ÒÑÌá½»ÍË³ö²Ëµ¥»¬¶¯, 0=Î´´¥·¢
+ * @brief  æ¾æ‰‹æ—¶å°è¯•æäº¤é€€å‡ºèœå•
+ * @param  dy          è§¦æ‘¸Yæ€»ä½ç§» (ts.y - g_touch_start_y)
+ * @param  state       æ¸¸æˆçŠ¶æ€å˜é‡æŒ‡é’ˆ
+ * @param  exit_state  æ¸¸æˆçš„EXIT_MENUçŠ¶æ€å€¼
+ * @return 1=å·²æäº¤é€€å‡ºèœå•æ»‘åŠ¨, 0=æœªè§¦å‘
  */
 uint8_t game_menu_commit_exit(int16_t dy, uint8_t *state, uint8_t exit_state);
 
 /**
- * @brief  ËÉÊÖÊ±³¢ÊÔÌá½»ÖØĞÂ¿ªÊ¼²Ëµ¥
- * @param  dy            ´¥ÃşY×ÜÎ»ÒÆ
- * @param  state         ÓÎÏ·×´Ì¬±äÁ¿Ö¸Õë
- * @param  restart_state ÓÎÏ·µÄRESTART_MENU×´Ì¬Öµ
- * @param  y_threshold   µ×²¿´¥ÃşÆğµãYãĞÖµ
- * @param  swipe_dist    ÉÏ»®¾àÀëãĞÖµ (d2048/klotski=10, tetris=25)
- * @return 1=ÒÑÌá½»ÖØĞÂ¿ªÊ¼²Ëµ¥»¬¶¯, 0=Î´´¥·¢
+ * @brief  æ¾æ‰‹æ—¶å°è¯•æäº¤é‡æ–°å¼€å§‹èœå•
+ * @param  dy            è§¦æ‘¸Yæ€»ä½ç§»
+ * @param  state         æ¸¸æˆçŠ¶æ€å˜é‡æŒ‡é’ˆ
+ * @param  restart_state æ¸¸æˆçš„RESTART_MENUçŠ¶æ€å€¼
+ * @param  y_threshold   åº•éƒ¨è§¦æ‘¸èµ·ç‚¹Yé˜ˆå€¼
+ * @param  swipe_dist    ä¸Šåˆ’è·ç¦»é˜ˆå€¼ (d2048/klotski=10, tetris=25)
+ * @return 1=å·²æäº¤é‡æ–°å¼€å§‹èœå•æ»‘åŠ¨, 0=æœªè§¦å‘
  */
 uint8_t game_menu_commit_restart(int16_t dy, uint8_t *state, uint8_t restart_state,
                                   uint16_t y_threshold, uint8_t swipe_dist);
 
-/* ---- ÓÎÏ·ÍË³ö/ÖØĞÂ¿ªÊ¼²Ëµ¥¹²ÓÃ±äÁ¿ ---- */
-extern uint8_t  g_touch_down;
-extern uint16_t g_touch_start_y;
-extern uint8_t  g_menu_cooldown;
-extern uint8_t  g_exit_menu_visible;
-extern uint8_t  g_exit_dragging;
-extern uint8_t  g_exit_sliding;
-extern uint8_t  g_state_before_menu;     /* ½øÈë²Ëµ¥Ç°µÄÓÎÏ·×´Ì¬ */
-extern int16_t  g_exit_drag_y;           /* ÍË³ö²Ëµ¥ÍÏ×§YÆ«ÒÆ */
-extern uint16_t g_exit_drag_start_y;     /* ÍË³ö²Ëµ¥ÍÏ×§ÆğÊ¼´¥ÃşY */
-extern uint8_t  g_restart_menu_visible;   /* ÖØĞÂ¿ªÊ¼²Ëµ¥¿É¼û */
-extern uint8_t  g_restart_sliding;        /* ÖØĞÂ¿ªÊ¼²Ëµ¥»¬¶¯ÖĞ */
-extern uint8_t  g_restart_dragging;       /* ÖØĞÂ¿ªÊ¼²Ëµ¥ÍÏ×§ÖĞ */
-extern int16_t  g_restart_slide_y;        /* ÖØĞÂ¿ªÊ¼²Ëµ¥»¬¶¯YÎ»ÖÃ */
-
-/* ²Ëµ¥/ÖØ¿ªÇøÓòÇå³ıÉ« (ÓÎÏ·¿ÉÉèÎª×ÔÉí±³¾°É«, ±ÜÃâÇå²Ëµ¥ºÚÉÁ) */
-extern uint16_t g_menu_clear_color;
-extern uint8_t  g_lowbatt_showing;   /* µÍµçÍ¼±êÕıÏÔÊ¾ÖĞ(ÁÁ¶Î), ²Ëµ¥ÖØ»æÌø¹ıµç³ØÇø */
-
-/* ´ÓÓÎÏ·½øÈëÉèÖÃµÄ±êÖ¾ (MAIN_MODE_VIDEO=ÎŞ, ÆäËû=À´Ô´ÓÎÏ·Ä£Ê½) */
-extern uint8_t  g_settings_from_game;
-
-/* ÊÓÆµÉèÖÃ²Ëµ¥×´Ì¬ (main.c¶¨Òå, ÓÎÏ·ÉèÖÃÂ·¾¶Ö±½Ó·ÃÎÊ) */
-extern uint8_t  s_video_menu_visible;
-extern int16_t  s_video_menu_slide_y;
-extern uint8_t  vm_touch_down;
-
-/* ÓÎÏ·½øÈëÉèÖÃ: ±£´æÀ´Ô´²¢´ò¿ªÊÓÆµÉèÖÃ²Ëµ¥ */
+/* ---- è¿›å…¥è®¾ç½®/ç»Ÿä¸€çŠ¶æ€æœº ---- */
+/**
+ * @brief  æ¸¸æˆè¿›å…¥è®¾ç½®: ä¿å­˜æ¥æºå¹¶æ‰“å¼€è§†é¢‘è®¾ç½®èœå•
+ */
 void menu_enter_game_settings(void);
-/* ÓÎÏ·"¶ş´ÎÉÏ»®"½øÈëÉèÖÃ²¢¸úÊÖ»¬³ö (ÍÆÏä×ÓÓÃ, ¸´ÓÃ VideoMenu_Update ÍÏ×§×´Ì¬»ú) */
-void menu_enter_game_settings_swipe(uint16_t start_y);
-
-/* ÉèÖÃ²Ëµ¥ÖĞ¶¥²¿ÏÂ»¬´¥·¢: GameSettings_UpdateÉèÖÃ, ¸÷ÓÎÏ·update¼ì²é */
-extern uint8_t g_game_enter_exit_menu;
-
-/* ---- ¹²Ïí´¥Ãş×´Ì¬ (´Ó¸÷ÓÎÏ·¾²Ì¬ÌáÉıÎªÈ«¾Ö, ¹© game_menu_command ¸´ÓÃ) ---- */
-extern uint8_t  g_prev_pressed;
-extern uint16_t g_touch_start_x;
-
-/* ·´Ïò»¬¹Ø±ÕºóµÄËÉÊÖÎüÊÕ±êÖ¾: ÓÎÏ·ÒÆ¶¯ÅĞ¶¨´¦¼ì²é, ÖÃ1Ê±ÎüÊÕ±¾´ÎËÉÊÖ²»Îó´¥ÒÆ¶¯ */
-extern uint8_t  g_game_consume_release;
-
-/* ---- ÅäÖÃÇı¶¯ÓÎÏ·²Ëµ¥×´Ì¬»ú (d2048/klotski/tetris/fish ¹²ÓÃ) ---- */
-typedef struct {
-    uint8_t  playing;              /* ÓÎÏ·½øĞĞÖĞ×´Ì¬Öµ */
-    uint8_t  exit;                 /* ÍË³ö²Ëµ¥×´Ì¬Öµ */
-    uint8_t  restart;              /* ÖØĞÂ¿ªÊ¼²Ëµ¥×´Ì¬Öµ */
-    const uint8_t *exit_row_types; /* ÍË³ö²Ëµ¥6ĞĞÀàĞÍÊı×é */
-    const uint8_t *exit_map;       /* ÍË³ö²Ëµ¥5¸ñ¡ú·µ»ØÂëÓ³Éä±í */
-    uint16_t y_threshold;          /* µ×²¿ÉÏ»®ÆğµãYãĞÖµ (d2048/klotski/tetris=210, fish=220) */
-    uint8_t  release_thresh;       /* ËÉÊÖÉÏ»®¾àÀëãĞÖµ (tetris=25, ÆäÓà=10) */
-    uint16_t bat_x, bat_y;         /* ÖØ²Ë¾²Ö¹Ê±µç³ØÍ¼±êÎ»ÖÃ; 0xFFFF=²»»æÖÆ */
-    void (*mark_dirty)(void);      /* ÖÃÓÎÏ·×ÔÉí±³¾°Ôà±ê¼Ç(¹Ø±Õ/È¡Ïû²Ëµ¥ºóĞèÖØ»æ³¡¾°) */
-    uint8_t (*bg_redraw)(void);    /* ÒÀ¾İ×ÔÉíÔà±ê¼ÇÖØ»æ²Ëµ¥±³¾°(³¡¾°/½áÊø»­Ãæ), ·µ»Ø1=±¾Ö¡ÒÑÖØ»æ */
-    void (*on_to_exit)(void);      /* ÖØ²ËÏÂ»¬´ò¶Ï½øÍË³ö²Ëµ¥ºóµÄÓÎÏ·²à²¹³ä´¦Àí(¿ÉÎªNULL) */
-} GameMenuCfg;
-
-/* game_menu_command ·µ»ØÃüÁî */
-#define GAME_MENU_CMD_NONE      0   /* ²Ëµ¥ÒÑ´¦Àí, µ÷ÓÃ·½ return 0 */
-#define GAME_MENU_CMD_RETURN    1   /* ¹Ø±Õ²Ëµ¥(µã¿Õ°×/·µ»ØÌõ): ÒÑ»Ø g_state_before_menu, µ÷ÓÃ·½ return 0 */
-#define GAME_MENU_CMD_INTERACT  2   /* Ğè·µ»Ø GAME_RET_INTERACT(ÉÏ»®ÇĞµ½ÖØ²Ë/ÖØ²Ë"·µ»Ø") */
-#define GAME_MENU_CMD_SETTINGS  3   /* µã"ÉèÖÃ": µ÷ÓÃ·½ menu_enter_game_settings() ²¢ return EXIT_RET_SETTINGS */
-#define GAME_MENU_CMD_RESTART   4   /* µã"ÖØĞÂ¿ªÊ¼": ÒÑÇå²Ëµ¥, µ÷ÓÃ·½ xxx_init() ²¢ return GAME_RET_INTERACT */
-#define GAME_MENU_CMD_SWITCH    5   /* ÇĞ»»ÓÎÏ·: *out_ret = EXIT_RET_*, µ÷ÓÃ·½ return *out_ret */
-
-/* ¹©¸÷ÓÎÏ·¶¨Òå×ÔÉí GameMenuCfg Ê±Ê¹ÓÃµÄµç³ØÎ»ÖÃÉÚ±ø */
-#define GAME_MENU_BAT_NONE 0xFFFF
 
 /**
- * @brief  ÅäÖÃÇı¶¯ÓÎÏ·ÍË³ö/ÖØĞÂ¿ªÊ¼²Ëµ¥Í³Ò»×´Ì¬»ú (d2048/klotski/tetris/fish ¹²ÓÃ)
- * @param  cfg       ²Ëµ¥ÅäÖÃ (×´Ì¬Ã¶¾Ù/ĞĞÀàĞÍ/Ó³Éä/ãĞÖµ/»Øµ÷)
- * @param  state     ÓÎÏ·×´Ì¬Ö¸Õë (½øÈëÊ±Îª EXIT/RESTART ×´Ì¬, ÄÚ²¿»áÇĞ»Ø PLAYING/·µ»ØÖµ)
- * @param  out_ret   ÇĞ»»ÓÎÏ·Ê±Êä³ö EXIT_RET_* ·µ»ØÖµ
+ * @brief  æ¸¸æˆ"äºŒæ¬¡ä¸Šåˆ’"è¿›å…¥è®¾ç½®å¹¶è·Ÿæ‰‹æ»‘å‡º (æ¨ç®±å­ç”¨, å¤ç”¨ VideoMenu_Update æ‹–æ‹½çŠ¶æ€æœº)
+ * @param  start_y  ä¸Šåˆ’èµ·ç‚¹Y
+ */
+void menu_enter_game_settings_swipe(uint16_t start_y);
+
+/**
+ * @brief  é…ç½®é©±åŠ¨æ¸¸æˆé€€å‡º/é‡æ–°å¼€å§‹èœå•ç»Ÿä¸€çŠ¶æ€æœº (d2048/klotski/tetris/fish å…±ç”¨)
+ * @param  cfg       èœå•é…ç½® (çŠ¶æ€æšä¸¾/è¡Œç±»å‹/æ˜ å°„/é˜ˆå€¼/å›è°ƒ)
+ * @param  state     æ¸¸æˆçŠ¶æ€æŒ‡é’ˆ (è¿›å…¥æ—¶ä¸º EXIT/RESTART çŠ¶æ€, å†…éƒ¨ä¼šåˆ‡å› PLAYING/è¿”å›å€¼)
+ * @param  out_ret   åˆ‡æ¢æ¸¸æˆæ—¶è¾“å‡º EXIT_RET_* è¿”å›å€¼
  * @return GAME_MENU_CMD_*
  */
 uint8_t game_menu_command(const GameMenuCfg *cfg, uint8_t *state, uint8_t *out_ret);

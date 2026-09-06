@@ -1,127 +1,126 @@
 /**
  * @file    fish.c
- * @brief   ´óÓã³ÔĞ¡ÓãÓÎÏ·Ä£¿é
- *          ´¥Ãş¸úÊÖ¿ØÖÆ´óÓãÒÆ¶¯, Ğ¡ÓãËæ»úÓÎ¶¯;
- *          ´óÓãÄÜ³Ôµô±È×Ô¼ºĞ¡µÄÓã²¢³É³¤, Åöµ½±È×Ô¼º´óµÄÓãÔòÊ§°Ü¡£
- *          ÓãÍ¼Æ¬´æÓÚÍâ²¿Flash, ÔËĞĞÊ±°´´óĞ¡DMAÁ÷Ê½¶ÁÈ¡¡£
+ * @brief   å¤§é±¼åƒå°é±¼æ¸¸æˆæ¨¡å—
+ *          è§¦æ‘¸è·Ÿæ‰‹æ§åˆ¶å¤§é±¼ç§»åŠ¨, å°é±¼éšæœºæ¸¸åŠ¨;
+ *          å¤§é±¼èƒ½åƒæ‰æ¯”è‡ªå·±å°çš„é±¼å¹¶æˆé•¿, ç¢°åˆ°æ¯”è‡ªå·±å¤§çš„é±¼åˆ™å¤±è´¥ã€‚
+ *          é±¼å›¾ç‰‡å­˜äºå¤–éƒ¨Flash, è¿è¡Œæ—¶æŒ‰å¤§å°DMAæµå¼è¯»å–ã€‚
  */
 #include "fish.h"
-#include "fish_imgs.h"     /* ÓãÍ¼Æ¬³ß´ç/Êı¾İ(fish_imgs_dim) */
-#include "player_imgs.h"   /* Íæ¼ÒĞÎÏó³ß´ç/Êı¾İ(player_imgs_dim) */
-#include "tetris.h"        /* GAME_RET_* */
-#include "menu.h"          /* ²Ëµ¥/ÍË³ö/ÖØ¿ª */
-#include "sok_img_win.h"   /* sok_draw_digit_16x32 */
-#include "flash_store.h"   /* ÓãÍ¼Æ¬×ÊÔ´´ÓÍâ²¿Flash¶ÁÈ¡ */
+#include "fish_imgs.h"     /* é±¼å›¾ç‰‡å°ºå¯¸/æ•°æ®è¡¨ */
+#include "player_imgs.h"   /* ç©å®¶å½¢è±¡å°ºå¯¸/æ•°æ®è¡¨ */
+#include "tetris.h"        /* æ¸¸æˆè¿”å›ç  */
+#include "menu.h"          /* èœå•/é€€å‡º/é‡å¼€ */
+#include "sok_img_win.h"   /* 16x32 æ•°å­—å­—æ¨¡ */
+#include "flash_store.h"   /* é±¼å›¾ç‰‡èµ„æºä»å¤–éƒ¨Flashè¯»å– */
 #include "lcd.h"
 #include "display.h"
 #include "touch.h"
 #include "string.h"
 #include "timer.h"
-/* ================================================================
- *  ²Ëµ¥: ÍË³ö²Ëµ¥Ó³Éä + ĞĞÀàĞÍ (¸´ÓÃ menu.c Í³Ò»²Ëµ¥ÏµÍ³)
- * ================================================================ */
-/* ÏÂ»®²Ëµ¥ÓÎÏ·Ó³Éä (ÊÓÆµ/ÍÆÏä×Ó/2048/»ªÈİµÀ, ¼õµ±Ç°=´óÓã³ÔĞ¡Óã) */
+ /* èœå•: é€€å‡ºèœå•æ˜ å°„ + è¡Œç±»å‹ (å¤ç”¨ menu.c ç»Ÿä¸€èœå•ç³»ç»Ÿ) */
+ /* ä¸‹åˆ’èœå•æ¸¸æˆæ˜ å°„ (è§†é¢‘/æ¨ç®±å­/2048/åå®¹é“, å‡å½“å‰=å¤§é±¼åƒå°é±¼) */
 static const uint8_t fish_exit_map[5] = {
     EXIT_RET_VIDEO, EXIT_RET_SOKOBAN, EXIT_RET_D2048, EXIT_RET_TETRIS, EXIT_RET_KLOTSKI
 };
-/* ÍË³ö²Ëµ¥ĞĞÀàĞÍ (¹© menu_draw_nrow_frame_only / game_menu_drag_poll Ê¹ÓÃ) */
+/* é€€å‡ºèœå•è¡Œç±»å‹ (ä¾› menu_draw_nrow_frame_only / game_menu_drag_poll ä½¿ç”¨) */
 static const uint8_t fish_row_types[5] = {
     MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI
-};         /* GetTimerCount: »ùÓÚÕæÊµÊ±¼äµÄÒÆ¶¯½ÚÅÄ(ÓëÖ¡ÂÊÎŞ¹Ø) */
+};
 
-/* ================================================================
- *  ÓÎÏ·²ÎÊı
- * ================================================================ */
-#define FISH_PLAYER_START_LEVEL  0   /* Íæ¼ÒÎïÀí³õÊ¼µÈ¼¶0(µÚ1ÌõÉ³¶¡Óã); HUDÏÔÊ¾Îª µÈ¼¶+1 */
-#define FISH_PLAYER_LEVEL_MAX    9   /* Íæ¼Ò×î´óµÈ¼¶(ÎïÀí9¼¶=ÏÔÊ¾10¼¶, ÓÃ×î´óĞÎÏóPLAYER_COUNT-1) */
+/* æ¸¸æˆå‚æ•° */
+#define FISH_PLAYER_START_LEVEL  0   /* ç©å®¶ç‰©ç†åˆå§‹ç­‰çº§0(ç¬¬1æ¡æ²™ä¸é±¼); HUDæ˜¾ç¤ºä¸º ç­‰çº§+1 */
+#define FISH_PLAYER_LEVEL_MAX    9   /* ç©å®¶æœ€å¤§ç­‰çº§(ç‰©ç†9çº§=æ˜¾ç¤º10çº§, ç”¨æœ€å¤§å½¢è±¡PLAYER_COUNT-1) */
 #define FISH_PLAYER_X   (LCD_W / 2)
 #define FISH_PLAYER_Y   (LCD_H / 2)
 
-#define FISH_NUM_FOOD   6      /* ³¡ÉÏĞ¡ÓãÊıÁ¿ */
-#define FISH_SPEED_BASE 2      /* Ğ¡Óã»ù´¡ÒÆ¶¯ËÙ¶È(½µÂı, ±ãÓÚ²¶×½) */
-#define FISH_MOVE_US    40000 /* Ğ¡ÓãÃ¿40msÒÆ¶¯Ò»´Î(»ùÓÚÕæÊµÊ±¼ä, ¸üÁ¬Ğø) */
-#define FISH_LIFE_TICKS     150   /* ¿É³ÔĞ¡Óã(<=Íæ¼Ò¼¶)×î³¤Í£ÁôÈ¦Êı, 40ms/È¦¡Ö6s */
-#define FISH_LIFE_BIG_TICKS  60    /* ±ÈÍæ¼Ò´óµÄÓã¸ü¿ìÀë¿ª(¡Ö2.4s), ±ÜÃâ³¡ÉÏÈ«ÊÇ³Ô²»µ½µÄ´óÓã */
-#define FISH_LEAVE_SPEED     2      /* ÓÎ³öÆÁÄ»ËÙ¶È(px/40ms), ÓëÆÕÍ¨Ğ¡ÓãÒ»ÖÂ±£³Ö×ÔÈ»ÒÆ¶¯ */
-#define FISH_FOOD_RANGE 3      /* ×ÔÊÊÓ¦ÄÑ¶È: Ğ¡ÓãµÈ¼¶ÔÚÍæ¼Ò×óÓÒ ¡À3 ÄÚ */
-#define FISH_INVINCIBLE 0      /* ÎŞµĞÄ£Ê½(1=ÎŞµĞ: Åöµ½¸ü´óÓãºöÂÔ²»×²ËÀÒ²²»³Ô; 0=Õı³£Íæ·¨, Åö´óÓã¼´Ê§°Ü) */
-#define FISH_WIN_SCORE     1953125   /* Í¨¹ØÄ¿±ê·ÖÊı: ´ïµ½1,953,125·Ö(ÏÔÊ¾10¼¶)¼´Í¨¹Ø */
+#define FISH_NUM_FOOD   6      /* åœºä¸Šå°é±¼æ•°é‡ */
+#define FISH_SPEED_BASE 2      /* å°é±¼åŸºç¡€ç§»åŠ¨é€Ÿåº¦(é™æ…¢, ä¾¿äºæ•æ‰) */
+#define FISH_MOVE_US    40000 /* å°é±¼æ¯40msç§»åŠ¨ä¸€æ¬¡(åŸºäºçœŸå®æ—¶é—´, æ›´è¿ç»­) */
+#define FISH_LIFE_TICKS     150   /* å¯åƒå°é±¼(<=ç©å®¶çº§)æœ€é•¿åœç•™åœˆæ•°, 40ms/åœˆâ‰ˆ6s */
+#define FISH_LIFE_BIG_TICKS  60    /* æ¯”ç©å®¶å¤§çš„é±¼æ›´å¿«ç¦»å¼€(â‰ˆ2.4s), é¿å…åœºä¸Šå…¨æ˜¯åƒä¸åˆ°çš„å¤§é±¼ */
+#define FISH_LEAVE_SPEED     2      /* æ¸¸å‡ºå±å¹•é€Ÿåº¦(px/40ms), ä¸æ™®é€šå°é±¼ä¸€è‡´ä¿æŒè‡ªç„¶ç§»åŠ¨ */
+#define FISH_FOOD_RANGE 3      /* è‡ªé€‚åº”éš¾åº¦: å°é±¼ç­‰çº§åœ¨ç©å®¶å·¦å³ Â±3 å†… */
+#define FISH_INVINCIBLE 0      /* æ— æ•Œæ¨¡å¼(1=æ— æ•Œ: ç¢°åˆ°æ›´å¤§é±¼å¿½ç•¥ä¸æ’æ­»ä¹Ÿä¸åƒ; 0=æ­£å¸¸ç©æ³•, ç¢°å¤§é±¼å³å¤±è´¥) */
+#define FISH_WIN_SCORE     1953125   /* é€šå…³ç›®æ ‡åˆ†æ•°: è¾¾åˆ°1,953,125åˆ†(æ˜¾ç¤º10çº§)å³é€šå…³ */
 
-/* ¶¥²¿µÃ·ÖÌõÇøÓò(16x32Êı×Ö´Óy=4µ½y=35), ÊµÌå²»µÃÔ½¹ı, ±ÜÃâÓÎ¶¯Ê±²Áµô¼Æ·Ö */
+/* å­˜æ¡£ç¼“å†²å¸ƒå±€å® */
+#define FISH_SAVE_BASE 11   /* ç©å®¶ level+x+y+facing(6) + score(4) + state(1) */
+#define FISH_SAVE_FOOD 9    /* æ¯æ¡é±¼: active+level+x+y+vx+vy */
+#define FISH_SAVE_LEN (FISH_SAVE_BASE + FISH_NUM_FOOD * FISH_SAVE_FOOD)
+
+/* ç©å®¶å½¢è±¡/å°ºå¯¸çº§åˆ«(å°é¡¶åˆ°æœ€å¤§å›¾ç‰‡) */
+#define PLAYER_IMG_LVL ((g_player.level < PLAYER_COUNT) ? g_player.level : (PLAYER_COUNT - 1))
+
+/* é¡¶éƒ¨å¾—åˆ†æ¡åŒºåŸŸ(16x32æ•°å­—ä»y=4åˆ°y=35), å®ä½“ä¸å¾—è¶Šè¿‡, é¿å…æ¸¸åŠ¨æ—¶æ“¦æ‰è®¡åˆ† */
 #define SCORE_TOP      4
 #define SCORE_H        32
-/* ¶¥²¿ĞÅÏ¢À¸Êı×Ö´óĞ¡Îª8x14, ĞÅÏ¢À¸Õ¼ y4~31; PLAY_TOP=32 ÈÃÓã¶¥ÌùĞÅÏ¢À¸ÏÂÔµ */
-#define PLAY_TOP       32   /* ÓÎÏ·Çø¶¥²¿±ß½ç(ĞÅÏ¢À¸µ×31, Áô1px) */
-#define PLAY_Y_MIN    (PLAY_TOP + 20)           /* ×î¸ßÊµÌå°ë¸ß(player=20), ·À¶¥Í¼Ô½½ç */
-#define PLAY_Y_MAX    (LCD_H - 21)              /* ¸ß¶È×î´ó41(°ë¸ß20)Ê±µ×±ßÈÔÍêÕû */
-#define PLAY_X_MIN    26                        /* ¿í¶È×î´ó52(°ë¿í26)Ê±×óÓÒÈÔÍêÕû */
+/* é¡¶éƒ¨ä¿¡æ¯æ æ•°å­—å¤§å°ä¸º8x14, ä¿¡æ¯æ å  y4~31; PLAY_TOP=32 è®©é±¼é¡¶è´´ä¿¡æ¯æ ä¸‹ç¼˜ */
+#define PLAY_TOP       32   /* æ¸¸æˆåŒºé¡¶éƒ¨è¾¹ç•Œ(ä¿¡æ¯æ åº•31, ç•™1px) */
+#define PLAY_Y_MIN    (PLAY_TOP + 20)           /* æœ€é«˜å®ä½“åŠé«˜(player=20), é˜²é¡¶å›¾è¶Šç•Œ */
+#define PLAY_Y_MAX    (LCD_H - 21)              /* é«˜åº¦æœ€å¤§41(åŠé«˜20)æ—¶åº•è¾¹ä»å®Œæ•´ */
+#define PLAY_X_MIN    26                        /* å®½åº¦æœ€å¤§52(åŠå®½26)æ—¶å·¦å³ä»å®Œæ•´ */
 #define PLAY_X_MAX    (LCD_W - 26)
-#define PLAY_CORNER   30   /* 8½ÇĞÎµ¹½Ç±ß³¤: ÇĞµô¾ØĞÎËÄ½Ç, ÈÃÓã²»½øÈëÔ²ĞÎÆÁ±»ÕÚµ²µÄËÄ½Ç */
+#define PLAY_CORNER   30   /* 8è§’å½¢å€’è§’è¾¹é•¿: åˆ‡æ‰çŸ©å½¢å››è§’, è®©é±¼ä¸è¿›å…¥åœ†å½¢å±è¢«é®æŒ¡çš„å››è§’ */
 
-/* ================================================================
- *  ÓÎÏ·×´Ì¬
- * ================================================================ */
+/* æ¸¸æˆçŠ¶æ€ */
 typedef struct {
-    uint8_t active;      /* ÊÇ·ñÔÚ³¡ */
-    uint8_t level;       /* µÈ¼¶ 0-9 */
-    uint8_t dir;         /* ÓÎ¶¯·½Ïò(0-7) */
-    uint16_t x, y;       /* µ±Ç°Î»ÖÃ */
-    int16_t vx, vy;      /* ËÙ¶È·ÖÁ¿ */
-    int16_t prev_x, prev_y;  /* ÉÏÒ»Ö¡Î»ÖÃ(ÔöÁ¿²Á³ıÓÃ) */
-    uint8_t prev_level;  /* ÉÏÒ»Ö¡µÈ¼¶(³ß´ç±ä»¯ºó²Á³ı¾ÉÍ¼ÓÃ) */
+    uint8_t active;      /* æ˜¯å¦åœ¨åœº */
+    uint8_t level;       /* ç­‰çº§ 0-9 */
+    uint8_t dir;         /* æ¸¸åŠ¨æ–¹å‘(0-7) */
+    uint16_t x, y;       /* å½“å‰ä½ç½® */
+    int16_t vx, vy;      /* é€Ÿåº¦åˆ†é‡ */
+    int16_t prev_x, prev_y;  /* ä¸Šä¸€å¸§ä½ç½®(å¢é‡æ“¦é™¤ç”¨) */
+    uint8_t prev_level;  /* ä¸Šä¸€å¸§ç­‰çº§(å°ºå¯¸å˜åŒ–åæ“¦é™¤æ—§å›¾ç”¨) */
     uint16_t life;
-    uint8_t leaving;
-    uint8_t entering;
-    uint8_t facing;  /* ³¯Ïò: 0=ÓÒ, 1=×ó(½öÍæ¼ÒÊ¹ÓÃ) */  /* ´Ó±ßÔµÈë³¡ÖĞ±êÖ¾ */  /* ×ß³öÆÁÄ»ÖĞ±êÖ¾ */
-    uint8_t drawn;       /* ¸ÃÊµÌåÒÑ»æÖÆ¹ı(ÓÃÓÚÖ»»­±ä»¯) */
+    uint8_t leaving;     /* èµ°å‡ºå±å¹•ä¸­æ ‡å¿— */
+    uint8_t entering;    /* ä»è¾¹ç¼˜å…¥åœºä¸­æ ‡å¿— */
+    uint8_t facing;      /* æœå‘: 0=å³, 1=å·¦(ä»…ç©å®¶ä½¿ç”¨) */
+    uint8_t drawn;       /* è¯¥å®ä½“å·²ç»˜åˆ¶è¿‡(ç”¨äºåªç”»å˜åŒ–) */
 } FishEntity;
 
 static uint8_t   g_state = FISH_STATE_PLAYING;
-static uint8_t   g_won;  /* Ê¤Àû±êÖ¾: 1=´ïµ½1,953,125·ÖÍ¨¹Ø */
-static FishEntity g_player;          /* Íæ¼Ò´óÓã */
-static FishEntity g_food[FISH_NUM_FOOD];  /* Ğ¡Óã */
-#define PLAYER_IMG_LVL ((g_player.level < PLAYER_COUNT) ? g_player.level : (PLAYER_COUNT - 1))  /* Íæ¼ÒĞÎÏó/³ß´ç¼¶±ğ(·â¶¥µ½×î´óÍ¼Æ¬) */
-static uint32_t  g_score;            /* ÀÛ»ı·Ö(³ÔÓãµÃ·Ö = 5^µÈ¼¶: 0¼¶=1,1¼¶=5,2¼¶=25...) */
-static uint8_t   g_hud_dirty;        /* ¶¥²¿ĞÅÏ¢(·ÖÊı/½ø¶È)ĞèÖØ»æ */
-static uint16_t  g_frame;            /* Ö¡¼ÆÊıÆ÷(ÓÃÓÚ¶¯»­/ÒÆ¶¯½ÚÅÄ) */
-static uint32_t  g_food_us;          /* ÉÏ´ÎĞ¡ÓãÒÆ¶¯µÄÊ±¼ä´Á(Î¢Ãë, ÕæÊµÊ±¼ä½ÚÅÄ) */
-static uint8_t   g_full_redraw;      /* È«ÆÁÖØ»æÔà±ê¼Ç */
-static int16_t   s_last_touch_x;     /* ÉÏÒ»´ÎÓĞĞ§´¥ÃşÎ»ÖÃ(ÔöÁ¿ÍÏ¶¯ÓÃ) */
+static uint8_t   g_won;  /* èƒœåˆ©æ ‡å¿—: 1=è¾¾åˆ°1,953,125åˆ†é€šå…³ */
+static FishEntity g_player;          /* ç©å®¶å¤§é±¼ */
+static FishEntity g_food[FISH_NUM_FOOD];  /* å°é±¼ */
+static uint32_t  g_score;            /* ç´¯ç§¯åˆ†(åƒé±¼å¾—åˆ† = 5^ç­‰çº§: 0çº§=1,1çº§=5,2çº§=25...) */
+static uint8_t   g_hud_dirty;        /* é¡¶éƒ¨ä¿¡æ¯(åˆ†æ•°/è¿›åº¦)éœ€é‡ç»˜ */
+static uint16_t  g_frame;            /* å¸§è®¡æ•°å™¨(ç”¨äºåŠ¨ç”»/ç§»åŠ¨èŠ‚æ‹) */
+static uint32_t  g_food_us;          /* ä¸Šæ¬¡å°é±¼ç§»åŠ¨çš„æ—¶é—´æˆ³(å¾®ç§’, çœŸå®æ—¶é—´èŠ‚æ‹) */
+static uint8_t   g_full_redraw;      /* å…¨å±é‡ç»˜è„æ ‡è®° */
+static int16_t   s_last_touch_x;     /* ä¸Šä¸€æ¬¡æœ‰æ•ˆè§¦æ‘¸ä½ç½®(å¢é‡æ‹–åŠ¨ç”¨) */
 static int16_t   s_last_touch_y;
 
-/* ================================================================
- *  ÑÕÉ«¶¨Òå (RGB565)
- * ================================================================ */
-#define COLOR_BG     0x14A6   /* Éîº£À¶±³¾° */
-#define COL_RED      0xF800   /* ½áÊøÌáÊ¾-ºì */
-/* ÅĞ¶ÏÏñËØÊÇ·ñÊÓÎª"Í¸Ã÷": ½Ó½ü°×É«(º¬´¿°×)Ò²²»ÏÔÊ¾, ±ÜÃâ±ßÔµ²ĞÁô°×±ß */
+/* é¢œè‰²å®šä¹‰ (RGB565) */
+#define COLOR_BG     0x14A6   /* æ·±æµ·è“èƒŒæ™¯ */
+#define COL_RED      0xF800   /* ç»“æŸæç¤º-çº¢ */
+/* åˆ¤æ–­åƒç´ æ˜¯å¦è§†ä¸º"é€æ˜": æ¥è¿‘ç™½è‰²(å«çº¯ç™½)ä¹Ÿä¸æ˜¾ç¤º, é¿å…è¾¹ç¼˜æ®‹ç•™ç™½è¾¹ */
 #define IS_TRANSPARENT(p)  (((((p) >> 11) & 0x1F) >= 0x1C) && \
                             (((((p) >> 5) & 0x3F)) >= 0x38) && \
                             (((p) & 0x1F) >= 0x1C))
 
-/* ================================================================
- *  ÄÚ²¿¹¤¾ß: Ëæ»úÊı (¸´ÓÃ game_rand)
- * ================================================================ */
-static uint16_t fish_rand(uint16_t n)
-{
+/**
+ * @brief  å†…éƒ¨å·¥å…·: éšæœºæ•° (å¤ç”¨ game_rand)
+ * @param  n ä¸Šé™
+ * @return [0, n) çš„éšæœºæ•°
+ */
+static uint16_t fish_rand(uint16_t n) {
     if (n == 0) return 0;
     return (uint16_t)(game_rand() % n);
 }
 
-/* ================================================================
- *  ½«Óã/Íæ¼ÒÖĞĞÄµãÇ¯ÖÆµ½"8½ÇĞÎ"¿ÉÓÎ¶¯Çø(¾ØĞÎËÄ½Çµ¹½Ç, ÌùºÏÔ²ĞÎÆÁ).
- *  µ¹½ÇºóÖĞĞÄµã²»ÔÙ½øÈëÔ²ĞÎÆÁ±»ÕÚµ²/²ÃÇĞµÄËÄ½Ç¡£
- *  @param px,py Ö¸Õë: Èë=µ±Ç°Î»ÖÃ, ³ö=Ç¯ÖÆºóÎ»ÖÃ
- * ================================================================ */
-static void fish_clamp_pos(int16_t *px, int16_t *py)
-{
+/**
+ * @brief  å°†é±¼/ç©å®¶ä¸­å¿ƒç‚¹é’³åˆ¶åˆ°"8è§’å½¢"å¯æ¸¸åŠ¨åŒº(çŸ©å½¢å››è§’å€’è§’, è´´åˆåœ†å½¢å±)ã€‚
+ *         å€’è§’åä¸­å¿ƒç‚¹ä¸å†è¿›å…¥åœ†å½¢å±è¢«é®æŒ¡/è£åˆ‡çš„å››è§’ã€‚
+ * @param  px,py æŒ‡é’ˆ: å…¥=å½“å‰ä½ç½®, å‡º=é’³åˆ¶åä½ç½®
+ */
+static void fish_clamp_pos(int16_t* px, int16_t* py) {
     int16_t x = *px, y = *py;
-    /* ¾ØĞÎÇ¯Î» */
+    /* çŸ©å½¢é’³ä½ */
     if (x < PLAY_X_MIN) x = PLAY_X_MIN;
     if (x > PLAY_X_MAX) x = PLAY_X_MAX;
     if (y < PLAY_Y_MIN) y = PLAY_Y_MIN;
     if (y > PLAY_Y_MAX) y = PLAY_Y_MAX;
-    /* ËÄ½Çµ¹½Ç: ½Ç²¿(ÀëÁ½ÁÚ±ß¶¼ < PLAY_CORNER)Ê±, °ÑÖĞĞÄµãÍÆ»Ø45¡ãĞ±±ßÄÚ */
+    /* å››è§’å€’è§’: è§’éƒ¨(ç¦»ä¸¤é‚»è¾¹éƒ½ < PLAY_CORNER)æ—¶, æŠŠä¸­å¿ƒç‚¹æ¨å›45Â°æ–œè¾¹å†… */
     if (x < PLAY_X_MIN + PLAY_CORNER && y < PLAY_Y_MIN + PLAY_CORNER) {
         if ((x - PLAY_X_MIN) + (y - PLAY_Y_MIN) < PLAY_CORNER)
             x = PLAY_X_MIN + (int16_t)(PLAY_CORNER - (y - PLAY_Y_MIN));
@@ -142,25 +141,28 @@ static void fish_clamp_pos(int16_t *px, int16_t *py)
     *py = y;
 }
 
-/* ================================================================
- *  Ğ¡Óã½ÇÂä·´µ¯: ÔÚ8½ÇĞÎµÄĞ±±ß´¦, ÈôËÙ¶ÈÈÔ³¯Íâ, °ÑËÙ¶È·´×ªÏòÄÚ
- *  ²¢Ìù»ØĞ±±ß, ±ÜÃâÓã¿¨ÔÚ½ÇÂäÒªµÈËæ»ú±äÏò²Å¶¯¡£
- * ================================================================ */
-static void fish_bounce_corners(FishEntity *f)
-{
+/**
+ * @brief  å°é±¼è§’è½åå¼¹: åœ¨8è§’å½¢çš„æ–œè¾¹å¤„, è‹¥é€Ÿåº¦ä»æœå¤–, æŠŠé€Ÿåº¦åè½¬å‘å†…
+ *         å¹¶è´´å›æ–œè¾¹, é¿å…é±¼å¡åœ¨è§’è½è¦ç­‰éšæœºå˜å‘æ‰åŠ¨ã€‚
+ * @param  f å°é±¼å®ä½“
+ */
+static void fish_bounce_corners(FishEntity* f) {
     int16_t X = (int16_t)f->x, Y = (int16_t)f->y;
     int16_t dxl = X - PLAY_X_MIN, dxr = PLAY_X_MAX - X;
     int16_t dyt = Y - PLAY_Y_MIN, dyb = PLAY_Y_MAX - Y;
     if (dxl < PLAY_CORNER && dyt < PLAY_CORNER && f->vx <= 0 && f->vy <= 0) {
         f->vx = (int16_t)-f->vx; f->vy = (int16_t)-f->vy;
         X = PLAY_X_MIN + (int16_t)(PLAY_CORNER - dyt);
-    } else if (dxr < PLAY_CORNER && dyt < PLAY_CORNER && f->vx >= 0 && f->vy <= 0) {
+    }
+    else if (dxr < PLAY_CORNER && dyt < PLAY_CORNER && f->vx >= 0 && f->vy <= 0) {
         f->vx = (int16_t)-f->vx; f->vy = (int16_t)-f->vy;
         X = PLAY_X_MAX - (int16_t)(PLAY_CORNER - dyt);
-    } else if (dxl < PLAY_CORNER && dyb < PLAY_CORNER && f->vx <= 0 && f->vy >= 0) {
+    }
+    else if (dxl < PLAY_CORNER && dyb < PLAY_CORNER && f->vx <= 0 && f->vy >= 0) {
         f->vx = (int16_t)-f->vx; f->vy = (int16_t)-f->vy;
         X = PLAY_X_MIN + (int16_t)(PLAY_CORNER - dyb);
-    } else if (dxr < PLAY_CORNER && dyb < PLAY_CORNER && f->vx >= 0 && f->vy >= 0) {
+    }
+    else if (dxr < PLAY_CORNER && dyb < PLAY_CORNER && f->vx >= 0 && f->vy >= 0) {
         f->vx = (int16_t)-f->vx; f->vy = (int16_t)-f->vy;
         X = PLAY_X_MAX - (int16_t)(PLAY_CORNER - dyb);
     }
@@ -168,22 +170,25 @@ static void fish_bounce_corners(FishEntity *f)
     f->y = (uint16_t)Y;
 }
 
-/* ================================================================
- *  Éı¼¶/µÃ·ÖãĞÖµ: ·µ»Ø 5^lv (0¼¶=1, 1¼¶=5, 2¼¶=25...). lv<=9 °²È«(uint32)
- * ================================================================ */
-static uint32_t fish_thresh(uint8_t lv)
-{
+/**
+ * @brief  å‡çº§/å¾—åˆ†é˜ˆå€¼: è¿”å› 5^lv (0çº§=1, 1çº§=5, 2çº§=25...)
+ * @param  lv ç­‰çº§(<=9 å®‰å…¨, uint32)
+ * @return 5^lv
+ */
+static uint32_t fish_thresh(uint8_t lv) {
     uint32_t v = 1;
     uint8_t i;
     for (i = 0; i < lv; i++) v *= 5;
     return v;
 }
 
-/* ================================================================
- *  °Ñ uint32 ·ÖÊı×ª³É¸÷Î»Êı×Ö; ·µ»ØÎ»Êı, digits[0]=¸öÎ» ... digits[n-1]=×î¸ßÎ»
- * ================================================================ */
-static uint8_t fish_score_digits(uint32_t v, uint8_t *digits)
-{
+/**
+ * @brief  æŠŠ uint32 åˆ†æ•°è½¬æˆå„ä½æ•°å­—ã€‚
+ * @param  v      åˆ†æ•°
+ * @param  digits è¾“å‡ºç¼“å†²(digits[0]=ä¸ªä½ ... digits[n-1]=æœ€é«˜ä½)
+ * @return äº§ç”Ÿçš„ä½æ•°
+ */
+static uint8_t fish_score_digits(uint32_t v, uint8_t* digits) {
     uint8_t n = 0;
     do {
         if (n >= 8) break;
@@ -193,20 +198,22 @@ static uint8_t fish_score_digits(uint32_t v, uint8_t *digits)
     return n;
 }
 
-/* Ç°ÏòÉùÃ÷: clear_entity_rect ÄÚ²¿ĞèÖØ»æÏà½»ÊµÌå */
+/* å‰å‘å£°æ˜: clear_entity_rect å†…éƒ¨éœ€é‡ç»˜ç›¸äº¤å®ä½“ */
 static void draw_image_sprite(FlashStoreId id_base, const uint16_t dims[][2],
-                              uint8_t count, uint8_t level, uint16_t x, uint16_t y,
-                              uint8_t flip);
+    uint8_t count, uint8_t level, uint16_t x, uint16_t y,
+    uint8_t flip);
 
-/* ================================================================
- *  ²Á³ıÒ»¸öÊµÌåµÄ¾ØĞÎÇøÓò, ²¢Á¢¼´ÖØ»æËùÓĞÓë¸ÃÇøÓòÏà½»µÄÆäËûÊµÌå¡£
- *  ËµÃ÷: Í¸Ã÷Í¼ÔöÁ¿»æÖÆÓÃ±³¾°É«ÌîÂúÄ³ÊµÌå¾É¾ØĞÎÊ±, »áÎóÉËÓëÆäÖØµşµÄ
- *  ÆäËûÊµÌåÏñËØ; Òò´ËÌî±³¾°ºóÁ¢¼´°´¹Ì¶¨Ë³ĞòÖØ»æ¾ØĞÎÄÚµÄËùÓĞÊµÌå, ·ÀÖ¹²ĞÁô¡£
- *  @param dims ³ß´ç±í  @param level µÈ¼¶  @param cx,cy ÖĞĞÄ
- * ================================================================ */
+/**
+ * @brief  æ“¦é™¤ä¸€ä¸ªå®ä½“çš„çŸ©å½¢åŒºåŸŸ, å¹¶ç«‹å³é‡ç»˜æ‰€æœ‰ä¸è¯¥åŒºåŸŸç›¸äº¤çš„å…¶ä»–å®ä½“ã€‚
+ * @param  dims  å°ºå¯¸è¡¨
+ * @param  level ç­‰çº§
+ * @param  cx   ä¸­å¿ƒ X
+ * @param  cy   ä¸­å¿ƒ Y
+ * @note   é€æ˜å›¾å¢é‡ç»˜åˆ¶ç”¨èƒŒæ™¯è‰²å¡«æ»¡æŸå®ä½“æ—§çŸ©å½¢æ—¶, ä¼šè¯¯ä¼¤ä¸å…¶é‡å çš„å…¶ä»–å®ä½“åƒç´ ;
+ *         å› æ­¤å¡«èƒŒæ™¯åç«‹å³æŒ‰å›ºå®šé¡ºåºé‡ç»˜çŸ©å½¢å†…çš„æ‰€æœ‰å®ä½“, é˜²æ­¢æ®‹ç•™ã€‚
+ */
 static void clear_entity_rect(const uint16_t dims[][2], uint8_t level,
-                              int16_t cx, int16_t cy)
-{
+    int16_t cx, int16_t cy) {
     uint16_t w = dims[level][0];
     uint16_t h = dims[level][1];
     int16_t x0 = cx - (int16_t)(w / 2);
@@ -218,9 +225,9 @@ static void clear_entity_rect(const uint16_t dims[][2], uint8_t level,
     if (x1 > 239) x1 = 239;
     if (y1 > 239) y1 = 239;
     if (x1 < x0 || y1 < y0) return;
-    /* Ìî±³¾° (LCD_Fill µÄ end ²»º¬×ø±ê) */
+    /* å¡«èƒŒæ™¯ (LCD_Fill çš„ end ä¸å«åæ ‡) */
     LCD_Fill((uint16_t)x0, (uint16_t)y0, (uint16_t)(x1 + 1), (uint16_t)(y1 + 1), COLOR_BG);
-    /* ÖØ»æËùÓĞÓë¸Ã¾ØĞÎÏà½»µÄÊµÌå(°´µ±Ç°×ø±ê), ±ÜÃâ±»±³¾°ÎóÉË */
+    /* é‡ç»˜æ‰€æœ‰ä¸è¯¥çŸ©å½¢ç›¸äº¤çš„å®ä½“(æŒ‰å½“å‰åæ ‡), é¿å…è¢«èƒŒæ™¯è¯¯ä¼¤ */
     {
         uint16_t pw = player_imgs_dim[PLAYER_IMG_LVL][0];
         uint16_t ph = player_imgs_dim[PLAYER_IMG_LVL][1];
@@ -230,10 +237,10 @@ static void clear_entity_rect(const uint16_t dims[][2], uint8_t level,
         int16_t py1 = py0 + (int16_t)ph - 1;
         if (px1 >= x0 && px0 <= x1 && py1 >= y0 && py0 <= y1)
             draw_image_sprite(FLASH_STORE_ID_PLAYER_0, player_imgs_dim,
-                              PLAYER_COUNT, g_player.level, g_player.x, g_player.y, g_player.facing);
+                PLAYER_COUNT, g_player.level, g_player.x, g_player.y, g_player.facing);
         uint8_t i;
         for (i = 0; i < FISH_NUM_FOOD; i++) {
-            FishEntity *f = &g_food[i];
+            FishEntity* f = &g_food[i];
             if (!f->active) continue;
             uint16_t fw = fish_imgs_dim[f->level][0];
             uint16_t fh = fish_imgs_dim[f->level][1];
@@ -243,39 +250,38 @@ static void clear_entity_rect(const uint16_t dims[][2], uint8_t level,
             int16_t fy1 = fy0 + (int16_t)fh - 1;
             if (fx1 >= x0 && fx0 <= x1 && fy1 >= y0 && fy0 <= y1)
                 draw_image_sprite(FLASH_STORE_ID_FISH_0, fish_imgs_dim,
-                                  FISH_COUNT, f->level, f->x, f->y, f->facing);
+                    FISH_COUNT, f->level, f->x, f->y, f->facing);
         }
     }
 }
 
 /**
- * @brief  »æÖÆÒ»ÕÅ¾«ÁéÍ¼(°´µÈ¼¶´ÓÍâ²¿ Flash Á÷Ê½¶ÁÈ¡¶ÔÓ¦Í¼, Ìø¹ı°×É«±³¾°)¡£
- * @param  id_base ×ÊÔ´ÆğÊ¼ ID(FLASH_STORE_ID_*_0)
- * @param  dims    ³ß´ç±í(count¡Á2, Ã¿µÈ¼¶ {w,h})
- * @param  count   Í¼ÕÅÊı
- * @param  level   µÚ¼¸ÕÅ(0~count-1, Ô½½çÇ¯Î»)
- * @param  x       ÖĞĞÄ X
- * @param  y       ÖĞĞÄ Y
- * @param  flip    1=Ë®Æ½¾µÏñ
+ * @brief  ç»˜åˆ¶ä¸€å¼ ç²¾çµå›¾(æŒ‰ç­‰çº§ä»å¤–éƒ¨ Flash æµå¼è¯»å–å¯¹åº”å›¾, è·³è¿‡ç™½è‰²èƒŒæ™¯)ã€‚
+ * @param  id_base èµ„æºèµ·å§‹ ID(FLASH_STORE_ID_*_0)
+ * @param  dims    å°ºå¯¸è¡¨(countÃ—2, æ¯ç­‰çº§ {w,h})
+ * @param  count   å›¾å¼ æ•°
+ * @param  level   ç¬¬å‡ å¼ (0~count-1, è¶Šç•Œé’³ä½)
+ * @param  x       ä¸­å¿ƒ X
+ * @param  y       ä¸­å¿ƒ Y
+ * @param  flip    1=æ°´å¹³é•œåƒ
  */
 static void draw_image_sprite(FlashStoreId id_base, const uint16_t dims[][2],
-                              uint8_t count, uint8_t level,
-                              uint16_t x, uint16_t y, uint8_t flip)
-{
+    uint8_t count, uint8_t level,
+    uint16_t x, uint16_t y, uint8_t flip) {
     if (level >= count) {
         if (count == 0) return;
-        level = (uint8_t)(count - 1);   /* ³¬¹ı×î´óµÈ¼¶: ÓÃ×î´óÒ»ÕÅ */
+        level = (uint8_t)(count - 1);   /* è¶…è¿‡æœ€å¤§ç­‰çº§: ç”¨æœ€å¤§ä¸€å¼  */
     }
     uint16_t w = dims[level][0];
     uint16_t h = dims[level][1];
     FlashStoreId id = (FlashStoreId)(id_base + level);
-    const uint8_t *img = FlashStore_ResLoad(id, 0, (uint16_t)(w * h * 2));
+    const uint8_t* img = FlashStore_ResLoad(id, 0, (uint16_t)(w * h * 2));
     if (!img) return;
 
-    const uint16_t *px = (const uint16_t *)img;   /* Ğ¡¶ËĞòÇ¿×ª */
-    /* ×óÉÏ½Ç(ÖĞĞÄ¶ÔÆë) */
-    int16_t x0 = (int16_t)(x) - (int16_t)(w / 2);
-    int16_t y0 = (int16_t)(y) - (int16_t)(h / 2);
+    const uint16_t* px = (const uint16_t*)img;   /* å°ç«¯åºå¼ºè½¬ */
+    /* å·¦ä¸Šè§’(ä¸­å¿ƒå¯¹é½) */
+    int16_t x0 = (int16_t)(x)-(int16_t)(w / 2);
+    int16_t y0 = (int16_t)(y)-(int16_t)(h / 2);
 
     uint16_t r, c;
     LCD_CS_CLR;
@@ -284,18 +290,19 @@ static void draw_image_sprite(FlashStoreId id_base, const uint16_t dims[][2],
         if (sy < 0 || sy >= 240) continue;
         c = 0;
         while (c < w) {
-            /* Ìø¹ı½Ó½ü°×É«±³¾°(Í¸Ã÷) */
+            /* è·³è¿‡æ¥è¿‘ç™½è‰²èƒŒæ™¯(é€æ˜) */
             while (c < w && IS_TRANSPARENT(px[r * w + c])) c++;
             if (c >= w) break;
             uint16_t start = c;
-            /* ÊÕ¼¯Á¬Ğø·ÇÍ¸Ã÷(·Ç°×)¶Î */
+            /* æ”¶é›†è¿ç»­éé€æ˜(éç™½)æ®µ */
             while (c < w && !IS_TRANSPARENT(px[r * w + c])) c++;
-            /* ¶Î [start, c), ÆÁÄ»X²Ã¼ô; flip=1 Ê±Ë®Æ½¾µÏñ */
+            /* æ®µ [start, c), å±å¹•Xè£å‰ª; flip=1 æ—¶æ°´å¹³é•œåƒ */
             int16_t sx0, sx1;
             if (flip) {
                 sx0 = x0 + (int16_t)(w - c);
                 sx1 = x0 + (int16_t)(w - 1 - start);
-            } else {
+            }
+            else {
                 sx0 = x0 + (int16_t)start;
                 sx1 = x0 + (int16_t)c - 1;
             }
@@ -304,7 +311,7 @@ static void draw_image_sprite(FlashStoreId id_base, const uint16_t dims[][2],
             if (sx1 > 239) sx1 = 239;
             if (sx1 < sx0) continue;
             LCD_Address_Set((uint16_t)sx0, (uint16_t)sy,
-                            (uint16_t)sx1, (uint16_t)sy);
+                (uint16_t)sx1, (uint16_t)sy);
             for (uint16_t i = 0; i < (uint16_t)(c - start); i++) {
                 if (flip) LCD_WR_DATA_16Bit(px[r * w + (c - 1 - i)]);
                 else      LCD_WR_DATA_16Bit(px[r * w + start + i]);
@@ -314,12 +321,12 @@ static void draw_image_sprite(FlashStoreId id_base, const uint16_t dims[][2],
     LCD_CS_SET;
 }
 
-/* ================================================================
- *  Ğ¡ÓãÒÆ¶¯µÄĞĞ¼¶Ô­×ÓÖØ»æ: ¶Ô"¾É¡ÈĞÂ"ÇøÓòÖğĞĞ "ÏÈĞ´¸ÃĞĞ±³¾°¡¢ÔÙĞ´¸ÃĞĞĞÂÓãÏñËØ",
- *  ±ÜÃâÕû¿é±³¾°Ìî³äÔì³ÉµÄË²¼äÉÁË¸; Ö®ºóÖØ»æÇøÓòÄÚÆäËüÏà½»ÊµÌå(·ÀÎóÉË)¡£
- * ================================================================ */
-static void fish_move_redraw(const FishEntity *f)
-{
+/**
+ * @brief  å°é±¼ç§»åŠ¨çš„è¡Œçº§åŸå­é‡ç»˜: å¯¹"æ—§âˆªæ–°"åŒºåŸŸé€è¡Œ "å…ˆå†™è¯¥è¡ŒèƒŒæ™¯ã€å†å†™è¯¥è¡Œæ–°é±¼åƒç´ ",
+ *         é¿å…æ•´å—èƒŒæ™¯å¡«å……é€ æˆçš„ç¬é—´é—ªçƒ; ä¹‹åé‡ç»˜åŒºåŸŸå†…å…¶å®ƒç›¸äº¤å®ä½“(é˜²è¯¯ä¼¤)ã€‚
+ * @param  f å°é±¼å®ä½“
+ */
+static void fish_move_redraw(const FishEntity* f) {
     uint16_t w = fish_imgs_dim[f->level][0];
     uint16_t h = fish_imgs_dim[f->level][1];
     uint16_t ow = fish_imgs_dim[f->prev_level][0];
@@ -342,30 +349,31 @@ static void fish_move_redraw(const FishEntity *f)
     if (ry1 > 239) ry1 = 239;
     if (rx1 < rx0 || ry1 < ry0) return;
 
-    const uint8_t *img = FlashStore_ResLoad((FlashStoreId)(FLASH_STORE_ID_FISH_0 + f->level),
-                                            0, (uint16_t)(w * h * 2));
+    const uint8_t* img = FlashStore_ResLoad((FlashStoreId)(FLASH_STORE_ID_FISH_0 + f->level),
+        0, (uint16_t)(w * h * 2));
     if (!img) return;
-    const uint16_t *px = (const uint16_t *)img;
+    const uint16_t* px = (const uint16_t*)img;
 
     LCD_CS_CLR;
     for (int16_t y = ry0; y <= ry1; y++) {
-        /* ¸ÃĞĞÏÈĞ´±³¾°(²»¿çÔ½ĞĞ, ËºÁÑ´°¿ÚÊÕËõµ½µ¥ĞĞ, ¼õÉÁ) */
+        /* è¯¥è¡Œå…ˆå†™èƒŒæ™¯(ä¸è·¨è¶Šè¡Œ, æ’•è£‚çª—å£æ”¶ç¼©åˆ°å•è¡Œ, å‡é—ª) */
         LCD_Address_Set((uint16_t)rx0, (uint16_t)y, (uint16_t)rx1, (uint16_t)y);
         for (int16_t x = rx0; x <= rx1; x++) LCD_WR_DATA_16Bit(COLOR_BG);
-        /* ¸ÃĞĞĞÂÓãµÄ·Ç°×¶Î(¸²¸Ç±³¾°) */
+        /* è¯¥è¡Œæ–°é±¼çš„éç™½æ®µ(è¦†ç›–èƒŒæ™¯) */
         int16_t fy = y - ny0;
         if (fy >= 0 && fy < (int16_t)h) {
             int16_t c = 0;
             while (c < (int16_t)w) {
-                    while (c < (int16_t)w && IS_TRANSPARENT(px[fy * w + c])) c++;
-                    if (c >= (int16_t)w) break;
-                    int16_t start = c;
-                    while (c < (int16_t)w && !IS_TRANSPARENT(px[fy * w + c])) c++;
+                while (c < (int16_t)w && IS_TRANSPARENT(px[fy * w + c])) c++;
+                if (c >= (int16_t)w) break;
+                int16_t start = c;
+                while (c < (int16_t)w && !IS_TRANSPARENT(px[fy * w + c])) c++;
                 int16_t sx0, sx1;
                 if (f->facing) {
                     sx0 = nx0 + (int16_t)(w - c);
                     sx1 = nx0 + (int16_t)(w - 1 - start);
-                } else {
+                }
+                else {
                     sx0 = nx0 + start;
                     sx1 = nx0 + (int16_t)c - 1;
                 }
@@ -382,7 +390,7 @@ static void fish_move_redraw(const FishEntity *f)
     }
     LCD_CS_SET;
 
-    /* ÖØ»æÓëÇøÓòÏà½»µÄÆäËüÊµÌå(µ±Ç°×ø±ê), ±ÜÃâĞĞ±³¾°ÎóÉËËüÃÇ */
+    /* é‡ç»˜ä¸åŒºåŸŸç›¸äº¤çš„å…¶å®ƒå®ä½“(å½“å‰åæ ‡), é¿å…è¡ŒèƒŒæ™¯è¯¯ä¼¤å®ƒä»¬ */
     {
         uint16_t pw = player_imgs_dim[PLAYER_IMG_LVL][0];
         uint16_t ph = player_imgs_dim[PLAYER_IMG_LVL][1];
@@ -392,10 +400,10 @@ static void fish_move_redraw(const FishEntity *f)
         int16_t py1 = py0 + (int16_t)ph - 1;
         if (px1 >= rx0 && px0 <= rx1 && py1 >= ry0 && py0 <= ry1)
             draw_image_sprite(FLASH_STORE_ID_PLAYER_0, player_imgs_dim,
-                              PLAYER_COUNT, g_player.level, g_player.x, g_player.y, g_player.facing);
+                PLAYER_COUNT, g_player.level, g_player.x, g_player.y, g_player.facing);
         uint8_t i;
         for (i = 0; i < FISH_NUM_FOOD; i++) {
-            const FishEntity *of = &g_food[i];
+            const FishEntity* of = &g_food[i];
             if (of == f || !of->active) continue;
             uint16_t fw = fish_imgs_dim[of->level][0];
             uint16_t fh = fish_imgs_dim[of->level][1];
@@ -405,36 +413,34 @@ static void fish_move_redraw(const FishEntity *f)
             int16_t fy1 = fy0 + (int16_t)fh - 1;
             if (fx1 >= rx0 && fx0 <= rx1 && fy1 >= ry0 && fy0 <= ry1)
                 draw_image_sprite(FLASH_STORE_ID_FISH_0, fish_imgs_dim,
-                                  FISH_COUNT, of->level, of->x, of->y, of->facing);
+                    FISH_COUNT, of->level, of->x, of->y, of->facing);
         }
     }
 }
 
-/* ================================================================
- *  ÇåÆÁ±³¾°
- * ================================================================ */
-static void draw_background(void)
-{
+/**
+ * @brief  æ¸…å±èƒŒæ™¯
+ */
+static void draw_background(void) {
     LCD_Fill(0, 0, LCD_W, LCD_H, COLOR_BG);
 }
 
-/* ================================================================
- *  »æÖÆ¶¥²¿ĞÅÏ¢À¸: ×ó=µ±Ç°·ÖÊı, ÓÒ=Éı¼¶½ø¶ÈÌõ(10¸ñ, °´·ÖÊıÔÚµ±Ç°¼¶µÄÕ¼±È)
- * ================================================================ */
-static void draw_hud(void)
-{
+/**
+ * @brief  ç»˜åˆ¶é¡¶éƒ¨ä¿¡æ¯æ : å·¦=å½“å‰åˆ†æ•°, å³=å‡çº§è¿›åº¦æ¡(10æ ¼, æŒ‰åˆ†æ•°åœ¨å½“å‰çº§çš„å æ¯”)
+ */
+static void draw_hud(void) {
     if (!g_hud_dirty) return;
     g_hud_dirty = 0;
-    /* Çå¿Õ¶¥²¿ĞÅÏ¢Çø */
+    /* æ¸…ç©ºé¡¶éƒ¨ä¿¡æ¯åŒº */
     LCD_Fill(0, SCORE_TOP, LCD_W, PLAY_TOP, COLOR_BG);
     {
         uint8_t digits[8];
-        uint8_t dc = fish_score_digits(g_score, digits);   /* µÍÎ»ÔÚÇ° */
+        uint8_t dc = fish_score_digits(g_score, digits);   /* ä½ä½åœ¨å‰ */
         uint16_t score_w = (uint16_t)dc * 8;
-        uint16_t prog_w = 10 * 4 + 9 * 1;         /* ½ø¶ÈÌõ×Ü¿í49 */
-        uint16_t pl_total = prog_w + 2 + 16;      /* ½ø¶È+¼ä¸ô+µÈ¼¶(×î¶à2Î») */
+        uint16_t prog_w = 10 * 4 + 9 * 1;         /* è¿›åº¦æ¡æ€»å®½49 */
+        uint16_t pl_total = prog_w + 2 + 16;      /* è¿›åº¦+é—´éš”+ç­‰çº§(æœ€å¤š2ä½) */
         LCD_CS_CLR;
-        /* ĞĞ1: µ±Ç°·ÖÊı(¾ÓÖĞ, »ÆÉ« 7x11) */
+        /* è¡Œ1: å½“å‰åˆ†æ•°(å±…ä¸­, é»„è‰² 7x11) */
         {
             uint16_t sx = (240 - score_w) / 2;
             uint8_t i;
@@ -443,7 +449,7 @@ static void draw_hud(void)
                 sok_draw_digit_scaled(sx + i * 8, 4, d, LCD_YELLOW, 8, 14);
             }
         }
-        /* ĞĞ2: Éı¼¶½ø¶ÈÌõ + µ±Ç°µÈ¼¶(¾ÓÖĞ, µÈ¼¶½ôÌù½ø¶ÈÌõÓÒ²à) */
+        /* è¡Œ2: å‡çº§è¿›åº¦æ¡ + å½“å‰ç­‰çº§(å±…ä¸­, ç­‰çº§ç´§è´´è¿›åº¦æ¡å³ä¾§) */
         {
             uint16_t px = (240 - pl_total) / 2;
             uint16_t py = 18;
@@ -463,13 +469,14 @@ static void draw_hud(void)
                 px += 4 + 1;
             }
             px += 2;
-            LCD_CS_CLR;   /* ½ø¶ÈÌõ LCD_Fill ÄÚ²¿»áÇĞ CS, »­µÈ¼¶Ç°ĞëÖØĞÂÀ­µÍÆ¬Ñ¡, ·ñÔòĞ´²»½ø */
+            LCD_CS_CLR;   /* è¿›åº¦æ¡ LCD_Fill å†…éƒ¨ä¼šåˆ‡ CS, ç”»ç­‰çº§å‰é¡»é‡æ–°æ‹‰ä½ç‰‡é€‰, å¦åˆ™å†™ä¸è¿› */
             {
                 uint8_t lv = (uint8_t)(g_player.level + 1);
                 if (lv >= 10) {
                     sok_draw_digit_scaled(px, py, 1, LCD_WHITE, 8, 14);
                     sok_draw_digit_scaled((uint16_t)(px + 8), py, (uint8_t)(lv - 10), LCD_WHITE, 8, 14);
-                } else {
+                }
+                else {
                     sok_draw_digit_scaled(px, py, lv, LCD_WHITE, 8, 14);
                 }
             }
@@ -478,40 +485,40 @@ static void draw_hud(void)
     }
 }
 
-/* ================================================================
- *  »æÖÆÓÎÏ·½áÊø»­Ãæ: ÖĞÑë"ÓÎÏ·½áÊø"(32x32ºì×Ö) + ÏÂÅÅ"ÖØĞÂ¿ªÊ¼"ÌáÊ¾(24x24)
- * ================================================================ */
-static void draw_game_over(void)
-{
+/**
+ * @brief  ç»˜åˆ¶æ¸¸æˆç»“æŸç”»é¢: ä¸­å¤®"æ¸¸æˆç»“æŸ"(32x32çº¢å­—) + ä¸‹æ’"é‡æ–°å¼€å§‹"æç¤º(24x24)
+ */
+static void draw_game_over(void) {
     LCD_Fill(0, 0, LCD_W, LCD_H, COLOR_BG);
     if (g_won) {
-        /* "Í¨¹Ø" 32x32 Á½×Ö, ¾ÓÖĞ (ÂÌÉ«) */
+        /* "é€šå…³" 32x32 ä¸¤å­—, å±…ä¸­ (ç»¿è‰²) */
         uint16_t x = (240 - 2 * 32) / 2;
         uint16_t y = (240 - 32) / 2 - 14;
         LCD_CS_CLR;
-        sok_draw_char_32(x,      y, FlashStore_ResLoad(FLASH_STORE_ID_32_TONG, 0, 128), LCD_GREEN);
+        sok_draw_char_32(x, y, FlashStore_ResLoad(FLASH_STORE_ID_32_TONG, 0, 128), LCD_GREEN);
         sok_draw_char_32(x + 32, y, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, 128), LCD_GREEN);
         LCD_CS_SET;
-    } else {
-        /* "ÓÎÏ·½áÊø" 32x32 ËÄ×Ö, ¾ÓÖĞ (ºìÉ«) */
+    }
+    else {
+        /* "æ¸¸æˆç»“æŸ" 32x32 å››å­—, å±…ä¸­ (çº¢è‰²) */
         uint16_t x = (240 - 4 * 32) / 2;
         uint16_t y = (240 - 32) / 2 - 14;
         LCD_CS_CLR;
-        sok_draw_char_32(x,      y, FlashStore_ResLoad(FLASH_STORE_ID_32_YOU, 0, 128), LCD_RED);
+        sok_draw_char_32(x, y, FlashStore_ResLoad(FLASH_STORE_ID_32_YOU, 0, 128), LCD_RED);
         sok_draw_char_32(x + 32, y, FlashStore_ResLoad(FLASH_STORE_ID_32_XI3, 0, 128), LCD_RED);
         sok_draw_char_32(x + 64, y, FlashStore_ResLoad(FLASH_STORE_ID_32_JIE, 0, 128), LCD_RED);
         sok_draw_char_32(x + 96, y, FlashStore_ResLoad(FLASH_STORE_ID_32_SHU, 0, 128), LCD_RED);
         LCD_CS_SET;
     }
-    /* Í¨¹Ø/½áÊøÎÄ×ÖÏÂ·½ÏÔÊ¾µ±Ç°·ÖÊı (»ÆÉ« 16x26, ¾ÓÖĞ) */
+    /* é€šå…³/ç»“æŸæ–‡å­—ä¸‹æ–¹æ˜¾ç¤ºå½“å‰åˆ†æ•° (é»„è‰² 16x26, å±…ä¸­) */
     {
         uint8_t digits[8];
-        uint8_t dc = fish_score_digits(g_score, digits);  /* µÍÎ»ÔÚÇ° */
+        uint8_t dc = fish_score_digits(g_score, digits);  /* ä½ä½åœ¨å‰ */
         uint16_t tw = 16, th = 26;
         uint16_t sx = (uint16_t)((240 - (uint16_t)dc * tw) / 2);
         uint16_t sy = 150;
         uint8_t i;
-        LCD_CS_CLR;   /* Ç°Ãæ LCD_Fill/Ğ´×ÖÒÑÇĞ CS, »­Êı×ÖÇ°ĞëÖØĞÂÀ­µÍÆ¬Ñ¡ */
+        LCD_CS_CLR;   /* å‰é¢ LCD_Fill/å†™å­—å·²åˆ‡ CS, ç”»æ•°å­—å‰é¡»é‡æ–°æ‹‰ä½ç‰‡é€‰ */
         for (i = 0; i < dc; i++)
             sok_draw_digit_scaled(sx + i * tw, sy, digits[dc - 1 - i], LCD_YELLOW, tw, th);
         LCD_CS_SET;
@@ -520,19 +527,21 @@ static void draw_game_over(void)
     draw_hud();
 }
 
-/* ================================================================
- *  ³õÊ¼»¯Ò»ÌõĞ¡Óã (Ëæ»úÎ»ÖÃ/µÈ¼¶/·½Ïò)
- * ================================================================ */
-static void food_respawn(FishEntity *e, uint8_t avoid_player)
-{
+/**
+ * @brief  åˆå§‹åŒ–ä¸€æ¡å°é±¼ (éšæœºä½ç½®/ç­‰çº§/æ–¹å‘)
+ * @param  e             å°é±¼å®ä½“
+ * @param  avoid_player æ˜¯å¦é¿å¼€ç©å®¶(1=è€ƒè™‘ä¸ç©å®¶è·ç¦»)
+ */
+static void food_respawn(FishEntity* e, uint8_t avoid_player) {
     uint8_t was_drawn = e->drawn;
     e->active = 1;
-    /* ´ó¶àĞ¡Óã <=Íæ¼Ò¼¶±ğ(¿É³Ô, ¹©³É³¤), ÉÙÊı¸ü´ó(ÌôÕ½); ±ÜÃâ¿ª¾ÖÎŞÓã¿É³Ô */
+    /* å¤§å¤šå°é±¼ <=ç©å®¶çº§åˆ«(å¯åƒ, ä¾›æˆé•¿), å°‘æ•°æ›´å¤§(æŒ‘æˆ˜); é¿å…å¼€å±€æ— é±¼å¯åƒ */
     if (fish_rand(4) != 0) {
-        /* 75%: µÈ¼¶ 0..Íæ¼Ò¼¶±ğ (º¬Í¬¼¶, ¿É³Ô) */
+        /* 75%: ç­‰çº§ 0..ç©å®¶çº§åˆ« (å«åŒçº§, å¯åƒ) */
         e->level = (uint8_t)fish_rand((uint16_t)(g_player.level + 1));
-    } else {
-        /* 25%: Íæ¼Ò¼¶±ğ+1 .. +2 (¸ü´ó, Åö×²Ê§°Ü) */
+    }
+    else {
+        /* 25%: ç©å®¶çº§åˆ«+1 .. +2 (æ›´å¤§, ç¢°æ’å¤±è´¥) */
         int16_t lo = (int16_t)g_player.level + 1;
         int16_t hi = (int16_t)g_player.level + 2;
         if (hi > 9) hi = 9;
@@ -541,30 +550,32 @@ static void food_respawn(FishEntity *e, uint8_t avoid_player)
         e->level = (uint8_t)(lo + (int16_t)fish_rand((uint16_t)(hi - lo + 1)));
     }
     if (e->level > 9) e->level = 9;
-    /* ´ÓËæ»úÆÁÄ»±ßÔµÍâÈë³¡(ÏÂ/×ó/ÓÒ), ÈôÓëÒÑÓĞÓã³öÏÖÎ»ÖÃÖØµşÔòÑØ±ßÆ«ÒÆ´í¿ª */
+    /* ä»éšæœºå±å¹•è¾¹ç¼˜å¤–å…¥åœº(ä¸‹/å·¦/å³), è‹¥ä¸å·²æœ‰é±¼å‡ºç°ä½ç½®é‡å åˆ™æ²¿è¾¹åç§»é”™å¼€ */
     {
         uint8_t edge = (uint8_t)fish_rand(3);
-        if (edge == 0) {          /* ÏÂ±ß(ÍùÉÏÓÎÈë) */
+        if (edge == 0) {          /* ä¸‹è¾¹(å¾€ä¸Šæ¸¸å…¥) */
             e->x = (uint16_t)(60 + fish_rand(120));
             e->y = (uint16_t)(LCD_H + 20);
             e->vx = 0; e->vy = -(int16_t)FISH_SPEED_BASE;
-        } else if (edge == 1) {   /* ×ó±ß(ÍùÓÒÓÎÈë) */
+        }
+        else if (edge == 1) {   /* å·¦è¾¹(å¾€å³æ¸¸å…¥) */
             e->x = (uint16_t)(-20);
             e->y = (uint16_t)(85 + fish_rand(100));
             e->vx = (int16_t)FISH_SPEED_BASE; e->vy = 0;
-        } else {                  /* ÓÒ±ß(Íù×óÓÎÈë) */
+        }
+        else {                  /* å³è¾¹(å¾€å·¦æ¸¸å…¥) */
             e->x = (uint16_t)(LCD_W + 20);
             e->y = (uint16_t)(85 + fish_rand(100));
             e->vx = -(int16_t)FISH_SPEED_BASE; e->vy = 0;
         }
-        /* ³öÏÖÎ»ÖÃÓëÆäËûÓãÖØµşÊ±, ÑØ±ßÆ½ÒÆ´í¿ª */
+        /* å‡ºç°ä½ç½®ä¸å…¶ä»–é±¼é‡å æ—¶, æ²¿è¾¹å¹³ç§»é”™å¼€ */
         {
             uint8_t tries;
             for (tries = 0; tries < 8; tries++) {
                 int16_t overlap = 0;
                 uint8_t i2;
                 for (i2 = 0; i2 < FISH_NUM_FOOD; i2++) {
-                    FishEntity *o = &g_food[i2];
+                    FishEntity* o = &g_food[i2];
                     if (o == e || !o->active) continue;
                     uint16_t ow = fish_imgs_dim[o->level][0];
                     uint16_t oh = fish_imgs_dim[o->level][1];
@@ -575,7 +586,9 @@ static void food_respawn(FishEntity *e, uint8_t avoid_player)
                     if (adx < 0) adx = (int16_t)-adx;
                     if (ady < 0) ady = (int16_t)-ady;
                     if (adx < (int16_t)((ow + ew) / 2) &&
-                        ady < (int16_t)((oh + eh) / 2)) { overlap = 1; break; }
+                        ady < (int16_t)((oh + eh) / 2)) {
+                        overlap = 1; break;
+                    }
                 }
                 if (!overlap) break;
                 if (edge == 0) e->x = (uint16_t)((int16_t)e->x + 12);
@@ -585,8 +598,8 @@ static void food_respawn(FishEntity *e, uint8_t avoid_player)
         e->entering = 1;
     }
     e->dir = (uint8_t)fish_rand(8);
-    e->facing = (e->vx < 0) ? 1 : 0;   /* °´Èë³¡·½Ïò¶¨³¯Ïò */
-    /* ÏÈ»»ºÃĞÂÎ»ÖÃÔÙ²Á¾ÉÍ¼: clear ÓÃ prev(¾É) Ëã¾É¾ØĞÎ, ÖØ»æÏà½»ÊµÌåÓÃµ±Ç°(ÒÑ¸üĞÂ)×ø±ê, ²»»á°Ñ¾ÉÎ»ÖÃÓÖ»­»Ø */
+    e->facing = (e->vx < 0) ? 1 : 0;   /* æŒ‰å…¥åœºæ–¹å‘å®šæœå‘ */
+    /* å…ˆæ¢å¥½æ–°ä½ç½®å†æ“¦æ—§å›¾: clear ç”¨ prev(æ—§) ç®—æ—§çŸ©å½¢, é‡ç»˜ç›¸äº¤å®ä½“ç”¨å½“å‰(å·²æ›´æ–°)åæ ‡, ä¸ä¼šæŠŠæ—§ä½ç½®åˆç”»å› */
     if (was_drawn)
         clear_entity_rect(fish_imgs_dim, e->prev_level, e->prev_x, e->prev_y);
     e->prev_x = (int16_t)e->x;
@@ -598,29 +611,25 @@ static void food_respawn(FishEntity *e, uint8_t avoid_player)
     (void)avoid_player;
 }
 
-/* ================================================================
- *  ³õÊ¼»¯
- * ================================================================ */
 /**
- * @brief  »æÖÆÓãÓÎÏ·È«Ì×³¡¾°(±³¾°+Íæ¼Ò+ËùÓĞĞ¡Óã+HUD)¡£
- * @note   ÓÃÓÚ²Ëµ¥ÇĞ»»ºó»Ö¸´²Ëµ¥¿òÍâµÄ³¡¾°; ½áÊøÊ±ÓÃ draw_game_over¡£
+ * @brief  ç»˜åˆ¶é±¼æ¸¸æˆå…¨å¥—åœºæ™¯(èƒŒæ™¯+ç©å®¶+æ‰€æœ‰å°é±¼+HUD)ã€‚
+ * @note   ç”¨äºèœå•åˆ‡æ¢åæ¢å¤èœå•æ¡†å¤–çš„åœºæ™¯; ç»“æŸæ—¶ç”¨ draw_game_overã€‚
  */
-static void fish_draw_scene(void)
-{
+static void fish_draw_scene(void) {
     uint8_t i;
     draw_background();
     g_full_redraw = 0;
     draw_image_sprite(FLASH_STORE_ID_PLAYER_0, player_imgs_dim,
-                      PLAYER_COUNT, g_player.level, g_player.x, g_player.y, g_player.facing);
+        PLAYER_COUNT, g_player.level, g_player.x, g_player.y, g_player.facing);
     g_player.prev_x = (int16_t)g_player.x;
     g_player.prev_y = (int16_t)g_player.y;
     g_player.prev_level = g_player.level;
     g_player.drawn = 1;
     for (i = 0; i < FISH_NUM_FOOD; i++) {
-        FishEntity *f = &g_food[i];
+        FishEntity* f = &g_food[i];
         if (!f->active) continue;
         draw_image_sprite(FLASH_STORE_ID_FISH_0, fish_imgs_dim,
-                          FISH_COUNT, f->level, f->x, f->y, f->facing);
+            FISH_COUNT, f->level, f->x, f->y, f->facing);
         f->prev_x = (int16_t)f->x;
         f->prev_y = (int16_t)f->y;
         f->prev_level = f->level;
@@ -630,31 +639,26 @@ static void fish_draw_scene(void)
     draw_hud();
 }
 
-/* Restore the background right after a menu clear (same frame) to avoid a
-   one-frame black flash on menu switch/cancel (others redraw the board fast).*/
 /**
- * @brief  »Ö¸´²Ëµ¥¿òÍâµÄÓÎÏ·³¡¾°(Íæ¼Ò/Ğ¡Óã/±³¾°)¡£
+ * @brief  æ¢å¤èœå•æ¡†å¤–çš„æ¸¸æˆåœºæ™¯(ç©å®¶/å°é±¼/èƒŒæ™¯)ã€‚åŒå¸§æ‰§è¡Œ, é¿å…èœå•åˆ‡æ¢/å–æ¶ˆæ—¶é»‘é—ªä¸€å¸§ã€‚
  */
-static void fish_restore_scene_behind(void)
-{
+static void fish_restore_scene_behind(void) {
     if (g_state_before_menu == FISH_STATE_OVER) draw_game_over();
     else fish_draw_scene();
     g_full_redraw = 0;
 }
 /**
- * @brief  ³õÊ¼»¯ÓãÓÎÏ·: ¸´Î»×´Ì¬¡¢±³¾°É«¡¢Éú³ÉÍæ¼ÒÓëĞ¡Óã²¢»æÖÆ¡£
+ * @brief  åˆå§‹åŒ–é±¼æ¸¸æˆ: å¤ä½çŠ¶æ€ã€èƒŒæ™¯è‰²ã€ç”Ÿæˆç©å®¶ä¸å°é±¼å¹¶ç»˜åˆ¶ã€‚
  */
-
-void fish_init(void)
-{
+void fish_init(void) {
     uint8_t i;
     g_state = FISH_STATE_PLAYING;
     g_score = 0;
     g_won = 0;
-    g_menu_clear_color = COLOR_BG;   /* Çå²Ëµ¥Î»ÖÃÓÃ±³¾°É«Ìæ´úºÚÉ«, ±ÜÃâÇĞ²Ëµ¥ºÚÉÁ */
-    g_hud_dirty = 1;   /* Ê×Ö¡ÖØ»æ¶¥²¿ĞÅÏ¢ */
+    g_menu_clear_color = COLOR_BG;   /* æ¸…èœå•ä½ç½®ç”¨èƒŒæ™¯è‰²æ›¿ä»£é»‘è‰², é¿å…åˆ‡èœå•é»‘é—ª */
+    g_hud_dirty = 1;   /* é¦–å¸§é‡ç»˜é¡¶éƒ¨ä¿¡æ¯ */
     g_frame = 0;
-    g_food_us = GetTimerCount();   /* Ğ¡ÓãÊ±¼ä½ÚÅÄ»ù×¼ */
+    g_food_us = GetTimerCount();   /* å°é±¼æ—¶é—´èŠ‚æ‹åŸºå‡† */
     g_full_redraw = 1;
     g_prev_pressed = 0;
     g_touch_down = 0;
@@ -680,35 +684,25 @@ void fish_init(void)
         food_respawn(&g_food[i], 1);
 }
 
-/* ================================================================
- *  ¸üĞÂ (Ã¿Ö¡µ÷ÓÃ)
- *  @return GAME_RET_* ·µ»ØÖµ
- * ================================================================ */
-/* ================================================================
- *  ÅäÖÃÇı¶¯²Ëµ¥×´Ì¬»úµÄ hook (mark_dirty / bg_redraw / on_to_exit)
- * ================================================================ */
-/* ²Ëµ¥¹Ø±Õ/È¡Ïû, ¼°ÖØ²ËÏÂ»¬´ò¶Ï½øÍË³ö²Ëµ¥(on_to_exit)ºó: Á¢¼´ÖØ»æ³¡¾°(½áÊø»­Ãæ/ÓÎÏ·»­Ãæ)¡£
-   on_to_exit Óë mark_dirty µ±Ç°ĞĞÎªÒ»ÖÂ(¶¼½ö»Ö¸´³¡¾°), ¹Ê cfg Á½¸ö²ÛÎ»¹²ÓÃ´Ëº¯ÊıÊ¡ Flash */
 /**
- * @brief  ¹Ø±Õ/È¡Ïû²Ëµ¥ºóÖÃÔàÒÔ±ãÖØ»æÓã³¡¾°¡£
+ * @brief  å…³é—­/å–æ¶ˆèœå•åç½®è„ä»¥ä¾¿é‡ç»˜é±¼åœºæ™¯ã€‚
+ * @note   èœå•å…³é—­/å–æ¶ˆ, åŠé‡èœä¸‹æ»‘æ‰“æ–­è¿›é€€å‡ºèœå•(on_to_exit)åç«‹å³é‡ç»˜åœºæ™¯(ç»“æŸç”»é¢/æ¸¸æˆç”»é¢);
+ *         on_to_exit ä¸ mark_dirty è¡Œä¸ºä¸€è‡´(éƒ½ä»…æ¢å¤åœºæ™¯), æ•… cfg ä¸¤ä¸ªæ§½ä½å…±ç”¨æ­¤å‡½æ•°çœ Flashã€‚
  */
-static void fish_menu_mark_dirty(void)
-{
+static void fish_menu_mark_dirty(void) {
     fish_restore_scene_behind();
 }
 
-/* ÒÀ¾İÔà±ê¼ÇÖØ»æ²Ëµ¥±³¾°(½áÊø»­Ãæ/³¡¾°): ·µ»Ø1=±¾Ö¡ÒÑÖØ»æ */
 /**
- * @brief  ÒÀ¾İÔà±ê¼ÇÖØ»æÓã²Ëµ¥±³¾°³¡¾°¡£
- * @return 1=ÒÑÖØ»æ, 0=ÎŞÔà
+ * @brief  ä¾æ®è„æ ‡è®°é‡ç»˜é±¼èœå•èƒŒæ™¯åœºæ™¯ã€‚
+ * @return 1=å·²é‡ç»˜, 0=æ— è„
  */
-static uint8_t fish_menu_bg_redraw(void)
-{
+static uint8_t fish_menu_bg_redraw(void) {
     if (!g_full_redraw) return 0;
     g_full_redraw = 0;
-    /* ²Ëµ¥´ò¿ªÊ±µÍµç´¥·¢ g_full_redraw: ²Ëµ¥¿ò¼Ü²»Í¸Ã÷, ÖØ»æËü¸Ç×¡ÖĞÑëµÄµÍµçÍ¼±ê,
-       ²»ÒªÕûÆÁÖØ»æ³¡¾°, ·ñÔò²Ëµ¥»áÉÁ (²Î¿¼ sokoban ²Ëµ¥¿É¼ûÊ±½öÖØ»æ²Ëµ¥¿ò¼Ü)¡£
-       Í¹ÆğÇø x=195~210 ³¬³ö²Ëµ¥¿ò¼ÜÓÒÔµ(195), ÏÈÓÃÓã±³¾°É«Ìîµô±ÜÃâºìÉ«²ĞÁô */
+    /* èœå•æ‰“å¼€æ—¶ä½ç”µè§¦å‘ g_full_redraw: èœå•æ¡†æ¶ä¸é€æ˜, é‡ç»˜å®ƒç›–ä½ä¸­å¤®çš„ä½ç”µå›¾æ ‡,
+       ä¸è¦æ•´å±é‡ç»˜åœºæ™¯, å¦åˆ™èœå•ä¼šé—ª (å‚è€ƒ sokoban èœå•å¯è§æ—¶ä»…é‡ç»˜èœå•æ¡†æ¶)ã€‚
+       å‡¸èµ·åŒº x=195~210 è¶…å‡ºèœå•æ¡†æ¶å³ç¼˜(195), å…ˆç”¨é±¼èƒŒæ™¯è‰²å¡«æ‰é¿å…çº¢è‰²æ®‹ç•™ */
     LCD_Fill(195, 79, 211, 162, COLOR_BG);
     return 1;
 }
@@ -721,37 +715,35 @@ static const GameMenuCfg g_fish_menu_cfg = {
     fish_menu_mark_dirty, fish_menu_bg_redraw, fish_menu_mark_dirty
 };
 /**
- * @brief  ÓãÃ¿Ö¡¸üĞÂ: ´¦ÀíÍÏ¶¯¡¢Ğ¡ÓãÒÆ¶¯/³ÔÓã¡¢²Ëµ¥½»»¥ÓëäÖÈ¾¡£
- * @return GAME_RET_* ·µ»ØÃüÁî
+ * @brief  é±¼æ¯å¸§æ›´æ–°: å¤„ç†æ‹–åŠ¨ã€å°é±¼ç§»åŠ¨/åƒé±¼ã€èœå•äº¤äº’ä¸æ¸²æŸ“ã€‚
+ * @return GAME_RET_* è¿”å›å‘½ä»¤
  */
+uint8_t fish_update(void) {
 
-uint8_t fish_update(void)
-{
-
-    /* ²Ëµ¥ÀäÈ´ */
+    /* èœå•å†·å´ */
     if (g_menu_cooldown > 0) g_menu_cooldown--;
 
-    /* ÉèÖÃÒ³ÃæÏÂ»¬¡úÍË³ö²Ëµ¥ */
+    /* è®¾ç½®é¡µé¢ä¸‹æ»‘â†’é€€å‡ºèœå• */
     if (g_game_enter_exit_menu) {
         g_game_enter_exit_menu = 0;
         g_state = FISH_STATE_EXIT_MENU;
         g_full_redraw = 1;
     }
 
-    /* ---- ÍË³ö²Ëµ¥ / ÖØĞÂ¿ªÊ¼²Ëµ¥: ÅäÖÃÇı¶¯Í³Ò»×´Ì¬»ú ---- */
+    /* ---- é€€å‡ºèœå• / é‡æ–°å¼€å§‹èœå•: é…ç½®é©±åŠ¨ç»Ÿä¸€çŠ¶æ€æœº ---- */
     if (g_state == FISH_STATE_EXIT_MENU || g_state == FISH_STATE_RESTART_MENU) {
         uint8_t out_ret;
-        uint8_t cmd = game_menu_command(&g_fish_menu_cfg, (uint8_t *)&g_state, &out_ret);
+        uint8_t cmd = game_menu_command(&g_fish_menu_cfg, (uint8_t*)&g_state, &out_ret);
         switch (cmd) {
-            case GAME_MENU_CMD_SWITCH:   return out_ret;
-            case GAME_MENU_CMD_RESTART:  fish_init(); return GAME_RET_INTERACT;
-            case GAME_MENU_CMD_SETTINGS: menu_enter_game_settings(); return EXIT_RET_SETTINGS;
-            case GAME_MENU_CMD_INTERACT: return GAME_RET_INTERACT;
-            default:                     return 0;  /* RETURN/¹Ø±Õ */
+        case GAME_MENU_CMD_SWITCH:   return out_ret;
+        case GAME_MENU_CMD_RESTART:  fish_init(); return GAME_RET_INTERACT;
+        case GAME_MENU_CMD_SETTINGS: menu_enter_game_settings(); return EXIT_RET_SETTINGS;
+        case GAME_MENU_CMD_INTERACT: return GAME_RET_INTERACT;
+        default:                     return 0;  /* RETURN/å…³é—­ */
         }
     }
 
-    /* ---- ÓÎÏ·½áÊø: ÉÏ»¬/ÏÂ»¬ºô³ö²Ëµ¥ (²»ÔÙµã»÷ÈÎÒâ´¦ÖØ¿ª) ---- */
+    /* ---- æ¸¸æˆç»“æŸ: ä¸Šæ»‘/ä¸‹æ»‘å‘¼å‡ºèœå• (ä¸å†ç‚¹å‡»ä»»æ„å¤„é‡å¼€) ---- */
     if (g_state == FISH_STATE_OVER) {
         if (g_full_redraw) { draw_game_over(); g_full_redraw = 0; }
         TouchState ts;
@@ -760,7 +752,7 @@ uint8_t fish_update(void)
             g_touch_down = 1;
             g_touch_start_x = ts.x;
             g_touch_start_y = ts.y;
-            if (ts.y <= 220) g_menu_cooldown = 0;  /* ·ÇÉÏ»®ÇøÇå²Ëµ¥ÀäÈ´ */
+            if (ts.y <= 220) g_menu_cooldown = 0;  /* éä¸Šåˆ’åŒºæ¸…èœå•å†·å´ */
         }
         else if (ts.pressed && g_touch_down && g_touch_start_y < MENU_SWIPE_START_Y) {
             int16_t dy_move = (int16_t)ts.y - (int16_t)g_touch_start_y;
@@ -785,7 +777,7 @@ uint8_t fish_update(void)
                 g_restart_sliding = 0;
                 g_restart_slide_y = RESTART_MENU_Y + RESTART_MENU_H;
                 game_restart_menu_drag_poll(&g_restart_slide_y, g_touch_start_y,
-                                            &g_restart_dragging, &ts);
+                    &g_restart_dragging, &ts);
                 return 0;
             }
         }
@@ -824,52 +816,54 @@ uint8_t fish_update(void)
     uint8_t just_pressed = (uint8_t)(upress && !g_prev_pressed);
     g_prev_pressed = upress;
 
-    /* ´¥ÃşÆğÊ¼¼ÇÂ¼ (¹©²Ëµ¥ÊÖÊÆ¼ì²â) */
+    /* è§¦æ‘¸èµ·å§‹è®°å½• (ä¾›èœå•æ‰‹åŠ¿æ£€æµ‹) */
     if (upress && !g_touch_down) {
         g_touch_down = 1;
         g_touch_start_x = ts.x;
         g_touch_start_y = ts.y;
-        if (ts.y <= 220) g_menu_cooldown = 0;  /* ·ÇÉÏ»®ÇøÇå²Ëµ¥ÀäÈ´ */
+        if (ts.y <= 220) g_menu_cooldown = 0;  /* éä¸Šåˆ’åŒºæ¸…èœå•å†·å´ */
     }
-    /* ÏÂ»¬´¥·¢ÍË³ö²Ëµ¥ÍÏ×§ */
-    if (game_menu_enter_exit_drag(&ts, (uint8_t *)&g_state,
-                                   FISH_STATE_PLAYING, FISH_STATE_EXIT_MENU))
+    /* ä¸‹æ»‘è§¦å‘é€€å‡ºèœå•æ‹–æ‹½ */
+    if (game_menu_enter_exit_drag(&ts, (uint8_t*)&g_state,
+        FISH_STATE_PLAYING, FISH_STATE_EXIT_MENU))
         return 0;
-    /* ÉÏ»®´¥·¢ÖØĞÂ¿ªÊ¼²Ëµ¥ */
-    if (game_menu_enter_restart_drag(&ts, (uint8_t *)&g_state,
-                                      FISH_STATE_PLAYING, FISH_STATE_RESTART_MENU, 220))
+    /* ä¸Šåˆ’è§¦å‘é‡æ–°å¼€å§‹èœå• */
+    if (game_menu_enter_restart_drag(&ts, (uint8_t*)&g_state,
+        FISH_STATE_PLAYING, FISH_STATE_RESTART_MENU, 220))
         return 0;
-    /* ËÉÊÖÌá½»²Ëµ¥ */
+    /* æ¾æ‰‹æäº¤èœå• */
     if (!upress && g_touch_down) {
         g_touch_down = 0;
         int16_t dy = (int16_t)ts.y - (int16_t)g_touch_start_y;
-        if (game_menu_commit_exit(dy, (uint8_t *)&g_state, FISH_STATE_EXIT_MENU))
+        if (game_menu_commit_exit(dy, (uint8_t*)&g_state, FISH_STATE_EXIT_MENU))
             return GAME_RET_INTERACT;
-        if (game_menu_commit_restart(dy, (uint8_t *)&g_state,
-                                      FISH_STATE_RESTART_MENU, 220, 10))
+        if (game_menu_commit_restart(dy, (uint8_t*)&g_state,
+            FISH_STATE_RESTART_MENU, 220, 10))
             return GAME_RET_INTERACT;
     }
-    /* ÔöÁ¿ÍÏ¶¯: °´×¡»¬¶¯Ê±, Óã°´ÊÖÖ¸µÄÎ»ÒÆÔöÁ¿Æ½ÒÆ(²»Îü¸½µ½ÊÖÖ¸Î»ÖÃ, ËÉ¿ª¼´Í£) */
+    /* å¢é‡æ‹–åŠ¨: æŒ‰ä½æ»‘åŠ¨æ—¶, é±¼æŒ‰æ‰‹æŒ‡çš„ä½ç§»å¢é‡å¹³ç§»(ä¸å¸é™„åˆ°æ‰‹æŒ‡ä½ç½®, æ¾å¼€å³åœ) */
     if (g_state == FISH_STATE_PLAYING && upress) {
         if (g_game_consume_release) {
-            /* ²Ëµ¥·´Ïò»¬¹Ø±ÕºóµÄÍÏ¶¯²»´«ÈëÓÎÏ·: ±ÕºÏÊÖÊÆ°´×¡ÆÚ¼äÖ»¸úËæ²»ÒÆ¶¯Óã, ËÉÊÖ¼´»Ö¸´ */
+            /* èœå•åå‘æ»‘å…³é—­åçš„æ‹–åŠ¨ä¸ä¼ å…¥æ¸¸æˆ: é—­åˆæ‰‹åŠ¿æŒ‰ä½æœŸé—´åªè·Ÿéšä¸ç§»åŠ¨é±¼, æ¾æ‰‹å³æ¢å¤ */
             s_last_touch_x = (int16_t)ts.x;
             s_last_touch_y = (int16_t)ts.y;
-        } else if (just_pressed) {
-            /* ¸Õ°´ÏÂ: ¼ÇÂ¼Æğµã, ±¾Ö¡Óã²»¶¯ */
+        }
+        else if (just_pressed) {
+            /* åˆšæŒ‰ä¸‹: è®°å½•èµ·ç‚¹, æœ¬å¸§é±¼ä¸åŠ¨ */
             s_last_touch_x = (int16_t)ts.x;
             s_last_touch_y = (int16_t)ts.y;
-        } else {
+        }
+        else {
             int16_t dx = (int16_t)ts.x - s_last_touch_x;
             int16_t dy = (int16_t)ts.y - s_last_touch_y;
-            if (dx > 0) g_player.facing = 0;      /* ÏòÓÒ */
-            else if (dx < 0) g_player.facing = 1; /* Ïò×ó */
+            if (dx > 0) g_player.facing = 0;      /* å‘å³ */
+            else if (dx < 0) g_player.facing = 1; /* å‘å·¦ */
             g_player.x = (uint16_t)((int16_t)g_player.x + dx);
             g_player.y = (uint16_t)((int16_t)g_player.y + dy);
             s_last_touch_x = (int16_t)ts.x;
             s_last_touch_y = (int16_t)ts.y;
         }
-        /* ÏŞÖÆÔÚ8½ÇĞÎÓÎ¶¯Çø(¾ØĞÎ+ËÄ½Çµ¹½Ç, ²»½øÔ²ĞÎÆÁ±»ÕÚµ²µÄËÄ½Ç) */
+        /* é™åˆ¶åœ¨8è§’å½¢æ¸¸åŠ¨åŒº(çŸ©å½¢+å››è§’å€’è§’, ä¸è¿›åœ†å½¢å±è¢«é®æŒ¡çš„å››è§’) */
         {
             int16_t px = (int16_t)g_player.x;
             int16_t py = (int16_t)g_player.y;
@@ -879,20 +873,20 @@ uint8_t fish_update(void)
         }
     }
 
-    /* ±ÕºÏÊÖÊÆ½áÊø(ËÉÊÖ)ºóÇå³ıÎüÊÕ±êÖ¾, ÏÂÒ»´Î°´ÏÂ¼´¿ÉÕı³£²Ù×÷ÓÎÏ· */
+    /* é—­åˆæ‰‹åŠ¿ç»“æŸ(æ¾æ‰‹)åæ¸…é™¤å¸æ”¶æ ‡å¿—, ä¸‹ä¸€æ¬¡æŒ‰ä¸‹å³å¯æ­£å¸¸æ“ä½œæ¸¸æˆ */
     if (!upress && g_game_consume_release)
         g_game_consume_release = 0;
 
-    /* Ğ¡ÓãËæ»úÓÎ¶¯ (»ùÓÚÕæÊµÊ±¼ä½ÚÅÄ, ÓëÖ¡ÂÊÎŞ¹Ø, ·ÀÎ´°´ÏÂÊ±Ö÷Ñ­»·¿Õ×ªµ¼ÖÂ¿ñì­) */
+    /* å°é±¼éšæœºæ¸¸åŠ¨ (åŸºäºçœŸå®æ—¶é—´èŠ‚æ‹, ä¸å¸§ç‡æ— å…³, é˜²æœªæŒ‰ä¸‹æ—¶ä¸»å¾ªç¯ç©ºè½¬å¯¼è‡´ç‹‚é£™) */
     {
         uint32_t now_us = GetTimerCount();
         if ((uint32_t)(now_us - g_food_us) >= FISH_MOVE_US) {
             g_food_us = now_us;
             uint8_t i;
             for (i = 0; i < FISH_NUM_FOOD; i++) {
-                FishEntity *f = &g_food[i];
+                FishEntity* f = &g_food[i];
                 if (!f->active) continue;
-                /* ×ß³öÆÁÄ»ÖĞ: Ö±³å³öÆÁ, ÍêÈ«³öÆÁºó»»ĞÂÓã */
+                /* èµ°å‡ºå±å¹•ä¸­: ç›´å†²å‡ºå±, å®Œå…¨å‡ºå±åæ¢æ–°é±¼ */
                 if (f->leaving) {
                     f->x = (uint16_t)((int16_t)f->x + f->vx);
                     f->y = (uint16_t)((int16_t)f->y + f->vy);
@@ -909,7 +903,7 @@ uint8_t fish_update(void)
                     continue;
                 }
 
-                /* ´ÓÆÁÄ»±ßÔµÓÎÈë: ²»Ç¯ÖÆ, ÓÎ½ø¿ÉÓÎ¶¯Çøºó×ªÎª³£¹æÒÆ¶¯ */
+                /* ä»å±å¹•è¾¹ç¼˜æ¸¸å…¥: ä¸é’³åˆ¶, æ¸¸è¿›å¯æ¸¸åŠ¨åŒºåè½¬ä¸ºå¸¸è§„ç§»åŠ¨ */
                 if (f->entering) {
                     f->x = (uint16_t)((int16_t)f->x + f->vx);
                     f->y = (uint16_t)((int16_t)f->y + f->vy);
@@ -926,7 +920,7 @@ uint8_t fish_update(void)
                 if (f->x > PLAY_X_MAX) { f->x = PLAY_X_MAX; f->vx = (int16_t)-f->vx; }
                 if (f->y < PLAY_Y_MIN) { f->y = PLAY_Y_MIN; f->vy = (int16_t)-f->vy; }
                 if (f->y > PLAY_Y_MAX) { f->y = PLAY_Y_MAX; f->vy = (int16_t)-f->vy; }
-                /* 8½ÇĞÎÇ¯ÖÆ: ²»½øÔ²ĞÎÆÁ±»ÕÚµ²µÄËÄ½Ç */
+                /* 8è§’å½¢é’³åˆ¶: ä¸è¿›åœ†å½¢å±è¢«é®æŒ¡çš„å››è§’ */
                 {
                     int16_t fx = (int16_t)f->x;
                     int16_t fy = (int16_t)f->y;
@@ -934,17 +928,17 @@ uint8_t fish_update(void)
                     f->x = (uint16_t)fx;
                     f->y = (uint16_t)fy;
                 }
-                /* ½ÇÂä·´µ¯: ËÙ¶È³¯ÍâÊ±·´×ªÏòÄÚ, ·À¿¨½Ç */
+                /* è§’è½åå¼¹: é€Ÿåº¦æœå¤–æ—¶åè½¬å‘å†…, é˜²å¡è§’ */
                 fish_bounce_corners(f);
-                /* Å¼¶û¸Ä±ä·½Ïò */
+                /* å¶å°”æ”¹å˜æ–¹å‘ */
                 if (fish_rand(64) == 0) {
-                    f->vx = (int16_t)fish_rand(FISH_SPEED_BASE*2+1) - FISH_SPEED_BASE;
-                    f->vy = (int16_t)fish_rand(FISH_SPEED_BASE*2+1) - FISH_SPEED_BASE;
-                    if (f->vx == 0 && f->vy == 0) f->vx = 1;   /* ±ÜÃâÍ£ËÀ */
+                    f->vx = (int16_t)fish_rand(FISH_SPEED_BASE * 2 + 1) - FISH_SPEED_BASE;
+                    f->vy = (int16_t)fish_rand(FISH_SPEED_BASE * 2 + 1) - FISH_SPEED_BASE;
+                    if (f->vx == 0 && f->vy == 0) f->vx = 1;   /* é¿å…åœæ­» */
                 }
-                /* °´ÓÎ¶¯·½Ïò¸üĞÂ³¯Ïò(×óÓÒ·­×ª) */
+                /* æŒ‰æ¸¸åŠ¨æ–¹å‘æ›´æ–°æœå‘(å·¦å³ç¿»è½¬) */
                 if (f->vx != 0) f->facing = (f->vx < 0) ? 1 : 0;
-                /* ÊÙÃüµ½ÆÚ: ³¯×î½ü±ßÔµÓÎ³öÆÁÄ»(²»Ô­µØÏûÊ§) */
+                /* å¯¿å‘½åˆ°æœŸ: æœæœ€è¿‘è¾¹ç¼˜æ¸¸å‡ºå±å¹•(ä¸åŸåœ°æ¶ˆå¤±) */
                 f->life++;
                 if (f->life >= ((f->level <= g_player.level) ? FISH_LIFE_TICKS : FISH_LIFE_BIG_TICKS)) {
                     f->leaving = 1;
@@ -953,40 +947,40 @@ uint8_t fish_update(void)
                     int16_t dt = (int16_t)f->y;
                     int16_t db = (int16_t)LCD_H - (int16_t)f->y;
                     if (dl < dr && dl < dt && dl < db) { f->vx = -FISH_LEAVE_SPEED; f->vy = 0; }
-                    else if (dr < dt && dr < db)       { f->vx = FISH_LEAVE_SPEED;  f->vy = 0; }
-                    else if (dt < db)                  { f->vx = 0;                 f->vy = -FISH_LEAVE_SPEED; }
-                    else                               { f->vx = 0;                 f->vy = FISH_LEAVE_SPEED; }
-                    /* Àë³¡³¯×î½ü±ßÔµÓÎ³ö, Í¬²½³¯ÏòÍù³ö¿Ú·½Ïò */
+                    else if (dr < dt && dr < db) { f->vx = FISH_LEAVE_SPEED;  f->vy = 0; }
+                    else if (dt < db) { f->vx = 0;                 f->vy = -FISH_LEAVE_SPEED; }
+                    else { f->vx = 0;                 f->vy = FISH_LEAVE_SPEED; }
+                    /* ç¦»åœºæœæœ€è¿‘è¾¹ç¼˜æ¸¸å‡º, åŒæ­¥æœå‘å¾€å‡ºå£æ–¹å‘ */
                     if (f->vx != 0) f->facing = (f->vx < 0) ? 1 : 0;
                 }
             }
         }
     }
 
-    /* Åö×²¼ì²â: Íæ¼Ò vs Ğ¡Óã */
+    /* ç¢°æ’æ£€æµ‹: ç©å®¶ vs å°é±¼ */
     {
         uint8_t i;
         for (i = 0; i < FISH_NUM_FOOD; i++) {
-            FishEntity *f = &g_food[i];
+            FishEntity* f = &g_food[i];
             if (!f->active) continue;
             int16_t ddx = (int16_t)f->x - (int16_t)g_player.x;
             int16_t ddy = (int16_t)f->y - (int16_t)g_player.y;
             if (ddx < 0) ddx = (int16_t)-ddx;
             if (ddy < 0) ddy = (int16_t)-ddy;
-            /* ´ÖÂÔÅĞ¶¨: Íæ¼Ò³ß´çËæµÈ¼¶Ôö´ó */
+            /* ç²—ç•¥åˆ¤å®š: ç©å®¶å°ºå¯¸éšç­‰çº§å¢å¤§ */
             uint16_t pr = (uint16_t)(8 + PLAYER_IMG_LVL * 4);
             if (ddx < (int16_t)pr && ddy < (int16_t)pr) {
                 if (f->level <= g_player.level ||
-    (g_player.level >= (FISH_PLAYER_LEVEL_MAX - 1) && f->level <= (uint8_t)(g_player.level + 1))) {
-                    /* ³Ôµô: °´µÈ¼¶µÃ·Ö(5^µÈ¼¶:0¼¶=1,1¼¶=5...), ÀÛ¼Æ·Ö´ïãĞÖµ¼´ÉıÒ»¼¶ */
+                    (g_player.level >= (FISH_PLAYER_LEVEL_MAX - 1) && f->level <= (uint8_t)(g_player.level + 1))) {
+                    /* åƒæ‰: æŒ‰ç­‰çº§å¾—åˆ†(5^ç­‰çº§:0çº§=1,1çº§=5...), ç´¯è®¡åˆ†è¾¾é˜ˆå€¼å³å‡ä¸€çº§ */
                     g_score += fish_thresh(f->level);
-                    g_hud_dirty = 1;   /* ¶¥²¿·ÖÊı/½ø¶ÈĞèË¢ĞÂ */
+                    g_hud_dirty = 1;   /* é¡¶éƒ¨åˆ†æ•°/è¿›åº¦éœ€åˆ·æ–° */
                     while (g_player.level < FISH_PLAYER_LEVEL_MAX &&
-                           g_score >= fish_thresh((uint8_t)(g_player.level + 1))) {
-                        g_player.level++;   /* ÀÛ¼Æ·Ö´ïµ½ÏÂÒ»¼¶ãĞÖµ, ÉıÒ»¼¶ */
+                        g_score >= fish_thresh((uint8_t)(g_player.level + 1))) {
+                        g_player.level++;   /* ç´¯è®¡åˆ†è¾¾åˆ°ä¸‹ä¸€çº§é˜ˆå€¼, å‡ä¸€çº§ */
                     }
                     food_respawn(f, 1);
-                    /* ´ïµ½1,953,125·Ö(ÏÔÊ¾10¼¶): Í¨¹Ø(Ê¤Àû) */
+                    /* è¾¾åˆ°1,953,125åˆ†(æ˜¾ç¤º10çº§): é€šå…³(èƒœåˆ©) */
                     if (g_score >= FISH_WIN_SCORE) {
                         g_won = 1;
                         g_state = FISH_STATE_OVER;
@@ -994,8 +988,9 @@ uint8_t fish_update(void)
                         g_touch_down = 0;
                         return GAME_RET_INTERACT;
                     }
-                } else if (!FISH_INVINCIBLE) {
-                    /* Åöµ½¸ü´óµÄÓã: ÓÎÏ·½áÊø */
+                }
+                else if (!FISH_INVINCIBLE) {
+                    /* ç¢°åˆ°æ›´å¤§çš„é±¼: æ¸¸æˆç»“æŸ */
                     g_state = FISH_STATE_OVER;
                     draw_game_over();
                     g_touch_down = 0;
@@ -1005,35 +1000,35 @@ uint8_t fish_update(void)
         }
     }
 
-    /* ===== ÔöÁ¿»æÖÆ (²»ÕûÆÁÖØ»æ, Ö»Ë¢ĞÂÓĞ±ä»¯µÄÓã/Íæ¼Ò, ·ÀÉÁË¸) ===== */
+    /* å¢é‡ç»˜åˆ¶ (ä¸æ•´å±é‡ç»˜, åªåˆ·æ–°æœ‰å˜åŒ–çš„é±¼/ç©å®¶, é˜²é—ªçƒ) */
     if (g_full_redraw) {
-        /* Ê×´Î/»Ö¸´: È«ÆÁÌî±³¾°, ËùÓĞÊµÌåÖØ»­ */
+        /* é¦–æ¬¡/æ¢å¤: å…¨å±å¡«èƒŒæ™¯, æ‰€æœ‰å®ä½“é‡ç”» */
         draw_background();
         g_full_redraw = 0;
-        g_hud_dirty = 1;      /* ¶¥²¿·ÖÊı/µÈ¼¶Ìõ±»±³¾°¸²¸Ç, ĞèÖØ»æ */
+        g_hud_dirty = 1;      /* é¡¶éƒ¨åˆ†æ•°/ç­‰çº§æ¡è¢«èƒŒæ™¯è¦†ç›–, éœ€é‡ç»˜ */
         draw_hud();
         g_player.drawn = 0;
         uint8_t i0;
         for (i0 = 0; i0 < FISH_NUM_FOOD; i0++) g_food[i0].drawn = 0;
     }
 
-    /* Íæ¼Ò: Î»ÖÃ/µÈ¼¶±ä»¯ »ò ±»ÖØµşÎóÉË±ê¼ÇÊ±²ÅÖØ»­ */
+    /* ç©å®¶: ä½ç½®/ç­‰çº§å˜åŒ– æˆ– è¢«é‡å è¯¯ä¼¤æ ‡è®°æ—¶æ‰é‡ç”» */
     {
-        FishEntity *p = &g_player;
+        FishEntity* p = &g_player;
         uint8_t moved = (p->x != (uint16_t)p->prev_x ||
-                         p->y != (uint16_t)p->prev_y ||
-                         p->level != p->prev_level);
+            p->y != (uint16_t)p->prev_y ||
+            p->level != p->prev_level);
         if (!p->drawn || moved) {
             if (p->drawn && moved) {
                 clear_entity_rect(player_imgs_dim, p->prev_level,
-                                  p->prev_x, p->prev_y);
-                /* µÈ¼¶±ä»¯(³ß´ç±ä´ó)Ê±, ĞÂ³ß´ç¾ØĞÎÒ²ÇåÒ»´Î±³¾°, ±ÜÃâ²ĞÁô¾ÉÍ¼ */
+                    p->prev_x, p->prev_y);
+                /* ç­‰çº§å˜åŒ–(å°ºå¯¸å˜å¤§)æ—¶, æ–°å°ºå¯¸çŸ©å½¢ä¹Ÿæ¸…ä¸€æ¬¡èƒŒæ™¯, é¿å…æ®‹ç•™æ—§å›¾ */
                 if (p->level != p->prev_level)
                     clear_entity_rect(player_imgs_dim, PLAYER_IMG_LVL,
-                                      (int16_t)p->x, (int16_t)p->y);
+                        (int16_t)p->x, (int16_t)p->y);
             }
             draw_image_sprite(FLASH_STORE_ID_PLAYER_0, player_imgs_dim,
-                              PLAYER_COUNT, p->level, p->x, p->y, p->facing);
+                PLAYER_COUNT, p->level, p->x, p->y, p->facing);
             p->prev_x = (int16_t)p->x;
             p->prev_y = (int16_t)p->y;
             p->prev_level = p->level;
@@ -1041,21 +1036,21 @@ uint8_t fish_update(void)
         }
     }
 
-    /* Ğ¡Óã: Âß¼­Í¬Íæ¼Ò */
+    /* å°é±¼: é€»è¾‘åŒç©å®¶ */
     {
         uint8_t i;
         for (i = 0; i < FISH_NUM_FOOD; i++) {
-            FishEntity *f = &g_food[i];
+            FishEntity* f = &g_food[i];
             if (!f->active) continue;
             uint8_t moved = (f->x != (uint16_t)f->prev_x ||
-                             f->y != (uint16_t)f->prev_y ||
-                             f->level != f->prev_level);
+                f->y != (uint16_t)f->prev_y ||
+                f->level != f->prev_level);
             if (!f->drawn || moved) {
                 if (f->drawn && moved)
-                    fish_move_redraw(f);   /* ĞĞ¼¶Ô­×ÓÖØ»æ(ÓãÒÆ¶¯), ¼õÉÁ */
+                    fish_move_redraw(f);   /* è¡Œçº§åŸå­é‡ç»˜(é±¼ç§»åŠ¨), å‡é—ª */
                 else
                     draw_image_sprite(FLASH_STORE_ID_FISH_0, fish_imgs_dim,
-                                      FISH_COUNT, f->level, f->x, f->y, f->facing);
+                        FISH_COUNT, f->level, f->x, f->y, f->facing);
                 f->prev_x = (int16_t)f->x;
                 f->prev_y = (int16_t)f->y;
                 f->prev_level = f->level;
@@ -1064,42 +1059,39 @@ uint8_t fish_update(void)
         }
     }
 
-    /* ¶¥²¿ĞÅÏ¢ */
+    /* é¡¶éƒ¨ä¿¡æ¯ */
     draw_hud();
 
     return GAME_RET_NONE;
 }
 
-/* ================================================================
- *  ´¥Ãş¸´Î»
- * ================================================================ */
-void fish_reset_touch(void)
-{
+/**
+ * @brief  å¤ä½é±¼æ¸¸æˆè§¦æ‘¸çŠ¶æ€(ä»å…¶å®ƒæ¸¸æˆè¿”å›æ—¶è°ƒç”¨)ã€‚
+ */
+void fish_reset_touch(void) {
     g_prev_pressed = 0;
 }
 
-/* ================================================================
- *  È«ÆÁÖØ»æ
- * ================================================================ */
-void fish_full_redraw(void)
-{
+/**
+ * @brief  è¯·æ±‚é±¼æ¸¸æˆå…¨å±é‡ç»˜(ç”µæ± é—ªç­/èœå•åˆ‡æ¢åæ¢å¤)ã€‚
+ */
+void fish_full_redraw(void) {
     g_full_redraw = 1;
 }
 
 /**
- * @brief ¾Ö²¿Çå³ıµÍµçÍ¼±ê¸²¸ÇÇø, ²»ÕûÆÁÖØ»æ(±ÜÃâÓÎÏ·»­ÃæÉÁ)
- * @note  ²Ëµ¥¿É¼ûÊ±½»ÓÉ²Ëµ¥×´Ì¬»úÖØ»æ¿ò¼Ü¸Ç×¡; ÓÎÏ·½çÃæ¸´ÓÃ
- *        clear_entity_rect Ìî±³¾°²¢ÖØ»æÏà½»ÊµÌå, ¹Ê¶¥²¿·ÖÊı/µÈ¼¶²»ÊÜÓ°Ïì
+ * @brief å±€éƒ¨æ¸…é™¤ä½ç”µå›¾æ ‡è¦†ç›–åŒº, ä¸æ•´å±é‡ç»˜(é¿å…æ¸¸æˆç”»é¢é—ª)
+ * @note  èœå•å¯è§æ—¶äº¤ç”±èœå•çŠ¶æ€æœºé‡ç»˜æ¡†æ¶ç›–ä½; æ¸¸æˆç•Œé¢å¤ç”¨
+ *        clear_entity_rect å¡«èƒŒæ™¯å¹¶é‡ç»˜ç›¸äº¤å®ä½“, æ•…é¡¶éƒ¨åˆ†æ•°/ç­‰çº§ä¸å—å½±å“
  */
-void fish_clear_lowbattery(void)
-{
-    /* µÍµçÍ¼±ê¸²¸ÇÇø: ÖĞĞÄ(127,120), ¿í166, ¸ß83 (x=44~209, y=79~161) */
-    static const uint16_t lb_dims[][2] = {{166, 83}};
+void fish_clear_lowbattery(void) {
+    /* ä½ç”µå›¾æ ‡è¦†ç›–åŒº: ä¸­å¿ƒ(127,120), å®½166, é«˜83 (x=44~209, y=79~161) */
+    static const uint16_t lb_dims[][2] = { {166, 83} };
 
     if (g_state == FISH_STATE_EXIT_MENU || g_state == FISH_STATE_RESTART_MENU) {
-        /* ÇøÓòË¢ĞÂ(²»ÕûÆÁÖØ»æ, ±ÜÃâÓÎÏ·»­ÃæÉÁ): ÇåºìÉ«µÍµçÍ¼±êºó, Ìîµç³ØÇøÎª±³¾°É«
-           ²¢ÖØ»æÓëÆäÏà½»µÄÍæ¼Ò/Ğ¡ÓãÊµÌå, ÔÙÍ¬Ö¡ÖØ»­²Ëµ¥¿ò¼Ü. ²Ëµ¥ÍÏ×§/»¬ÈëÖĞ(Î´µ½Î»)
-           Ê±¿òÍâÂ¶³ö²¿·ÖµÃÒÔ»Ö¸´, ²»²ĞÁôºì/ºÚ²»ÉÁ; µ½Î»Ê±¿òÄÚ²¿·ÖÓÉ²Ëµ¥¿ò¼Ü¸Ç×¡. */
+        /* åŒºåŸŸåˆ·æ–°(ä¸æ•´å±é‡ç»˜, é¿å…æ¸¸æˆç”»é¢é—ª): æ¸…çº¢è‰²ä½ç”µå›¾æ ‡å, å¡«ç”µæ± åŒºä¸ºèƒŒæ™¯è‰²
+           å¹¶é‡ç»˜ä¸å…¶ç›¸äº¤çš„ç©å®¶/å°é±¼å®ä½“, å†åŒå¸§é‡ç”»èœå•æ¡†æ¶. èœå•æ‹–æ‹½/æ»‘å…¥ä¸­(æœªåˆ°ä½)
+           æ—¶æ¡†å¤–éœ²å‡ºéƒ¨åˆ†å¾—ä»¥æ¢å¤, ä¸æ®‹ç•™çº¢/é»‘ä¸é—ª; åˆ°ä½æ—¶æ¡†å†…éƒ¨åˆ†ç”±èœå•æ¡†æ¶ç›–ä½. */
         LCD_ClearLowBatteryOverlay();
         clear_entity_rect(lb_dims, 0, 127, 120);
         if (g_state == FISH_STATE_EXIT_MENU)
@@ -1111,37 +1103,28 @@ void fish_clear_lowbattery(void)
     clear_entity_rect(lb_dims, 0, 127, 120);
 }
 
-/* ================================================================
- *  ²Ëµ¥¿É¼û
- * ================================================================ */
-uint8_t fish_is_menu_visible(void)
-{
+/**
+ * @brief  åˆ¤æ–­å½“å‰æ˜¯å¦æ˜¾ç¤ºèœå•(é€€å‡º/é‡å¼€)ã€‚
+ * @return 1=æœ‰èœå•, 0=æ— 
+ */
+uint8_t fish_is_menu_visible(void) {
     return (g_state == FISH_STATE_EXIT_MENU || g_state == FISH_STATE_RESTART_MENU);
 }
 
-/* ================================================================
- *  ´æµµ / »Ö¸´ (´æÍæ¼ÒµÈ¼¶/×ø±ê/³¯Ïò + ÍêÕûµÃ·Ö/×´Ì¬ + Ã¿ÌõĞ¡ÓãÎ»ÖÃ/ËÙ¶È)
- *  ÔØºÉ²¼¾Ö: Íæ¼Ò level(1) x(2,y2) y(2) facing(1) + score(4) + state(1)
- *            È»ºó FISH_NUM_FOOD ÌõÓã, Ã¿Ìõ active(1) level(1) x(2) y(2) vx(2) vy(2)
- *  »Ö¸´Ê±Ô­µØ¼ÌĞø, ±ÜÃâ"Óã±»ÖØĞÂÉú³Éµ½ÆÁÄ»Íâ±ßÔµ¡¢¶ÌÔİÎŞÓã"µÄÎÊÌâ
- * ================================================================ */
-#define FISH_SAVE_BASE 11   /* Íæ¼Ò level+x+y+facing(6) + score(4) + state(1) */
-#define FISH_SAVE_FOOD 9    /* Ã¿ÌõÓã: active+level+x+y+vx+vy */
-#define FISH_SAVE_LEN (FISH_SAVE_BASE + FISH_NUM_FOOD * FISH_SAVE_FOOD)
-/**
- * @brief  ĞòÁĞ»¯ÓãÓÎÏ·×´Ì¬(Íæ¼Ò+Ã¿Ö»Ğ¡Óã)µ½´æµµ»º³å¡£
- * @param  buf     Êä³ö»º³å
- * @param  max_len »º³åÉÏÏŞ
- * @return Ğ´Èë×Ö½ÚÊı
- */
-
-uint8_t fish_save_state(uint8_t *buf, uint8_t max_len)
-{
+/* å­˜æ¡£ / æ¢å¤: å­˜ç©å®¶ç­‰çº§/åæ ‡/æœå‘ + å®Œæ•´å¾—åˆ†/çŠ¶æ€ + æ¯æ¡å°é±¼ä½ç½®/é€Ÿåº¦ã€‚
+   æ¢å¤æ—¶åŸåœ°ç»§ç»­, é¿å…"é±¼è¢«é‡æ–°ç”Ÿæˆåˆ°å±å¹•å¤–è¾¹ç¼˜ã€çŸ­æš‚æ— é±¼"çš„é—®é¢˜ */
+   /**
+    * @brief  åºåˆ—åŒ–é±¼æ¸¸æˆçŠ¶æ€(ç©å®¶+æ¯åªå°é±¼)åˆ°å­˜æ¡£ç¼“å†²ã€‚
+    * @param  buf     è¾“å‡ºç¼“å†²
+    * @param  max_len ç¼“å†²ä¸Šé™
+    * @return å†™å…¥å­—èŠ‚æ•°
+    */
+uint8_t fish_save_state(uint8_t* buf, uint8_t max_len) {
     uint8_t i, state;
-    uint8_t *p;
+    uint8_t* p;
     if (!buf || max_len < FISH_SAVE_LEN) return 0;
 
-    /* ²Ëµ¥´ò¿ªÊ±´æ½øÈë²Ëµ¥Ç°µÄ×´Ì¬ */
+    /* èœå•æ‰“å¼€æ—¶å­˜è¿›å…¥èœå•å‰çš„çŠ¶æ€ */
     if (g_state == FISH_STATE_EXIT_MENU || g_state == FISH_STATE_RESTART_MENU)
         state = g_state_before_menu;
     else
@@ -1160,7 +1143,7 @@ uint8_t fish_save_state(uint8_t *buf, uint8_t max_len)
     *p++ = state;
 
     for (i = 0; i < FISH_NUM_FOOD; i++) {
-        const FishEntity *f = &g_food[i];
+        const FishEntity* f = &g_food[i];
         *p++ = f->active;
         *p++ = f->level;
         p[0] = (uint8_t)(f->x & 0xFF); p[1] = (uint8_t)(f->x >> 8); p += 2;
@@ -1171,16 +1154,14 @@ uint8_t fish_save_state(uint8_t *buf, uint8_t max_len)
     return FISH_SAVE_LEN;
 }
 /**
- * @brief  ´Ó´æµµ»º³å»Ö¸´ÓãÓÎÏ·×´Ì¬²¢ÖØ»æ¡£
- * @param  buf ´æµµ»º³å
- * @param  len ³¤¶È
- * @return 1=³É¹¦, 0=Ê§°Ü
+ * @brief  ä»å­˜æ¡£ç¼“å†²æ¢å¤é±¼æ¸¸æˆçŠ¶æ€å¹¶é‡ç»˜ã€‚
+ * @param  buf å­˜æ¡£ç¼“å†²
+ * @param  len é•¿åº¦
+ * @return 1=æˆåŠŸ, 0=å¤±è´¥
  */
-
-uint8_t fish_restore_state(const uint8_t *buf, uint8_t len)
-{
+uint8_t fish_restore_state(const uint8_t* buf, uint8_t len) {
     uint8_t i, state;
-    const uint8_t *p;
+    const uint8_t* p;
     uint32_t score;
 
     if (!buf || len < FISH_SAVE_LEN) return 0;
@@ -1191,7 +1172,7 @@ uint8_t fish_restore_state(const uint8_t *buf, uint8_t len)
     g_player.y = (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8)); p += 2;
     g_player.facing = *p++;
     score = (uint32_t)p[0] | ((uint32_t)p[1] << 8)
-          | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+        | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
     p += 4;
     state = *p++;
     if (state > FISH_STATE_OVER) return 0;
@@ -1200,7 +1181,7 @@ uint8_t fish_restore_state(const uint8_t *buf, uint8_t len)
     g_won = (g_score >= FISH_WIN_SCORE) ? 1 : 0;
     g_state = (state == FISH_STATE_OVER) ? FISH_STATE_OVER : FISH_STATE_PLAYING;
 
-    /* Íæ¼Ò: »Ö¸´×ø±ê, ËÙ¶ÈÇåÁã(Íæ¼ÒÓÉ´¥ÃşÔöÁ¿Çı¶¯), ÆäÓà¸´Î» */
+    /* ç©å®¶: æ¢å¤åæ ‡, é€Ÿåº¦æ¸…é›¶(ç©å®¶ç”±è§¦æ‘¸å¢é‡é©±åŠ¨), å…¶ä½™å¤ä½ */
     g_player.active = 1;
     g_player.vx = 0;
     g_player.vy = 0;
@@ -1212,9 +1193,9 @@ uint8_t fish_restore_state(const uint8_t *buf, uint8_t len)
     g_player.entering = 0;
     g_player.dir = 0;
 
-    /* Ã¿ÌõĞ¡Óã: ÔøÔÚ³¡ÔòÔ­µØ»Ö¸´(´øËÙ¶È), ¿ÕÎ»ÔòÖØĞÂÉú³ÉÒ»Ìõ */
+    /* æ¯æ¡å°é±¼: æ›¾åœ¨åœºåˆ™åŸåœ°æ¢å¤(å¸¦é€Ÿåº¦), ç©ºä½åˆ™é‡æ–°ç”Ÿæˆä¸€æ¡ */
     for (i = 0; i < FISH_NUM_FOOD; i++) {
-        FishEntity *f = &g_food[i];
+        FishEntity* f = &g_food[i];
         uint8_t act = *p++;
         f->level = *p++;
         f->x = (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8)); p += 2;
@@ -1229,14 +1210,15 @@ uint8_t fish_restore_state(const uint8_t *buf, uint8_t len)
             f->drawn = 0;
             f->leaving = 0;
             f->entering = 0;
-        } else {
+        }
+        else {
             f->drawn = 0;
             food_respawn(f, 0);
         }
     }
 
     g_menu_clear_color = COLOR_BG;
-    g_hud_dirty = 1;   /* Ê×Ö¡ÖØ»æ¶¥²¿ĞÅÏ¢ */
+    g_hud_dirty = 1;   /* é¦–å¸§é‡ç»˜é¡¶éƒ¨ä¿¡æ¯ */
     g_frame = 0;
     g_food_us = GetTimerCount();
     g_full_redraw = 1;
@@ -1249,7 +1231,7 @@ uint8_t fish_restore_state(const uint8_t *buf, uint8_t len)
     g_restart_dragging = 0;
     g_restart_slide_y = RESTART_MENU_Y + RESTART_MENU_H;
 
-    /* Á¢¼´ÖØ»æ, ±ÜÃâ»Ö¸´ºóºÚÆÁÒ»Ö¡ */
+    /* ç«‹å³é‡ç»˜, é¿å…æ¢å¤åé»‘å±ä¸€å¸§ */
     LCD_Fill(0, 0, LCD_W, LCD_H, COLOR_BG);
     if (g_state == FISH_STATE_OVER) draw_game_over();
     else fish_draw_scene();

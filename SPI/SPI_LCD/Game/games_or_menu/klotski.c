@@ -1,57 +1,53 @@
 /**
  * @file    klotski.c
- * @brief   »ªÈİµÀ (15-Puzzle) ÓÎÏ·Ä£¿é
- *          4x4 Êı×ÖÆ´Í¼, ´¥Ãş»¬¶¯, ²½Êı+¼ÆÊ±
+ * @brief   åå®¹é“ (15-Puzzle) æ¸¸æˆæ¨¡å—
+ *          4x4 æ•°å­—æ‹¼å›¾, è§¦æ‘¸æ»‘åŠ¨, æ­¥æ•°+è®¡æ—¶
  */
-/* µ÷ÊÔÄ£Ê½: Ö±½ÓÉèÎªÄ¿±êÅÅÁĞ, »¬¶¯Ò»´Î¼´Í¨¹ØÑéÖ¤ */
-//#define KLOTSKI_TEST_MODE
+ /* è°ƒè¯•æ¨¡å¼: ç›´æ¥è®¾ä¸ºç›®æ ‡æ’åˆ—, æ»‘åŠ¨ä¸€æ¬¡å³é€šå…³éªŒè¯ */
+ //#define KLOTSKI_TEST_MODE
 
 #include "klotski.h"
-#include "tetris.h"       /* GAME_RET_* */
-#include "menu.h"
-#include "sok_img_win.h"
-#include "flash_store.h"   /* ×Ö¿â×ÊÔ´´ÓÍâ²¿Flash¶ÁÈ¡ */
-#include "lcd.h"
+#include "tetris.h"       /* æ¸¸æˆè¿”å›ç  */
+#include "menu.h"         /* èœå•/é€€å‡º/é‡å¼€ */
+#include "sok_img_win.h"  /* æ•°å­—å­—æ¨¡ */
+#include "flash_store.h"   /* å­—åº“èµ„æºä»å¤–éƒ¨Flashè¯»å– */
+#include "lcd.h"    
 #include "display.h"
 #include "touch.h"
 #include "timer.h"
 #include "string.h"
 
-/* ================================================================
- *  ÑÕÉ«
- * ================================================================ */
-#define KLOTSKI_EMPTY_COLOR  0xE73C   /* ¿Õ¸ñ: À¶»ÒÉ« */
-#define KLOTSKI_TILE_COLOR   0x2DC5   /* ·½¿éÉ«: ÂÌÉ« */
+/* é¢œè‰² */
+#define KLOTSKI_EMPTY_COLOR  0xE73C   /* ç©ºæ ¼: è“ç°è‰² */
+#define KLOTSKI_TILE_COLOR   0x2DC5   /* æ–¹å—è‰²: ç»¿è‰² */
 
-/* ================================================================
- *  ÓÎÏ·×´Ì¬
- * ================================================================ */
-static uint8_t  g_grid[KLOTSKI_SIZE];     /* 4x4: 1~15=·½¿é±àºÅ, 0=¿Õ¸ñ */
-static uint8_t  g_empty_r, g_empty_c;     /* ¿Õ¸ñÎ»ÖÃ */
-static uint16_t g_moves;                  /* ÒÆ¶¯²½Êı */
-static uint32_t g_timer_start;           /* ¼ÆÊ±Æğµã(ticks) */
-static uint16_t g_time_sec;              /* ÒÑÓÃÊ±¼äÃëÊı */
+/* å­˜æ¡£ç¼“å†²é•¿åº¦: ç½‘æ ¼16 + æ­¥æ•°2 + ç§’æ•°2 + çŠ¶æ€1 = 21 */
+#define KLOTSKI_SAVE_LEN  21
+
+/* æ»‘åŠ¨æœ€å°é˜ˆå€¼(ç§»å‡ºç©ºæ ¼) */
+#define SWIPE_THRESH  10
+
+/* æ¸¸æˆçŠ¶æ€ */
+static uint8_t  g_grid[KLOTSKI_SIZE];     /* 4x4: 1~15=æ–¹å—ç¼–å·, 0=ç©ºæ ¼ */
+static uint8_t  g_empty_r, g_empty_c;     /* ç©ºæ ¼ä½ç½® */
+static uint16_t g_moves;                  /* ç§»åŠ¨æ­¥æ•° */
+static uint32_t g_timer_start;           /* è®¡æ—¶èµ·ç‚¹(ticks) */
+static uint16_t g_time_sec;              /* å·²ç”¨æ—¶é—´ç§’æ•° */
 static KlotskiState g_state;
 static uint8_t  g_grid_dirty;
 
-/* ´¥Ãş×´Ì¬ */
-
-/* ÏÂ»®²Ëµ¥ÓÎÏ·Ó³Éä (Ë³Ğò: ÊÓÆµ/ÍÆÏä×Ó/2048/¶íÂŞË¹·½¿é, ¼õµ±Ç°=»ªÈİµÀ) */
+/* ä¸‹åˆ’èœå•æ¸¸æˆæ˜ å°„ (é¡ºåº: è§†é¢‘/æ¨ç®±å­/2048/ä¿„ç½—æ–¯æ–¹å—, å‡å½“å‰=åå®¹é“) */
 static const uint8_t klotski_exit_map[5] = {
     EXIT_RET_VIDEO, EXIT_RET_SOKOBAN, EXIT_RET_D2048, EXIT_RET_TETRIS, EXIT_RET_FISH
 };
 
-#define SWIPE_THRESH  10   /* »¬¶¯×îĞ¡ãĞÖµ(ÒÆ³ö¿Õ¸ñ) */
-
-/* ÍË³ö²Ëµ¥ĞĞÀàĞÍ (klotski×¨Êô) */
+/* é€€å‡ºèœå•è¡Œç±»å‹ (klotskiä¸“å±) */
 static const uint8_t klotski_row_types[5] = {
     MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_2048,
     MENU_ROW_TETRIS, MENU_ROW_FISH
 };
 
-/* ================================================================
- *  Ä¿±êÅÅÁĞ
- * ================================================================ */
+/* ç›®æ ‡æ’åˆ— */
 static const uint8_t goal_grid[KLOTSKI_SIZE] = {
     1,  2,  3,  4,
     5,  6,  7,  8,
@@ -59,32 +55,43 @@ static const uint8_t goal_grid[KLOTSKI_SIZE] = {
     13, 14, 15, 0
 };
 
-/* ================================================================
- *  ¸ñ×Ó×óÉÏ½Ç×ø±ê
- * ================================================================ */
-static uint16_t tile_x(uint8_t col) { return KLOTSKI_GRID_X + col * (KLOTSKI_TILE_SIZE + KLOTSKI_GAP); }
 /**
- * @brief  ĞĞºÅ×ª¸ñ×Ó¶¥²¿ Y ×ø±ê¡£
- * @param  row ĞĞºÅ(0~3)
- * @return ¸ÃĞĞ¶¥²¿ Y ÏñËØ
+ * @brief  åˆ—å·è½¬æ ¼å­å·¦ä¸Šè§’ X åæ ‡ã€‚
+ * @param  col åˆ—å·(0~3)
+ * @return è¯¥åˆ—å·¦ä¸Šè§’ X åƒç´ 
  */
-static uint16_t tile_y(uint8_t row) { return KLOTSKI_GRID_Y + row * (KLOTSKI_TILE_SIZE + KLOTSKI_GAP); }
+static uint16_t tile_x(uint8_t col) {
+    return KLOTSKI_GRID_X + col * (KLOTSKI_TILE_SIZE + KLOTSKI_GAP);
+}
 
-/* ================================================================
- *  »æÖÆ¸ñ×Ó±³¾°
- * ================================================================ */
-static void draw_tile_bg(uint8_t row, uint8_t col, uint16_t color)
-{
+/**
+ * @brief  è¡Œå·è½¬æ ¼å­é¡¶éƒ¨ Y åæ ‡ã€‚
+ * @param  row è¡Œå·(0~3)
+ * @return è¯¥è¡Œé¡¶éƒ¨ Y åƒç´ 
+ */
+static uint16_t tile_y(uint8_t row) {
+    return KLOTSKI_GRID_Y + row * (KLOTSKI_TILE_SIZE + KLOTSKI_GAP);
+}
+
+/**
+ * @brief  ç»˜åˆ¶æ ¼å­èƒŒæ™¯
+ * @param  row   è¡Œå·(0~3)
+ * @param  col   åˆ—å·(0~3)
+ * @param  color èƒŒæ™¯è‰²
+ */
+static void draw_tile_bg(uint8_t row, uint8_t col, uint16_t color) {
     uint16_t x = tile_x(col);
     uint16_t y = tile_y(row);
     LCD_Fill(x, y, x + KLOTSKI_TILE_SIZE - 1, y + KLOTSKI_TILE_SIZE - 1, color);
 }
 
-/* ================================================================
- *  »æÖÆ¸ñ×ÓÖĞµÄÊı×Ö (1~2Î»ÓÃ16x32, 3Î»Ëõ·Å)
- * ================================================================ */
-static void draw_tile_number(uint8_t row, uint8_t col, uint8_t val)
-{
+/**
+ * @brief  ç»˜åˆ¶æ ¼å­ä¸­çš„æ•°å­— (1~2ä½ç”¨16x32, 3ä½ç¼©æ”¾)
+ * @param  row è¡Œå·(0~3)
+ * @param  col åˆ—å·(0~3)
+ * @param  val æ•°å€¼
+ */
+static void draw_tile_number(uint8_t row, uint8_t col, uint8_t val) {
     if (val == 0) return;
 
     uint16_t text_color = LCD_WHITE;
@@ -96,7 +103,7 @@ static void draw_tile_number(uint8_t row, uint8_t col, uint8_t val)
     uint8_t i;
 
     if (dc <= 2) {
-        /* 1~2Î»ÓÃ16x32´ó×ÖÌå */
+        /* 1~2ä½ç”¨16x32å¤§å­—ä½“ */
         uint8_t gap = (dc == 1) ? 0 : (KLOTSKI_TILE_SIZE - 16) / 2;
         uint16_t total_w = 16 + (dc - 1) * gap;
         uint16_t start_x = tile_x(col) + (KLOTSKI_TILE_SIZE - total_w) / 2;
@@ -105,8 +112,9 @@ static void draw_tile_number(uint8_t row, uint8_t col, uint8_t val)
             uint8_t d = digits[dc - 1 - i];
             sok_draw_digit_16x32(start_x + i * gap, y, d, text_color);
         }
-    } else {
-        /* 3Î»Ëõ·Å»æÖÆ (Õı³£»ªÈİµÀ×î¶à15¼´2Î», Ô¤ÁôÀ©Õ¹) */
+    }
+    else {
+        /* 3ä½ç¼©æ”¾ç»˜åˆ¶ (æ­£å¸¸åå®¹é“æœ€å¤š15å³2ä½, é¢„ç•™æ‰©å±•) */
         uint8_t tw = 10, th = 20, gap = 1;
         uint16_t total_w = dc * tw + (dc - 1) * gap;
         uint16_t start_x = tile_x(col) + (KLOTSKI_TILE_SIZE - total_w) / 2;
@@ -119,11 +127,10 @@ static void draw_tile_number(uint8_t row, uint8_t col, uint8_t val)
     LCD_CS_SET;
 }
 
-/* ================================================================
- *  »æÖÆÕû¸öÍø¸ñ
- * ================================================================ */
-static void draw_grid(void)
-{
+/**
+ * @brief  ç»˜åˆ¶æ•´ä¸ªç½‘æ ¼
+ */
+static void draw_grid(void) {
     uint8_t r, c;
     for (r = 0; r < KLOTSKI_ROWS; r++) {
         for (c = 0; c < KLOTSKI_COLS; c++) {
@@ -137,16 +144,15 @@ static void draw_grid(void)
     }
 }
 
-/* ================================================================
- *  »æÖÆ×´Ì¬ (²½ÊıÏÔÊ¾)
- * ================================================================ */
-static void draw_status(void)
-{
+/**
+ * @brief  ç»˜åˆ¶çŠ¶æ€ (æ­¥æ•°æ˜¾ç¤º)
+ */
+static void draw_status(void) {
     LCD_Fill(0, 0, 239, KLOTSKI_GRID_Y - 1, LCD_BLACK);
 
     LCD_CS_CLR;
 
-    /* ²½Êı: ¾ÓÖĞ»æÖÆ */
+    /* æ­¥æ•°: å±…ä¸­ç»˜åˆ¶ */
     {
         uint8_t digits[8];
         uint8_t dc = uint_to_digits(g_moves, digits);
@@ -163,11 +169,10 @@ static void draw_status(void)
     game_battery_icon_update(164, 22, 1);
 }
 
-/* ================================================================
- *  ²éÕÒ¿Õ¸ñÎ»ÖÃ
- * ================================================================ */
-static void find_empty(void)
-{
+/**
+ * @brief  æŸ¥æ‰¾ç©ºæ ¼ä½ç½®
+ */
+static void find_empty(void) {
     uint8_t i;
     for (i = 0; i < KLOTSKI_SIZE; i++) {
         if (g_grid[i] == 0) {
@@ -178,11 +183,11 @@ static void find_empty(void)
     }
 }
 
-/* ================================================================
- *  ¼ì²éÊÇ·ñÍ¨¹Ø
- * ================================================================ */
-static uint8_t is_won(void)
-{
+/**
+ * @brief  æ£€æŸ¥æ˜¯å¦é€šå…³
+ * @return 1=å·²é€šå…³, 0=æœªé€šå…³
+ */
+static uint8_t is_won(void) {
     uint8_t i;
     for (i = 0; i < KLOTSKI_SIZE; i++) {
         if (g_grid[i] != goal_grid[i]) return 0;
@@ -190,20 +195,19 @@ static uint8_t is_won(void)
     return 1;
 }
 
-/* ================================================================
- *  ÒÆ¶¯: ´ÓÓÃ»§ÊÓ½Ç, »¬¶¯·½ÏòÊı×ÖÒÆÈë¿Õ¸ñ
- *  dir: 0=ÏÂ(ÓÃ»§ÏòÉÏ»¬, ÏÂ·½Êı×ÖÉÏÒÆ), 1=ÉÏ, 2=ÓÒ, 3=×ó
- *  ·µ»Ø1±íÊ¾ÒÆ¶¯ÓĞĞ§
- * ================================================================ */
-static uint8_t do_move(uint8_t dir)
-{
+/**
+ * @brief  ç§»åŠ¨: ä»ç”¨æˆ·è§†è§’, æ»‘åŠ¨æ–¹å‘æ•°å­—ç§»å…¥ç©ºæ ¼ã€‚
+ * @param  dir 0=ä¸‹(ç”¨æˆ·å‘ä¸Šæ»‘, ä¸‹æ–¹æ•°å­—ä¸Šç§»), 1=ä¸Š, 2=å³, 3=å·¦
+ * @return 1=ç§»åŠ¨æœ‰æ•ˆ, 0=æ— æ•ˆ
+ */
+static uint8_t do_move(uint8_t dir) {
     int8_t dr = 0, dc = 0;
-    /* Êı×ÖÒÆÈë¿Õ¸ñµÄ·½Ïò -> Êı×ÖÀ´Ô´(·´Ïò) */
+    /* æ•°å­—ç§»å…¥ç©ºæ ¼çš„æ–¹å‘ -> æ•°å­—æ¥æº(åå‘) */
     switch (dir) {
-    case 0: dr =  1; dc =  0; break;  /* ÏÂ»¬: ÉÏ·½Êı×ÖÏÂÒÆ */
-    case 1: dr = -1; dc =  0; break;  /* ÉÏ»¬: ÏÂ·½Êı×ÖÉÏÒÆ */
-    case 2: dr =  0; dc =  1; break;  /* ÓÒ»¬: ×ó²àÊı×ÖÓÒÒÆ */
-    case 3: dr =  0; dc = -1; break;  /* ×ó»¬: ÓÒ²àÊı×Ö×óÒÆ */
+    case 0: dr = 1; dc = 0; break;  /* ä¸‹æ»‘: ä¸Šæ–¹æ•°å­—ä¸‹ç§» */
+    case 1: dr = -1; dc = 0; break;  /* ä¸Šæ»‘: ä¸‹æ–¹æ•°å­—ä¸Šç§» */
+    case 2: dr = 0; dc = 1; break;  /* å³æ»‘: å·¦ä¾§æ•°å­—å³ç§» */
+    case 3: dr = 0; dc = -1; break;  /* å·¦æ»‘: å³ä¾§æ•°å­—å·¦ç§» */
     default: return 0;
     }
 
@@ -213,7 +217,7 @@ static uint8_t do_move(uint8_t dir)
     if (tr < 0 || tr >= KLOTSKI_ROWS || tc < 0 || tc >= KLOTSKI_COLS)
         return 0;
 
-    /* ½»»»¿Õ¸ñÓëÀ´Ô´Êı×Ö */
+    /* äº¤æ¢ç©ºæ ¼ä¸æ¥æºæ•°å­— */
     uint8_t ei = g_empty_r * KLOTSKI_COLS + g_empty_c;
     uint8_t ti = (uint8_t)tr * KLOTSKI_COLS + (uint8_t)tc;
     g_grid[ei] = g_grid[ti];
@@ -225,46 +229,45 @@ static uint8_t do_move(uint8_t dir)
     return 1;
 }
 
-/* ================================================================
- *  ´òÂÒ: ´ÓÄ¿±êÅÅÁĞÖ´ĞĞN²½Ëæ»úÒÆ¶¯ (±£Ö¤ÓĞ½â)
- * ================================================================ */
-static void shuffle(void)
-{
+/**
+ * @brief  æ‰“ä¹±: ä»ç›®æ ‡æ’åˆ—æ‰§è¡ŒNæ­¥éšæœºç§»åŠ¨ (ä¿è¯æœ‰è§£)
+ */
+static void shuffle(void) {
     uint8_t i;
-    /* ³õÊ¼»¯ÎªÄ¿±êÅÅÁĞ */
+    /* åˆå§‹åŒ–ä¸ºç›®æ ‡æ’åˆ— */
     for (i = 0; i < KLOTSKI_SIZE; i++) g_grid[i] = goal_grid[i];
     find_empty();
 
-    /* Ö´ĞĞ100²½Ëæ»úÒÆ¶¯ */
-    uint8_t last_dir = 0xFF;  /* ·ÀÖ¹À´»ØµÖÏû */
+    /* æ‰§è¡Œ100æ­¥éšæœºç§»åŠ¨ */
+    uint8_t last_dir = 0xFF;  /* é˜²æ­¢æ¥å›æŠµæ¶ˆ */
     for (i = 0; i < 100; i++) {
-        /* ÊÕ¼¯ºÏ·¨·½Ïò 0-3 */
+        /* æ”¶é›†åˆæ³•æ–¹å‘ 0-3 */
         uint8_t dir;
         uint8_t valid_dirs[4];
         uint8_t vc = 0;
 
-        /* ¼ì²é4¸ö·½Ïò(ÒÆÈë·½Ïò) */
-        /* ÏÂ»¬(dir=0):¿Õ¸ñĞĞ<3 */  if (g_empty_r < KLOTSKI_ROWS - 1) { valid_dirs[vc++] = 0; }
-        /* ÉÏ»¬(dir=1):¿Õ¸ñĞĞ>0 */  if (g_empty_r > 0)                  { valid_dirs[vc++] = 1; }
-        /* ÓÒ»¬(dir=2):¿Õ¸ñÁĞ<3 */  if (g_empty_c < KLOTSKI_COLS - 1)  { valid_dirs[vc++] = 2; }
-        /* ×ó»¬(dir=3):¿Õ¸ñÁĞ>0 */  if (g_empty_c > 0)                  { valid_dirs[vc++] = 3; }
+        /* æ£€æŸ¥4ä¸ªæ–¹å‘(ç§»å…¥æ–¹å‘) */
+        /* ä¸‹æ»‘(dir=0):ç©ºæ ¼è¡Œ<3 */  if (g_empty_r < KLOTSKI_ROWS - 1) { valid_dirs[vc++] = 0; }
+        /* ä¸Šæ»‘(dir=1):ç©ºæ ¼è¡Œ>0 */  if (g_empty_r > 0) { valid_dirs[vc++] = 1; }
+        /* å³æ»‘(dir=2):ç©ºæ ¼åˆ—<3 */  if (g_empty_c < KLOTSKI_COLS - 1) { valid_dirs[vc++] = 2; }
+        /* å·¦æ»‘(dir=3):ç©ºæ ¼åˆ—>0 */  if (g_empty_c > 0) { valid_dirs[vc++] = 3; }
 
         if (vc == 0) break;
 
         dir = valid_dirs[game_rand() % vc];
 
-        /* ±ÜÃâÀ´»ØµÖÏû */
+        /* é¿å…æ¥å›æŠµæ¶ˆ */
         if ((last_dir == 0 && dir == 1) || (last_dir == 1 && dir == 0) ||
             (last_dir == 2 && dir == 3) || (last_dir == 3 && dir == 2)) {
             if (vc > 1) {
-                /* »»Ò»¸ö·Ç·´ÏòµÄ·½Ïò */
+                /* æ¢ä¸€ä¸ªéåå‘çš„æ–¹å‘ */
                 uint8_t j;
                 for (j = 0; j < vc; j++) {
                     if (valid_dirs[j] != dir &&
                         !((last_dir == 0 && valid_dirs[j] == 1) ||
-                          (last_dir == 1 && valid_dirs[j] == 0) ||
-                          (last_dir == 2 && valid_dirs[j] == 3) ||
-                          (last_dir == 3 && valid_dirs[j] == 2))) {
+                            (last_dir == 1 && valid_dirs[j] == 0) ||
+                            (last_dir == 2 && valid_dirs[j] == 3) ||
+                            (last_dir == 3 && valid_dirs[j] == 2))) {
                         dir = valid_dirs[j];
                         break;
                     }
@@ -281,26 +284,26 @@ static void shuffle(void)
     g_time_sec = 0;
     find_empty();
 }
-/* ================================================================
- *  »¬¶¯·½Ïò¼ì²â
- * ================================================================ */
-static uint8_t detect_swipe(int16_t dx, int16_t dy)
-{
+/**
+ * @brief  æ»‘åŠ¨æ–¹å‘æ£€æµ‹
+ * @param  dx Xä½ç§»
+ * @param  dy Yä½ç§»
+ * @return 0=ä¸‹ 1=ä¸Š 2=å³ 3=å·¦, 0xFF=æ— æ•ˆ
+ */
+static uint8_t detect_swipe(int16_t dx, int16_t dy) {
     int16_t adx = (dx < 0) ? -dx : dx;
     int16_t ady = (dy < 0) ? -dy : dy;
     if (adx < SWIPE_THRESH && ady < SWIPE_THRESH) return 0xFF;
-    if (adx > ady) return (dx > 0) ? 3 : 2;   /* ×ó»¬ / ÓÒ»¬ */
-    else           return (dy > 0) ? 1 : 0;    /* ÏÂ»¬ / ÉÏ»¬ */
+    if (adx > ady) return (dx > 0) ? 3 : 2;   /* å·¦æ»‘ / å³æ»‘ */
+    else           return (dy > 0) ? 1 : 0;    /* ä¸‹æ»‘ / ä¸Šæ»‘ */
 }
 
-/* ================================================================
- *  Íâ²¿½Ó¿Ú
- * ================================================================ */
-
-void klotski_init(void)
-{
+/**
+ * @brief  åˆå§‹åŒ–åå®¹é“: æ‰“ä¹±/å¤ä½çŠ¶æ€ã€‚
+ */
+void klotski_init(void) {
 #ifdef KLOTSKI_TEST_MODE
-    /* µ÷ÊÔÄ£Ê½: Ö±½ÓÍê³ÉÅÅÁĞ, »¬¶¯Ò»²½¼´ÏÔÊ¾Í¨¹Ø */
+    /* è°ƒè¯•æ¨¡å¼: ç›´æ¥å®Œæˆæ’åˆ—, æ»‘åŠ¨ä¸€æ­¥å³æ˜¾ç¤ºé€šå…³ */
     {
         uint8_t i;
         for (i = 0; i < KLOTSKI_SIZE; i++) g_grid[i] = goal_grid[i];
@@ -324,11 +327,9 @@ void klotski_init(void)
     g_restart_slide_y = RESTART_MENU_Y + RESTART_MENU_H;
 }
 /**
- * @brief  ÖØÖÃ´¥Ãş×´Ì¬(´ÓÆäËûÓÎÏ··µ»ØÊ±µ÷ÓÃ)¡£
+ * @brief  é‡ç½®è§¦æ‘¸çŠ¶æ€(ä»å…¶ä»–æ¸¸æˆè¿”å›æ—¶è°ƒç”¨)ã€‚
  */
-
-void klotski_reset_touch(void)
-{
+void klotski_reset_touch(void) {
     g_prev_pressed = 1;
     g_touch_down = 0;
     g_touch_start_x = 0;
@@ -337,35 +338,32 @@ void klotski_reset_touch(void)
 }
 
 /**
- * @brief  »ªÈİµÀÈ«ÆÁÖØ»æ£¬ÓÃÓÚµç³ØÉÁÃğ»Ö¸´£¬±ÜÃâÈ«ÆÁLCD_FillÉÁË¸
- * @note   ÓÉ klotski_update() ÏÂÒ»Ö¡Ö´ĞĞÔöÁ¿gridÖØ»æÒÔ½µµÍSPIÕ¼ÓÃ
+ * @brief  åå®¹é“å…¨å±é‡ç»˜ï¼Œç”¨äºç”µæ± é—ªç­æ¢å¤ï¼Œé¿å…å…¨å±LCD_Fillé—ªçƒ
+ * @note   ç”± klotski_update() ä¸‹ä¸€å¸§æ‰§è¡Œå¢é‡gridé‡ç»˜ä»¥é™ä½SPIå ç”¨
  */
-void klotski_full_redraw(void)
-{
-    g_grid_dirty = 2;  /* µç³ØÉÁÃğÖØ»æ£¬Ìø¹ıÈ«ÆÁ´óÌî³ä */
+void klotski_full_redraw(void) {
+    g_grid_dirty = 2;  /* ç”µæ± é—ªç­é‡ç»˜ï¼Œè·³è¿‡å…¨å±å¤§å¡«å…… */
 }
 
 /**
- * @brief  ¼ì²éÍË³ö²Ëµ¥/ÖØĞÂ¿ªÊ¼²Ëµ¥ÊÇ·ñ¿É¼û
- * @retval 1=²Ëµ¥¿É¼û, 0=²»¿É¼û
+ * @brief  æ£€æŸ¥é€€å‡ºèœå•/é‡æ–°å¼€å§‹èœå•æ˜¯å¦å¯è§
+ * @retval 1=èœå•å¯è§, 0=ä¸å¯è§
  */
-uint8_t klotski_is_menu_visible(void)
-{
+uint8_t klotski_is_menu_visible(void) {
     return g_exit_menu_visible || g_restart_menu_visible;
 }
 
-/* klotski_redraw_battery_rows ¶¨ÒåÔÚ±¾ÎÄ¼şÏÂ·½, ´Ë´¦Ç°ÏòÉùÃ÷ */
+/* klotski_redraw_battery_rows å®šä¹‰åœ¨æœ¬æ–‡ä»¶ä¸‹æ–¹, æ­¤å¤„å‰å‘å£°æ˜ */
 static void klotski_redraw_battery_rows(void);
 static void klotski_restore_battery_rows(int16_t menu_top, int16_t menu_h);
 
-/* »Ö¸´µÍµçÍ¼±êÉì³öµ½ÖØ¿ª²Ëµ¥ÉÏ·½/Íâ²àµÄÏñËØ(²Ëµ¥¸²¸Ç y>=RESTART_MENU_Y=110,
-   x=45..195). Ö»Ìî³äÕâĞ©Ï¸Ìõ´øÎªÍø¸ñ¸ñµ×É«(¸ñ×ÓÄÚ²¿/Êı×ÖÔÚÍ¸Ã÷µç³ØÌåÄÚ, ±£³ÖÍêºÃ).
-   ÖØÒª: ÕâÀï²»»­ÈÎºÎÑÓÉìµ½²Ëµ¥¿òºóÃæµÄÍêÕû¸ñ×Ó, ·ñÔòÓÎÏ·Í¼»áÏÈÓÚ²Ëµ¥ÏÔÊ¾Ò»Ö¡ -> ÉÁ. */
 /**
- * @brief  »Ö¸´ÖØ¿ª²Ëµ¥ÉÏ·½µÄÏ¸Ìõ´ø(²Ëµ¥¸²¸Ç y>=110 Ö®ÍâµÄÍø¸ñµ×É«)¡£
+ * @brief  æ¢å¤é‡å¼€èœå•ä¸Šæ–¹çš„ç»†æ¡å¸¦(èœå•è¦†ç›– y>=110 ä¹‹å¤–çš„ç½‘æ ¼åº•è‰²)ã€‚
+ * @note   æ¢å¤ä½ç”µå›¾æ ‡ä¼¸å‡ºåˆ°é‡å¼€èœå•ä¸Šæ–¹/å¤–ä¾§çš„åƒç´ (èœå•è¦†ç›– y>=RESTART_MENU_Y=110,
+ *         x=45..195)ã€‚åªå¡«å……è¿™äº›ç»†æ¡å¸¦ä¸ºç½‘æ ¼æ ¼åº•è‰²(æ ¼å­å†…éƒ¨/æ•°å­—åœ¨é€æ˜ç”µæ± ä½“å†…, ä¿æŒå®Œå¥½)ã€‚
+ *         è¿™é‡Œä¸ç”»ä»»ä½•å»¶ä¼¸åˆ°èœå•æ¡†åé¢çš„å®Œæ•´æ ¼å­, å¦åˆ™æ¸¸æˆå›¾ä¼šå…ˆäºèœå•æ˜¾ç¤ºä¸€å¸§ -> é—ªã€‚
  */
-static void klotski_restore_above_menu_slivers(void)
-{
+static void klotski_restore_above_menu_slivers(void) {
     uint16_t b1[4];
     uint8_t c;
     for (c = 0; c < KLOTSKI_COLS; c++)
@@ -373,42 +371,41 @@ static void klotski_restore_above_menu_slivers(void)
     uint16_t b23 = (g_grid[2 * KLOTSKI_COLS + 3] == 0)
         ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR;
 
-    /* row0 ÍêÈ«ÔÚ²Ëµ¥ÉÏ·½: ÖØ»­ËüµÄ¸ñµ×+Êı×Ö(¸Ç×¡µç³ØÖ÷ÌåÉÏ±ß¿ò y=79..80 ¼°
-      row0 ´¦×óÓÒ±ß¿ò) */
+    /* row0 å®Œå…¨åœ¨èœå•ä¸Šæ–¹: é‡ç”»å®ƒçš„æ ¼åº•+æ•°å­—(ç›–ä½ç”µæ± ä¸»ä½“ä¸Šè¾¹æ¡† y=79..80 åŠ
+      row0 å¤„å·¦å³è¾¹æ¡†) */
     for (c = 0; c < KLOTSKI_COLS; c++) {
         uint16_t b0 = (g_grid[c] == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR;
         draw_tile_bg(0, c, b0);
         if (g_grid[c] != 0) draw_tile_number(0, c, g_grid[c]);
     }
 
-    /* µç³ØÖ÷Ìå×ó±ß¿òÑ¹ÔÚ col0 row1 (x=45..46, y=85..109) */
+    /* ç”µæ± ä¸»ä½“å·¦è¾¹æ¡†å‹åœ¨ col0 row1 (x=45..46, y=85..109) */
     LCD_Fill(45, 85, 47, RESTART_MENU_Y, b1[0]);
-    /* µç³ØÖ÷ÌåÓÒ±ß¿òÑ¹ÔÚ col3 row1 (x=193..194, y=85..109) */
+    /* ç”µæ± ä¸»ä½“å³è¾¹æ¡†å‹åœ¨ col3 row1 (x=193..194, y=85..109) */
     LCD_Fill(193, 85, 195, RESTART_MENU_Y, b1[3]);
-    /* µç³ØÖ÷ÌåÉÏ±ß¿òÒÑ±»ÉÏÃæ row0 ÖØ»æ¸²¸Ç */
+    /* ç”µæ± ä¸»ä½“ä¸Šè¾¹æ¡†å·²è¢«ä¸Šé¢ row0 é‡ç»˜è¦†ç›– */
 
-    /* ¸ĞÌ¾ºÅÊúÌõ(x=111..128, y=92..109 ÔÚ²Ëµ¥ÉÏ·½)Ñ¹ÔÚ col1/col2 row1 */
-    LCD_Fill(111, 92, 118, RESTART_MENU_Y, b1[1]);   /* col1 ÓÒÔµ */
-    LCD_Fill(118, 92, 122, RESTART_MENU_Y, LCD_BLACK); /* col1/col2 ·ìÏ¶ */
-    LCD_Fill(122, 92, 129, RESTART_MENU_Y, b1[2]);   /* col2 ×óÔµ */
+    /* æ„Ÿå¹å·ç«–æ¡(x=111..128, y=92..109 åœ¨èœå•ä¸Šæ–¹)å‹åœ¨ col1/col2 row1 */
+    LCD_Fill(111, 92, 118, RESTART_MENU_Y, b1[1]);   /* col1 å³ç¼˜ */
+    LCD_Fill(118, 92, 122, RESTART_MENU_Y, LCD_BLACK); /* col1/col2 ç¼éš™ */
+    LCD_Fill(122, 92, 129, RESTART_MENU_Y, b1[2]);   /* col2 å·¦ç¼˜ */
 
-   /* µç³ØÍ¹µã(x=195..209)ÔÚ²Ëµ¥Íâ(x=195 ÓÒ²à): Ìî³äÆä¸²¸ÇµÄ¸ñÄÚÈİ */
-    LCD_Fill(195, 104, 207, 126, b1[3]);            /* (1,3) col3 ¸ñ */
-    LCD_Fill(195, 126, 207, 130, LCD_BLACK);        /* row1/row2 ·ìÏ¶ */
-    LCD_Fill(195, 130, 207, 136, b23);              /* (2,3) col3 ¸ñ */
-    LCD_Fill(207, 104, 210, 136, LCD_BLACK);        /* col3 ÓÒ·ì */
+    /* ç”µæ± å‡¸ç‚¹(x=195..209)åœ¨èœå•å¤–(x=195 å³ä¾§): å¡«å……å…¶è¦†ç›–çš„æ ¼å†…å®¹ */
+    LCD_Fill(195, 104, 207, 126, b1[3]);            /* (1,3) col3 æ ¼ */
+    LCD_Fill(195, 126, 207, 130, LCD_BLACK);        /* row1/row2 ç¼éš™ */
+    LCD_Fill(195, 130, 207, 136, b23);              /* (2,3) col3 æ ¼ */
+    LCD_Fill(207, 104, 210, 136, LCD_BLACK);        /* col3 å³ç¼ */
 }
 
-/* Ö»ÖØ»æÍË³ö²Ëµ¥¿òÍâÂ¶³öµÄµç³ØÇø: °´ĞĞÅĞ¶Ï, ĞĞÍêÈ«±»²Ëµ¥¿ò y ¸²¸Ç(¿òÄÚ)ÔòÖ»²¹
-   ºã¿òÍâµÄÍ¹µãÁĞ(3)(ºá¿ç²Ëµ¥ÓÒ±ß¿ò), ·ñÔòÕûĞĞÖØ»æ(º¬Í¹µã). ¿òÄÚÖ÷ÌåÓÉ²Ëµ¥¿ò¸Ç×¡,
-   ±ÜÃâÏÈÆåÅÌºó²Ëµ¥ÉÁÒ»Ö¡. */
 /**
- * @brief  »Ö¸´µç³Ø¸²¸ÇµÄÍø¸ñĞĞ(¿òÍâÂ¶³ö²¿·Ö, ¿òÄÚÓÉ²Ëµ¥¿ò¸Ç×¡)¡£
- * @param  menu_top ²Ëµ¥¿ò¶¥ Y
- * @param  menu_h   ²Ëµ¥¿ò¸ß
+ * @brief  æ¢å¤ç”µæ± è¦†ç›–çš„ç½‘æ ¼è¡Œ(æ¡†å¤–éœ²å‡ºéƒ¨åˆ†, æ¡†å†…ç”±èœå•æ¡†ç›–ä½)ã€‚
+ * @param  menu_top èœå•æ¡†é¡¶ Y
+ * @param  menu_h   èœå•æ¡†é«˜
+ * @note   åªé‡ç»˜é€€å‡ºèœå•æ¡†å¤–éœ²å‡ºçš„ç”µæ± åŒº: æŒ‰è¡Œåˆ¤æ–­, è¡Œå®Œå…¨è¢«èœå•æ¡† y è¦†ç›–(æ¡†å†…)åˆ™åªè¡¥
+ *         æ’æ¡†å¤–çš„å‡¸ç‚¹åˆ—(3)(æ¨ªè·¨èœå•å³è¾¹æ¡†), å¦åˆ™æ•´è¡Œé‡ç»˜(å«å‡¸ç‚¹)ã€‚æ¡†å†…ä¸»ä½“ç”±èœå•æ¡†ç›–ä½,
+ *         é¿å…å…ˆæ£‹ç›˜åèœå•é—ªä¸€å¸§ã€‚
  */
-static void klotski_restore_battery_rows(int16_t menu_top, int16_t menu_h)
-{
+static void klotski_restore_battery_rows(int16_t menu_top, int16_t menu_h) {
     int16_t menu_bot = menu_top + menu_h;
     uint8_t r;
     for (r = 1; r <= 2; r++) {
@@ -419,7 +416,8 @@ static void klotski_restore_battery_rows(int16_t menu_top, int16_t menu_h)
             uint16_t val = g_grid[r * KLOTSKI_COLS + 3];
             draw_tile_bg(r, 3, (val == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR);
             if (val != 0) draw_tile_number(r, 3, val);
-        } else {
+        }
+        else {
             for (c = 0; c < KLOTSKI_COLS; c++) {
                 uint16_t val = g_grid[r * KLOTSKI_COLS + c];
                 draw_tile_bg(r, c, (val == 0) ? KLOTSKI_EMPTY_COLOR : KLOTSKI_TILE_COLOR);
@@ -430,32 +428,33 @@ static void klotski_restore_battery_rows(int16_t menu_top, int16_t menu_h)
 }
 
 /**
- * @brief  µÍµçÍ¼±êÃğ¶Îºó»Ö¸´±»Æä¸²¸ÇµÄµ×²ãÄÚÈİ
- * @note   ²ÎÕÕ d2048_lowbatt_restore(ÍÆÏä×ÓÑùÊ½).
- *         - µç³ØÍ¹µã(x=195..210, y=104..136)ÔÚ²Ëµ¥¿òÍâ, Ñ¹ÔÚÍø¸ñ¸ñ(1,3)/(2,3): ÏÈÖØ»­.
- *         - ÏÂ»¬(ÍË³ö)²Ëµ¥: Ö»ÖØ»­²»Í¸Ã÷²Ëµ¥¿ò(¸Ç×¡²Ëµ¥ÄÚµç³ØÖ÷Ìå/¸ĞÌ¾ºÅ) => ²»ÖØ»æ
- *           Íø¸ñ, ·ñÔòÍø¸ñĞĞÉÁÒ»Ö¡.
- *         - ÖØ¿ª²Ëµ¥: Ö»»Ö¸´²Ëµ¥ÉÏ·½/Íâ²àµÄÍ¼±êÏ¸Ìõ´ø, ÔÙ»­²Ëµ¥¿ò; ²»ÖØ»æÑÓÉìµ½
- *           ²Ëµ¥ºóÃæµÄÍø¸ñĞĞ(Ôøµ¼ÖÂÓÎÏ·Í¼ÏÈÓÚ²Ëµ¥ÏÔÊ¾Ò»Ö¡).
- *         - ´¿ÓÎÏ·: Ö»ÖØ»æµç³Ø¸²¸ÇµÄÍø¸ñÇøÓò(rows1-2).
+ * @brief  ä½ç”µå›¾æ ‡ç­æ®µåæ¢å¤è¢«å…¶è¦†ç›–çš„åº•å±‚å†…å®¹
+ * @note   å‚ç…§ d2048_lowbatt_restore(æ¨ç®±å­æ ·å¼).
+ *         - ç”µæ± å‡¸ç‚¹(x=195..210, y=104..136)åœ¨èœå•æ¡†å¤–, å‹åœ¨ç½‘æ ¼æ ¼(1,3)/(2,3): å…ˆé‡ç”».
+ *         - ä¸‹æ»‘(é€€å‡º)èœå•: åªé‡ç”»ä¸é€æ˜èœå•æ¡†(ç›–ä½èœå•å†…ç”µæ± ä¸»ä½“/æ„Ÿå¹å·) => ä¸é‡ç»˜
+ *           ç½‘æ ¼, å¦åˆ™ç½‘æ ¼è¡Œé—ªä¸€å¸§.
+ *         - é‡å¼€èœå•: åªæ¢å¤èœå•ä¸Šæ–¹/å¤–ä¾§çš„å›¾æ ‡ç»†æ¡å¸¦, å†ç”»èœå•æ¡†; ä¸é‡ç»˜å»¶ä¼¸åˆ°
+ *           èœå•åé¢çš„ç½‘æ ¼è¡Œ(æ›¾å¯¼è‡´æ¸¸æˆå›¾å…ˆäºèœå•æ˜¾ç¤ºä¸€å¸§).
+ *         - çº¯æ¸¸æˆ: åªé‡ç»˜ç”µæ± è¦†ç›–çš„ç½‘æ ¼åŒºåŸŸ(rows1-2).
  */
-void klotski_lowbatt_restore(void)
-{
-    LCD_ClearLowBatteryOverlay();   /* Í¼±ê±ß¿ò+Í¹µã+¸ĞÌ¾ºÅ ºì¡úºÚ */
+void klotski_lowbatt_restore(void) {
+    LCD_ClearLowBatteryOverlay();   /* å›¾æ ‡è¾¹æ¡†+å‡¸ç‚¹+æ„Ÿå¹å· çº¢â†’é»‘ */
 
     if (g_exit_menu_visible) {
-        /* ÍË³ö²Ëµ¥¸²¸ÇÕûÆÁ(x=45~195): ¿òÄÚÖ÷ÌåÓÉ²Ëµ¥¿òÖ±½Ó¸Ç×¡, ²»ÖØ»æ(±ÜÃâÏÈÆåÅÌºó²Ëµ¥ÉÁ);
-           Ö»ÖØ»æÍÏ×§ÖĞ(²Ëµ¥Î´¸Ç×¡)¿òÍâÂ¶³öµÄĞĞ + ºã¿òÍâµÄÍ¹µãÁĞ(1,3)/(2,3)(ºá¿ç²Ëµ¥ÓÒ±ß¿ò) */
+        /* é€€å‡ºèœå•è¦†ç›–æ•´å±(x=45~195): æ¡†å†…ä¸»ä½“ç”±èœå•æ¡†ç›´æ¥ç›–ä½, ä¸é‡ç»˜(é¿å…å…ˆæ£‹ç›˜åèœå•é—ª);
+           åªé‡ç»˜æ‹–æ‹½ä¸­(èœå•æœªç›–ä½)æ¡†å¤–éœ²å‡ºçš„è¡Œ + æ’æ¡†å¤–çš„å‡¸ç‚¹åˆ—(1,3)/(2,3)(æ¨ªè·¨èœå•å³è¾¹æ¡†) */
         klotski_restore_battery_rows(g_exit_drag_y, MENU_H);
         menu_draw_nrow_frame_only(g_exit_drag_y, klotski_row_types, 5);
-    } else if (g_restart_menu_visible) {
-        /* ÖØ¿ª²Ëµ¥Ö»¸Ç y>=110: Ö»»Ö¸´²Ëµ¥ÉÏ·½/Íâ²àÏ¸Ìõ´ø(²»ÖØ»æÑÓÉìµ½²Ëµ¥ºóµÄÕû¸ñ, ·ñÔòÉÁ) */
+    }
+    else if (g_restart_menu_visible) {
+        /* é‡å¼€èœå•åªç›– y>=110: åªæ¢å¤èœå•ä¸Šæ–¹/å¤–ä¾§ç»†æ¡å¸¦(ä¸é‡ç»˜å»¶ä¼¸åˆ°èœå•åçš„æ•´æ ¼, å¦åˆ™é—ª) */
         klotski_restore_above_menu_slivers();
         menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
-    } else if (g_settings_from_game) {
-        /* ÉèÖÃÄ£Ê½(¶ş¼¶²Ëµ¥Ìõ´ø x=45..195 ÒÑ¸Ç×¡µç³ØÖ÷Ìå/¸ĞÌ¾ºÅ): Ö»ÖØ»æÍ¹µã¸ñ×Ó(1,3)/(2,3),
-           ²»ÖØ»æ rows1-2 -- ·ñÔòÏÈ»­ÓÎÏ·(rows1-2)ÔÙ»­²Ëµ¥¿ò»áÉÁÒ»Ö¡(Í¬ 2048 ¿Ó).
-           Í¹µãÔÚ²Ëµ¥¿òÍâ(x=195..210), ĞëÓÉÓÎÏ·Íø¸ñ¸ñ»Ö¸´; ²Ëµ¥¿òÄÚ²¿·ÖÓÉÌõ´ø¸²¸Ç. */
+    }
+    else if (g_settings_from_game) {
+        /* è®¾ç½®æ¨¡å¼(äºŒçº§èœå•æ¡å¸¦ x=45..195 å·²ç›–ä½ç”µæ± ä¸»ä½“/æ„Ÿå¹å·): åªé‡ç»˜å‡¸ç‚¹æ ¼å­(1,3)/(2,3),
+           ä¸é‡ç»˜ rows1-2 -- å¦åˆ™å…ˆç”»æ¸¸æˆ(rows1-2)å†ç”»èœå•æ¡†ä¼šé—ªä¸€å¸§(åŒ 2048 å‘).
+           å‡¸ç‚¹åœ¨èœå•æ¡†å¤–(x=195..210), é¡»ç”±æ¸¸æˆç½‘æ ¼æ ¼æ¢å¤; èœå•æ¡†å†…éƒ¨åˆ†ç”±æ¡å¸¦è¦†ç›–. */
         uint8_t r;
         for (r = 1; r <= 2; r++) {
             uint8_t c = 3;
@@ -464,22 +463,20 @@ void klotski_lowbatt_restore(void)
             draw_tile_bg(r, c, bg);
             if (val != 0) draw_tile_number(r, c, val);
         }
-    } else {
-        /* ´¿ÓÎÏ·(ÎŞ²Ëµ¥¿ò): ±£³ÖÔ­ÉèÔà, ÏÂÒ»Ö¡ klotski_update ÖØ»æµç³Ø¸²¸ÇĞĞ */
+    }
+    else {
+        /* çº¯æ¸¸æˆ(æ— èœå•æ¡†): ä¿æŒåŸè®¾è„, ä¸‹ä¸€å¸§ klotski_update é‡ç»˜ç”µæ± è¦†ç›–è¡Œ */
         klotski_full_redraw();
     }
 }
 
-#define KLOTSKI_SAVE_LEN  21
 /**
- * @brief  ĞòÁĞ»¯»ªÈİµÀµ±Ç°×´Ì¬µ½´æµµ»º³å¡£
- * @param  buf     Êä³ö»º³å
- * @param  max_len »º³åÉÏÏŞ
- * @return Ğ´Èë×Ö½ÚÊı
+ * @brief  åºåˆ—åŒ–åå®¹é“å½“å‰çŠ¶æ€åˆ°å­˜æ¡£ç¼“å†²ã€‚
+ * @param  buf     è¾“å‡ºç¼“å†²
+ * @param  max_len ç¼“å†²ä¸Šé™
+ * @return å†™å…¥å­—èŠ‚æ•°
  */
-
-uint8_t klotski_save_state(uint8_t *buf, uint8_t max_len)
-{
+uint8_t klotski_save_state(uint8_t* buf, uint8_t max_len) {
     KlotskiState state = g_state;
 
     if (max_len < KLOTSKI_SAVE_LEN) return 0;
@@ -495,14 +492,12 @@ uint8_t klotski_save_state(uint8_t *buf, uint8_t max_len)
     return KLOTSKI_SAVE_LEN;
 }
 /**
- * @brief  ´Ó´æµµ»º³å»Ö¸´»ªÈİµÀ×´Ì¬²¢ÖØ»æ¡£
- * @param  buf ´æµµ»º³å
- * @param  len ³¤¶È
- * @return 1=³É¹¦, 0=Ê§°Ü
+ * @brief  ä»å­˜æ¡£ç¼“å†²æ¢å¤åå®¹é“çŠ¶æ€å¹¶é‡ç»˜ã€‚
+ * @param  buf å­˜æ¡£ç¼“å†²
+ * @param  len é•¿åº¦
+ * @return 1=æˆåŠŸ, 0=å¤±è´¥
  */
-
-uint8_t klotski_restore_state(const uint8_t *buf, uint8_t len)
-{
+uint8_t klotski_restore_state(const uint8_t* buf, uint8_t len) {
     uint8_t i;
     uint16_t seen = 0;
 
@@ -527,21 +522,18 @@ uint8_t klotski_restore_state(const uint8_t *buf, uint8_t len)
     return 1;
 }
 
-/* ================================================================
- *  ÅäÖÃÇı¶¯²Ëµ¥×´Ì¬»úµÄ hook (mark_dirty / bg_redraw / on_to_exit)
- * ================================================================ */
-void klotski_menu_mark_dirty(void)   /* ¹Ø±Õ/È¡Ïû²Ëµ¥ºóĞèÖØ»æ³¡¾° */
-{
+/**
+ * @brief  å…³é—­/å–æ¶ˆèœå•åæ ‡è®°éœ€é‡ç»˜åœºæ™¯ã€‚
+ */
+void klotski_menu_mark_dirty(void) {
     g_grid_dirty = 1;
 }
 
-/* ÖØ»æµç³Ø¸²¸ÇµÄÍø¸ñĞĞ(rows1-2); ¹©²Ëµ¥±³¾°ÖØ»æ(g_grid_dirty==2)Óë
-   klotski_lowbatt_restore(Á¢¼´ÇøÓò»Ö¸´)¹²ÓÃ. */
 /**
- * @brief  ÖØ»æµç³Ø¸²¸ÇµÄÍø¸ñĞĞ(rows1-2, º¬Í¹µã)¡£
+ * @brief  é‡ç»˜ç”µæ± è¦†ç›–çš„ç½‘æ ¼è¡Œ(rows1-2, å«å‡¸ç‚¹)ã€‚
+ * @note   ä¾›èœå•èƒŒæ™¯é‡ç»˜(g_grid_dirty==2)ä¸ klotski_lowbatt_restore(ç«‹å³åŒºåŸŸæ¢å¤)å…±ç”¨ã€‚
  */
-static void klotski_redraw_battery_rows(void)
-{
+static void klotski_redraw_battery_rows(void) {
     uint8_t r, c;
     for (r = 1; r <= 2; r++) {
         for (c = 0; c < KLOTSKI_COLS; c++) {
@@ -553,18 +545,17 @@ static void klotski_redraw_battery_rows(void)
     }
 }
 
-/* ÒÀ¾İÔà±ê¼ÇÖØ»æ²Ëµ¥±³¾°: ·µ»Ø1=±¾Ö¡ÒÑÖØ»æ */
 /**
- * @brief  ÒÀ¾İÔà±ê¼ÇÖØ»æ²Ëµ¥±³¾°(Íø¸ñ/×´Ì¬)¡£
- * @return 1=ÒÑÖØ»æ, 0=ÎŞÔà
+ * @brief  ä¾æ®è„æ ‡è®°é‡ç»˜èœå•èƒŒæ™¯(ç½‘æ ¼/çŠ¶æ€)ã€‚
+ * @return 1=å·²é‡ç»˜, 0=æ— è„
  */
-uint8_t klotski_menu_bg_redraw(void)
-{
+uint8_t klotski_menu_bg_redraw(void) {
     if (!g_grid_dirty) return 0;
     if (g_grid_dirty == 2) {
-        /* µç³ØÉÁÃğ: ½öÖØ»æÖĞ¶ÎĞĞ(row1-2)ÒÔ¼õÉÙSPI³åÍ» */
+        /* ç”µæ± é—ªç­: ä»…é‡ç»˜ä¸­æ®µè¡Œ(row1-2)ä»¥å‡å°‘SPIå†²çª */
         klotski_redraw_battery_rows();
-    } else {
+    }
+    else {
         draw_grid();
         draw_status();
     }
@@ -572,12 +563,10 @@ uint8_t klotski_menu_bg_redraw(void)
     return 1;
 }
 
-/* ÖØ²ËÏÂ»¬´ò¶Ï½øÍË³ö²Ëµ¥ºóµÄ²¹³ä´¦Àí: ÖÃÔàÒÔ±ãÖØ»æ±³¾° */
 /**
- * @brief  ÖØ²ËÏÂ»¬´ò¶Ï½øÍË³ö²Ëµ¥ºóµÄ²¹³ä´¦Àí(ÖÃÔàÖØ»æ)¡£
+ * @brief  é‡èœä¸‹æ»‘æ‰“æ–­è¿›é€€å‡ºèœå•åçš„è¡¥å……å¤„ç†(ç½®è„é‡ç»˜)ã€‚
  */
-static void klotski_menu_on_to_exit(void)
-{
+static void klotski_menu_on_to_exit(void) {
     g_grid_dirty = 1;
 }
 
@@ -589,38 +578,36 @@ static const GameMenuCfg g_klotski_menu_cfg = {
     klotski_menu_mark_dirty, klotski_menu_bg_redraw, klotski_menu_on_to_exit
 };
 /**
- * @brief  »ªÈİµÀÃ¿Ö¡¸üĞÂ: ´¦Àí´¥Ãş¡¢²Ëµ¥¡¢²½ÊıÓëäÖÈ¾¡£
- * @return GAME_RET_* ·µ»ØÃüÁî
+ * @brief  åå®¹é“æ¯å¸§æ›´æ–°: å¤„ç†è§¦æ‘¸ã€èœå•ã€æ­¥æ•°ä¸æ¸²æŸ“ã€‚
+ * @return GAME_RET_* è¿”å›å‘½ä»¤
  */
-
-uint8_t klotski_update(void)
-{
+uint8_t klotski_update(void) {
     uint8_t interacted = 0;
 
-    /* ÀäÈ´µ¹¼ÆÊ± */
+    /* å†·å´å€’è®¡æ—¶ */
     if (g_menu_cooldown > 0) g_menu_cooldown--;
 
-    /* Íâ²¿ÇëÇó½øÈëÍË³ö²Ëµ¥ */
+    /* å¤–éƒ¨è¯·æ±‚è¿›å…¥é€€å‡ºèœå• */
     if (g_game_enter_exit_menu) {
         g_game_enter_exit_menu = 0;
         g_state = KLOTSKI_STATE_EXIT_MENU;
         g_grid_dirty = 1;
     }
 
-    /* ---- ÍË³ö²Ëµ¥ / ÖØĞÂ¿ªÊ¼²Ëµ¥: ÅäÖÃÇı¶¯Í³Ò»×´Ì¬»ú ---- */
+    /* ---- é€€å‡ºèœå• / é‡æ–°å¼€å§‹èœå•: é…ç½®é©±åŠ¨ç»Ÿä¸€çŠ¶æ€æœº ---- */
     if (g_state == KLOTSKI_STATE_EXIT_MENU || g_state == KLOTSKI_STATE_RESTART_MENU) {
         uint8_t out_ret;
-        uint8_t cmd = game_menu_command(&g_klotski_menu_cfg, (uint8_t *)&g_state, &out_ret);
+        uint8_t cmd = game_menu_command(&g_klotski_menu_cfg, (uint8_t*)&g_state, &out_ret);
         switch (cmd) {
-            case GAME_MENU_CMD_SWITCH:   return out_ret;
-            case GAME_MENU_CMD_RESTART:  klotski_init(); return GAME_RET_INTERACT;
-            case GAME_MENU_CMD_SETTINGS: menu_enter_game_settings(); return EXIT_RET_SETTINGS;
-            case GAME_MENU_CMD_INTERACT: return GAME_RET_INTERACT;
-            default:                     return 0;
+        case GAME_MENU_CMD_SWITCH:   return out_ret;
+        case GAME_MENU_CMD_RESTART:  klotski_init(); return GAME_RET_INTERACT;
+        case GAME_MENU_CMD_SETTINGS: menu_enter_game_settings(); return EXIT_RET_SETTINGS;
+        case GAME_MENU_CMD_INTERACT: return GAME_RET_INTERACT;
+        default:                     return 0;
         }
     }
 
-    /* ---- ÓÎÏ·½øĞĞÖĞ ---- */
+    /* ---- æ¸¸æˆè¿›è¡Œä¸­ ---- */
     TouchState ts;
     Touch_Scan(&ts);
 
@@ -629,19 +616,19 @@ uint8_t klotski_update(void)
         g_touch_start_x = ts.x;
         g_touch_start_y = ts.y;
         if (ts.y <= 210)
-            g_menu_cooldown = 0;  /* ´¥ÃşÉÏ°ëÇøÊ±½â³ı²Ëµ¥ÀäÈ´, ÔÊĞíÁ¢¿ÌÉÏ»® */
+            g_menu_cooldown = 0;  /* è§¦æ‘¸ä¸ŠåŠåŒºæ—¶è§£é™¤èœå•å†·å´, å…è®¸ç«‹åˆ»ä¸Šåˆ’ */
     }
 
-    /* ÓÎÏ·½øĞĞÖĞ: ÏÂ»¬´¥·¢ÍË³ö²Ëµ¥ÍÏ×§ */
-    if (game_menu_enter_exit_drag(&ts, (uint8_t *)&g_state,
-                                   KLOTSKI_STATE_PLAYING, KLOTSKI_STATE_EXIT_MENU))
+    /* æ¸¸æˆè¿›è¡Œä¸­: ä¸‹æ»‘è§¦å‘é€€å‡ºèœå•æ‹–æ‹½ */
+    if (game_menu_enter_exit_drag(&ts, (uint8_t*)&g_state,
+        KLOTSKI_STATE_PLAYING, KLOTSKI_STATE_EXIT_MENU))
         return 0;
-    /* ÓÎÏ·½øĞĞÖĞ: ÉÏ»®´¥·¢ÖØĞÂ¿ªÊ¼²Ëµ¥ */
-    if (game_menu_enter_restart_drag(&ts, (uint8_t *)&g_state,
-                                      KLOTSKI_STATE_PLAYING, KLOTSKI_STATE_RESTART_MENU, 210))
+    /* æ¸¸æˆè¿›è¡Œä¸­: ä¸Šåˆ’è§¦å‘é‡æ–°å¼€å§‹èœå• */
+    if (game_menu_enter_restart_drag(&ts, (uint8_t*)&g_state,
+        KLOTSKI_STATE_PLAYING, KLOTSKI_STATE_RESTART_MENU, 210))
         return 0;
 
-    /* ËÉÊÖ·À¶¶: Á¬Ğø¶ª2Ö¡²ÅÈ·ÈÏÊÍ·Å, ·ÀÖ¹´¥ÃşIC¶¶¶¯Îó´¥·¢ */
+    /* æ¾æ‰‹é˜²æŠ–: è¿ç»­ä¸¢2å¸§æ‰ç¡®è®¤é‡Šæ”¾, é˜²æ­¢è§¦æ‘¸ICæŠ–åŠ¨è¯¯è§¦å‘ */
     {
         static uint8_t rel_db = 0;
         if (ts.pressed) { rel_db = 0; }
@@ -650,7 +637,7 @@ uint8_t klotski_update(void)
     }
     if (!ts.pressed && g_touch_down) {
         g_touch_down = 0;
-        /* ²Ëµ¥·´Ïò»¬¹Ø±ÕºóµÄËÉÊÖ²»´«ÈëÓÎÏ·: Ö»ÎüÊÕ±¾´Î±ÕºÏÊÖÊÆµÄËÉÊÖ, ÏÂ´Î°´ÏÂ¼´²Ù×÷ÓÎÏ· */
+        /* èœå•åå‘æ»‘å…³é—­åçš„æ¾æ‰‹ä¸ä¼ å…¥æ¸¸æˆ: åªå¸æ”¶æœ¬æ¬¡é—­åˆæ‰‹åŠ¿çš„æ¾æ‰‹, ä¸‹æ¬¡æŒ‰ä¸‹å³æ“ä½œæ¸¸æˆ */
         if (g_game_consume_release) {
             g_game_consume_release = 0;
             return interacted;
@@ -658,44 +645,44 @@ uint8_t klotski_update(void)
         int16_t dx = (int16_t)ts.x - (int16_t)g_touch_start_x;
         int16_t dy = (int16_t)ts.y - (int16_t)g_touch_start_y;
 
-        /* ËÉÊÖÈ·ÈÏ: ÍË³ö²Ëµ¥ */
-        if (game_menu_commit_exit(dy, (uint8_t *)&g_state, KLOTSKI_STATE_EXIT_MENU))
+        /* æ¾æ‰‹ç¡®è®¤: é€€å‡ºèœå• */
+        if (game_menu_commit_exit(dy, (uint8_t*)&g_state, KLOTSKI_STATE_EXIT_MENU))
             return GAME_RET_INTERACT;
 
-        /* ËÉÊÖÈ·ÈÏ: ÖØĞÂ¿ªÊ¼²Ëµ¥ */
-        if (game_menu_commit_restart(dy, (uint8_t *)&g_state,
-                                      KLOTSKI_STATE_RESTART_MENU, 210, 10))
+        /* æ¾æ‰‹ç¡®è®¤: é‡æ–°å¼€å§‹èœå• */
+        if (game_menu_commit_restart(dy, (uint8_t*)&g_state,
+            KLOTSKI_STATE_RESTART_MENU, 210, 10))
             return GAME_RET_INTERACT;
 
-        /* »¬¶¯ÒÆ¶¯Êı×Ö */
+        /* æ»‘åŠ¨ç§»åŠ¨æ•°å­— */
         uint8_t dir = detect_swipe(dx, dy);
         if (dir != 0xFF && g_state == KLOTSKI_STATE_PLAYING) {
             uint8_t old_r = g_empty_r, old_c = g_empty_c;
             uint8_t moved = do_move(dir);
             if (moved) {
                 interacted = 1;
-                Main_ClearLowBattSaveFlag();  /* ÓĞ²Ù×÷±ä»¯Ê±Çå³ıµÍµç±£´æ±ê¼Ç */
-                /* ÔöÁ¿»æÖÆ½ö±ä»¯µÄÁ½¸ö¸ñ×Ó */
+                Main_ClearLowBattSaveFlag();  /* æœ‰æ“ä½œå˜åŒ–æ—¶æ¸…é™¤ä½ç”µä¿å­˜æ ‡è®° */
+                /* å¢é‡ç»˜åˆ¶ä»…å˜åŒ–çš„ä¸¤ä¸ªæ ¼å­ */
                 {
                     uint8_t val;
-                    /* À´Ô´¸ñ(Ô­¿Õ¸ñÎ»ÖÃ) */
+                    /* æ¥æºæ ¼(åŸç©ºæ ¼ä½ç½®) */
                     val = g_grid[old_r * KLOTSKI_COLS + old_c];
                     draw_tile_bg(old_r, old_c, KLOTSKI_TILE_COLOR);
                     draw_tile_number(old_r, old_c, val);
-                    /* ¿Õ¸ñ(ĞÂÎ»ÖÃ) */
+                    /* ç©ºæ ¼(æ–°ä½ç½®) */
                     draw_tile_bg(g_empty_r, g_empty_c, KLOTSKI_EMPTY_COLOR);
                 }
                 draw_status();
 
                 if (is_won()) {
                     g_state = KLOTSKI_STATE_WON;
-                    g_grid_dirty = 1;  /* ´¥·¢Í¨¹Ø»­Ãæ */
+                    g_grid_dirty = 1;  /* è§¦å‘é€šå…³ç”»é¢ */
                 }
             }
         }
     }
 
-    /* ---- ¼ÆÊ± (½ö½øĞĞÖĞ, ÉÏÏŞ99:59) ---- */
+    /* ---- è®¡æ—¶ (ä»…è¿›è¡Œä¸­, ä¸Šé™99:59) ---- */
     if (g_state == KLOTSKI_STATE_PLAYING) {
         uint32_t sec32 = (GetTimerCount() - g_timer_start) / 1000000;
         if (sec32 > 5999) sec32 = 5999;
@@ -704,36 +691,36 @@ uint8_t klotski_update(void)
             g_time_sec = sec;
         }
     }
-    /* ---- »æÖÆ ---- */
+    /* ---- ç»˜åˆ¶ ---- */
     if (g_grid_dirty) {
-        /* µç³ØÉÁÃğ»Ö¸´(g_grid_dirty==2)Ê±Ìø¹ıÈ«ÆÁ´óÌî³ä */
+        /* ç”µæ± é—ªç­æ¢å¤(g_grid_dirty==2)æ—¶è·³è¿‡å…¨å±å¤§å¡«å…… */
         if (g_grid_dirty != 2) {
             LCD_Fill(0, KLOTSKI_GRID_Y, 239,
-                     KLOTSKI_GRID_Y + KLOTSKI_ROWS * KLOTSKI_TILE_SIZE + (KLOTSKI_ROWS - 1) * KLOTSKI_GAP - 1,
-                     LCD_BLACK);
+                KLOTSKI_GRID_Y + KLOTSKI_ROWS * KLOTSKI_TILE_SIZE + (KLOTSKI_ROWS - 1) * KLOTSKI_GAP - 1,
+                LCD_BLACK);
         }
         draw_grid();
         draw_status();
         g_grid_dirty = 0;
 
-        /* Í¨¹Ø»­Ãæ */
+        /* é€šå…³ç”»é¢ */
         if (g_state == KLOTSKI_STATE_WON) {
             uint16_t min = g_time_sec / 60;
             uint16_t sec = g_time_sec % 60;
 
-            /* Çå³ıÖĞ¼äÇøÓò±ÜÃâµş×Ö */
+            /* æ¸…é™¤ä¸­é—´åŒºåŸŸé¿å…å å­— */
             LCD_Fill(40, 122, 199, 207, LCD_BLACK);
 
             LCD_CS_CLR;
-            /* "¹§Ï²Í¨¹Ø" (4¸ö32x32ºº×Ö) */
+            /* "æ­å–œé€šå…³" (4ä¸ª32x32æ±‰å­—) */
             {
                 uint16_t cx = (240 - 128) / 2;
-                sok_draw_char_32(cx,       90, FlashStore_ResLoad(FLASH_STORE_ID_32_GONG, 0, FONT_CHAR_SIZE), LCD_RED);
-                sok_draw_char_32(cx + 32,  90, FlashStore_ResLoad(FLASH_STORE_ID_32_XI,   0, FONT_CHAR_SIZE), LCD_RED);
-                sok_draw_char_32(cx + 64,  90, FlashStore_ResLoad(FLASH_STORE_ID_32_TONG, 0, FONT_CHAR_SIZE), LCD_RED);
-                sok_draw_char_32(cx + 96,  90, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), LCD_RED);
+                sok_draw_char_32(cx, 90, FlashStore_ResLoad(FLASH_STORE_ID_32_GONG, 0, FONT_CHAR_SIZE), LCD_RED);
+                sok_draw_char_32(cx + 32, 90, FlashStore_ResLoad(FLASH_STORE_ID_32_XI, 0, FONT_CHAR_SIZE), LCD_RED);
+                sok_draw_char_32(cx + 64, 90, FlashStore_ResLoad(FLASH_STORE_ID_32_TONG, 0, FONT_CHAR_SIZE), LCD_RED);
+                sok_draw_char_32(cx + 96, 90, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), LCD_RED);
             }
-            /* ²½Êı (¾ÓÖĞ16x32Êı×Ö) */
+            /* æ­¥æ•° (å±…ä¸­16x32æ•°å­—) */
             {
                 uint8_t digits[8];
                 uint8_t dc = uint_to_digits(g_moves, digits);
@@ -744,18 +731,19 @@ uint8_t klotski_update(void)
                     sok_draw_digit_16x32(start_x + (dc - 1 - i) * 16, y, digits[i], LCD_YELLOW);
                 }
             }
-            /* Ê±¼ä MM:SS */
+            /* æ—¶é—´ MM:SS */
             {
                 uint16_t y = 170;
-                /* ·ÖÖÓ */
+                /* åˆ†é’Ÿ */
                 uint16_t start_x = (240 - 56) / 2;
                 if (min >= 10) {
-                    sok_draw_digit_16x32(start_x,      y, min / 10, LCD_YELLOW);
+                    sok_draw_digit_16x32(start_x, y, min / 10, LCD_YELLOW);
                     sok_draw_digit_16x32(start_x + 16, y, min % 10, LCD_YELLOW);
-                } else {
-                    sok_draw_digit_16x32(start_x + 8,  y, min,      LCD_YELLOW);
                 }
-                /* Ã°ºÅ : (Á½µã, Ìø¹ıLCD_Fill±ÜÃâ¶ÔCS¸ÉÈÅ) */
+                else {
+                    sok_draw_digit_16x32(start_x + 8, y, min, LCD_YELLOW);
+                }
+                /* å†’å· : (ä¸¤ç‚¹, è·³è¿‡LCD_Fillé¿å…å¯¹CSå¹²æ‰°) */
                 {
                     uint8_t k;
                     LCD_Address_Set(start_x + 31, y + 7, start_x + 33, y + 11);
@@ -766,7 +754,7 @@ uint8_t klotski_update(void)
                     LCD_Address_Set(start_x + 31, y + 20, start_x + 33, y + 24);
                     for (k = 0; k < 15; k++) LCD_WR_DATA_16Bit(LCD_YELLOW);
                 }
-                /* Ãë */
+                /* ç§’ */
                 sok_draw_digit_16x32(start_x + 40, y, sec / 10, LCD_YELLOW);
                 sok_draw_digit_16x32(start_x + 56, y, sec % 10, LCD_YELLOW);
             }
