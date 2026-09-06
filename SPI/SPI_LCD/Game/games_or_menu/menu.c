@@ -61,12 +61,12 @@ static uint16_t s_game_battery_x;               /* 上次绘制的左上角 X 坐标 */
 static uint16_t s_game_battery_y;               /* 上次绘制的左上角 Y 坐标 */
 static uint8_t s_game_battery_valid;            /* 电量缓存有效标志 */
 
-/**
- * @brief  根据电量等级绘制游戏界面的小型电池图标
- * @param  x      图标左上角 X 坐标
- * @param  y      图标左上角 Y 坐标
- * @param  level  当前电量等级，范围为 BAT_LEVEL_0～BAT_LEVEL_5
- */
+/* game_menu_drag_poll 私有静态状态 (暴露通过 game_menu_drag_reset 重置) */
+static uint8_t  gdp_rel_cnt = 0;    /* 防抖: 连丢2帧才确认释放 */
+static int16_t  gdp_start_y = 0;   /* 拖拽起始菜单Y */
+static uint16_t gdp_start_ty = 0;  /* 拖拽起始触摸Y */
+static uint8_t  gdp_tracking = 0;  /* 已记录起始位置 */
+static uint16_t gdp_max_ty = 0;    /* 拖拽中最远触摸Y (用于松手取消判定) */
 /* 充电状态 */
 static uint8_t  s_charge_flash = 0;
 static uint32_t s_charge_flash_time = 0;
@@ -424,10 +424,6 @@ static void draw_2048_strip(uint8_t *row, uint8_t cr, uint16_t menu_w)
  * @param  row_types  行内容类型数组 (MENU_ROW_*)
  * @param  n_rows     行数 (2=重新开始, 5=主菜单/退出菜单)
  */
-/* 把低电电池图标(框2px边+感叹号)该行的红色像素写进菜单条带 buf(菜单内坐标),
-   使菜单跟手重绘时电池区内容即为图标(而非被遮蔽再补画), 菜单+图标一次 DMA 一起绘制,
-   消除"菜单每帧清青+图标每帧补红"来回闪. 凸点(x=195~210)在菜单右缘外, 由
-   Main_FlashLowBattery 独立绘制, 本函数不处理. 几何常量与 display.c LowBattery_ComputeGeo 一致. */
 /**
  * @brief  把低电电池图标像素写进菜单条带缓冲(与菜单一次 DMA 一起绘制)。
  * @param  row 条带缓冲
@@ -781,12 +777,6 @@ void menu_enter_game_settings(void)
     vm_touch_down = 0;
 }
 
-/* game_menu_drag_poll 私有静态状态 (暴露通过 game_menu_drag_reset 重置) */
-static uint8_t  gdp_rel_cnt = 0;    /* 防抖: 连丢2帧才确认释放 */
-static int16_t  gdp_start_y = 0;   /* 拖拽起始菜单Y */
-static uint16_t gdp_start_ty = 0;  /* 拖拽起始触摸Y */
-static uint8_t  gdp_tracking = 0;  /* 已记录起始位置 */
-static uint16_t gdp_max_ty = 0;    /* 拖拽中最远触摸Y (用于松手取消判定) */
 
 /**
  * @brief  重置 game_menu_drag_poll 内部状态, 确保下次调用从干净状态启动
