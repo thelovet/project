@@ -63,6 +63,11 @@ static const uint8_t goal_grid[KLOTSKI_SIZE] = {
  *  格子左上角坐标
  * ================================================================ */
 static uint16_t tile_x(uint8_t col) { return KLOTSKI_GRID_X + col * (KLOTSKI_TILE_SIZE + KLOTSKI_GAP); }
+/**
+ * @brief  行号转格子顶部 Y 坐标。
+ * @param  row 行号(0~3)
+ * @return 该行顶部 Y 像素
+ */
 static uint16_t tile_y(uint8_t row) { return KLOTSKI_GRID_Y + row * (KLOTSKI_TILE_SIZE + KLOTSKI_GAP); }
 
 /* ================================================================
@@ -318,6 +323,9 @@ void klotski_init(void)
     g_restart_dragging = 0;
     g_restart_slide_y = RESTART_MENU_Y + RESTART_MENU_H;
 }
+/**
+ * @brief  重置触摸状态(从其他游戏返回时调用)。
+ */
 
 void klotski_reset_touch(void)
 {
@@ -353,6 +361,9 @@ static void klotski_restore_battery_rows(int16_t menu_top, int16_t menu_h);
 /* 恢复低电图标伸出到重开菜单上方/外侧的像素(菜单覆盖 y>=RESTART_MENU_Y=110,
    x=45..195). 只填充这些细条带为网格格底色(格子内部/数字在透明电池体内, 保持完好).
    重要: 这里不画任何延伸到菜单框后面的完整格子, 否则游戏图会先于菜单显示一帧 -> 闪. */
+/**
+ * @brief  恢复重开菜单上方的细条带(菜单覆盖 y>=110 之外的网格底色)。
+ */
 static void klotski_restore_above_menu_slivers(void)
 {
     uint16_t b1[4];
@@ -391,6 +402,11 @@ static void klotski_restore_above_menu_slivers(void)
 /* 只重绘退出菜单框外露出的电池区: 按行判断, 行完全被菜单框 y 覆盖(框内)则只补
    恒框外的凸点列(3)(横跨菜单右边框), 否则整行重绘(含凸点). 框内主体由菜单框盖住,
    避免先棋盘后菜单闪一帧. */
+/**
+ * @brief  恢复电池覆盖的网格行(框外露出部分, 框内由菜单框盖住)。
+ * @param  menu_top 菜单框顶 Y
+ * @param  menu_h   菜单框高
+ */
 static void klotski_restore_battery_rows(int16_t menu_top, int16_t menu_h)
 {
     int16_t menu_bot = menu_top + menu_h;
@@ -455,6 +471,12 @@ void klotski_lowbatt_restore(void)
 }
 
 #define KLOTSKI_SAVE_LEN  21
+/**
+ * @brief  序列化华容道当前状态到存档缓冲。
+ * @param  buf     输出缓冲
+ * @param  max_len 缓冲上限
+ * @return 写入字节数
+ */
 
 uint8_t klotski_save_state(uint8_t *buf, uint8_t max_len)
 {
@@ -472,6 +494,12 @@ uint8_t klotski_save_state(uint8_t *buf, uint8_t max_len)
     buf[20] = (uint8_t)state;
     return KLOTSKI_SAVE_LEN;
 }
+/**
+ * @brief  从存档缓冲恢复华容道状态并重绘。
+ * @param  buf 存档缓冲
+ * @param  len 长度
+ * @return 1=成功, 0=失败
+ */
 
 uint8_t klotski_restore_state(const uint8_t *buf, uint8_t len)
 {
@@ -509,6 +537,9 @@ void klotski_menu_mark_dirty(void)   /* 关闭/取消菜单后需重绘场景 */
 
 /* 重绘电池覆盖的网格行(rows1-2); 供菜单背景重绘(g_grid_dirty==2)与
    klotski_lowbatt_restore(立即区域恢复)共用. */
+/**
+ * @brief  重绘电池覆盖的网格行(rows1-2, 含凸点)。
+ */
 static void klotski_redraw_battery_rows(void)
 {
     uint8_t r, c;
@@ -523,6 +554,10 @@ static void klotski_redraw_battery_rows(void)
 }
 
 /* 依据脏标记重绘菜单背景: 返回1=本帧已重绘 */
+/**
+ * @brief  依据脏标记重绘菜单背景(网格/状态)。
+ * @return 1=已重绘, 0=无脏
+ */
 uint8_t klotski_menu_bg_redraw(void)
 {
     if (!g_grid_dirty) return 0;
@@ -538,6 +573,9 @@ uint8_t klotski_menu_bg_redraw(void)
 }
 
 /* 重菜下滑打断进退出菜单后的补充处理: 置脏以便重绘背景 */
+/**
+ * @brief  重菜下滑打断进退出菜单后的补充处理(置脏重绘)。
+ */
 static void klotski_menu_on_to_exit(void)
 {
     g_grid_dirty = 1;
@@ -550,6 +588,10 @@ static const GameMenuCfg g_klotski_menu_cfg = {
     164, 22,
     klotski_menu_mark_dirty, klotski_menu_bg_redraw, klotski_menu_on_to_exit
 };
+/**
+ * @brief  华容道每帧更新: 处理触摸、菜单、步数与渲染。
+ * @return GAME_RET_* 返回命令
+ */
 
 uint8_t klotski_update(void)
 {

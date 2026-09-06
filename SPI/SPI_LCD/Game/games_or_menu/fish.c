@@ -248,14 +248,16 @@ static void clear_entity_rect(const uint16_t dims[][2], uint8_t level,
     }
 }
 
-/* ================================================================
- *  共用图片绘制: 按等级从外部Flash流式读取对应图, 跳过白色背景
- *  @param id_base  资源ID基址 (FLASH_STORE_ID_*_0)
- *  @param dims     尺寸表 (每等级 {w,h})
- *  @param count    等级数
- *  @param level    等级 0-(count-1)
- *  @param x,y      中心坐标
- * ================================================================ */
+/**
+ * @brief  绘制一张精灵图(按等级从外部 Flash 流式读取对应图, 跳过白色背景)。
+ * @param  id_base 资源起始 ID(FLASH_STORE_ID_*_0)
+ * @param  dims    尺寸表(count×2, 每等级 {w,h})
+ * @param  count   图张数
+ * @param  level   第几张(0~count-1, 越界钳位)
+ * @param  x       中心 X
+ * @param  y       中心 Y
+ * @param  flip    1=水平镜像
+ */
 static void draw_image_sprite(FlashStoreId id_base, const uint16_t dims[][2],
                               uint8_t count, uint8_t level,
                               uint16_t x, uint16_t y, uint8_t flip)
@@ -599,9 +601,10 @@ static void food_respawn(FishEntity *e, uint8_t avoid_player)
 /* ================================================================
  *  初始化
  * ================================================================ */
-/* Full redraw of the current fish scene (background + player + all food + HUD).
-   Used to restore the scene behind a menu after a menu-switch cleared the area to
-   black (mirrors tetris redrawing its board). Game-over screen uses draw_game_over. */
+/**
+ * @brief  绘制鱼游戏全套场景(背景+玩家+所有小鱼+HUD)。
+ * @note   用于菜单切换后恢复菜单框外的场景; 结束时用 draw_game_over。
+ */
 static void fish_draw_scene(void)
 {
     uint8_t i;
@@ -629,12 +632,18 @@ static void fish_draw_scene(void)
 
 /* Restore the background right after a menu clear (same frame) to avoid a
    one-frame black flash on menu switch/cancel (others redraw the board fast).*/
+/**
+ * @brief  恢复菜单框外的游戏场景(玩家/小鱼/背景)。
+ */
 static void fish_restore_scene_behind(void)
 {
     if (g_state_before_menu == FISH_STATE_OVER) draw_game_over();
     else fish_draw_scene();
     g_full_redraw = 0;
 }
+/**
+ * @brief  初始化鱼游戏: 复位状态、背景色、生成玩家与小鱼并绘制。
+ */
 
 void fish_init(void)
 {
@@ -680,12 +689,19 @@ void fish_init(void)
  * ================================================================ */
 /* 菜单关闭/取消, 及重菜下滑打断进退出菜单(on_to_exit)后: 立即重绘场景(结束画面/游戏画面)。
    on_to_exit 与 mark_dirty 当前行为一致(都仅恢复场景), 故 cfg 两个槽位共用此函数省 Flash */
+/**
+ * @brief  关闭/取消菜单后置脏以便重绘鱼场景。
+ */
 static void fish_menu_mark_dirty(void)
 {
     fish_restore_scene_behind();
 }
 
 /* 依据脏标记重绘菜单背景(结束画面/场景): 返回1=本帧已重绘 */
+/**
+ * @brief  依据脏标记重绘鱼菜单背景场景。
+ * @return 1=已重绘, 0=无脏
+ */
 static uint8_t fish_menu_bg_redraw(void)
 {
     if (!g_full_redraw) return 0;
@@ -704,6 +720,10 @@ static const GameMenuCfg g_fish_menu_cfg = {
     GAME_MENU_BAT_NONE, 0,
     fish_menu_mark_dirty, fish_menu_bg_redraw, fish_menu_mark_dirty
 };
+/**
+ * @brief  鱼每帧更新: 处理拖动、小鱼移动/吃鱼、菜单交互与渲染。
+ * @return GAME_RET_* 返回命令
+ */
 
 uint8_t fish_update(void)
 {
@@ -1108,6 +1128,12 @@ uint8_t fish_is_menu_visible(void)
 #define FISH_SAVE_BASE 11   /* 玩家 level+x+y+facing(6) + score(4) + state(1) */
 #define FISH_SAVE_FOOD 9    /* 每条鱼: active+level+x+y+vx+vy */
 #define FISH_SAVE_LEN (FISH_SAVE_BASE + FISH_NUM_FOOD * FISH_SAVE_FOOD)
+/**
+ * @brief  序列化鱼游戏状态(玩家+每只小鱼)到存档缓冲。
+ * @param  buf     输出缓冲
+ * @param  max_len 缓冲上限
+ * @return 写入字节数
+ */
 
 uint8_t fish_save_state(uint8_t *buf, uint8_t max_len)
 {
@@ -1144,6 +1170,12 @@ uint8_t fish_save_state(uint8_t *buf, uint8_t max_len)
     }
     return FISH_SAVE_LEN;
 }
+/**
+ * @brief  从存档缓冲恢复鱼游戏状态并重绘。
+ * @param  buf 存档缓冲
+ * @param  len 长度
+ * @return 1=成功, 0=失败
+ */
 
 uint8_t fish_restore_state(const uint8_t *buf, uint8_t len)
 {

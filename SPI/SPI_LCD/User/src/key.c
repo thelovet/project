@@ -43,16 +43,26 @@ void KEY_Init(void)
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
 }
+/**
+ * @brief  获取按键状态。
+ * @return 按键状态
+ */
 
 uint8_t Get_Key_Status(void)//获取按键状态
 {
     return key_status;
 }
+/**
+ * @brief  清除按键状态。
+ */
 
 void Clear_Key_Status(void)//清除按键状态
 {
     key_status = 0;
 }
+/**
+ * @brief  重置按键状态(重新开始/模式切换时调用)。
+ */
 
 void KEY_Reset(void)//重置按键状态
 {
@@ -71,6 +81,10 @@ void KEY_Reset(void)//重置按键状态
  *          短按：释放时判定（且未曾触发长按）
  **********************************************************************/
 void EXTI0_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+/**
+ * @brief  按键外部中断(EXTI0)处理。
+ * @note   标准 ISR, 记录按键触发并清除中断标志。
+ */
 void EXTI0_IRQHandler(void)
 {
     if(EXTI_GetITStatus(EXTI_Line0) != RESET)

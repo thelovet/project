@@ -290,6 +290,9 @@ static void GPIO_ALL_IPU(void) {
     GPIO_Init(GPIOC, &GPIO_InitStructure);
     GPIO_Init(GPIOD, &GPIO_InitStructure);
 }
+/**
+ * @brief  LCD 电源初始化(背光/供电)。
+ */
 
 static void LCD_PWR_Init(void) {
     GPIO_InitTypeDef GPIO_InitStructure = { 0 };//GPIO初始化结构体
@@ -305,6 +308,10 @@ static void LCD_PWR_Init(void) {
     /* PB9: 背光引脚，仅置ODR高(关)防止闪亮，GPIO初始化由LCD_Backlight_PWM_Init完成 */
     LCD_LED_SET;  // BSHR=ODR置1
 }
+/**
+ * @brief  独立看门狗初始化(超时约1s)。
+ * @note   休眠前由调用方禁用, 唤醒后恢复。
+ */
 
 static void IWDG_Init(void)//独立看门狗初始化，超时约1s
 {
@@ -899,6 +906,10 @@ static void main_restore_game_under_icon(void)
         default: break;
     }
 }
+/**
+ * @brief  低电图标灭段后恢复其下方底层内容(按模式/菜单覆盖分派)。
+ * @note   按 s_main_mode 分派各游戏/设置恢复函数, 图标显示时覆盖的场景需由底层重绘恢复, 否则留黑/红残留。
+ */
 
 static void main_lowbatt_restore_under_icon(void)
 {
@@ -1184,6 +1195,11 @@ static void GameSettings_Update(void)
  */
 /* 统一游戏主循环分支: 首次进入设置背光+init, 进设置(g_settings_from_game)时跳过刷新
    (由 GameSettings_Update 处理设置界面); update 返回的切换命令交给 game_handle_ret */
+/**
+ * @brief  统一游戏主循环分支: 首次进入设背光+init, 设置模式(g_settings_from_game)跳过刷新, 更新命令交 game_handle_ret。
+ * @param  init_fn   游戏初始化函数
+ * @param  update_fn 游戏每帧更新函数
+ */
 static void main_run_game(void (*init_fn)(void), uint8_t (*update_fn)(void))
 {
     if (!s_game_inited) {
@@ -1195,6 +1211,10 @@ static void main_run_game(void (*init_fn)(void), uint8_t (*update_fn)(void))
         game_handle_ret(update_fn(), &s_main_mode, &s_game_inited,
                         &s_touch_down, &key_response);
 }
+/**
+ * @brief  主循环按当前模式分派各模块更新(视频/设置/游戏/主菜单)。
+ * @param  charging_game_saved 充电时保存游戏状态标志
+ */
 
 static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
 {
@@ -1316,6 +1336,9 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
     /* 从游戏进入设置: 通用处理 (所有模式尾部调用, 视频模式下为no-op) */
     GameSettings_Update();
 }
+/**
+ * @brief  主程序入口: 初始化外设并进入主循环。
+ */
 
 int main(void) {
 #ifdef VIDEO_CHUNK_STORE_MODE

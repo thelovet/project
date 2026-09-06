@@ -767,6 +767,12 @@ void sokoban_reset_touch(void)
     s_swipe_origin_y = MENU_SWIPE_START_Y;  /* 退出菜单手势起始Y坐标设为安全值 */
     s_menu_cooldown = 0;
 }
+/**
+ * @brief  序列化推箱子当前状态到存档缓冲。
+ * @param  buf     输出缓冲
+ * @param  max_len 缓冲上限
+ * @return 写入字节数
+ */
 
 uint8_t sokoban_save_state(uint8_t *buf, uint8_t max_len)
 {
@@ -794,6 +800,12 @@ uint8_t sokoban_save_state(uint8_t *buf, uint8_t max_len)
     buf[2] = box_count;
     return (uint8_t)(3 + box_count);
 }
+/**
+ * @brief  从存档缓冲恢复推箱子状态并重绘。
+ * @param  buf 存档缓冲
+ * @param  len 长度
+ * @return 1=成功, 0=失败
+ */
 
 uint8_t sokoban_restore_state(const uint8_t *buf, uint8_t len)
 {
@@ -935,6 +947,10 @@ static void sok_redraw_battery_tiles(int16_t x0, int16_t y0, int16_t x1, int16_t
 /* 低电图标灭段恢复(设置模式用): 设置模式下 sokoban_update() 不跑, g_sok_dirty 无人消费,
    故需立即恢复. 二级菜单条带(x=45..195)盖住电池主体, 只重绘条带右缘外凸点 + 条带未盖住时
    框外露出的电池主体; 非设置模式保持置脏, 由下一帧 sokoban_update() 恢复(覆盖重绘UI). */
+/**
+ * @brief  低电图标灭段恢复: 按菜单覆盖范围重绘电池区瓦片。
+ * @note   设置模式重绘电池区; 纯游戏重绘整屏。
+ */
 void sokoban_lowbatt_restore(void)
 {
     if (g_settings_from_game) {
@@ -950,6 +966,10 @@ void sokoban_lowbatt_restore(void)
         sokoban_full_redraw();
     }
 }
+/**
+ * @brief  推箱子每帧更新: 处理触摸、菜单、移动与渲染。
+ * @return GAME_RET_* 返回命令
+ */
 
 uint8_t sokoban_update(void)
 {

@@ -23,6 +23,10 @@ void HardFault_Handler(void)
  *
  * @return  none
  */
+/**
+ * @brief  不可屏蔽中断处理。
+ * @note   标准 ISR(保留)。
+ */
 void NMI_Handler(void)
 {
   while (1)
@@ -36,6 +40,10 @@ void NMI_Handler(void)
  * @brief   This function handles Hard Fault exception.
  *
  * @return  none
+ */
+/**
+ * @brief  硬件错误中断处理。
+ * @note   标准 ISR, 捕获后死循环/复位。
  */
 void HardFault_Handler(void)
 {

@@ -115,6 +115,12 @@ static uint8_t s_scratch[FLASH_STORE_SCRATCH_SIZE];
  * 仅烧录模式使用(写入/校验), 游戏模式不编译以消除警告
  * ================================================================ */
 #if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
+/**
+ * @brief  CRC16 迭代更新(每字节)。
+ * @param  crc  当前 CRC
+ * @param  byte 待更新字节
+ * @return 更新后 CRC
+ */
 static uint16_t flash_store_crc16_update(uint16_t crc, uint8_t byte)
 {
     crc ^= byte;
@@ -124,6 +130,12 @@ static uint16_t flash_store_crc16_update(uint16_t crc, uint8_t byte)
     }
     return crc;
 }
+/**
+ * @brief  计算一段数据的 CRC16。
+ * @param  data 数据指针
+ * @param  len  长度
+ * @return CRC16 值
+ */
 
 static uint16_t flash_store_crc16(const uint8_t *data, uint32_t len)
 {
@@ -139,6 +151,10 @@ static uint16_t flash_store_crc16(const uint8_t *data, uint32_t len)
  * ================================================================ */
 #if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
 /* 扇区擦除(4K) */
+/**
+ * @brief  用 4B 指令擦除外部 Flash 扇区。
+ * @param  addr 扇区地址
+ */
 static void flash_store_erase_sector_4b(uint32_t addr)
 {
     SPI_FLASH_Write_Enable();
@@ -154,6 +170,12 @@ static void flash_store_erase_sector_4b(uint32_t addr)
 }
 
 /* 页编程(单页≤256字节, 不能跨页) */
+/**
+ * @brief  用 4B 指令编程一页数据。
+ * @param  src  源数据
+ * @param  addr 目标地址
+ * @param  len  长度
+ */
 static void flash_store_page_program_4b(const uint8_t *src, uint32_t addr, uint16_t len)
 {
     SPI_FLASH_Write_Enable();
@@ -169,6 +191,12 @@ static void flash_store_page_program_4b(const uint8_t *src, uint32_t addr, uint1
 }
 
 /* 跨页写 */
+/**
+ * @brief  用 4B 指令写入数据(自动擦页+编程)。
+ * @param  src  源数据
+ * @param  addr 目标地址
+ * @param  len  长度
+ */
 static void flash_store_write_4b(const uint8_t *src, uint32_t addr, uint32_t len)
 {
     while (len) {
@@ -183,6 +211,12 @@ static void flash_store_write_4b(const uint8_t *src, uint32_t addr, uint32_t len
 #endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE */
 
 /* 读数据(4字节地址) */
+/**
+ * @brief  用 4B 指令读取外部 Flash 数据。
+ * @param  buf  输出缓冲
+ * @param  addr 读取地址
+ * @param  len  长度
+ */
 static void flash_store_read_4b(uint8_t *buf, uint32_t addr, uint16_t len)
 {
     FLASH_CS_CLR;
@@ -203,6 +237,9 @@ static uint32_t s_flash_size = FLASH_STORE_FLASH_SIZE; /* 实际容量(检测后更新) *
 static uint8_t  s_use_4b     = 0;                       /* 1=使用4字节地址指令 */
 
 /* 根据JEDEC ID容量字节识别芯片大小 */
+/**
+ * @brief  检测外部 Flash 芯片型号(读 ID)。
+ */
 static void flash_store_detect_chip(void)
 {
     uint32_t jedec = SPI_Flash_ReadJedecDeviceID();
@@ -221,6 +258,10 @@ static void flash_store_detect_chip(void)
  * ================================================================ */
 #if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
 /* 统一扇区擦除(按实际地址模式) */
+/**
+ * @brief  擦除外部 Flash 扇区(普通指令)。
+ * @param  addr 扇区地址
+ */
 static void flash_store_erase_sector(uint32_t addr)
 {
     if (s_use_4b) {
@@ -231,6 +272,12 @@ static void flash_store_erase_sector(uint32_t addr)
 }
 
 /* 统一跨页写(按实际地址模式) */
+/**
+ * @brief  写入数据到外部 Flash(普通指令)。
+ * @param  src  源数据
+ * @param  addr 目标地址
+ * @param  len  长度
+ */
 static void flash_store_write(const uint8_t *src, uint32_t addr, uint32_t len)
 {
     if (s_use_4b) {
@@ -242,6 +289,12 @@ static void flash_store_write(const uint8_t *src, uint32_t addr, uint32_t len)
 #endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE */
 
 /* 统一读数据(按实际地址模式; 3字节地址用DMA读取, 释放CPU) */
+/**
+ * @brief  读取外部 Flash 数据(普通指令)。
+ * @param  buf  输出缓冲
+ * @param  addr 读取地址
+ * @param  len  长度
+ */
 static void flash_store_read(uint8_t *buf, uint32_t addr, uint16_t len)
 {
     if (s_use_4b) {
@@ -260,11 +313,21 @@ static uint8_t  s_res_valid = 0;     /* 目录缓存是否有效 */
 static uint32_t s_data_start = 0;    /* 数据区起始地址(来自目录头) */
 
 /* 目录项解析辅助: 读取条目中的4字节大端字段 */
+/**
+ * @brief  读取资源目录项中的字段。
+ * @param  e   目录项指针
+ * @param  off 字段偏移
+ * @return 字段值
+ */
 static uint32_t flash_store_dir_field(const uint8_t *e, uint8_t off)
 {
     return ((uint32_t)e[off] << 24) | ((uint32_t)e[off + 1] << 16) |
            ((uint32_t)e[off + 2] << 8) | (uint32_t)e[off + 3];
 }
+/**
+ * @brief  初始化外部 Flash 资源表(探测芯片、建立索引)。
+ * @return 1=成功, 0=失败
+ */
 
 uint8_t FlashStore_ResInit(void)
 {
@@ -289,6 +352,14 @@ uint8_t FlashStore_ResInit(void)
     s_res_valid = 0;
     return 0;
 }
+/**
+ * @brief  流式读取资源数据(经 SPI DMA)。
+ * @param  id     资源 ID
+ * @param  offset 资源内偏移
+ * @param  buf    输出缓冲
+ * @param  len    长度
+ * @return 实际读取字节数
+ */
 
 uint16_t FlashStore_ResRead(FlashStoreId id, uint32_t offset, uint8_t *buf, uint16_t len)
 {
@@ -331,6 +402,12 @@ static uint8_t  s_ui_last_pct  = 0xFF; /* 上次绘制百分比(仅变化时重绘) */
 static uint16_t s_ui_last_fill = 0;    /* 上次已填充宽度 */
 
 /* 绘制%符号: 两个圆点+斜线 */
+/**
+ * @brief  绘制烧录百分比文字。
+ * @param  x     位置 X
+ * @param  y     位置 Y
+ * @param  color 文字颜色
+ */
 static void flash_store_draw_percent(uint16_t x, uint16_t y, uint16_t color)
 {
     LCD_Fill(x,     y,      x + 4, y + 4, color); /* 右上圆点 */
@@ -341,6 +418,9 @@ static void flash_store_draw_percent(uint16_t x, uint16_t y, uint16_t color)
 }
 
 /* 初始化UI: 清屏 + 画进度条边框 */
+/**
+ * @brief  初始化烧录进度 UI(背景/标题)。
+ */
 static void flash_store_ui_init(void)
 {
     s_ui_last_pct  = 0xFF;
@@ -354,6 +434,11 @@ static void flash_store_ui_init(void)
 }
 
 /* 绘制百分比数字(居中, 指定颜色) */
+/**
+ * @brief  绘制烧录进度条。
+ * @param  pct   百分比(0~100)
+ * @param  color 填充颜色
+ */
 static void flash_store_ui_draw_pct(uint8_t pct, uint16_t color)
 {
     LCD_Fill(60, 42, 180, 80, LCD_BLACK);
@@ -375,6 +460,10 @@ static void flash_store_ui_draw_pct(uint8_t pct, uint16_t color)
 }
 
 /* 更新进度条填充与百分比数值 */
+/**
+ * @brief  更新烧录进度显示。
+ * @param  pct 百分比(0~100)
+ */
 static void flash_store_ui_update(uint8_t pct)
 {
     if (pct > 100) pct = 100;
@@ -394,12 +483,19 @@ static void flash_store_ui_update(uint8_t pct)
 }
 
 /* 烧录完成: 绿色突出显示100% */
+/**
+ * @brief  烧录完成 UI 提示。
+ */
 static void flash_store_ui_done(void)
 {
     flash_store_ui_draw_pct(100, LCD_GREEN);
 }
 
 /* 校验失败: 进度条变红, 百分比数字变红提示 */
+/**
+ * @brief  烧录失败 UI 提示。
+ * @param  pct 失败时百分比
+ */
 static void flash_store_ui_fail(uint8_t pct)
 {
     LCD_Fill(UI_BAR_X0, UI_BAR_Y0, UI_BAR_X1, UI_BAR_Y1, LCD_RED);
@@ -411,6 +507,9 @@ static void flash_store_ui_fail(uint8_t pct)
  * 烧录主流程 (FLASH_DATA_STORE_MODE: 字库/图片资源烧录)
  * ================================================================ */
 #ifdef FLASH_DATA_STORE_MODE
+/**
+ * @brief  烧录全部资源到外部 Flash(带进度 UI)。
+ */
 void FlashStore_BurnAll(void)
 {
     uint32_t i;

@@ -335,6 +335,9 @@ static const uint8_t s_fonts_pm_id[4]  = { FLASH_STORE_ID_24_PING, FLASH_STORE_I
 static const uint8_t s_dig_2048[4]   = { 2, 0, 4, 8 };
 
 /* 加载菜单字库缓存 (24x24字库ID 0-21 各自独立资源, 逐字读入) */
+/**
+ * @brief  加载菜单字体缓存(从外部 Flash 按需载入字库块)。
+ */
 static void menu_font_cache_load(void)
 {
     uint8_t i;
@@ -363,6 +366,9 @@ static void menu_font_cache_load(void)
 static const uint8_t g_main_menu_row_types[5] = {
     MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH
 };
+/**
+ * @brief  绘制主菜单(5行: 视频/各游戏), 用 n 行框架统一绘制。
+ */
 
 void main_menu_draw(void)
 {
@@ -379,6 +385,12 @@ void main_menu_draw_frame_only(int16_t y_top)
 }
 
 /* 2048数字条带渲染: 14x28缩放, 32px行内垂直居中 (颜色常量 = MENU_TEXT_COLOR: 0xF81F) */
+/**
+ * @brief  生成主菜单里 2048 选项的条带像素。
+ * @param  row     条带缓冲
+ * @param  cr      条带位置
+ * @param  menu_w  菜单宽度
+ */
 static void draw_2048_strip(uint8_t *row, uint8_t cr, uint16_t menu_w)
 {
     /* 14x28在32px行内: 跳过顶部2px和底部2px */
@@ -416,6 +428,14 @@ static void draw_2048_strip(uint8_t *row, uint8_t cr, uint16_t menu_w)
    使菜单跟手重绘时电池区内容即为图标(而非被遮蔽再补画), 菜单+图标一次 DMA 一起绘制,
    消除"菜单每帧清青+图标每帧补红"来回闪. 凸点(x=195~210)在菜单右缘外, 由
    Main_FlashLowBattery 独立绘制, 本函数不处理. 几何常量与 display.c LowBattery_ComputeGeo 一致. */
+/**
+ * @brief  把低电电池图标像素写进菜单条带缓冲(与菜单一次 DMA 一起绘制)。
+ * @param  row 条带缓冲
+ * @param  ay  条带所在屏幕 Y
+ * @param  mx  菜单左缘 X
+ * @param  mw  菜单宽度
+ * @note   仅图标亮段(g_lowbatt_showing)且条带位于电池区时叠加, 避免拖拽时菜单与电池来回闪。
+ */
 static void lmbat_strip(uint8_t *row, int16_t ay, int16_t mx, uint16_t mw)
 {
     int16_t bx=45, by=79, bw=150, bh=82;           /* 电池主体(2px边): x=45~195, y=79~161 */
@@ -444,6 +464,13 @@ static void lmbat_strip(uint8_t *row, int16_t ay, int16_t mx, uint16_t mw)
         }
     }
 }
+/**
+ * @brief  绘制 n 行菜单框架(逐条带乒乓双缓冲, 一次 DMA 发送)。
+ * @param  y_top     菜单框顶 Y
+ * @param  row_types 各行人类型数组
+ * @param  n_rows    行数
+ * @note   条带复用 shared_buffer 前后两半, 不额外占 RAM; 低电亮段时电池区条带叠加图标。
+ */
 
 void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
                                 uint8_t n_rows)
@@ -883,6 +910,13 @@ uint8_t game_restart_menu_down_poll(const TouchState *ts, uint8_t *touch_down,
  **********************************************************************/
 #define VIDEO_MENU_SLIDE_SPEED   1  /* 上划移动速度 */
 #define VIDEO_MENU_DRAG_MAX_STEP 4
+/**
+ * @brief  视频设置菜单拖拽跟随轮询。
+ * @param  slide_y       滑动位置
+ * @param              drag_start_y 拖拽起点 Y
+ * @param  dragging      拖拽中标志
+ * @param  ts            触摸状态
+ */
 uint8_t video_menu_drag_poll(int16_t *slide_y, uint16_t drag_start_y,
                               uint8_t *dragging, const TouchState *ts)
 {
@@ -922,6 +956,13 @@ uint8_t video_menu_drag_poll(int16_t *slide_y, uint16_t drag_start_y,
  **********************************************************************/
 #define VIDEO_SWIPE_START_Y  210  /* 上划起点最小Y (接近底部) */
 #define VIDEO_SWIPE_TRIGGER   5
+/**
+ * @brief  视频设置菜单上划触发轮询。
+ * @param  ts         触摸状态
+ * @param  touch_down 按下标志
+ * @param  start_x    触摸起点 X
+ * @param  start_y    触摸起点 Y
+ */
 uint8_t video_menu_swipe_up_poll(const TouchState *ts, uint8_t *touch_down,
                                   uint16_t *start_x, uint16_t *start_y)
 {
@@ -955,6 +996,16 @@ uint8_t video_menu_swipe_up_poll(const TouchState *ts, uint8_t *touch_down,
  * @return 1 = 已处理, 0 = 未处理
  **********************************************************************/
 static uint8_t main_menu_hit_test(uint16_t x, uint16_t y);  /* 前向声明 */
+/**
+ * @brief  主菜单命中检测与点击处理(返回值切换模式)。
+ * @param  x           命中 X
+ * @param  y           命中 Y
+ * @param  mode        输出目标模式
+ * @param  menu_drawn  菜单已绘制标志
+ * @param  game_inited 游戏已初始化标志
+ * @param  touch_down  触摸按下标志
+ * @param  key_resp    按键响应
+ */
 
 uint8_t main_menu_handle(uint16_t x, uint16_t y,
                           MainMode *mode, uint8_t *menu_drawn,
@@ -1041,6 +1092,10 @@ static MainMode game_ret_to_mode(uint8_t ret)
 }
 
 /* ---- 内部辅助：ret→reset_touch ---- */
+/**
+ * @brief  模式切换时重置触摸状态并标记等待松手。
+ * @param  ret 切换返回命令
+ */
 static void game_reset_touch(uint8_t ret)
 {
     switch (ret) {
@@ -1363,6 +1418,9 @@ uint8_t game_menu_commit_restart(int16_t dy, uint8_t *state, uint8_t restart_sta
         g_restart_slide_y = RESTART_MENU_Y + RESTART_MENU_RELEASE_GAP;
     return 1;
 }
+/**
+ * @brief  重开菜单清理: 复位重开菜单状态并置脏场景。
+ */
 
 void menu_restart_cleanup(void)
 {
@@ -1373,6 +1431,12 @@ void menu_restart_cleanup(void)
     g_restart_menu_visible = 0;
     g_restart_dragging = 0;
 }
+/**
+ * @brief  重开菜单下滑打断进退出菜单(先清重菜区再进退出菜单)。
+ * @param  state      当前状态指针
+ * @param  exit_state 退出菜单状态
+ * @param  touch_y    触摸 Y
+ */
 
 void game_menu_restart_to_exit(uint8_t *state, uint8_t exit_state,
                                 uint16_t touch_y)
@@ -1385,6 +1449,12 @@ void game_menu_restart_to_exit(uint8_t *state, uint8_t exit_state,
     g_exit_drag_start_y = touch_y;
     g_exit_drag_y = -MENU_H + MENU_DRAG_MAX_STEP;
 }
+/**
+ * @brief  上划切换到重开菜单处理(按起点分流)。
+ * @param  y_threshold   起点阈值
+ * @param  release_thresh 松手阈值
+ * @return 1=已触发, 0=未触发
+ */
 
 uint8_t menu_swipe_to_restart_handler(uint16_t y_threshold, uint8_t release_thresh)
 {
@@ -1406,6 +1476,12 @@ uint8_t menu_swipe_to_restart_handler(uint16_t y_threshold, uint8_t release_thre
         return 2;
     }
 }
+/**
+ * @brief  把无符号整数拆成十进制数字串。
+ * @param  val    待转换值
+ * @param  digits 输出数字数组(每字节一位)
+ * @return 数字位数
+ */
 
 uint8_t uint_to_digits(uint32_t val, uint8_t *digits)
 {
@@ -1414,6 +1490,9 @@ uint8_t uint_to_digits(uint32_t val, uint8_t *digits)
     else { while (val > 0) { digits[dc++] = (uint8_t)(val % 10); val /= 10; } }
     return dc;
 }
+/**
+ * @brief  退出菜单返回清理(复位退出菜单状态并置脏场景)。
+ */
 
 void menu_exit_back_cleanup(void)
 {

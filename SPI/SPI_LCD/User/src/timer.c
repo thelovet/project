@@ -55,6 +55,10 @@ void TIMER2_Init(void)
  */
 void TIM1_UP_IRQHandler(void)
     __attribute__((interrupt("WCH-Interrupt-fast"), used, externally_visible));
+/**
+ * @brief  TIM1 更新中断处理(低电检测/计时)。
+ * @note   标准 ISR, 用于非喂狗用途的计时。
+ */
 void TIM1_UP_IRQHandler(void)
 {
     if(TIM_GetITStatus(TIM1, TIM_IT_Update) == SET)
@@ -80,6 +84,10 @@ uint8_t TIMER2_TakeLowBatteryPending(void)
     low_battery_pending = 0;
     return pending;
 }
+/**
+ * @brief  获取定时器计数(微秒), 与帧率无关。
+ * @return 当前微秒计数
+ */
 
 uint32_t GetTimerCount(void)//获取定时器计数
 {

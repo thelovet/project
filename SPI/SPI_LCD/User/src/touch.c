@@ -367,17 +367,32 @@ static uint16_t MapCoord(uint16_t raw, uint8_t mirror)
     if (mapped >= TOUCH_MAP_MAX) mapped = TOUCH_MAP_MAX - 1;
     return mapped;
 }
+/**
+ * @brief  两数差绝对值。
+ * @param  a 第一个数
+ * @param  b 第二个数
+ * @return |a-b|
+ */
 
 static uint16_t Touch_AbsDiff(uint16_t a, uint16_t b)
 {
     return (a >= b) ? (a - b) : (b - a);
 }
+/**
+ * @brief  重置触摸坐标滤波/去抖状态。
+ */
 
 static void Touch_ResetCoordFilter(void)
 {
     g_touch_have_valid_sample = 0;
     g_touch_have_pending_sample = 0;
 }
+/**
+ * @brief  应用一次原始坐标(滤波/去抖, 判定是否有效)。
+ * @param  raw_x 原始 X
+ * @param  raw_y 原始 Y
+ * @return 1=坐标有效, 0=忽略
+ */
 
 static uint8_t Touch_TryApplyCoords(uint16_t raw_x, uint16_t raw_y)
 {
@@ -519,6 +534,10 @@ void Touch_Init(void)
  */
 void EXTI9_5_IRQHandler(void)
     __attribute__((interrupt("WCH-Interrupt-fast"), used, externally_visible));
+/**
+ * @brief  触摸外部中断(EXTI9_5)处理。
+ * @note   标准 ISR, 唤醒/标记触摸事件。
+ */
 void EXTI9_5_IRQHandler(void)
 {
     if (EXTI_GetITStatus(EXTI_Line8) != RESET)
