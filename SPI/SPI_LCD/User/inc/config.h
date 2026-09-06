@@ -61,21 +61,21 @@
 #define LCD_PWR_PORT      GPIOB
 #define LCD_PWR_PIN       (GPIO_Pin_4)
 
-/* ��Ļ���⼫�ԣ�����=���������ߵ�ƽ����ע��=���������͵�ƽ���� */
+/* 屏幕背光极性（定义=测试屏，高电平亮，注释=正常屏，低电平亮） */
 //#define TEST_SCREEN_BACKLIGHT
-/* Standbyģʽ����LCD���磬֧�ִ������ѣ������ӹ��ģ� */
+/* Standby模式保持LCD供电，支持触摸唤醒（会增加功耗） */
 #define KEEP_LCD_POWER_IN_STANDBY
 
 /* ================================================================
- * ��¼ģʽ�л� (��ѡһ, ��ע�� = ������Ϸ����)
- *   FLASH_DATA_STORE_MODE : ȫ���Զ���¼�����ֿ�/ͼƬ��Դ���ⲿFlashĩβ
- *   VIDEO_CHUNK_STORE_MODE: ��¼Ƕ��̼�����Ƶ���ݿ鵽�ⲿFlash��ַ0(��Ƶ����)
- *                           ÿ���� gen_video_chunk.py ����(video_chunk.c/h)
+ * 烧录模式切换 (二选一, 都注释 = 正常游戏程序)
+ *   FLASH_DATA_STORE_MODE : 全量自动烧录内置字库/图片资源到外部Flash末尾
+ *   VIDEO_CHUNK_STORE_MODE: 烧录嵌入固件的视频数据块到外部Flash地址0(视频区域)
+ *                           每块由 gen_video_chunk.py 生成(video_chunk.c/h)
  * ================================================================ */
-// ��¼ģʽ:
-//   FLASH_DATA_STORE_MODE  = ȫ���Զ���¼�ֿ�/ͼƬ��Դ���ⲿFlashĩβ
-//   VIDEO_CHUNK_STORE_MODE = ��¼Ƕ��̼�����Ƶ���ݿ鵽�ⲿFlash��ַ0(��Ƶ����)
-//#define FLASH_DATA_STORE_MODE   /* ��¼���, �ָ���Ϸģʽ */
+// 烧录模式:
+//   FLASH_DATA_STORE_MODE  = 全量自动烧录字库/图片资源到外部Flash末尾
+//   VIDEO_CHUNK_STORE_MODE = 烧录嵌入固件的视频数据块到外部Flash地址0(视频区域)
+//#define FLASH_DATA_STORE_MODE   /* 烧录完成, 恢复游戏模式 */
 //#define VIDEO_CHUNK_STORE_MODE
 
 #endif

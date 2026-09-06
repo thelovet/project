@@ -1,9 +1,9 @@
 #include "battery.h"
 #include "lcd.h"
 
-// ====== ³äµç¼ì²âÒı½Å¶¨Òå ======
-// CHRG  PB6: À­µÍ=³äµçÖĞ (³äµçIC CHRGÒı½Å£¬¿ªÂ©Êä³ö)
-// STDBY PB5: À­µÍ=³äÂú   (³äµçIC STDBYÒı½Å£¬¿ªÂ©Êä³ö)
+// ====== å……ç”µæ£€æµ‹å¼•è„šå®šä¹‰ ======
+// CHRG  PB6: æ‹‰ä½=å……ç”µä¸­ (å……ç”µIC CHRGå¼•è„šï¼Œå¼€æ¼è¾“å‡º)
+// STDBY PB5: æ‹‰ä½=å……æ»¡   (å……ç”µIC STDBYå¼•è„šï¼Œå¼€æ¼è¾“å‡º)
 #define CHRG_RCC    RCC_APB2Periph_GPIOB
 #define CHRG_PORT   GPIOB
 #define CHRG_PIN    GPIO_Pin_6
@@ -18,7 +18,7 @@
 #define STDBY_PORT_SOURCE    GPIO_PortSourceGPIOB
 #define STDBY_PIN_SOURCE     GPIO_PinSource5
 
-// ====== ÆÁÄ»·Ö±æÂÊ¶¨Òå ======
+// ====== å±å¹•åˆ†è¾¨ç‡å®šä¹‰ ======
 #ifndef LCD_WIDTH
 #define LCD_WIDTH   240
 #endif
@@ -26,61 +26,61 @@
 #define LCD_HEIGHT  240
 #endif
 
-// ====== µç³ØÍ¼±ê¼¸ºÎ²ÎÊı (»ùÓÚÆÁÄ»·Ö±æÂÊ±ÈÀı¼ÆËã) ======
-#define BATTERY_W_RATIO      0.30f   // µç³Ø¿í¶ÈÕ¼ÆÁÄ»¿í¶ÈµÄ30%
-#define BATTERY_H_RATIO      0.133f  // µç³Ø¸ß¶ÈÕ¼ÆÁÄ»¸ß¶ÈµÄÔ¼13.3%
-#define NUB_W_RATIO          0.033f  // Õı¼«Í»Æğ¿í¶ÈÕ¼ÆÁÄ»¿í¶ÈµÄ3.3%
-#define NUB_H_RATIO          0.067f  // Õı¼«Í»Æğ¸ß¶ÈÕ¼ÆÁÄ»¸ß¶ÈµÄ6.7%
+// ====== ç”µæ± å›¾æ ‡å‡ ä½•å‚æ•° (åŸºäºå±å¹•åˆ†è¾¨ç‡æ¯”ä¾‹è®¡ç®—) ======
+#define BATTERY_W_RATIO      0.30f   // ç”µæ± å®½åº¦å å±å¹•å®½åº¦çš„30%
+#define BATTERY_H_RATIO      0.133f  // ç”µæ± é«˜åº¦å å±å¹•é«˜åº¦çš„çº¦13.3%
+#define NUB_W_RATIO          0.033f  // æ­£æçªèµ·å®½åº¦å å±å¹•å®½åº¦çš„3.3%
+#define NUB_H_RATIO          0.067f  // æ­£æçªèµ·é«˜åº¦å å±å¹•é«˜åº¦çš„6.7%
 
-// ¼ÆËãÊµ¼ÊÏñËØÖµ(ËÄÉáÎåÈë)
+// è®¡ç®—å®é™…åƒç´ å€¼(å››èˆäº”å…¥)
 #define BATTERY_W       ((uint16_t)(LCD_WIDTH  * BATTERY_W_RATIO + 0.5f))
 #define BATTERY_H       ((uint16_t)(LCD_HEIGHT * BATTERY_H_RATIO + 0.5f))
-#define BATTERY_X       ((uint16_t)((LCD_WIDTH - BATTERY_W) / 2))  // Ë®Æ½¾ÓÖĞ
-#define BATTERY_Y       ((uint16_t)((LCD_HEIGHT - BATTERY_H) / 2))  // ´¹Ö±¾ÓÖĞ
+#define BATTERY_X       ((uint16_t)((LCD_WIDTH - BATTERY_W) / 2))  // æ°´å¹³å±…ä¸­
+#define BATTERY_Y       ((uint16_t)((LCD_HEIGHT - BATTERY_H) / 2))  // å‚ç›´å±…ä¸­
 #define NUB_W           ((uint16_t)(LCD_WIDTH * NUB_W_RATIO))
 #define NUB_H           ((uint16_t)(LCD_HEIGHT * NUB_H_RATIO))
 
-// ====== ÑÕÉ«¶¨Òå ======
+// ====== é¢œè‰²å®šä¹‰ ======
 #define BATTERY_FRAME_COLOR    LCD_WHITE
 #define BATTERY_BLOCK_ON_COLOR LCD_GREEN
 #define BATTERY_BLOCK_OFF_COLOR LCD_BLACK
 
 /**
- * ³äµçµçÑ¹ãĞÖµ¼°ÖÍ»Ø (mV)
- *   0~4¸ñÓÉµçÑ¹ÅĞ¶Ï£¬5¸ñ½öÓÉPB5(STDBY)À­µÍ(BAT_FULL)¿ØÖÆ
- *   ÖÍ»Ø30mV·ÀÖ¹µçÑ¹¶¶¶¯µ¼ÖÂµµÎ»Ìø±ä
+ * å……ç”µç”µå‹é˜ˆå€¼åŠæ»å› (mV)
+ *   0~4æ ¼ç”±ç”µå‹åˆ¤æ–­ï¼Œ5æ ¼ä»…ç”±PB5(STDBY)æ‹‰ä½(BAT_FULL)æ§åˆ¶
+ *   æ»å›30mVé˜²æ­¢ç”µå‹æŠ–åŠ¨å¯¼è‡´æ¡£ä½è·³å˜
  */
 #define BAT_CHARGE_HYST_MV         30U
-#define BAT_CHARGE_LEVEL_1_MV    3500U  // >= 3500mV ¡ú 1¸ñ
-#define BAT_CHARGE_LEVEL_2_MV    3700U  // >= 3700mV ¡ú 2¸ñ
-#define BAT_CHARGE_LEVEL_3_MV    3900U  // >= 3850mV ¡ú 3¸ñ
-#define BAT_CHARGE_LEVEL_4_MV    4100U  // >= 4100mV ¡ú 4¸ñ
+#define BAT_CHARGE_LEVEL_1_MV    3500U  // >= 3500mV â†’ 1æ ¼
+#define BAT_CHARGE_LEVEL_2_MV    3700U  // >= 3700mV â†’ 2æ ¼
+#define BAT_CHARGE_LEVEL_3_MV    3900U  // >= 3850mV â†’ 3æ ¼
+#define BAT_CHARGE_LEVEL_4_MV    4100U  // >= 4100mV â†’ 4æ ¼
 
 /**
- * ÓÎÏ··ÅµçµçÑ¹ãĞÖµ (mV)
- *   Ö»½µ²»Éı£º½µ¸ñĞèÁ¬Ğø3´Î²ÉÑùÈ·ÈÏ£¬Éı¸ñ½ö³äµçºóÔÊĞí£¨ALLOW_RISE Ò²Ğè3´ÎÈ·ÈÏ£©
+ * æ¸¸æˆæ”¾ç”µç”µå‹é˜ˆå€¼ (mV)
+ *   åªé™ä¸å‡ï¼šé™æ ¼éœ€è¿ç»­3æ¬¡é‡‡æ ·ç¡®è®¤ï¼Œå‡æ ¼ä»…å……ç”µåå…è®¸ï¼ˆALLOW_RISE ä¹Ÿéœ€3æ¬¡ç¡®è®¤ï¼‰
  */
-#define BAT_GAME_LEVEL_1_MV      3000U  // >= 3000mV ¡ú 1¸ñ
-#define BAT_GAME_LEVEL_2_MV      3600U  // >= 3600mV ¡ú 2¸ñ
-#define BAT_GAME_LEVEL_3_MV      3800U  // >= 3800mV ¡ú 3¸ñ
-#define BAT_GAME_LEVEL_4_MV      4000U  // >= 4000mV ¡ú 4¸ñ
-#define BAT_GAME_LEVEL_5_MV      4150U  // >= 4150mV ¡ú 5¸ñ
+#define BAT_GAME_LEVEL_1_MV      3000U  // >= 3000mV â†’ 1æ ¼
+#define BAT_GAME_LEVEL_2_MV      3600U  // >= 3600mV â†’ 2æ ¼
+#define BAT_GAME_LEVEL_3_MV      3800U  // >= 3800mV â†’ 3æ ¼
+#define BAT_GAME_LEVEL_4_MV      4000U  // >= 4000mV â†’ 4æ ¼
+#define BAT_GAME_LEVEL_5_MV      4150U  // >= 4150mV â†’ 5æ ¼
 
-// ÓÎÏ·µçÁ¿±£´æÔÚ±¸·İ¼Ä´æÆ÷ÖĞ£¬ĞİÃß¸´Î»ºóÈÔ±£³Ö
+// æ¸¸æˆç”µé‡ä¿å­˜åœ¨å¤‡ä»½å¯„å­˜å™¨ä¸­ï¼Œä¼‘çœ å¤ä½åä»ä¿æŒ
 #define BAT_GAME_BKP_MAGIC        0xB471U
 #define BAT_GAME_BKP_DR_MAGIC     BKP_DR3
 #define BAT_GAME_BKP_DR_STATE     BKP_DR4
 #define BAT_GAME_BKP_LEVEL_MASK   0x0007U
 #define BAT_GAME_BKP_ALLOW_RISE   0x0100U
-#define BAT_GAME_DECREASE_CONFIRM 3       /* Éı½µ¸ñ¾ùĞèÁ¬Ğø3´Î²ÉÑùÈ·ÈÏ */
+#define BAT_GAME_DECREASE_CONFIRM 3       /* å‡é™æ ¼å‡éœ€è¿ç»­3æ¬¡é‡‡æ ·ç¡®è®¤ */
 
-// ====== ¶¯»­¿ØÖÆ ======
-#define ANIM_FRAMES_PER_STEP  3     // Ã¿²½³ÖĞøµÄÖ¡Êı
-static uint16_t anim_frame = 0;     // È«¾ÖÖ¡¼ÆÊı(ÓÀÔ¶ÀÛ¼Ó£¬²»ÒòµµÎ»±ä»¯ÖØÖÃ)
-static uint8_t  g_need_redraw = 1;  // ĞèÒªÇåÆÁÖØ»æ±ß¿ò(Ê×´Î/±»´ò¶ÏÊ±)
+// ====== åŠ¨ç”»æ§åˆ¶ ======
+#define ANIM_FRAMES_PER_STEP  3     // æ¯æ­¥æŒç»­çš„å¸§æ•°
+static uint16_t anim_frame = 0;     // å…¨å±€å¸§è®¡æ•°(æ°¸è¿œç´¯åŠ ï¼Œä¸å› æ¡£ä½å˜åŒ–é‡ç½®)
+static uint8_t  g_need_redraw = 1;  // éœ€è¦æ¸…å±é‡ç»˜è¾¹æ¡†(é¦–æ¬¡/è¢«æ‰“æ–­æ—¶)
 
 /**
- * @brief  ¿ªÆô±¸·İ¼Ä´æÆ÷Ê±ÖÓºÍĞ´·ÃÎÊ
+ * @brief  å¼€å¯å¤‡ä»½å¯„å­˜å™¨æ—¶é’Ÿå’Œå†™è®¿é—®
  */
 static void battery_backup_access_enable(void)
 {
@@ -89,9 +89,9 @@ static void battery_backup_access_enable(void)
 }
 
 /**
- * @brief  °´ÓÎÏ·µçÑ¹µÄ¾«È··Ö½ç¼ÆËã±¾´ÎÊµ²âµÈ¼¶
- * @param  voltage_mv  ÓÎÏ·ÔËĞĞÊ±µÄµç³ØµçÑ¹£¬µ¥Î»Îª mV
- * @return ²»º¬ÀúÊ·ÏŞÖÆµÄÊµ²âµçÁ¿µÈ¼¶
+ * @brief  æŒ‰æ¸¸æˆç”µå‹çš„ç²¾ç¡®åˆ†ç•Œè®¡ç®—æœ¬æ¬¡å®æµ‹ç­‰çº§
+ * @param  voltage_mv  æ¸¸æˆè¿è¡Œæ—¶çš„ç”µæ± ç”µå‹ï¼Œå•ä½ä¸º mV
+ * @return ä¸å«å†å²é™åˆ¶çš„å®æµ‹ç”µé‡ç­‰çº§
  */
 static BatteryLevel battery_game_voltage_to_raw_level(uint16_t voltage_mv)
 {
@@ -104,9 +104,9 @@ static BatteryLevel battery_game_voltage_to_raw_level(uint16_t voltage_mv)
 }
 
 /**
- * @brief  ³õÊ¼»¯³äµç¼ì²âGPIO
- *         CHRG  PB6: ÉÏÀ­ÊäÈë + EXTIÏÂ½µÑØÊÂ¼ş (³äµçICÀ­µÍ=³äµç)
- *         STDBY PB5: ÉÏÀ­ÊäÈë (³äµçICÀ­µÍ=³äÂú)
+ * @brief  åˆå§‹åŒ–å……ç”µæ£€æµ‹GPIO
+ *         CHRG  PB6: ä¸Šæ‹‰è¾“å…¥ + EXTIä¸‹é™æ²¿äº‹ä»¶ (å……ç”µICæ‹‰ä½=å……ç”µ)
+ *         STDBY PB5: ä¸Šæ‹‰è¾“å…¥ (å……ç”µICæ‹‰ä½=å……æ»¡)
  */
 void Battery_Init(void)
 {
@@ -115,31 +115,31 @@ void Battery_Init(void)
 
     RCC_APB2PeriphClockCmd(CHRG_RCC | STDBY_RCC | RCC_APB2Periph_AFIO, ENABLE);
 
-    // CHRG PB6: ÉÏÀ­ÊäÈë
+    // CHRG PB6: ä¸Šæ‹‰è¾“å…¥
     GPIO_InitStructure.GPIO_Pin = CHRG_PIN;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
     GPIO_Init(CHRG_PORT, &GPIO_InitStructure);
 
-    // STDBY PB5: ÉÏÀ­ÊäÈë
+    // STDBY PB5: ä¸Šæ‹‰è¾“å…¥
     GPIO_InitStructure.GPIO_Pin = STDBY_PIN;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
     GPIO_Init(STDBY_PORT, &GPIO_InitStructure);
 
-    // ÅäÖÃPB6 EXTIÏÂ½µÑØÊÂ¼ş£¨ÔËĞĞÊ±¼ì²â³äµç²åÈë£©
+    // é…ç½®PB6 EXTIä¸‹é™æ²¿äº‹ä»¶ï¼ˆè¿è¡Œæ—¶æ£€æµ‹å……ç”µæ’å…¥ï¼‰
     GPIO_EXTILineConfig(CHRG_PORT_SOURCE, CHRG_PIN_SOURCE);
     EXTI_InitStructure.EXTI_Line = CHRG_EXTI_LINE;
-    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Event;      // ÊÂ¼şÄ£Ê½£¨·ÇÖĞ¶Ï£©
-    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling; // ÏÂ½µÑØ´¥·¢
+    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Event;      // äº‹ä»¶æ¨¡å¼ï¼ˆéä¸­æ–­ï¼‰
+    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling; // ä¸‹é™æ²¿è§¦å‘
     EXTI_InitStructure.EXTI_LineCmd = ENABLE;
     EXTI_Init(&EXTI_InitStructure);
 }
 
 /**
- * @brief  ÅäÖÃPB6 EXTIÓÃÓÚStandbyÄ£Ê½»½ĞÑ
- *         StandbyÄ£Ê½ÏÂÖ»ÓĞWKUP(PA0)ºÍEXTIÊÂ¼ş+WFEÄÜ»½ĞÑ¡£
- *         ´Ëº¯ÊıÔÚ½øÈëStandbyÇ°µ÷ÓÃ£¬ÅäÖÃPB6ÏÂ½µÑØÊÂ¼ş»½ĞÑ¡£
- *         ×¢Òâ£ºCH32V20xÓ²¼ş¿ÉÄÜ²»Ö§³ÖEXTI´ÓStandby»½ĞÑ£¬
- *         ´ËÊ±Í¨¹ıBattery_ShouldStayAwake()×÷Îªºó±¸·½°¸¡£
+ * @brief  é…ç½®PB6 EXTIç”¨äºStandbyæ¨¡å¼å”¤é†’
+ *         Standbyæ¨¡å¼ä¸‹åªæœ‰WKUP(PA0)å’ŒEXTIäº‹ä»¶+WFEèƒ½å”¤é†’ã€‚
+ *         æ­¤å‡½æ•°åœ¨è¿›å…¥Standbyå‰è°ƒç”¨ï¼Œé…ç½®PB6ä¸‹é™æ²¿äº‹ä»¶å”¤é†’ã€‚
+ *         æ³¨æ„ï¼šCH32V20xç¡¬ä»¶å¯èƒ½ä¸æ”¯æŒEXTIä»Standbyå”¤é†’ï¼Œ
+ *         æ­¤æ—¶é€šè¿‡Battery_ShouldStayAwake()ä½œä¸ºåå¤‡æ–¹æ¡ˆã€‚
  */
 void Battery_StandbyWakeupConfig(void)
 {
@@ -147,18 +147,18 @@ void Battery_StandbyWakeupConfig(void)
 
     RCC_APB2PeriphClockCmd(CHRG_RCC | RCC_APB2Periph_AFIO, ENABLE);
 
-    // CHRG PB6: ÉÏÀ­ÊäÈë
+    // CHRG PB6: ä¸Šæ‹‰è¾“å…¥
     GPIO_InitTypeDef GPIO_InitStructure = {0};
     GPIO_InitStructure.GPIO_Pin = CHRG_PIN;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
     GPIO_Init(CHRG_PORT, &GPIO_InitStructure);
 
-    // STDBY PB5: ÉÏÀ­ÊäÈë
+    // STDBY PB5: ä¸Šæ‹‰è¾“å…¥
     GPIO_InitStructure.GPIO_Pin = STDBY_PIN;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
     GPIO_Init(STDBY_PORT, &GPIO_InitStructure);
 
-    // ÅäÖÃPB6 CHRG EXTIÏÂ½µÑØÊÂ¼ş
+    // é…ç½®PB6 CHRG EXTIä¸‹é™æ²¿äº‹ä»¶
     GPIO_EXTILineConfig(CHRG_PORT_SOURCE, CHRG_PIN_SOURCE);
     EXTI_InitStructure.EXTI_Line = CHRG_EXTI_LINE;
     EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Event;
@@ -166,7 +166,7 @@ void Battery_StandbyWakeupConfig(void)
     EXTI_InitStructure.EXTI_LineCmd = ENABLE;
     EXTI_Init(&EXTI_InitStructure);
 
-    // ÅäÖÃPB5 STDBY EXTIÏÂ½µÑØÊÂ¼ş
+    // é…ç½®PB5 STDBY EXTIä¸‹é™æ²¿äº‹ä»¶
     GPIO_EXTILineConfig(STDBY_PORT_SOURCE, STDBY_PIN_SOURCE);
     EXTI_InitStructure.EXTI_Line = STDBY_EXTI_LINE;
     EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Event;
@@ -174,20 +174,20 @@ void Battery_StandbyWakeupConfig(void)
     EXTI_InitStructure.EXTI_LineCmd = ENABLE;
     EXTI_Init(&EXTI_InitStructure);
 
-    // Çå³ı¿ÉÄÜ¹ÒÆğµÄEXTIÊÂ¼ş
+    // æ¸…é™¤å¯èƒ½æŒ‚èµ·çš„EXTIäº‹ä»¶
     EXTI_ClearFlag(CHRG_EXTI_LINE);
     EXTI_ClearFlag(STDBY_EXTI_LINE);
 }
 
 /**
- * @brief  ¶ÁÈ¡³äµç×´Ì¬£¨´øÈ¥¶¶£©
- * @return BAT_FULL:     STDBYÀ­µÍ=³äÂú
- *         BAT_CHARGING: CHRGÀ­µÍ=³äµçÖĞ
- *         BAT_NORMAL:   ÆäËûÇé¿ö
+ * @brief  è¯»å–å……ç”µçŠ¶æ€ï¼ˆå¸¦å»æŠ–ï¼‰
+ * @return BAT_FULL:     STDBYæ‹‰ä½=å……æ»¡
+ *         BAT_CHARGING: CHRGæ‹‰ä½=å……ç”µä¸­
+ *         BAT_NORMAL:   å…¶ä»–æƒ…å†µ
  */
 BatteryStatus Battery_GetStatus(void)
 {
-    // ¶à´Î¶ÁÈ¡È¥¶¶£¬±ÜÃâ³äµçICÒı½Å¶¶¶¯µ¼ÖÂÂ©¼ì
+    // å¤šæ¬¡è¯»å–å»æŠ–ï¼Œé¿å…å……ç”µICå¼•è„šæŠ–åŠ¨å¯¼è‡´æ¼æ£€
     uint8_t stdby_low = 0, chrg_low = 0;
     for (uint8_t i = 0; i < 8; i++) {
         if (GPIO_ReadInputDataBit(STDBY_PORT, STDBY_PIN) == Bit_RESET) stdby_low++;
@@ -199,9 +199,9 @@ BatteryStatus Battery_GetStatus(void)
 }
 
 /**
- * @brief  ÅĞ¶ÏÊÇ·ñÕıÔÚ³äµç£¨ÓÃÓÚStandby¾ö²ß£©
- * @return 1=ÕıÔÚ³äµç£¬²»Ó¦½øÈëStandby
- *         0=Î´³äµç£¬ÔÊĞí½øÈëStandby
+ * @brief  åˆ¤æ–­æ˜¯å¦æ­£åœ¨å……ç”µï¼ˆç”¨äºStandbyå†³ç­–ï¼‰
+ * @return 1=æ­£åœ¨å……ç”µï¼Œä¸åº”è¿›å…¥Standby
+ *         0=æœªå……ç”µï¼Œå…è®¸è¿›å…¥Standby
  */
 uint8_t Battery_IsCharging(void)
 {
@@ -209,16 +209,16 @@ uint8_t Battery_IsCharging(void)
 }
 
 /**
- * @brief  ¸ù¾İµç³ØµçÑ¹¼ÆËã³äµçµçÁ¿µµÎ»£¨0~4¸ñ£©
- * @param voltage_mv µç³ØµçÑ¹ (mV)
- * @return BatteryLevel µçÁ¿µµÎ» (0~4¸ñ)
+ * @brief  æ ¹æ®ç”µæ± ç”µå‹è®¡ç®—å……ç”µç”µé‡æ¡£ä½ï¼ˆ0~4æ ¼ï¼‰
+ * @param voltage_mv ç”µæ± ç”µå‹ (mV)
+ * @return BatteryLevel ç”µé‡æ¡£ä½ (0~4æ ¼)
  *
- *         4¸ñ£º4.00¡«4.15V  (4000¡«4150mV)
- *         3¸ñ£º3.85¡«4.00V  (3850¡«4000mV)
- *         2¸ñ£º3.70¡«3.85V  (3700¡«3850mV)
- *         1¸ñ£º3.50¡«3.70V  (3500¡«3700mV)
- *         0¸ñ£º< 3.50V
- * @note   5¸ñ½öÓÉPB5(STDBY)À­µÍ(BAT_FULL)¿ØÖÆ£¬¼ûBattery_DrawIcon¡£
+ *         4æ ¼ï¼š4.00ï½4.15V  (4000ï½4150mV)
+ *         3æ ¼ï¼š3.85ï½4.00V  (3850ï½4000mV)
+ *         2æ ¼ï¼š3.70ï½3.85V  (3700ï½3850mV)
+ *         1æ ¼ï¼š3.50ï½3.70V  (3500ï½3700mV)
+ *         0æ ¼ï¼š< 3.50V
+ * @note   5æ ¼ä»…ç”±PB5(STDBY)æ‹‰ä½(BAT_FULL)æ§åˆ¶ï¼Œè§Battery_DrawIconã€‚
  */
 BatteryLevel Battery_ChargeVoltageToLevel(uint16_t voltage_mv)
 {
@@ -242,15 +242,15 @@ BatteryLevel Battery_ChargeVoltageToLevel(uint16_t voltage_mv)
 }
 
 /**
- * @brief  °´ÓÎÏ··ÅµçãĞÖµ¼ÆËãµçÁ¿µÈ¼¶
- * @param  voltage_mv  ÓÎÏ·ÔËĞĞÊ±µÄµç³ØµçÑ¹£¬µ¥Î»Îª mV
- * @return ÓÎÏ·ÓÒÉÏ½ÇÍ¼±êÊ¹ÓÃµÄµçÁ¿µÈ¼¶
+ * @brief  æŒ‰æ¸¸æˆæ”¾ç”µé˜ˆå€¼è®¡ç®—ç”µé‡ç­‰çº§
+ * @param  voltage_mv  æ¸¸æˆè¿è¡Œæ—¶çš„ç”µæ± ç”µå‹ï¼Œå•ä½ä¸º mV
+ * @return æ¸¸æˆå³ä¸Šè§’å›¾æ ‡ä½¿ç”¨çš„ç”µé‡ç­‰çº§
  *
- *         5¸ñ£º>= 4.15V    4¸ñ£º>= 4.00V    3¸ñ£º>= 3.80V
- *         2¸ñ£º>= 3.60V    1¸ñ£º>= 3.00V    0¸ñ£º< 3.00V
- * @note   ALLOW_RISE ÆÚ¼äÖ»×·ÕÇ£¨Á¢¼´Éı¸ñ£©£¬²»½µ£¨·À³äµç¶¶¶¯£©
- *         µçÑ¹ÎÈ¶¨µ½ == stored Ê±¹Ø±Õ ALLOW_RISE¡£
- *         Õı³£ÓÎÏ·ÆÚ¼äÖ»½µ²»Éı£¬½µ¸ñĞèÁ¬Ğø3´Î²ÉÑùÈ·ÈÏ¡£
+ *         5æ ¼ï¼š>= 4.15V    4æ ¼ï¼š>= 4.00V    3æ ¼ï¼š>= 3.80V
+ *         2æ ¼ï¼š>= 3.60V    1æ ¼ï¼š>= 3.00V    0æ ¼ï¼š< 3.00V
+ * @note   ALLOW_RISE æœŸé—´åªè¿½æ¶¨ï¼ˆç«‹å³å‡æ ¼ï¼‰ï¼Œä¸é™ï¼ˆé˜²å……ç”µæŠ–åŠ¨ï¼‰
+ *         ç”µå‹ç¨³å®šåˆ° == stored æ—¶å…³é—­ ALLOW_RISEã€‚
+ *         æ­£å¸¸æ¸¸æˆæœŸé—´åªé™ä¸å‡ï¼Œé™æ ¼éœ€è¿ç»­3æ¬¡é‡‡æ ·ç¡®è®¤ã€‚
  */
 BatteryLevel Battery_GameVoltageToLevel(uint16_t voltage_mv)
 {
@@ -276,7 +276,7 @@ BatteryLevel Battery_GameVoltageToLevel(uint16_t voltage_mv)
         stored = (BatteryLevel)(state & BAT_GAME_BKP_LEVEL_MASK);
         uint8_t allow_rise = (state & BAT_GAME_BKP_ALLOW_RISE) != 0;
 
-        /* ALLOW_RISE ÉÏÉıÑØ£ºÇ¿ÖÆÖØÖÃ½µ¸ñ´ıÈ·ÈÏ£¬·ÀÖ¹¾É¼ÆÊıÎóÌá½» */
+        /* ALLOW_RISE ä¸Šå‡æ²¿ï¼šå¼ºåˆ¶é‡ç½®é™æ ¼å¾…ç¡®è®¤ï¼Œé˜²æ­¢æ—§è®¡æ•°è¯¯æäº¤ */
         if (allow_rise && !s_prev_rise) {
             s_pending_level = measured;
             s_pending_cnt    = 0;
@@ -284,16 +284,16 @@ BatteryLevel Battery_GameVoltageToLevel(uint16_t voltage_mv)
         s_prev_rise = allow_rise;
 
         if (allow_rise) {
-            /* ³äµç×·ÕÇ´°¿Ú£ºÁ¢¼´Éı¸ñ£¬²»½µ¸ñ */
+            /* å……ç”µè¿½æ¶¨çª—å£ï¼šç«‹å³å‡æ ¼ï¼Œä¸é™æ ¼ */
             if (measured > stored) {
                 stored = measured;
             } else if (measured == stored) {
-                /* µçÑ¹ÒÑÎÈ¶¨µ½µ±Ç°¸ñÎ»£¬¹Ø±Õ×·ÕÇ */
+                /* ç”µå‹å·²ç¨³å®šåˆ°å½“å‰æ ¼ä½ï¼Œå…³é—­è¿½æ¶¨ */
                 state &= ~BAT_GAME_BKP_ALLOW_RISE;
             }
-            /* measured < stored£ººöÂÔ£¬¿ÉÄÜÊÇ³äµç¶¶¶¯ */
+            /* measured < storedï¼šå¿½ç•¥ï¼Œå¯èƒ½æ˜¯å……ç”µæŠ–åŠ¨ */
         } else {
-            /* Õı³£ÓÎÏ·£ºÖ»½µ²»Éı£¬ĞèÁ¬ĞøÈ·ÈÏ */
+            /* æ­£å¸¸æ¸¸æˆï¼šåªé™ä¸å‡ï¼Œéœ€è¿ç»­ç¡®è®¤ */
             if (measured < stored) {
                 if (measured == s_pending_level) {
                     s_pending_cnt++;
@@ -306,7 +306,7 @@ BatteryLevel Battery_GameVoltageToLevel(uint16_t voltage_mv)
                     s_pending_cnt    = 1;
                 }
             } else {
-                /* measured >= stored£ºÎÈ¶¨»ò»ØÉı£¨ÎŞ ALLOW_RISE ÔòºöÂÔ»ØÉı£© */
+                /* measured >= storedï¼šç¨³å®šæˆ–å›å‡ï¼ˆæ—  ALLOW_RISE åˆ™å¿½ç•¥å›å‡ï¼‰ */
                 s_pending_level = measured;
                 s_pending_cnt    = 0;
             }
@@ -321,9 +321,9 @@ BatteryLevel Battery_GameVoltageToLevel(uint16_t voltage_mv)
 }
 
 /**
- * @brief  ³äµçºóĞ´Èë ALLOW_RISE ±ê¼Ç£¬ÊÚÈ¨ÓÎÏ·µçÁ¿Éı¸ñ
- * @note   ½ö³äµçÆÁµ÷ÓÃ£¨main.c:1149£©¡£±ê¼ÇÓÉ Battery_GameVoltageToLevel ÔÚ
- *         Á¬Ğø3´Î²ÉÑùÈ·ÈÏÉı¸ñºóÏû·ÑÇåÁã£¬Í¬Ê±ÖØÖÃ´ıÈ·ÈÏ¼ÆÊı¡£
+ * @brief  å……ç”µåå†™å…¥ ALLOW_RISE æ ‡è®°ï¼Œæˆæƒæ¸¸æˆç”µé‡å‡æ ¼
+ * @note   ä»…å……ç”µå±è°ƒç”¨ï¼ˆmain.c:1149ï¼‰ã€‚æ ‡è®°ç”± Battery_GameVoltageToLevel åœ¨
+ *         è¿ç»­3æ¬¡é‡‡æ ·ç¡®è®¤å‡æ ¼åæ¶ˆè´¹æ¸…é›¶ï¼ŒåŒæ—¶é‡ç½®å¾…ç¡®è®¤è®¡æ•°ã€‚
  */
 void Battery_GameLevelAllowIncrease(void)
 {
@@ -344,16 +344,16 @@ void Battery_GameLevelAllowIncrease(void)
 }
 
 /**
- * @brief  »æÖÆµç³ØÍ¼±ê
- *         5¸ö·½¿é£¬¸ù¾İµçÁ¿µµÎ»ÏÔÊ¾Ìî³ä¶¯»­£¨×óÆğÌî³ä£©£º
- *         1¸ñ£º¨€ ¡ú ¨€¨€ ¡ú ¨€¨€¨€ ¡ú ¨€¨€¨€¨€ ¡ú ¨€¨€¨€¨€¨€ ¡ú Ñ­»·
- *         2¸ñ£º¨€¨€ ¡ú ¨€¨€¨€ ¡ú ¨€¨€¨€¨€ ¡ú ¨€¨€¨€¨€¨€ ¡ú Ñ­»·
- *         3¸ñ£º¨€¨€¨€ ¡ú ¨€¨€¨€¨€ ¡ú ¨€¨€¨€¨€¨€ ¡ú Ñ­»·
- *         4¸ñ£º¨€¨€¨€¨€ ¡ú ¨€¨€¨€¨€¨€ ¡ú Ñ­»·
- *         ³äÂú£º5¸öÈ«ÁÁ
+ * @brief  ç»˜åˆ¶ç”µæ± å›¾æ ‡
+ *         5ä¸ªæ–¹å—ï¼Œæ ¹æ®ç”µé‡æ¡£ä½æ˜¾ç¤ºå¡«å……åŠ¨ç”»ï¼ˆå·¦èµ·å¡«å……ï¼‰ï¼š
+ *         1æ ¼ï¼šâ–ˆ â†’ â–ˆâ–ˆ â†’ â–ˆâ–ˆâ–ˆ â†’ â–ˆâ–ˆâ–ˆâ–ˆ â†’ â–ˆâ–ˆâ–ˆâ–ˆâ–ˆ â†’ å¾ªç¯
+ *         2æ ¼ï¼šâ–ˆâ–ˆ â†’ â–ˆâ–ˆâ–ˆ â†’ â–ˆâ–ˆâ–ˆâ–ˆ â†’ â–ˆâ–ˆâ–ˆâ–ˆâ–ˆ â†’ å¾ªç¯
+ *         3æ ¼ï¼šâ–ˆâ–ˆâ–ˆ â†’ â–ˆâ–ˆâ–ˆâ–ˆ â†’ â–ˆâ–ˆâ–ˆâ–ˆâ–ˆ â†’ å¾ªç¯
+ *         4æ ¼ï¼šâ–ˆâ–ˆâ–ˆâ–ˆ â†’ â–ˆâ–ˆâ–ˆâ–ˆâ–ˆ â†’ å¾ªç¯
+ *         å……æ»¡ï¼š5ä¸ªå…¨äº®
  *
- * @param status ³äµç×´Ì¬
- * @param level  µçÁ¿µµÎ»
+ * @param status å……ç”µçŠ¶æ€
+ * @param level  ç”µé‡æ¡£ä½
  */
 void Battery_DrawIcon(BatteryStatus status, BatteryLevel level)
 {
@@ -362,51 +362,51 @@ void Battery_DrawIcon(BatteryStatus status, BatteryLevel level)
     uint16_t w = BATTERY_W;
     uint16_t h = BATTERY_H;
 
-    // ´Óµç³Ø¿ò³ß´ç×Ô¶¯ÍÆµ¼·½¿é³ß´ç(±ß¿ò±Úºñ2px, 5¸ö·½¿é+4¼äÏ¶+2±ß¾à=µç³Ø¿í¶È)
-    uint16_t blk_pad = 1;                           // ÄÚ±ß¾à
-    uint16_t blk_gap = 1;                           // ·½¿é¼äÏ¶
-    uint16_t blk_w   = (w - 2 * blk_pad - 4 * blk_gap) / 5; // ·½¿é¿í¶È
-    uint16_t blk_h   = h - 2 * blk_pad - 2;        // ·½¿é¸ß¶È(¿Û³ıÉÏÏÂ±ß¿ò¸÷2px)
+    // ä»ç”µæ± æ¡†å°ºå¯¸è‡ªåŠ¨æ¨å¯¼æ–¹å—å°ºå¯¸(è¾¹æ¡†å£åš2px, 5ä¸ªæ–¹å—+4é—´éš™+2è¾¹è·=ç”µæ± å®½åº¦)
+    uint16_t blk_pad = 1;                           // å†…è¾¹è·
+    uint16_t blk_gap = 1;                           // æ–¹å—é—´éš™
+    uint16_t blk_w   = (w - 2 * blk_pad - 4 * blk_gap) / 5; // æ–¹å—å®½åº¦
+    uint16_t blk_h   = h - 2 * blk_pad - 2;        // æ–¹å—é«˜åº¦(æ‰£é™¤ä¸Šä¸‹è¾¹æ¡†å„2px)
 
-    // Ö¡¼ÆÊıÇı¶¯¶¯»­(ÓÀÔ¶ÀÛ¼Ó£¬²»ÊÜµµÎ»±ä»¯Ó°Ïì)
+    // å¸§è®¡æ•°é©±åŠ¨åŠ¨ç”»(æ°¸è¿œç´¯åŠ ï¼Œä¸å—æ¡£ä½å˜åŒ–å½±å“)
     anim_frame++;
 
-    // ADCµµÎ»¸üĞÂ£º×ßÍêµ±Ç°¶¯»­ÖÜÆÚºó²ÅÇĞ»»£¬±ÜÃâÖĞÍ¾Ìø±ä
+    // ADCæ¡£ä½æ›´æ–°ï¼šèµ°å®Œå½“å‰åŠ¨ç”»å‘¨æœŸåæ‰åˆ‡æ¢ï¼Œé¿å…ä¸­é€”è·³å˜
     static BatteryLevel displayed_level = BAT_LEVEL_0;
     static BatteryLevel pending_level   = BAT_LEVEL_0;
     if (level != displayed_level) {
-        pending_level = level;                       // ADCÇëÇóĞÂµµÎ»
+        pending_level = level;                       // ADCè¯·æ±‚æ–°æ¡£ä½
     }
-    uint8_t n = (uint8_t)displayed_level;            // µ±Ç°ÏÔÊ¾µÄµµÎ»
-    uint8_t cycle_len = (n > 0) ? (6 - n) : 6;     // 0¸ñ:6²½(0-1-2-3-4-5), ÆäËû:(6-n)²½
+    uint8_t n = (uint8_t)displayed_level;            // å½“å‰æ˜¾ç¤ºçš„æ¡£ä½
+    uint8_t cycle_len = (n > 0) ? (6 - n) : 6;     // 0æ ¼:6æ­¥(0-1-2-3-4-5), å…¶ä»–:(6-n)æ­¥
     uint8_t cycle_step = (anim_frame / ANIM_FRAMES_PER_STEP) % cycle_len;
     if (cycle_step == 0 && pending_level != displayed_level) {
-        displayed_level = pending_level;             // ÖÜÆÚ½áÊø£¬ÇĞ»»µ½ĞÂµµÎ»
+        displayed_level = pending_level;             // å‘¨æœŸç»“æŸï¼Œåˆ‡æ¢åˆ°æ–°æ¡£ä½
         n = (uint8_t)displayed_level;
-        anim_frame = 0;                              // ÖØÖÃÖ¡¼ÆÊı£¬´ÓĞÂµµÎ»µÚ0²½¿ªÊ¼
+        anim_frame = 0;                              // é‡ç½®å¸§è®¡æ•°ï¼Œä»æ–°æ¡£ä½ç¬¬0æ­¥å¼€å§‹
         cycle_step = 0;
     }
 
-    uint8_t blocks_lit[5] = {0};  // 5¸ö·½¿éÁÁÃğ±êÖ¾
+    uint8_t blocks_lit[5] = {0};  // 5ä¸ªæ–¹å—äº®ç­æ ‡å¿—
 
     if (status == BAT_FULL) {
         for (uint8_t i = 0; i < 5; i++) blocks_lit[i] = 1;
     } else {
-        // Ìî³ä¶¯»­£º·½¿éÊı´ÓnµİÔöµ½5£¬Ñ­»·£¨º¬0¸ñ:0¡ú1¡ú2¡ú3¡ú4¡ú5£©
+        // å¡«å……åŠ¨ç”»ï¼šæ–¹å—æ•°ä»né€’å¢åˆ°5ï¼Œå¾ªç¯ï¼ˆå«0æ ¼:0â†’1â†’2â†’3â†’4â†’5ï¼‰
         uint8_t lit = n + cycle_step;
         for (uint8_t i = 0; i < lit; i++) {
             blocks_lit[i] = 1;
         }
     }
 
-    // ´ò¶Ï/Ê×´ÎÊ±ÇåÆÁÖØ»æ±ß¿ò£¬Ö®ºóÖ»ÔöÁ¿¸üĞÂ·½¿é²»ÉÁÆÁ
+    // æ‰“æ–­/é¦–æ¬¡æ—¶æ¸…å±é‡ç»˜è¾¹æ¡†ï¼Œä¹‹ååªå¢é‡æ›´æ–°æ–¹å—ä¸é—ªå±
     if (g_need_redraw) {
         g_need_redraw = 0;
         LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
-        LCD_Fill(x, y, x + w, y + 1, BATTERY_FRAME_COLOR);                 // ÉÏ±ß
-        LCD_Fill(x + w - 1, y, x + w, y + h, BATTERY_FRAME_COLOR);         // ÓÒ±ß
-        LCD_Fill(x, y + h - 1, x + w, y + h, BATTERY_FRAME_COLOR);         // ÏÂ±ß
-        LCD_Fill(x, y, x + 1, y + h, BATTERY_FRAME_COLOR);                 // ×ó±ß
+        LCD_Fill(x, y, x + w, y + 1, BATTERY_FRAME_COLOR);                 // ä¸Šè¾¹
+        LCD_Fill(x + w - 1, y, x + w, y + h, BATTERY_FRAME_COLOR);         // å³è¾¹
+        LCD_Fill(x, y + h - 1, x + w, y + h, BATTERY_FRAME_COLOR);         // ä¸‹è¾¹
+        LCD_Fill(x, y, x + 1, y + h, BATTERY_FRAME_COLOR);                 // å·¦è¾¹
 
         uint16_t nub_x = x + w;
         uint16_t nub_y = y + (h - NUB_H) / 2;
@@ -414,7 +414,7 @@ void Battery_DrawIcon(BatteryStatus status, BatteryLevel level)
         LCD_Fill(nub_x + 1, nub_y + 1, nub_x + NUB_W - 1, nub_y + NUB_H - 1, BATTERY_BLOCK_OFF_COLOR);
     }
 
-    // ÔöÁ¿¸üĞÂ·½¿é£ºÖ»¸Ä±ä»¯µÄ£¬²»ÉÁÆÁ
+    // å¢é‡æ›´æ–°æ–¹å—ï¼šåªæ”¹å˜åŒ–çš„ï¼Œä¸é—ªå±
     static uint8_t prev_blocks[5] = {0};
     uint16_t block_y = y + blk_pad;
     for (uint8_t i = 0; i < 5; i++) {
@@ -428,7 +428,7 @@ void Battery_DrawIcon(BatteryStatus status, BatteryLevel level)
 }
 
 /**
- * @brief  ´ò¶Ï¶¯»­Ê±µ÷ÓÃ£¬Ç¿ÖÆÏÂ´Î»æÖÆÊ±ÇåÆÁÖØ»æ±ß¿ò
+ * @brief  æ‰“æ–­åŠ¨ç”»æ—¶è°ƒç”¨ï¼Œå¼ºåˆ¶ä¸‹æ¬¡ç»˜åˆ¶æ—¶æ¸…å±é‡ç»˜è¾¹æ¡†
  */
 void Battery_ResetDisplay(void)
 {

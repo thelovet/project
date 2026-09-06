@@ -3,7 +3,7 @@
 
 #include "ch32v20x.h"
 
-/* ÉèÖÃÄ£Ê½ */
+/* è®¾ç½®æ¨¡å¼ */
 typedef enum {
     SETTINGS_NONE        = 0,
     SETTINGS_BRIGHTNESS  = 1,
@@ -11,27 +11,27 @@ typedef enum {
     SETTINGS_ORIENTATION = 3,
 } SettingsMode;
 
-/* ·µ»Ø°´Å¥³ß´ç (Óësettings.cÖĞDrawBackÒ»ÖÂ) */
+/* è¿”å›æŒ‰é’®å°ºå¯¸ (ä¸settings.cä¸­DrawBackä¸€è‡´) */
 #define BACK_X  5
 #define BACK_Y  5
 #define BACK_W  30
 #define BACK_H  22
 
-/* È«¾ÖÉèÖÃ±äÁ¿ */
-extern uint8_t g_brightness;          /* ÁÁ¶È 0-100 */
-extern uint8_t g_sleep_time_index;    /* Ï¢ÆÁÊ±¼äË÷Òı: 0=2S,1=5S,2=10S,3=20S,4=30S,5=60S */
-extern uint8_t g_orientation_index;   /* ÆÁÄ»·½ÏòË÷Òı: 0=0?,1=90?,2=180?,3=270? */
+/* å…¨å±€è®¾ç½®å˜é‡ */
+extern uint8_t g_brightness;          /* äº®åº¦ 0-100 */
+extern uint8_t g_sleep_time_index;    /* æ¯å±æ—¶é—´ç´¢å¼•: 0=2S,1=5S,2=10S,3=20S,4=30S,5=60S */
+extern uint8_t g_orientation_index;   /* å±å¹•æ–¹å‘ç´¢å¼•: 0=0?,1=90?,2=180?,3=270? */
 
-/* Ï¢ÆÁÊ±¼äÖµÊı×é (Ãë) */
+/* æ¯å±æ—¶é—´å€¼æ•°ç»„ (ç§’) */
 extern const uint16_t g_sleep_times[6];
 
 /* API */
 void Settings_Enter(SettingsMode mode);
 void Settings_RedrawRegion(void);
 void Settings_Exit(void);
-uint8_t Settings_Update(void);  /* ·µ»Ø 0 ±íÊ¾°´ÁË·µ»Ø¼ü, 1 ±íÊ¾ÈÔÔÚÉèÖÃÖĞ */
-void Settings_Redraw(void);     /* Ö»ÖØ»æµ±Ç°ÉèÖÃÒ³, ²»´¦Àí´¥Ãş(µÍµç»Ö¸´ÓÃ) */
+uint8_t Settings_Update(void);  /* è¿”å› 0 è¡¨ç¤ºæŒ‰äº†è¿”å›é”®, 1 è¡¨ç¤ºä»åœ¨è®¾ç½®ä¸­ */
+void Settings_Redraw(void);     /* åªé‡ç»˜å½“å‰è®¾ç½®é¡µ, ä¸å¤„ç†è§¦æ‘¸(ä½ç”µæ¢å¤ç”¨) */
 void Settings_ApplyOrientation(uint8_t index);
-void GameAutoSleep_KeepAlive(void);  /* main.c Ìá¹©: ÖØÖÃĞİÃß¼ÆÊ±Æ÷ */
+void GameAutoSleep_KeepAlive(void);  /* main.c æä¾›: é‡ç½®ä¼‘çœ è®¡æ—¶å™¨ */
 
 #endif

@@ -1,55 +1,41 @@
-/*********************************************************************
- * File Name          : spi.c
- * Author             : WCH
- * Version            : V1.0.0
- * Date               : 2023/8/15
- * Description        : file for spi.
- *********************************************************************************
-* Copyright (c) 2023 Nanjing Qinheng Microelectronics Co., Ltd.
-* Attention: This software (modified or not) and binary are used for 
-* microcontroller manufactured by Nanjing Qinheng Microelectronics.
-*******************************************************************************/
 #include "spi.h"
 
-static const uint8_t DummyByte = 0xFF;  /* DMA_MemoryInc_Disable Ê±ÖØ¸´·¢ËÍ */
+static const uint8_t DummyByte = 0xFF;  /* DMA_MemoryInc_Disable æ—¶é‡å¤å‘é€ */
 
 
-/*********************************************************************
- * @fn      SPI1_Init
- * 
- * @brief   Initialize SPI1 
- * 
- * @return  none
+/**
+ * @brief  åˆå§‹åŒ–SPI1(å¤–éƒ¨Flashæ€»çº¿)
+ * @return æ— 
  */
 void SPI1_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure = {0};
     SPI_InitTypeDef  SPI_InitStructure  = {0};
 
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_SPI1, ENABLE);//Ê¹ÄÜSPI1Ê±ÖÓ
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_SPI1, ENABLE);//ä½¿èƒ½SPI1æ—¶é’Ÿ
 
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_5;//FLASH_CLK
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;//Êä³öÍÆÍìÄ£Ê½
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;//è¾“å‡ºæ¨æŒ½æ¨¡å¼
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
-    GPIOA->BSHR = GPIO_Pin_5;  // ÉèÖÃÎª¸ßµçÆ½
+    GPIOA->BSHR = GPIO_Pin_5;  // è®¾ç½®ä¸ºé«˜ç”µå¹³
 
-    GPIO_InitStructure.GPIO_Pin  = GPIO_Pin_6;//FLASH_MISO (ÊäÈë)
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;//ÊäÈë¸¡¿ÕÄ£Ê½
+    GPIO_InitStructure.GPIO_Pin  = GPIO_Pin_6;//FLASH_MISO (è¾“å…¥)
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;//è¾“å…¥æµ®ç©ºæ¨¡å¼
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_7;//FLASH_MOSI (Êä³ö)
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;//Êä³öÍÆÍìÄ£Ê½
+    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_7;//FLASH_MOSI (è¾“å‡º)
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;//è¾“å‡ºæ¨æŒ½æ¨¡å¼
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
-    GPIOA->BSHR = GPIO_Pin_7;  // ÉèÖÃÎª¸ßµçÆ½
+    GPIOA->BSHR = GPIO_Pin_7;  // è®¾ç½®ä¸ºé«˜ç”µå¹³
 
-    SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;//Ë«ÏßÈ«Ë«¹¤Ä£Ê½
-    SPI_InitStructure.SPI_Mode      = SPI_Mode_Master;//Ö÷Ä£Ê½
-    SPI_InitStructure.SPI_DataSize  = SPI_DataSize_8b;//8Î»Êı¾İ
-    SPI_InitStructure.SPI_CPOL      = SPI_CPOL_High;//¿ÕÏĞÊ±SCKÎª¸ßµçÆ½
-    SPI_InitStructure.SPI_CPHA      = SPI_CPHA_2Edge;//Êı¾İÔÚSCKµÚ¶ş¸ö±ßÑØÊ±²ÉÑù
-    SPI_InitStructure.SPI_NSS       = SPI_NSS_Soft;//Èí¼ş¿ØÖÆNSSÒı½Å
+    SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;//åŒçº¿å…¨åŒå·¥æ¨¡å¼
+    SPI_InitStructure.SPI_Mode      = SPI_Mode_Master;//ä¸»æ¨¡å¼
+    SPI_InitStructure.SPI_DataSize  = SPI_DataSize_8b;//8ä½æ•°æ®
+    SPI_InitStructure.SPI_CPOL      = SPI_CPOL_High;//ç©ºé—²æ—¶SCKä¸ºé«˜ç”µå¹³
+    SPI_InitStructure.SPI_CPHA      = SPI_CPHA_2Edge;//æ•°æ®åœ¨SCKç¬¬äºŒä¸ªè¾¹æ²¿æ—¶é‡‡æ ·
+    SPI_InitStructure.SPI_NSS       = SPI_NSS_Soft;//è½¯ä»¶æ§åˆ¶NSSå¼•è„š
 #if SPI1_SPEED_MODE == SPI_VELOCITY_2
     SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_2;
 #elif SPI1_SPEED_MODE == SPI_VELOCITY_4
@@ -60,28 +46,25 @@ void SPI1_Init(void)
     SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_16;
 #endif
 
-    SPI_InitStructure.SPI_FirstBit      = SPI_FirstBit_MSB;//×î¸ßÎ»ÏÈ·¢ËÍ
-    SPI_InitStructure.SPI_CRCPolynomial = 7;//CRC¶àÏîÊ½
-    SPI_Init(SPI1, &SPI_InitStructure);//³õÊ¼»¯SPI1
+    SPI_InitStructure.SPI_FirstBit      = SPI_FirstBit_MSB;//æœ€é«˜ä½å…ˆå‘é€
+    SPI_InitStructure.SPI_CRCPolynomial = 7;//CRCå¤šé¡¹å¼
+    SPI_Init(SPI1, &SPI_InitStructure);//åˆå§‹åŒ–SPI1
     
-    SPI_Cmd(SPI1, ENABLE);//Ê¹ÄÜSPI1
+    SPI_Cmd(SPI1, ENABLE);//ä½¿èƒ½SPI1
     
-    // ·¢ËÍ dummy Êı¾İÈ·±£ MOSI ³õÊ¼Îª¸ßµçÆ½
+    // å‘é€ dummy æ•°æ®ç¡®ä¿ MOSI åˆå§‹ä¸ºé«˜ç”µå¹³
     // while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET);
     // SPI_I2S_SendData(SPI1, 0xFF);
     // while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET);
 
-#if SPI_SPEED_MODE == SPI_FAST_MODE//¿ìËÙÄ£Ê½
+#if SPI_SPEED_MODE == SPI_FAST_MODE//å¿«é€Ÿæ¨¡å¼
     SPI1->HSCR = 1;
 #endif
 }
 
-/*********************************************************************
- * @fn      SPI1_Read_DMA_Init
- * 
- * @brief   Initialize DMA for SPI1, In this condition every time send 0XFF to read data
- * 
- * @return  none
+/**
+ * @brief  åˆå§‹åŒ–SPI1çš„DMAæ”¶å‘é€šé“ï¼Œè¯»å–æ—¶å‘é€0xFF
+ * @return æ— 
  */
 void SPI1_Read_DMA_Init()
 {
@@ -94,15 +77,15 @@ void SPI1_Read_DMA_Init()
 
     DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&SPI1->DATAR;
     DMA_InitStructure.DMA_MemoryBaseAddr     = (uint32_t)&DummyByte;
-    DMA_InitStructure.DMA_DIR                = DMA_DIR_PeripheralDST;//´ÓÍâÉèµ½ÄÚ´æ
+    DMA_InitStructure.DMA_DIR                = DMA_DIR_PeripheralDST;//ä»å¤–è®¾åˆ°å†…å­˜
     DMA_InitStructure.DMA_BufferSize         = 0;
-    DMA_InitStructure.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;//ÍâÉèµØÖ·²»×ÔÔö
-    DMA_InitStructure.DMA_MemoryInc          = DMA_MemoryInc_Disable;//ÄÚ´æµØÖ·²»×ÔÔö
-    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;//ÍâÉèÊı¾İ´óĞ¡Îª8Î»
-    DMA_InitStructure.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;//ÄÚ´æÊı¾İ´óĞ¡Îª8Î»
-    DMA_InitStructure.DMA_Mode               = DMA_Mode_Normal;//ÆÕÍ¨Ä£Ê½
-    DMA_InitStructure.DMA_Priority           = DMA_Priority_High;//¸ßÓÅÏÈ¼¶
-    DMA_InitStructure.DMA_M2M                = DMA_M2M_Disable;//·ÇM2MÄ£Ê½
+    DMA_InitStructure.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;//å¤–è®¾åœ°å€ä¸è‡ªå¢
+    DMA_InitStructure.DMA_MemoryInc          = DMA_MemoryInc_Disable;//å†…å­˜åœ°å€ä¸è‡ªå¢
+    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;//å¤–è®¾æ•°æ®å¤§å°ä¸º8ä½
+    DMA_InitStructure.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;//å†…å­˜æ•°æ®å¤§å°ä¸º8ä½
+    DMA_InitStructure.DMA_Mode               = DMA_Mode_Normal;//æ™®é€šæ¨¡å¼
+    DMA_InitStructure.DMA_Priority           = DMA_Priority_High;//é«˜ä¼˜å…ˆçº§
+    DMA_InitStructure.DMA_M2M                = DMA_M2M_Disable;//éM2Mæ¨¡å¼
     DMA_Init(SPI1_DMA_TX_CH, &DMA_InitStructure);
 
     // Rx
@@ -110,64 +93,60 @@ void SPI1_Read_DMA_Init()
 
     DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&SPI1->DATAR;
     DMA_InitStructure.DMA_MemoryBaseAddr     = (uint32_t)NULL;
-    DMA_InitStructure.DMA_DIR                = DMA_DIR_PeripheralSRC;//´ÓÍâÉèµ½ÄÚ´æ
+    DMA_InitStructure.DMA_DIR                = DMA_DIR_PeripheralSRC;//ä»å¤–è®¾åˆ°å†…å­˜
     DMA_InitStructure.DMA_BufferSize         = 0;
-    DMA_InitStructure.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;//ÍâÉèµØÖ·²»×ÔÔö
-    DMA_InitStructure.DMA_MemoryInc          = DMA_MemoryInc_Enable;//ÄÚ´æµØÖ·×ÔÔö
-    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;//ÍâÉèÊı¾İ´óĞ¡Îª8Î»
-    DMA_InitStructure.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;//ÄÚ´æÊı¾İ´óĞ¡Îª8Î»
-    DMA_InitStructure.DMA_Mode               = DMA_Mode_Normal;//ÆÕÍ¨Ä£Ê½
-    DMA_InitStructure.DMA_Priority           = DMA_Priority_High;//¸ßÓÅÏÈ¼¶
-    DMA_InitStructure.DMA_M2M                = DMA_M2M_Disable;//·ÇM2MÄ£Ê½
-    DMA_Init(SPI1_DMA_RX_CH, &DMA_InitStructure);//³õÊ¼»¯SPI1 DMA½ÓÊÕÍ¨µÀ2
+    DMA_InitStructure.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;//å¤–è®¾åœ°å€ä¸è‡ªå¢
+    DMA_InitStructure.DMA_MemoryInc          = DMA_MemoryInc_Enable;//å†…å­˜åœ°å€è‡ªå¢
+    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;//å¤–è®¾æ•°æ®å¤§å°ä¸º8ä½
+    DMA_InitStructure.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;//å†…å­˜æ•°æ®å¤§å°ä¸º8ä½
+    DMA_InitStructure.DMA_Mode               = DMA_Mode_Normal;//æ™®é€šæ¨¡å¼
+    DMA_InitStructure.DMA_Priority           = DMA_Priority_High;//é«˜ä¼˜å…ˆçº§
+    DMA_InitStructure.DMA_M2M                = DMA_M2M_Disable;//éM2Mæ¨¡å¼
+    DMA_Init(SPI1_DMA_RX_CH, &DMA_InitStructure);//åˆå§‹åŒ–SPI1 DMAæ¥æ”¶é€šé“2
 }
 
-/*********************************************************************
- * @fn      SPI1_Read_DMA
- * 
- * @brief   Í¨¹ıDMA´ÓSPI1_FLASH¶ÁÈ¡Êı¾İ
- * 
- * @param   data -  ½ÓÊÕÊı¾İµÄÄÚ´æµØÖ·
- *          len -  ¶ÁÈ¡³¤¶È
- * 
- * @return  none
+/**
+ * @brief  é€šè¿‡DMAä»SPI1(å¤–éƒ¨Flash)è¯»å–æ•°æ®
+ * @param  data  æ¥æ”¶æ•°æ®ç¼“å­˜åŒºå†…å­˜åœ°å€
+ * @param  len   è¯»å–é•¿åº¦
+ * @return æ— 
  */
 
 void SPI1_Read_DMA(uint8_t *data, uint16_t len) {
 
-    // ¶à¼¶Çå¿Õ£¬·ÀÖ¹Ó²¼ş´®ÈÅ²ĞÁô
-    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) != RESET) {//µÈ´ı½ÓÊÕ»º³åÇøÇå¿Õ
+    // å¤šçº§æ¸…ç©ºï¼Œé˜²æ­¢ç¡¬ä»¶ä¸²æ‰°æ®‹ç•™
+    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) != RESET) {//ç­‰å¾…æ¥æ”¶ç¼“å†²åŒºæ¸…ç©º
         SPI_I2S_ReceiveData(SPI1);
     }
     SPI_Cmd(SPI1, DISABLE);
     SPI_Cmd(SPI1, ENABLE);
 
-    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET);//µÈ´ıSPI1¿ÕÏĞ
+    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET);//ç­‰å¾…SPI1ç©ºé—²
 
-    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) != RESET) {//µÈ´ı½ÓÊÕ»º³åÇøÓĞÊı¾İ
+    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) != RESET) {//ç­‰å¾…æ¥æ”¶ç¼“å†²åŒºæœ‰æ•°æ®
         SPI_I2S_ReceiveData(SPI1);
     }
 
-    /* 1. ÅäÖÃ RX DMA Í¨µÀµÄÄ¿µÄÄÚ´æµØÖ·ºÍ´«Êä´óĞ¡ */
-    DMA1_Channel2->MADDR = (uint32_t)data; // Ö¸ÏòÄãµÄ½ÓÊÕ»º³åÇø
-    DMA1_Channel2->CNTR  = len;              // ½ÓÊÕ len ¸ö×Ö½Ú
+    /* 1. é…ç½® RX DMA é€šé“çš„ç›®çš„å†…å­˜åœ°å€å’Œä¼ è¾“å¤§å° */
+    DMA1_Channel2->MADDR = (uint32_t)data; // æŒ‡å‘ä½ çš„æ¥æ”¶ç¼“å†²åŒº
+    DMA1_Channel2->CNTR  = len;              // æ¥æ”¶ len ä¸ªå­—èŠ‚
 
-    /* 2. ÅäÖÃ TX DMA Í¨µÀµÄÔ´ÄÚ´æµØÖ·ºÍ´«Êä´óĞ¡ */
+    /* 2. é…ç½® TX DMA é€šé“çš„æºå†…å­˜åœ°å€å’Œä¼ è¾“å¤§å° */
     DMA1_Channel3->MADDR = (uint32_t)&DummyByte;
     DMA1_Channel3->CNTR  = len;
 
-    /* 3. Çå³ıÍ¨µÀ2µÄ´«ÊäÍê³É±êÖ¾£¬È»ºóÆô¶¯Á½¸ö DMA Í¨µÀ */
+    /* 3. æ¸…é™¤é€šé“2çš„ä¼ è¾“å®Œæˆæ ‡å¿—ï¼Œç„¶åå¯åŠ¨ä¸¤ä¸ª DMA é€šé“ */
     DMA_ClearFlag(DMA1_FLAG_TC2);
     DMA_Cmd(DMA1_Channel2, ENABLE);
     DMA_Cmd(DMA1_Channel3, ENABLE);
 
-    /* 4. µÈ´ı RX DMA ´«ÊäÍê³É */
+    /* 4. ç­‰å¾… RX DMA ä¼ è¾“å®Œæˆ */
     while (DMA_GetFlagStatus(DMA1_FLAG_TC2) == RESET);
 
-    /* 5. µÈ´ı SPI ×ÜÏß¿ÕÏĞ */
+    /* 5. ç­‰å¾… SPI æ€»çº¿ç©ºé—² */
     while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET);
 
-    /* 6. ¹Ø±Õ DMA Í¨µÀ */
+    /* 6. å…³é—­ DMA é€šé“ */
     DMA_Cmd(DMA1_Channel2, DISABLE);
     DMA_Cmd(DMA1_Channel3, DISABLE);
 
@@ -177,80 +156,69 @@ void SPI1_Read_DMA(uint8_t *data, uint16_t len) {
 }
 
 
-/*********************************************************************
- * @fn      SPI1_Read_DMA_NonBlocking
- * 
- * @brief   Í¨¹ı·Ç×èÈûDMA´ÓSPI1_FLASH¶ÁÈ¡Êı¾İ
- * 
- * @param   data -  ½ÓÊÕÊı¾İµÄÄÚ´æµØÖ·
- *          len -  ¶ÁÈ¡³¤¶È
- * 
- * @return  none
+/**
+ * @brief  é€šè¿‡éé˜»å¡DMAä»SPI1(å¤–éƒ¨Flash)è¯»å–æ•°æ®
+ * @param  data  æ¥æ”¶æ•°æ®ç¼“å­˜åŒºå†…å­˜åœ°å€
+ * @param  len   è¯»å–é•¿åº¦
+ * @return æ— 
  */
 void SPI1_Read_DMA_NonBlocking(uint8_t* data, uint16_t len) {
-    // ¶à¼¶Çå¿Õ£¬·ÀÖ¹Ó²¼ş´®ÈÅ²ĞÁô
-    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) != RESET) {//µÈ´ı½ÓÊÕ»º³åÇøÇå¿Õ
+    // å¤šçº§æ¸…ç©ºï¼Œé˜²æ­¢ç¡¬ä»¶ä¸²æ‰°æ®‹ç•™
+    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) != RESET) {//ç­‰å¾…æ¥æ”¶ç¼“å†²åŒºæ¸…ç©º
         SPI_I2S_ReceiveData(SPI1);
     }
-    SPI_Cmd(SPI1, DISABLE);//¹Ø±ÕSPI1flash£¬·ÀÖ¹´®ÈÅ
-    SPI_Cmd(SPI1, ENABLE);//¿ªÆôSPI1flash
+    SPI_Cmd(SPI1, DISABLE);//å…³é—­SPI1flashï¼Œé˜²æ­¢ä¸²æ‰°
+    SPI_Cmd(SPI1, ENABLE);//å¼€å¯SPI1flash
 
-    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET);//µÈ´ıSPI1flash¿ÕÏĞ
+    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET);//ç­‰å¾…SPI1flashç©ºé—²
 
-    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) != RESET) {//µÈ´ı½ÓÊÕ»º³åÇøÓĞÊı¾İ
+    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) != RESET) {//ç­‰å¾…æ¥æ”¶ç¼“å†²åŒºæœ‰æ•°æ®
         SPI_I2S_ReceiveData(SPI1);
     }
 
-    /* 1. ÅäÖÃ RX DMA Í¨µÀµÄÄ¿µÄÄÚ´æµØÖ·ºÍ´«Êä´óĞ¡ */
-    DMA1_Channel2->MADDR = (uint32_t)data; // Ö¸ÏòÄãµÄ½ÓÊÕ»º³åÇø
-    DMA1_Channel2->CNTR = len;              // ½ÓÊÕ len ¸ö×Ö½Ú
+    /* 1. é…ç½® RX DMA é€šé“çš„ç›®çš„å†…å­˜åœ°å€å’Œä¼ è¾“å¤§å° */
+    DMA1_Channel2->MADDR = (uint32_t)data; // æŒ‡å‘ä½ çš„æ¥æ”¶ç¼“å†²åŒº
+    DMA1_Channel2->CNTR = len;              // æ¥æ”¶ len ä¸ªå­—èŠ‚
 
-    /* 2. ÅäÖÃ TX DMA Í¨µÀµÄÔ´ÄÚ´æµØÖ·ºÍ´«Êä´óĞ¡ */
+    /* 2. é…ç½® TX DMA é€šé“çš„æºå†…å­˜åœ°å€å’Œä¼ è¾“å¤§å° */
     DMA1_Channel3->MADDR = (uint32_t)&DummyByte;
     DMA1_Channel3->CNTR = len;
 
 
-    /* 3. Çå³ıÍ¨µÀ2µÄ´«ÊäÍê³É±êÖ¾£¬È»ºóÆô¶¯Á½¸ö DMA Í¨µÀ */
-    DMA_ClearFlag(DMA1_FLAG_TC2); // Çå³ı RX Íê³É±êÖ¾
-    DMA_Cmd(DMA1_Channel2, ENABLE); // Æô¶¯ RX
-    DMA_Cmd(DMA1_Channel3, ENABLE); // Æô¶¯ TX
+    /* 3. æ¸…é™¤é€šé“2çš„ä¼ è¾“å®Œæˆæ ‡å¿—ï¼Œç„¶åå¯åŠ¨ä¸¤ä¸ª DMA é€šé“ */
+    DMA_ClearFlag(DMA1_FLAG_TC2); // æ¸…é™¤ RX å®Œæˆæ ‡å¿—
+    DMA_Cmd(DMA1_Channel2, ENABLE); // å¯åŠ¨ RX
+    DMA_Cmd(DMA1_Channel3, ENABLE); // å¯åŠ¨ TX
 }
 
 
-/*********************************************************************
- * @fn      SPI1_DMA_WaitComplete
- * 
- * @brief   µÈ´ıDMA´«ÊäÍê³É
- * 
- * @return  none
+/**
+ * @brief  ç­‰å¾…SPI1çš„DMAä¼ è¾“å®Œæˆ
+ * @return æ— 
  */
 void SPI1_DMA_WaitComplete(void) {
-    /* 4. µÈ´ı RX DMA ´«ÊäÍê³É */
+    /* 4. ç­‰å¾… RX DMA ä¼ è¾“å®Œæˆ */
     while (DMA_GetFlagStatus(DMA1_FLAG_TC2) == RESET);
 
-    /* 5. µÈ´ı SPI ×ÜÏß¿ÕÏĞ£¨·¢ËÍ×îºóÒ»¸ö×Ö½ÚµÄÒÆÎ»Íê³É£© */
+    /* 5. ç­‰å¾… SPI æ€»çº¿ç©ºé—²ï¼ˆå‘é€æœ€åä¸€ä¸ªå­—èŠ‚çš„ç§»ä½å®Œæˆï¼‰ */
     while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET);
 
-    /* 6. ¹Ø±Õ DMA Í¨µÀ */
+    /* 6. å…³é—­ DMA é€šé“ */
     DMA_Cmd(DMA1_Channel2, DISABLE);
     DMA_Cmd(DMA1_Channel3, DISABLE);
 
-    // ===== ³ö¿Ú·À»¤£º³ÔµôÂäµØµÄ×îºóÒ»¸ö×Ö½Ú =====
+    // ===== å‡ºå£é˜²æŠ¤ï¼šåƒæ‰è½åœ°çš„æœ€åä¸€ä¸ªå­—èŠ‚ =====
     if (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) != RESET) {
         SPI_I2S_ReceiveData(SPI1);
     }
 }
 
 
-/*********************************************************************
- * @fn      SPI1_Write_DMA
- * 
- * @brief   Í¨¹ıDMA·¢ËÍÊı¾İµ½SPI1_FLASH
- * 
- * @param   data -  ·¢ËÍÊı¾İµÄÄÚ´æµØÖ·
- *          len -  ·¢ËÍ³¤¶È
- * 
- * @return  none
+/**
+ * @brief  é€šè¿‡DMAå‘é€æ•°æ®åˆ°SPI1(å¤–éƒ¨Flash)
+ * @param  data  å‘é€æ•°æ®ç¼“å­˜åŒºå†…å­˜åœ°å€
+ * @param  len   å‘é€é•¿åº¦
+ * @return æ— 
  */
 void SPI1_Write_DMA(uint8_t* data, uint16_t len) {
     static DMA_InitTypeDef DMA_InitStructure = {0};
@@ -292,20 +260,17 @@ void SPI1_Write_DMA(uint8_t* data, uint16_t len) {
     DMA_InitStructure.DMA_MemoryBaseAddr     = (uint32_t)&DummyByte;
     DMA_InitStructure.DMA_MemoryInc          = DMA_MemoryInc_Disable;
     DMA_InitStructure.DMA_BufferSize         = 0;
-    DMA_Init(DMA1_Channel3, &DMA_InitStructure);//³õÊ¼»¯DMAÍ¨µÀ3
+    DMA_Init(DMA1_Channel3, &DMA_InitStructure);//åˆå§‹åŒ–DMAé€šé“3
 
-        // Èç¹û·¢ËÍ¹ı³ÌÖĞ²úÉúÁË½ÓÊÕÊı¾İ£¨Í¨³£¶¼ÓĞ£©£¬¶Á×ß¶ªÆú
+        // å¦‚æœå‘é€è¿‡ç¨‹ä¸­äº§ç”Ÿäº†æ¥æ”¶æ•°æ®ï¼ˆé€šå¸¸éƒ½æœ‰ï¼‰ï¼Œè¯»èµ°ä¸¢å¼ƒ
     if (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) != RESET) {
         SPI_I2S_ReceiveData(SPI1);
     }
 }
 
-/*********************************************************************
- * @fn      SPI2_Init
- * 
- * @brief   Initialize SPI2
- * 
- * @return  none
+/**
+ * @brief  åˆå§‹åŒ–SPI2(æ¶²æ™¶å±æ€»çº¿)
+ * @return æ— 
  */
 void SPI2_Init(void)
 {
@@ -316,25 +281,25 @@ void SPI2_Init(void)
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
 
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_13;//LCD_SCK
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;//¸´ÓÃÍÆÍìÊä³ö
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;//å¤ç”¨æ¨æŒ½è¾“å‡º
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;//50MHz
     GPIO_Init(GPIOB, &GPIO_InitStructure);
 
     GPIO_InitStructure.GPIO_Pin  = GPIO_Pin_14;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;//ÊäÈëÉÏÀ­µç×èÄ£Ê½
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;//è¾“å…¥ä¸Šæ‹‰ç”µé˜»æ¨¡å¼
     GPIO_Init(GPIOB, &GPIO_InitStructure);
 
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_15;//LCD_MOSI
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;//¸´ÓÃÍÆÍìÊä³ö
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;//å¤ç”¨æ¨æŒ½è¾“å‡º
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;//50MHz
     GPIO_Init(GPIOB, &GPIO_InitStructure);
 
-    SPI_InitStructure.SPI_Direction         = SPI_Direction_1Line_Tx;//µ¥ÏßÄ£Ê½£¬·¢ËÍÊı¾İ
-    SPI_InitStructure.SPI_Mode              = SPI_Mode_Master;//Ö÷Ä£Ê½
-    SPI_InitStructure.SPI_DataSize          = SPI_DataSize_8b;//Êı¾İ´óĞ¡Îª8Î»
-    SPI_InitStructure.SPI_CPOL              = SPI_CPOL_High;//Ê±ÖÓ¼«ĞÔ¸ßµçÆ½
-    SPI_InitStructure.SPI_CPHA              = SPI_CPHA_2Edge;//Ê±ÖÓÏàÎ»µÚ¶ş¸ö±ßÑØ
-    SPI_InitStructure.SPI_NSS               = SPI_NSS_Soft;//Èí¼ş¿ØÖÆNSS
+    SPI_InitStructure.SPI_Direction         = SPI_Direction_1Line_Tx;//å•çº¿æ¨¡å¼ï¼Œå‘é€æ•°æ®
+    SPI_InitStructure.SPI_Mode              = SPI_Mode_Master;//ä¸»æ¨¡å¼
+    SPI_InitStructure.SPI_DataSize          = SPI_DataSize_8b;//æ•°æ®å¤§å°ä¸º8ä½
+    SPI_InitStructure.SPI_CPOL              = SPI_CPOL_High;//æ—¶é’Ÿææ€§é«˜ç”µå¹³
+    SPI_InitStructure.SPI_CPHA              = SPI_CPHA_2Edge;//æ—¶é’Ÿç›¸ä½ç¬¬äºŒä¸ªè¾¹æ²¿
+    SPI_InitStructure.SPI_NSS               = SPI_NSS_Soft;//è½¯ä»¶æ§åˆ¶NSS
     #if SPI2_SPEED_MODE == SPI_VELOCITY_2
         SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_2;
     #elif SPI2_SPEED_MODE == SPI_VELOCITY_4
@@ -344,19 +309,16 @@ void SPI2_Init(void)
     #elif SPI2_SPEED_MODE == SPI_VELOCITY_16
         SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_16;
     #endif
-    SPI_InitStructure.SPI_FirstBit          = SPI_FirstBit_MSB;//×î¸ßÎ»ÏÈ·¢ËÍ
-    SPI_InitStructure.SPI_CRCPolynomial     = 7;//CRC¶àÏîÊ½Îª7
+    SPI_InitStructure.SPI_FirstBit          = SPI_FirstBit_MSB;//æœ€é«˜ä½å…ˆå‘é€
+    SPI_InitStructure.SPI_CRCPolynomial     = 7;//CRCå¤šé¡¹å¼ä¸º7
     SPI_Init(SPI2, &SPI_InitStructure);
 
-    SPI_Cmd(SPI2, ENABLE);//Ê¹ÄÜSPI2
+    SPI_Cmd(SPI2, ENABLE);//ä½¿èƒ½SPI2
 }
 
-/*********************************************************************
- * @fn      SPI2_DMA_Init
- * 
- * @brief   Initialize DMA for SPI2
- * 
- * @return  none
+/**
+ * @brief  åˆå§‹åŒ–SPI2çš„DMAå‘é€é€šé“
+ * @return æ— 
  */
 void SPI2_DMA_Init()
 {
@@ -366,92 +328,85 @@ void SPI2_DMA_Init()
 
     DMA_DeInit(SPI2_DMA_TX_CH);
 
-    DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&SPI2->DATAR;//SPI2Êı¾İ¼Ä´æÆ÷µØÖ·
-    DMA_InitStructure.DMA_MemoryBaseAddr     = (uint32_t)NULL;//ÄÚ´æµØÖ·
-    DMA_InitStructure.DMA_DIR                = DMA_DIR_PeripheralDST;//ÍâÉèµ½ÄÚ´æ
+    DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&SPI2->DATAR;//SPI2æ•°æ®å¯„å­˜å™¨åœ°å€
+    DMA_InitStructure.DMA_MemoryBaseAddr     = (uint32_t)NULL;//å†…å­˜åœ°å€
+    DMA_InitStructure.DMA_DIR                = DMA_DIR_PeripheralDST;//å¤–è®¾åˆ°å†…å­˜
     DMA_InitStructure.DMA_BufferSize         = 0;
-    DMA_InitStructure.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;//ÍâÉè²»×ÔÔö
-    DMA_InitStructure.DMA_MemoryInc          = DMA_MemoryInc_Enable;//ÄÚ´æ×ÔÔö
-    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;//ÍâÉèÊı¾İ´óĞ¡Îª8Î»
-    DMA_InitStructure.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;//ÄÚ´æÊı¾İ´óĞ¡Îª8Î»
-    DMA_InitStructure.DMA_Mode               = DMA_Mode_Normal;//ÆÕÍ¨Ä£Ê½£¬²»Ê¹ÓÃÑ­»·Ä£Ê½
-    DMA_InitStructure.DMA_Priority           = DMA_Priority_High;//¸ßÓÅÏÈ¼¶
-    DMA_InitStructure.DMA_M2M                = DMA_M2M_Disable;//²»Ê¹ÓÃM2MÄ£Ê½
+    DMA_InitStructure.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;//å¤–è®¾ä¸è‡ªå¢
+    DMA_InitStructure.DMA_MemoryInc          = DMA_MemoryInc_Enable;//å†…å­˜è‡ªå¢
+    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;//å¤–è®¾æ•°æ®å¤§å°ä¸º8ä½
+    DMA_InitStructure.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;//å†…å­˜æ•°æ®å¤§å°ä¸º8ä½
+    DMA_InitStructure.DMA_Mode               = DMA_Mode_Normal;//æ™®é€šæ¨¡å¼ï¼Œä¸ä½¿ç”¨å¾ªç¯æ¨¡å¼
+    DMA_InitStructure.DMA_Priority           = DMA_Priority_High;//é«˜ä¼˜å…ˆçº§
+    DMA_InitStructure.DMA_M2M                = DMA_M2M_Disable;//ä¸ä½¿ç”¨M2Mæ¨¡å¼
     DMA_Init(SPI2_DMA_TX_CH, &DMA_InitStructure);
 
-    SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, ENABLE);//Ê¹ÄÜSPI2 DMA
+    SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, ENABLE);//ä½¿èƒ½SPI2 DMA
 }
 
 
-/*********************************************************************
- * @fn      SPI2_Write
- * 
- * @brief   send one byte
- * @brief   ·¢ËÍÒ»¸ö×Ö½ÚÊı¾İ
- * 
- * @param   data -  the data to send
- * 
- * @return  none
+/**
+ * @brief  å‘é€ä¸€ä¸ªå­—èŠ‚æ•°æ®åˆ°SPI2(æ¶²æ™¶å±)
+ * @param  data  è¦å‘é€çš„æ•°æ®
+ * @return æ— 
  */
 void SPI2_Write(uint8_t data) {
-    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET)//µÈ´ı·¢ËÍ»º³åÇøÎª¿Õ
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET)//ç­‰å¾…å‘é€ç¼“å†²åŒºä¸ºç©º
         ;
-    SPI_I2S_SendData(SPI2, data & 0xFF);  // È·±£Ö»·¢ËÍµÍ8Î»
-    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET)//µÈ´ı·¢ËÍÍê³É
+    SPI_I2S_SendData(SPI2, data & 0xFF);  // ç¡®ä¿åªå‘é€ä½8ä½
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET)//ç­‰å¾…å‘é€å®Œæˆ
         ;
 }
 
-/*********************************************************************
- * @fn      SPI2_Write_DMA
- * 
- * @brief   send a lot of data 
- * @brief   Í¨¹ıDMA_SPI2·¢ËÍÆÁÄ»¶à×Ö½ÚÊı¾İ
- * 
- * @param   data -  the data to be send 
- *          len -  the length of data
- * 
- * @return  none
+/**
+ * @brief  é€šè¿‡DMAå‘é€å¤šå­—èŠ‚æ•°æ®åˆ°SPI2(æ¶²æ™¶å±)
+ * @param  data  å‘é€æ•°æ®ç¼“å­˜åŒºå†…å­˜åœ°å€
+ * @param  len   å‘é€é•¿åº¦
+ * @return æ— 
  */
 void SPI2_Write_DMA(uint8_t *data, uint16_t len)
 {
-   // 1. µÈ´ı SPI2 ÍêÈ«¿ÕÏĞ
+   // 1. ç­‰å¾… SPI2 å®Œå…¨ç©ºé—²
     while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);
 
-    // 2. Çå¿Õ½ÓÊÕ»º³åÇø£¨ÎŞº¦£©
+    // 2. æ¸…ç©ºæ¥æ”¶ç¼“å†²åŒºï¼ˆæ— å®³ï¼‰
     if (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != RESET) {
         SPI_I2S_ReceiveData(SPI2);
     }
 
-    // // 3. ¡ï È·±£·¢ËÍ»º³åÇøÎª¿Õ£¬Èç¹û·Ç¿Õ£¬¸´Î» SPI2 ÒÔÇå¿Õ
+    // // 3. â˜… ç¡®ä¿å‘é€ç¼“å†²åŒºä¸ºç©ºï¼Œå¦‚æœéç©ºï¼Œå¤ä½ SPI2 ä»¥æ¸…ç©º
     if (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET) {
         SPI_Cmd(SPI2, DISABLE);
         SPI_Cmd(SPI2, ENABLE);
         while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET);
     }
 
-    // 4. ÅäÖÃ²¢Æô¶¯ DMA
+    // 4. é…ç½®å¹¶å¯åŠ¨ DMA
     DMA_Cmd(SPI2_DMA_TX_CH, DISABLE);
     DMA_ClearFlag(SPI2_DMA_TC_FLAG);
 
-    SPI2_DMA_TX_CH->MADDR = (uint32_t)data;//ÉèÖÃDMAÄÚ´æµØÖ·ÎªdataÖ¸Õë
-    SPI2_DMA_TX_CH->CNTR  = len;//ÉèÖÃDMA´«Êä×Ö½ÚÊıÎªlen
+    SPI2_DMA_TX_CH->MADDR = (uint32_t)data;//è®¾ç½®DMAå†…å­˜åœ°å€ä¸ºdataæŒ‡é’ˆ
+    SPI2_DMA_TX_CH->CNTR  = len;//è®¾ç½®DMAä¼ è¾“å­—èŠ‚æ•°ä¸ºlen
 
-    DMA_Cmd(SPI2_DMA_TX_CH, ENABLE);//Ê¹ÄÜDMA´«Êä
+    DMA_Cmd(SPI2_DMA_TX_CH, ENABLE);//ä½¿èƒ½DMAä¼ è¾“
 }
 
 
-//ÅäÖÃDMA´«Êä
+/**
+ * @brief  ç­‰å¾…SPI2å‘é€ç©ºé—²å¹¶å¤ä½å‘é€ç¼“å†²åŒº
+ * @return æ— 
+ */
 void SPI2_WaitIdle(void)
 {
-    // 1. µÈ´ı SPI2 ÍêÈ«¿ÕÏĞ
+    // 1. ç­‰å¾… SPI2 å®Œå…¨ç©ºé—²
     while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);
 
-    // 2. Çå¿Õ½ÓÊÕ»º³åÇø£¨ÎŞº¦£©
+    // 2. æ¸…ç©ºæ¥æ”¶ç¼“å†²åŒºï¼ˆæ— å®³ï¼‰
     if (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != RESET) {
         SPI_I2S_ReceiveData(SPI2);
     }
 
-    // 3. È·±£·¢ËÍ»º³åÇøÎª¿Õ£¬Èç¹û·Ç¿Õ£¬¸´Î» SPI2 ÒÔÇå¿Õ
+    // 3. ç¡®ä¿å‘é€ç¼“å†²åŒºä¸ºç©ºï¼Œå¦‚æœéç©ºï¼Œå¤ä½ SPI2 ä»¥æ¸…ç©º
     if (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET) {
         SPI_Cmd(SPI2, DISABLE);
         SPI_Cmd(SPI2, ENABLE);
@@ -459,26 +414,35 @@ void SPI2_WaitIdle(void)
     }
 }
 
-//Æô¶¯DMA´«Êä
+/**
+ * @brief  å¯åŠ¨SPI2çš„DMAä¼ è¾“
+ * @param  data  å‘é€æ•°æ®ç¼“å­˜åŒºå†…å­˜åœ°å€
+ * @param  len   å‘é€é•¿åº¦
+ * @return æ— 
+ */
 void SPI2_StartDMA(uint8_t *data, uint16_t len)
 {
-    // 4. ÅäÖÃ²¢Æô¶¯ DMA
-    DMA_Cmd(SPI2_DMA_TX_CH, DISABLE);//½ûÓÃDMA´«Êä
-    DMA_ClearFlag(SPI2_DMA_TC_FLAG);//Çå³ıDMA´«ÊäÍê³É±êÖ¾Î»
+    // 4. é…ç½®å¹¶å¯åŠ¨ DMA
+    DMA_Cmd(SPI2_DMA_TX_CH, DISABLE);//ç¦ç”¨DMAä¼ è¾“
+    DMA_ClearFlag(SPI2_DMA_TC_FLAG);//æ¸…é™¤DMAä¼ è¾“å®Œæˆæ ‡å¿—ä½
 
     SPI2_DMA_TX_CH->MADDR = (uint32_t)data;
     SPI2_DMA_TX_CH->CNTR = len;
 
-    DMA_Cmd(SPI2_DMA_TX_CH, ENABLE);//Ê¹ÄÜDMA´«Êä
+    DMA_Cmd(SPI2_DMA_TX_CH, ENABLE);//ä½¿èƒ½DMAä¼ è¾“
 }
 
 
-//
+/**
+ * @brief  è®¾ç½®SPI2çš„æ•°æ®å¸§å®½åº¦å¹¶é‡æ–°åˆå§‹åŒ–
+ * @param  DataSize  æ•°æ®ä½å®½(8/16ç­‰)
+ * @return æ— 
+ */
 void SPI2_SetDataSize(uint16_t DataSize)
 {
     SPI_InitTypeDef SPI_InitStructure = {0};
     
-    SPI_Cmd(SPI2, DISABLE);  // ÏÈ½ûÓÃ SPI
+    SPI_Cmd(SPI2, DISABLE);  // å…ˆç¦ç”¨ SPI
     
     SPI_InitStructure.SPI_Direction         = SPI_Direction_1Line_Tx;
     SPI_InitStructure.SPI_Mode              = SPI_Mode_Master;
@@ -491,7 +455,7 @@ void SPI2_SetDataSize(uint16_t DataSize)
     SPI_InitStructure.SPI_CRCPolynomial     = 7;
     SPI_Init(SPI2, &SPI_InitStructure);
     
-    SPI_Cmd(SPI2, ENABLE);  // ÖØĞÂÆôÓÃ SPI
+    SPI_Cmd(SPI2, ENABLE);  // é‡æ–°å¯ç”¨ SPI
 }
 
 

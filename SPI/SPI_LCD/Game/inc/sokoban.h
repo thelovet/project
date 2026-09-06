@@ -5,36 +5,36 @@
 #include "menu.h"
 
 /**
- * @brief µØÍ¼ÔªËØ±àÂë
+ * @brief åœ°å›¾å…ƒç´ ç¼–ç 
  */
-#define SOK_FLOOR            0   /* ¿ÕµØ */
-#define SOK_WALL             1   /* Ç½ */
-#define SOK_TARGET           2   /* Ä¿±êµã */
-#define SOK_PLAYER           3   /* Íæ¼Ò³õÊ¼Î»ÖÃ */
-#define SOK_BOX              4   /* Ïä×Ó */
-#define SOK_BOX_ON_TARGET    5   /* Ïä×ÓÔÚÄ¿±êÉÏ(ÒÑÍê³É) */
-#define SOK_OUTER            6   /* Íâ½ç */
-#define SOK_PLAYER_ON_TARGET 7   /* Íæ¼ÒÔÚÄ¿±êÉÏ(±£Áô) */
+#define SOK_FLOOR            0   /* ç©ºåœ° */
+#define SOK_WALL             1   /* å¢™ */
+#define SOK_TARGET           2   /* ç›®æ ‡ç‚¹ */
+#define SOK_PLAYER           3   /* ç©å®¶åˆå§‹ä½ç½® */
+#define SOK_BOX              4   /* ç®±å­ */
+#define SOK_BOX_ON_TARGET    5   /* ç®±å­åœ¨ç›®æ ‡ä¸Š(å·²å®Œæˆ) */
+#define SOK_OUTER            6   /* å¤–ç•Œ */
+#define SOK_PLAYER_ON_TARGET 7   /* ç©å®¶åœ¨ç›®æ ‡ä¸Š(ä¿ç•™) */
 
 /**
- * @brief ¹Ø¿¨×ÜÊı / ¸ñ×Ó³ß´ç / ×î´ó¸ñ×ÓÊı
+ * @brief å…³å¡æ€»æ•° / æ ¼å­å°ºå¯¸ / æœ€å¤§æ ¼å­æ•°
  */
 #define SOKOBAN_LEVEL_COUNT  50
-#define SOK_TILE_SIZE        30   /* Ã¿¸ö¸ñ×Ó30x30ÏñËØ */
+#define SOK_TILE_SIZE        30   /* æ¯ä¸ªæ ¼å­30x30åƒç´  */
 #define SOK_TILE_PIXELS      (SOK_TILE_SIZE * SOK_TILE_SIZE)  /* 900 */
-#define SOK_PLAYER_SIZE      25   /* ÈËÎï25x25ÏñËØ */
+#define SOK_PLAYER_SIZE      25   /* äººç‰©25x25åƒç´  */
 #define SOK_PLAYER_PIXELS    (SOK_PLAYER_SIZE * SOK_PLAYER_SIZE)  /* 625 */
-#define SOK_TARGET_SIZE      25   /* Ä¿±ê25x25ÏñËØ */
+#define SOK_TARGET_SIZE      25   /* ç›®æ ‡25x25åƒç´  */
 #define SOK_TARGET_PIXELS    (SOK_TARGET_SIZE * SOK_TARGET_SIZE)  /* 625 */
-#define SOK_MAX_CELLS        (16 * 16)  /* ×î´ó¸ñ×ÓÊı, ·ÀÖ¹¼«ÏŞµØÍ¼Ô½½ç */
+#define SOK_MAX_CELLS        (16 * 16)  /* æœ€å¤§æ ¼å­æ•°, é˜²æ­¢æé™åœ°å›¾è¶Šç•Œ */
 
 /**
- * @brief ¹Ø¿¨Êı¾İ½á¹¹
+ * @brief å…³å¡æ•°æ®ç»“æ„
  */
 typedef struct {
-    uint8_t       rows;       /* ĞĞÊı */
-    uint8_t       cols;       /* ÁĞÊı */
-    const uint8_t *map;       /* ¹Ø¿¨µØÍ¼Êı¾İ [rows * cols], ´æFlash */
+    uint8_t       rows;       /* è¡Œæ•° */
+    uint8_t       cols;       /* åˆ—æ•° */
+    const uint8_t *map;       /* å…³å¡åœ°å›¾æ•°æ® [rows * cols], å­˜Flash */
 } SokobanLevel;
 
 extern const uint16_t sok_img_bg_palette[];
@@ -42,30 +42,30 @@ extern const uint16_t sok_img_wall_palette[];
 extern const uint16_t sok_img_box_palette[];
 
 /**
- * @brief ¹Ø¿¨±í
+ * @brief å…³å¡è¡¨
  */
 extern const SokobanLevel sokoban_levels[SOKOBAN_LEVEL_COUNT];
 
 /**
- * @brief 30x30 RGB565 Î»Í¼Êı¾İ (Ã¿¸ö900¸öuint16_t)
+ * @brief 30x30 RGB565 ä½å›¾æ•°æ® (æ¯ä¸ª900ä¸ªuint16_t)
  */
-extern const uint8_t sok_img_bg[SOK_TILE_PIXELS];    /* µØ°å(±³¾°) */
-extern const uint8_t sok_img_wall[SOK_TILE_PIXELS];  /* Ç½ */
-extern const uint16_t sok_img_player[SOK_PLAYER_PIXELS];/* Íæ¼Ò 25x25 */
-extern const uint8_t sok_img_box[SOK_TILE_PIXELS];   /* Ïä×Ó */
+extern const uint8_t sok_img_bg[SOK_TILE_PIXELS];    /* åœ°æ¿(èƒŒæ™¯) */
+extern const uint8_t sok_img_wall[SOK_TILE_PIXELS];  /* å¢™ */
+extern const uint16_t sok_img_player[SOK_PLAYER_PIXELS];/* ç©å®¶ 25x25 */
+extern const uint8_t sok_img_box[SOK_TILE_PIXELS];   /* ç®±å­ */
 extern const uint16_t sok_img_target_palette[];
-extern const uint8_t sok_img_target[SOK_TARGET_PIXELS];/* Ä¿±ê 25x25 */
+extern const uint8_t sok_img_target[SOK_TARGET_PIXELS];/* ç›®æ ‡ 25x25 */
 extern const uint16_t sok_img_box_on_target_palette[];
-extern const uint8_t sok_img_box_on_target[SOK_TILE_PIXELS];/* Ïä×ÓÔÚÄ¿±êÉÏ 30x30 */
+extern const uint8_t sok_img_box_on_target[SOK_TILE_PIXELS];/* ç®±å­åœ¨ç›®æ ‡ä¸Š 30x30 */
 
 /**
- * @brief  »æÖÆ¹Ø¿¨µ½LCD
- * @param  level_index  ¹Ø¿¨ĞòºÅ (0 ~ SOKOBAN_LEVEL_COUNT-1)
+ * @brief  ç»˜åˆ¶å…³å¡åˆ°LCD
+ * @param  level_index  å…³å¡åºå· (0 ~ SOKOBAN_LEVEL_COUNT-1)
  */
 void sokoban_draw_level(uint8_t level_index);
 
 /**
- * @brief ÒÆ¶¯·½ÏòÃ¶¾Ù
+ * @brief ç§»åŠ¨æ–¹å‘æšä¸¾
  */
 typedef enum {
     SOK_DIR_UP = 0,
@@ -76,24 +76,24 @@ typedef enum {
 } SokobanDir;
 
 /**
- * @brief ºËĞÄº¯Êı
+ * @brief æ ¸å¿ƒå‡½æ•°
  */
-void     sokoban_init_level(uint8_t level_index);   /* ³õÊ¼»¯¹Ø¿¨, ¼ÓÔØµØÍ¼Êı¾İ²¢¼ÆËã×ÔÊÊÓ¦Ëõ·Å */
-uint8_t  sokoban_move(SokobanDir dir);               /* ÒÆ¶¯ÈËÎï, ·µ»Ø1=Êµ¼ÊÒÆ¶¯ */
-uint8_t  sokoban_is_won(void);                       /* ¼ì²éÍ¨¹Ø, 1=Í¨¹Ø */
+void     sokoban_init_level(uint8_t level_index);   /* åˆå§‹åŒ–å…³å¡, åŠ è½½åœ°å›¾æ•°æ®å¹¶è®¡ç®—è‡ªé€‚åº”ç¼©æ”¾ */
+uint8_t  sokoban_move(SokobanDir dir);               /* ç§»åŠ¨äººç‰©, è¿”å›1=å®é™…ç§»åŠ¨ */
+uint8_t  sokoban_is_won(void);                       /* æ£€æŸ¥é€šå…³, 1=é€šå…³ */
 
 /**
- * @brief ÓÎÏ·×´Ì¬Ã¶¾Ù (ÓÃÓÚÖ÷Ñ­»·)
+ * @brief æ¸¸æˆçŠ¶æ€æšä¸¾ (ç”¨äºä¸»å¾ªç¯)
  */
 typedef enum {
-    SOK_STATE_PLAYING = 0,  /* ÓÎÏ·½øĞĞÖĞ */
-    SOK_STATE_WON,          /* Í¨¹Ø, ÏÔÊ¾"¹§Ï²Í¨¹Ø"ºÍ3¸ö°´Å¥ */
-    SOK_STATE_MENU,         /* ²Ëµ¥½çÃæÏÔÊ¾ÖĞ */
+    SOK_STATE_PLAYING = 0,  /* æ¸¸æˆè¿›è¡Œä¸­ */
+    SOK_STATE_WON,          /* é€šå…³, æ˜¾ç¤º"æ­å–œé€šå…³"å’Œ3ä¸ªæŒ‰é’® */
+    SOK_STATE_MENU,         /* èœå•ç•Œé¢æ˜¾ç¤ºä¸­ */
 } SokobanState;
 
 /**
- * @brief  Ã¿Ö¡µ÷ÓÃ, ´¦Àí´¥ÃşÊäÈëºÍÓÎÏ·×´Ì¬»ú
- * @retval  1=±¾Ö¡ÓĞÓÃ»§½»»¥(´¥Ãş/°´¼ü), 0=ÎŞ
+ * @brief  æ¯å¸§è°ƒç”¨, å¤„ç†è§¦æ‘¸è¾“å…¥å’Œæ¸¸æˆçŠ¶æ€æœº
+ * @retval  1=æœ¬å¸§æœ‰ç”¨æˆ·äº¤äº’(è§¦æ‘¸/æŒ‰é”®), 0=æ— 
  */
 uint8_t       sokoban_update(void);
 void          sokoban_reset_touch(void);
@@ -102,6 +102,6 @@ uint8_t       sokoban_restore_state(const uint8_t *buf, uint8_t len);
 void          sokoban_full_redraw(void);
 void          sokoban_lowbatt_restore(void);
 uint8_t       sokoban_is_menu_visible(void);
-void          sokoban_menu_settings_restore(void);  /* ´ÓÉèÖÃ²Ëµ¥·µ»Øµ½°´Å¥Ãæ°å */
+void          sokoban_menu_settings_restore(void);  /* ä»è®¾ç½®èœå•è¿”å›åˆ°æŒ‰é’®é¢æ¿ */
 
 #endif

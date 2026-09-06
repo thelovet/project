@@ -1,14 +1,3 @@
-/*********************************************************************
- * File Name          : flash.h
- * Author             : WCH
- * Version            : V1.0.0
- * Date               : 2023/8/15
- * Description        : file for spi flash.
- *********************************************************************************
-* Copyright (c) 2023 Nanjing Qinheng Microelectronics Co., Ltd.
-* Attention: This software (modified or not) and binary are used for 
-* microcontroller manufactured by Nanjing Qinheng Microelectronics.
-*******************************************************************************/
 #ifndef __SPI_FLASH_H
 #define __SPI_FLASH_H
 #include "debug.h"

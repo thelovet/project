@@ -8,18 +8,18 @@ static uint32_t frame_count = 0;
 static uint32_t last_time = 0;
 static uint32_t start_time = 0;
 static volatile uint32_t overflow_count = 0;
-static uint32_t max_frame_time = 0;//×î´óÖ¡ºÄÊ±£¬ÓÃÓÚ×îµÍÖ¡ÂÊ
-static uint32_t instant_fps = 0;//ÊµÊ±Ö¡ÂÊ£¬Ã¿Ö¡¸üĞÂ
-static uint32_t sum_delta = 0;//Ö¡¼ä¸ôÀÛ¼Ó
-static uint32_t sample_count = 0;//²ÉÑùÖ¡Êı
-static uint32_t last_fps_update = 0;//ÉÏ´Î¸üĞÂÊ±¿Ì
+static uint32_t max_frame_time = 0;//æœ€å¤§å¸§è€—æ—¶ï¼Œç”¨äºæœ€ä½å¸§ç‡
+static uint32_t instant_fps = 0;//å®æ—¶å¸§ç‡ï¼Œæ¯å¸§æ›´æ–°
+static uint32_t sum_delta = 0;//å¸§é—´éš”ç´¯åŠ 
+static uint32_t sample_count = 0;//é‡‡æ ·å¸§æ•°
+static uint32_t last_fps_update = 0;//ä¸Šæ¬¡æ›´æ–°æ—¶åˆ»
 
 static volatile uint8_t low_battery_pending = 0;
 
 #define ONE_SECOND  1000000
 
 /**
- * @brief ³õÊ¼»¯¶¨Ê±Æ÷2£¨65ms£©
+ * @brief åˆå§‹åŒ–å®šæ—¶å™¨2ï¼ˆ65msï¼‰
  * 
  */
 void TIMER2_Init(void)
@@ -50,14 +50,14 @@ void TIMER2_Init(void)
 
 
 /**
- * @brief ¶¨Ê±Æ÷ÖĞ¶Ï·şÎñº¯Êı£¨Ã¿65ms´¥·¢Ò»´Î£©
+ * @brief å®šæ—¶å™¨ä¸­æ–­æœåŠ¡å‡½æ•°ï¼ˆæ¯65msè§¦å‘ä¸€æ¬¡ï¼‰
  * 
  */
 void TIM1_UP_IRQHandler(void)
     __attribute__((interrupt("WCH-Interrupt-fast"), used, externally_visible));
 /**
- * @brief  TIM1 ¸üĞÂÖĞ¶Ï´¦Àí(µÍµç¼ì²â/¼ÆÊ±)¡£
- * @note   ±ê×¼ ISR, ÓÃÓÚ·ÇÎ¹¹·ÓÃÍ¾µÄ¼ÆÊ±¡£
+ * @brief  TIM1 æ›´æ–°ä¸­æ–­å¤„ç†(ä½ç”µæ£€æµ‹/è®¡æ—¶)ã€‚
+ * @note   æ ‡å‡† ISR, ç”¨äºéå–‚ç‹—ç”¨é€”çš„è®¡æ—¶ã€‚
  */
 void TIM1_UP_IRQHandler(void)
 {
@@ -66,17 +66,17 @@ void TIM1_UP_IRQHandler(void)
         TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
         overflow_count++;
 
-        // Ã¿´ÎÒç³ö¼ì²âµç³ØµÍÑ¹£¨~65ms/´Î£©£¬³äµçÊ±Ìø¹ı
-        if (!Battery_IsCharging() && Battery_GetStatus() != BAT_FULL && PWR_GetFlagStatus(PWR_FLAG_PVDO) == SET) {//½öÔÚµç³ØµÍÑ¹ÇÒÎ´³äµçÊ±¼ì²â
-            low_battery_pending = 1;//½»¸øÖ÷Ñ­»·´¦Àí£¬½ûÖ¹ÔÚÖĞ¶ÏÖĞ»æÆÁºÍÑÓÊ±
+        // æ¯æ¬¡æº¢å‡ºæ£€æµ‹ç”µæ± ä½å‹ï¼ˆ~65ms/æ¬¡ï¼‰ï¼Œå……ç”µæ—¶è·³è¿‡
+        if (!Battery_IsCharging() && Battery_GetStatus() != BAT_FULL && PWR_GetFlagStatus(PWR_FLAG_PVDO) == SET) {//ä»…åœ¨ç”µæ± ä½å‹ä¸”æœªå……ç”µæ—¶æ£€æµ‹
+            low_battery_pending = 1;//äº¤ç»™ä¸»å¾ªç¯å¤„ç†ï¼Œç¦æ­¢åœ¨ä¸­æ–­ä¸­ç»˜å±å’Œå»¶æ—¶
         }
     }
 }
 
 /**
- * @brief »ñÈ¡¶¨Ê±Æ÷¼ÆÊı£¨tick£©
+ * @brief è·å–å®šæ—¶å™¨è®¡æ•°ï¼ˆtickï¼‰
  * 
- * @return uint32_t ¶¨Ê±Æ÷¼ÆÊı£¨tick£©
+ * @return uint32_t å®šæ—¶å™¨è®¡æ•°ï¼ˆtickï¼‰
  */
 uint8_t TIMER2_TakeLowBatteryPending(void)
 {
@@ -85,11 +85,11 @@ uint8_t TIMER2_TakeLowBatteryPending(void)
     return pending;
 }
 /**
- * @brief  »ñÈ¡¶¨Ê±Æ÷¼ÆÊı(Î¢Ãë), ÓëÖ¡ÂÊÎŞ¹Ø¡£
- * @return µ±Ç°Î¢Ãë¼ÆÊı
+ * @brief  è·å–å®šæ—¶å™¨è®¡æ•°(å¾®ç§’), ä¸å¸§ç‡æ— å…³ã€‚
+ * @return å½“å‰å¾®ç§’è®¡æ•°
  */
 
-uint32_t GetTimerCount(void)//»ñÈ¡¶¨Ê±Æ÷¼ÆÊı
+uint32_t GetTimerCount(void)//è·å–å®šæ—¶å™¨è®¡æ•°
 {
     uint32_t high_before;
     uint32_t high_after;
@@ -97,9 +97,9 @@ uint32_t GetTimerCount(void)//»ñÈ¡¶¨Ê±Æ÷¼ÆÊı
     FlagStatus update_pending;
 
     /*
-     * ²»¶ÁÈ¡mstatus£¬±ÜÃâ²¿·Ö»½ĞÑ×´Ì¬ÏÂ·ÃÎÊ¸ÃCSR´¥·¢·Ç·¨Ö¸Áî¡£
-     * Èô¶ÁÈ¡ÆÚ¼äÒç³öÖĞ¶Ï¸Ä±äÁË¸ßÎ»¼ÆÊı£¬ÔòÖØĞÂ¶ÁÈ¡£»Èô¸üĞÂ±êÖ¾
-     * ÒÑÖÃÎ»µ«ISRÉĞÎ´Ö´ĞĞ£¬Ôò²¹³¥±¾´ÎÒç³ö£¬·ÀÖ¹Ê±¼äÖµË²¼äµ¹ÍË¡£
+     * ä¸è¯»å–mstatusï¼Œé¿å…éƒ¨åˆ†å”¤é†’çŠ¶æ€ä¸‹è®¿é—®è¯¥CSRè§¦å‘éæ³•æŒ‡ä»¤ã€‚
+     * è‹¥è¯»å–æœŸé—´æº¢å‡ºä¸­æ–­æ”¹å˜äº†é«˜ä½è®¡æ•°ï¼Œåˆ™é‡æ–°è¯»å–ï¼›è‹¥æ›´æ–°æ ‡å¿—
+     * å·²ç½®ä½ä½†ISRå°šæœªæ‰§è¡Œï¼Œåˆ™è¡¥å¿æœ¬æ¬¡æº¢å‡ºï¼Œé˜²æ­¢æ—¶é—´å€¼ç¬é—´å€’é€€ã€‚
      */
     do {
         high_before = overflow_count;
@@ -117,10 +117,10 @@ uint32_t GetTimerCount(void)//»ñÈ¡¶¨Ê±Æ÷¼ÆÊı
 }
 
 /**
- * @brief ´¥·¢Ö¡¼ÆÊı£¨Ã¿Ö¡µ÷ÓÃÒ»´Î£©
+ * @brief è§¦å‘å¸§è®¡æ•°ï¼ˆæ¯å¸§è°ƒç”¨ä¸€æ¬¡ï¼‰
  * 
  */
-void FrameTrigger(void)//´¥·¢Ö¡¼ÆÊı
+void FrameTrigger(void)//è§¦å‘å¸§è®¡æ•°
 {
     uint32_t current_time = GetTimerCount();
     uint32_t delta_time = current_time - last_time;
@@ -128,22 +128,22 @@ void FrameTrigger(void)//´¥·¢Ö¡¼ÆÊı
     frame_count++;
     last_time = current_time;
     
-    // ÀÛ¼ÓÖ¡¼ä¸ô£¬ÓÃÓÚ0.5SÆ½¾ù
+    // ç´¯åŠ å¸§é—´éš”ï¼Œç”¨äº0.5Så¹³å‡
     if (delta_time > 0 && delta_time < ONE_SECOND) {
         sum_delta += delta_time;
         sample_count++;
-        if (instant_fps == 0) {//Ê×¸öÓĞĞ§Ö¡Á¢¼´ÏÔÊ¾£¬²»µÈ0.5S
+        if (instant_fps == 0) {//é¦–ä¸ªæœ‰æ•ˆå¸§ç«‹å³æ˜¾ç¤ºï¼Œä¸ç­‰0.5S
             instant_fps = 1000000 / delta_time;
         }
     }
     
-    if (start_time == 0) {//Ê×´Îµ÷ÓÃ£¬½ö³õÊ¼»¯¼ÆÊ±Æğµã
+    if (start_time == 0) {//é¦–æ¬¡è°ƒç”¨ï¼Œä»…åˆå§‹åŒ–è®¡æ—¶èµ·ç‚¹
         start_time = current_time;
         last_fps_update = current_time;
         return;
     }
     
-    // 0.5S¸üĞÂÒ»´ÎÖ¡ÂÊ£¬±ÜÃâÌø¶¯
+    // 0.5Sæ›´æ–°ä¸€æ¬¡å¸§ç‡ï¼Œé¿å…è·³åŠ¨
     if (current_time - last_fps_update >= 500000) {
         if (sample_count > 0 && sum_delta > 0) {
             instant_fps = (1000000 * sample_count) / sum_delta;
@@ -164,43 +164,43 @@ void FrameTrigger(void)//´¥·¢Ö¡¼ÆÊı
 }
 
 /**
- * @brief »ñÈ¡ÊµÊ±Ö¡ÂÊ£¨Ã¿Ö¡¸üĞÂ£©
+ * @brief è·å–å®æ—¶å¸§ç‡ï¼ˆæ¯å¸§æ›´æ–°ï¼‰
  * 
- * @return uint32_t ÊµÊ±Ö¡ÂÊ£¨tick£©
+ * @return uint32_t å®æ—¶å¸§ç‡ï¼ˆtickï¼‰
  */
-uint32_t GetFPS(void)//»ñÈ¡ÊµÊ±Ö¡ÂÊ
+uint32_t GetFPS(void)//è·å–å®æ—¶å¸§ç‡
 {
     return instant_fps;
 }
 
 /**
- * @brief »ñÈ¡×îµÍÖ¡ÂÊ£¨Ã¿Ö¡È¡Ñù£¬»ùÓÚ×î´óÖ¡¼ä¸ô£©
+ * @brief è·å–æœ€ä½å¸§ç‡ï¼ˆæ¯å¸§å–æ ·ï¼ŒåŸºäºæœ€å¤§å¸§é—´éš”ï¼‰
  * 
- * @return uint32_t ×îµÍÖ¡ÂÊ£¨tick£©
+ * @return uint32_t æœ€ä½å¸§ç‡ï¼ˆtickï¼‰
  */
-uint32_t GetLowestFPS(void)//»ñÈ¡×îµÍÖ¡ÂÊ£¨Ã¿Ö¡È¡Ñù£¬»ùÓÚ×î´óÖ¡¼ä¸ô£©
+uint32_t GetLowestFPS(void)//è·å–æœ€ä½å¸§ç‡ï¼ˆæ¯å¸§å–æ ·ï¼ŒåŸºäºæœ€å¤§å¸§é—´éš”ï¼‰
 {
     if (max_frame_time == 0) return 0;
-    return 1000000 / max_frame_time;  // 1 tick = 1us, ×îÂıÖ¡ºÄÊ± = ×îµÍÖ¡ÂÊ
+    return 1000000 / max_frame_time;  // 1 tick = 1us, æœ€æ…¢å¸§è€—æ—¶ = æœ€ä½å¸§ç‡
 }
 
 
 /**
- * @brief Íâ²¿¸üĞÂ×î´óÖ¡Ê±¼ä£¨ÓÉÊµ¼ÊÖ¡ºÄÊ±Çı¶¯£©
+ * @brief å¤–éƒ¨æ›´æ–°æœ€å¤§å¸§æ—¶é—´ï¼ˆç”±å®é™…å¸§è€—æ—¶é©±åŠ¨ï¼‰
  * 
- * @param duration Êµ¼ÊÖ¡ºÄÊ±£¨tick£©
+ * @param duration å®é™…å¸§è€—æ—¶ï¼ˆtickï¼‰
  */
-void UpdateMaxFrameTime(uint32_t duration)//Íâ²¿¸üĞÂ×î´óÖ¡Ê±¼ä£¨ÓÉÊµ¼ÊÖ¡ºÄÊ±Çı¶¯£©
+void UpdateMaxFrameTime(uint32_t duration)//å¤–éƒ¨æ›´æ–°æœ€å¤§å¸§æ—¶é—´ï¼ˆç”±å®é™…å¸§è€—æ—¶é©±åŠ¨ï¼‰
 {
     if (duration > max_frame_time) max_frame_time = duration;
 }
 
 
 /**
- * @brief ÖØÖÃÖ¡ÂÊ¼ÆÊı£¨ĞİÃß»½ĞÑºóµ÷ÓÃ£©
+ * @brief é‡ç½®å¸§ç‡è®¡æ•°ï¼ˆä¼‘çœ å”¤é†’åè°ƒç”¨ï¼‰
  * 
  */
-void ResetFPS(void)//ÖØÖÃÖ¡ÂÊ¼ÆÊı
+void ResetFPS(void)//é‡ç½®å¸§ç‡è®¡æ•°
 {
     fps = 0;
     frame_count = 0;
@@ -210,10 +210,10 @@ void ResetFPS(void)//ÖØÖÃÖ¡ÂÊ¼ÆÊı
 }
 
 /**
- * @brief ÖØÖÃ×îµÍÖ¡ÂÊ£¨ĞİÃß»½ĞÑºóµ÷ÓÃ£©
+ * @brief é‡ç½®æœ€ä½å¸§ç‡ï¼ˆä¼‘çœ å”¤é†’åè°ƒç”¨ï¼‰
  * 
  */
-void ResetLowestFPS(void)//ÖØÖÃ×îµÍÖ¡ÂÊ£¨ĞİÃß»½ĞÑºóµ÷ÓÃ£©
+void ResetLowestFPS(void)//é‡ç½®æœ€ä½å¸§ç‡ï¼ˆä¼‘çœ å”¤é†’åè°ƒç”¨ï¼‰
 {
     max_frame_time = 0;
 }

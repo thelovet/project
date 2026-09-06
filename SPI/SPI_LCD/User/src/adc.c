@@ -3,7 +3,7 @@
 #include "debug.h"
 
 /**
- * @brief  ´ò¿ªµçÑ¹²âÁ¿¿ª¹Ø£¨PB3ÖÃµÍ£©
+ * @brief  æ‰“å¼€ç”µå‹æµ‹é‡å¼€å…³ï¼ˆPB3ç½®ä½ï¼‰
  */
 static void VOLT_SW_Open(void)
 {
@@ -11,7 +11,7 @@ static void VOLT_SW_Open(void)
 }
 
 /**
- * @brief  ¹Ø±ÕµçÑ¹²âÁ¿¿ª¹Ø£¨PB3ÖÃ¸ß£©
+ * @brief  å…³é—­ç”µå‹æµ‹é‡å¼€å…³ï¼ˆPB3ç½®é«˜ï¼‰
  */
 static void VOLT_SW_Close(void)
 {
@@ -19,9 +19,9 @@ static void VOLT_SW_Close(void)
 }
 
 /**
- * @brief  ³õÊ¼»¯µç³ØµçÑ¹¼ì²âADCºÍPA15²âÁ¿¿ª¹Ø
- *         PA1(ADC1_Channel_1) Ä£ÄâÊäÈë
- *         PA15(VOLT_SW) ÍÆÍìÊä³ö(µÍµçÆ½=´ò¿ª²âÁ¿, ¸ßµçÆ½=¶Ï¿ª²âÁ¿)
+ * @brief  åˆå§‹åŒ–ç”µæ± ç”µå‹æ£€æµ‹ADCå’ŒPA15æµ‹é‡å¼€å…³
+ *         PA1(ADC1_Channel_1) æ¨¡æ‹Ÿè¾“å…¥
+ *         PA15(VOLT_SW) æ¨æŒ½è¾“å‡º(ä½ç”µå¹³=æ‰“å¼€æµ‹é‡, é«˜ç”µå¹³=æ–­å¼€æµ‹é‡)
  */
 void BAT_ADC_Init(void)
 {
@@ -30,14 +30,14 @@ void BAT_ADC_Init(void)
 
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_ADC1, ENABLE);
 
-    // PA15: µçÑ¹²âÁ¿¿ª¹Ø(ÍÆÍìÊä³ö, Ä¬ÈÏ¶Ï¿ª)
+    // PA15: ç”µå‹æµ‹é‡å¼€å…³(æ¨æŒ½è¾“å‡º, é»˜è®¤æ–­å¼€)
     GPIO_InitStructure.GPIO_Pin = VOLT_SW_PIN;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(VOLT_SW_PORT, &GPIO_InitStructure);
-    VOLT_SW_Close();  // Ä¬ÈÏ¹Ø±Õ
+    VOLT_SW_Close();  // é»˜è®¤å…³é—­
 
-    // PA1: ADCÄ£ÄâÊäÈë
+    // PA1: ADCæ¨¡æ‹Ÿè¾“å…¥
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
@@ -53,7 +53,7 @@ void BAT_ADC_Init(void)
     ADC_InitStructure.ADC_Pga = ADC_Pga_1;
     ADC_Init(ADC1, &ADC_InitStructure);
 
-    // Ê¹ÄÜÄÚ²¿ÎÂ¶È´«¸ĞÆ÷ºÍVREFINT
+    // ä½¿èƒ½å†…éƒ¨æ¸©åº¦ä¼ æ„Ÿå™¨å’ŒVREFINT
     ADC_TempSensorVrefintCmd(ENABLE);
 
     ADC_Cmd(ADC1, ENABLE);
@@ -63,32 +63,32 @@ void BAT_ADC_Init(void)
     ADC_StartCalibration(ADC1);
     while(ADC_GetCalibrationStatus(ADC1));
     
-    // ÎÈ¶¨ADC
+    // ç¨³å®šADC
     for(uint8_t i = 0; i < 3; i++) {
         BAT_ADC_ReadRaw();
     }
 }
 
 /**
- * @brief  ÇĞ»»ADCÍ¨µÀ²¢¶ªÆúÇ°¼¸´Î²ÉÑù
- * @param channel ADCÍ¨µÀ
+ * @brief  åˆ‡æ¢ADCé€šé“å¹¶ä¸¢å¼ƒå‰å‡ æ¬¡é‡‡æ ·
+ * @param channel ADCé€šé“
  */
 static void ADC_SwitchChannel(uint8_t channel)
 {
     ADC_RegularChannelConfig(ADC1, channel, 1, ADC_SampleTime_239Cycles5);
-    // ¶ªÆúÇ°¼¸´Î²ÉÑù£¬ÈÃ²ÉÑùµçÈİ³ä·ÅµçÎÈ¶¨
+    // ä¸¢å¼ƒå‰å‡ æ¬¡é‡‡æ ·ï¼Œè®©é‡‡æ ·ç”µå®¹å……æ”¾ç”µç¨³å®š
     for (uint8_t i = 0; i < 4; i++) {
         BAT_ADC_ReadRaw();
     }
 }
 
 /**
- * @brief  ¶ÁÈ¡ADCÔ­Ê¼Öµ
- * @return 12Î»ADC²ÉÑùÖµ (0-4095)
+ * @brief  è¯»å–ADCåŸå§‹å€¼
+ * @return 12ä½ADCé‡‡æ ·å€¼ (0-4095)
  */
 uint16_t BAT_ADC_ReadRaw(void)
 {
-    uint32_t timeout = 100000;  /* ·ÂÕæÊ±ADC²»¹¤×÷£¬³¬Ê±ÍË³ö±ÜÃâËÀÑ­»· */
+    uint32_t timeout = 100000;  /* ä»¿çœŸæ—¶ADCä¸å·¥ä½œï¼Œè¶…æ—¶é€€å‡ºé¿å…æ­»å¾ªç¯ */
     ADC_SoftwareStartConvCmd(ADC1, ENABLE);
     while(!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC)) {
         if (--timeout == 0) return 0;
@@ -97,9 +97,9 @@ uint16_t BAT_ADC_ReadRaw(void)
 }
 
 /**
- * @brief  ¶ÁÈ¡VREFINT£¬¼ÆËãÊµ¼ÊVDDA
- * @return Êµ¼ÊVDDAµçÑ¹Öµ (µ¥Î»: mV)
- *         Ô­Àí: VDDA = VREFINT_NOMINAL ¡Á 4096 / VREFINT_RAW
+ * @brief  è¯»å–VREFINTï¼Œè®¡ç®—å®é™…VDDA
+ * @return å®é™…VDDAç”µå‹å€¼ (å•ä½: mV)
+ *         åŸç†: VDDA = VREFINT_NOMINAL Ã— 4096 / VREFINT_RAW
  */
 static uint16_t ADC_GetVDDA(void)
 {
@@ -111,27 +111,27 @@ static uint16_t ADC_GetVDDA(void)
     }
     uint16_t vrefint_raw = (uint16_t)(sum / 8);
     
-    // VDDA = 1200mV ¡Á 4096 / vrefint_raw
+    // VDDA = 1200mV Ã— 4096 / vrefint_raw
     uint32_t vdda = ((uint32_t)VREFINT_NOMINAL * BAT_ADC_RESOLUTION) / vrefint_raw;
     return (uint16_t)vdda;
 }
 
 /**
- * @brief  ¶ÁÈ¡µç³ØµçÑ¹£¨¿¼ÂÇ·ÖÑ¹µçÂ·£©
- * @return µç³ØµçÑ¹Öµ (µ¥Î»: mV)
- *         ·ÖÑ¹µçÂ·: µç³ØµçÑ¹ = ADCÊäÈëµçÑ¹ ¡Á 2
- *         Âúµç4.2V ¡ú ADCÊäÈë2.1V
- *         ²âÁ¿Á÷³Ì: ÏÈ¶ÁVREFINTĞ£×¼VDDA ¡ú ÇĞ»»Í¨µÀ ¡ú ²ÉÑù
+ * @brief  è¯»å–ç”µæ± ç”µå‹ï¼ˆè€ƒè™‘åˆ†å‹ç”µè·¯ï¼‰
+ * @return ç”µæ± ç”µå‹å€¼ (å•ä½: mV)
+ *         åˆ†å‹ç”µè·¯: ç”µæ± ç”µå‹ = ADCè¾“å…¥ç”µå‹ Ã— 2
+ *         æ»¡ç”µ4.2V â†’ ADCè¾“å…¥2.1V
+ *         æµ‹é‡æµç¨‹: å…ˆè¯»VREFINTæ ¡å‡†VDDA â†’ åˆ‡æ¢é€šé“ â†’ é‡‡æ ·
  */
 uint16_t BAT_ADC_ReadVoltage(void)
 {
     VOLT_SW_Open();
     Delay_Ms(50);
     
-    // ¶ÁÈ¡VREFINT»ñÈ¡Êµ¼ÊVDDA£¨µç³Ø¹©µçÊ±VDDA»á±ä»¯£©
+    // è¯»å–VREFINTè·å–å®é™…VDDAï¼ˆç”µæ± ä¾›ç”µæ—¶VDDAä¼šå˜åŒ–ï¼‰
     uint16_t vdda = ADC_GetVDDA();
     
-    // ÇĞ»»µ½µç³ØADCÍ¨µÀ
+    // åˆ‡æ¢åˆ°ç”µæ± ADCé€šé“
     ADC_SwitchChannel(BAT_ADC_CHANNEL);
     
     uint32_t adc_sum = 0;
@@ -143,7 +143,7 @@ uint16_t BAT_ADC_ReadVoltage(void)
     
     VOLT_SW_Close();
     
-    // Ê¹ÓÃÊµ¼ÊVDDA¼ÆËã£¬¶ø·Ç¹Ì¶¨²Î¿¼µçÑ¹
+    // ä½¿ç”¨å®é™…VDDAè®¡ç®—ï¼Œè€Œéå›ºå®šå‚è€ƒç”µå‹
     uint32_t voltage = (adc_avg * vdda * BAT_DIVIDER_RATIO * BAT_ADC_CAL_MUL) 
                        / (BAT_ADC_RESOLUTION * BAT_ADC_CAL_DIV);
     return (uint16_t)voltage;

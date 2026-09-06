@@ -5,15 +5,15 @@
 #include "ch32v20x_rcc.h"
 #include "ch32v20x_usart.h"
 
-// ====== ÓïÒôIC¿ª¹Ø ======
-// PB3 ÍÆÍìÊä³ö£¬µÍµçÆ½´ò¿ªÓïÒôIC£¬¸ßµçÆ½¹Ø±Õ
+// ====== è¯­éŸ³ICå¼€å…³ ======
+// PB3 æŽ¨æŒ½è¾“å‡ºï¼Œä½Žç”µå¹³æ‰“å¼€è¯­éŸ³ICï¼Œé«˜ç”µå¹³å…³é—­
 #define VOICE_SW_RCC        RCC_APB2Periph_GPIOB
 #define VOICE_SW_PORT       GPIOB
 #define VOICE_SW_PIN        GPIO_Pin_3
 #define VOICE_SW_ON         GPIO_ResetBits(VOICE_SW_PORT, VOICE_SW_PIN)
 #define VOICE_SW_OFF        GPIO_SetBits(VOICE_SW_PORT, VOICE_SW_PIN)
 
-// ====== ÓïÒôIC UART1 ======
+// ====== è¯­éŸ³IC UART1 ======
 // PA9 = TX, PA10 = RX
 #define VOICE_UART          USART1
 #define VOICE_UART_RCC      RCC_APB2Periph_USART1
@@ -22,16 +22,16 @@
 #define VOICE_UART_RX_PORT  GPIOA
 #define VOICE_UART_RX_PIN   GPIO_Pin_10
 
-#define VOICE_UART_BAUDRATE 9600   // ²¨ÌØÂÊ(¸ù¾ÝÓïÒôICÊÖ²áµ÷Õû)
+#define VOICE_UART_BAUDRATE 9600   // æ³¢ç‰¹çŽ‡(æ ¹æ®è¯­éŸ³ICæ‰‹å†Œè°ƒæ•´)
 
-// ====== ÓïÒôICÐ­Òé (CH7800, MP3-TF-16P¼æÈÝ) ======
-// ¼ò»¯Ö¡: 7E CMD DH DL EF, ÎÞÐèÐ£ÑéºÍ
-// ÎÄ¼þÃû±ØÐëÎª 001.mp3 ~ 999.mp3 (´¿3Î»Êý×Ö)
-#define VOICE_CMD_PLAY_TRACK   0x03  // Ö¸¶¨¸èÇú²¥·Å
-#define VOICE_FRAME_START      0x7E  // ÆðÊ¼×Ö½Ú
-#define VOICE_FRAME_END        0xEF  // ½áÊø×Ö½Ú
-#define VOICE_BOOT_TRACK       1     // ¿ª»ú²¥·Å¸èÇúºÅ(001)
+// ====== è¯­éŸ³ICåè®® (CH7800, MP3-TF-16På…¼å®¹) ======
+// ç®€åŒ–å¸§: 7E CMD DH DL EF, æ— éœ€æ ¡éªŒå’Œ
+// æ–‡ä»¶åå¿…é¡»ä¸º 001.mp3 ~ 999.mp3 (çº¯3ä½æ•°å­—)
+#define VOICE_CMD_PLAY_TRACK   0x03  // æŒ‡å®šæ­Œæ›²æ’­æ”¾
+#define VOICE_FRAME_START      0x7E  // èµ·å§‹å­—èŠ‚
+#define VOICE_FRAME_END        0xEF  // ç»“æŸå­—èŠ‚
+#define VOICE_BOOT_TRACK       1     // å¼€æœºæ’­æ”¾æ­Œæ›²å·(001)
 
-void VOICE_SW_Init(void);     // GPIO¿ª¹Ø³õÊ¼»¯
+void VOICE_SW_Init(void);     // GPIOå¼€å…³åˆå§‹åŒ–
 
 #endif

@@ -3,7 +3,7 @@
 #include "settings.h"
 
 /**
- * @brief Èí¼şI2CÒı½Å¿ØÖÆºê
+ * @brief è½¯ä»¶I2Cå¼•è„šæ§åˆ¶å®
  */
 #define SCL_H()   GPIO_SetBits(TOUCH_SCL_PORT, TOUCH_SCL_PIN)
 #define SCL_L()   GPIO_ResetBits(TOUCH_SCL_PORT, TOUCH_SCL_PIN)
@@ -12,7 +12,7 @@
 #define SDA_RD()  GPIO_ReadInputDataBit(TOUCH_SDA_PORT, TOUCH_SDA_PIN)
 
 /**
- * @brief ´¥Ãş×ø±êÓ³Éä²ÎÊı
+ * @brief è§¦æ‘¸åæ ‡æ˜ å°„å‚æ•°
  */
 #define TOUCH_MAX_RAW  240
 #define TOUCH_MAP_MAX  240
@@ -20,12 +20,12 @@
 #define TOUCH_JUMP_CONFIRM_LIMIT_RAW  40
 
 /**
- * @brief È«¾Ö×´Ì¬±äÁ¿
- * @note  g_touch_int_flag: INT´¥·¢±êÖ¾, ISRÖÃ1, Touch_IsPressedÇåÁã
+ * @brief å…¨å±€çŠ¶æ€å˜é‡
+ * @note  g_touch_int_flag: INTè§¦å‘æ ‡å¿—, ISRç½®1, Touch_IsPressedæ¸…é›¶
  */
 static uint16_t g_touch_x = 0;
 static uint16_t g_touch_y = 0;
-uint8_t  g_touch_pressed = 0;  /* ´¥Ãş×´Ì¬, 1=ÓĞ´¥Ãş, 0=ÎŞ´¥Ãş */
+uint8_t  g_touch_pressed = 0;  /* è§¦æ‘¸çŠ¶æ€, 1=æœ‰è§¦æ‘¸, 0=æ— è§¦æ‘¸ */
 volatile uint8_t g_touch_int_flag = 0;
 static uint16_t g_touch_last_raw_x = 0;
 static uint16_t g_touch_last_raw_y = 0;
@@ -35,10 +35,10 @@ static uint8_t g_touch_have_valid_sample = 0;
 static uint8_t g_touch_have_pending_sample = 0;
 
 /**
- * @brief ´ı»ú»½ĞÑºó»Ö¸´Èí¼şI2CºÍ´¥ÃşÊäÈë£¬µ«²»¸´Î»CST816S
- * @note  ÓÃÓÚ¶ÁÈ¡´¥·¢»½ĞÑµÄÔ­Ê¼´¥Ãş×´Ì¬£¬È·ÈÏÍê³ÉºóÈÔĞèµ÷ÓÃTouch_Init
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief å¾…æœºå”¤é†’åæ¢å¤è½¯ä»¶I2Cå’Œè§¦æ‘¸è¾“å…¥ï¼Œä½†ä¸å¤ä½CST816S
+ * @note  ç”¨äºè¯»å–è§¦å‘å”¤é†’çš„åŸå§‹è§¦æ‘¸çŠ¶æ€ï¼Œç¡®è®¤å®Œæˆåä»éœ€è°ƒç”¨Touch_Init
+ * @param  æ— 
+ * @retval æ— 
  */
 void Touch_WakeResumeInit(void)
 {
@@ -48,8 +48,8 @@ void Touch_WakeResumeInit(void)
         RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB, ENABLE);
 
     /*
-     * ÏÈÉèÖÃÊä³ö¼Ä´æÆ÷ÔÙÇĞ»»Òı½ÅÄ£Ê½£¬±ÜÃâPB8²úÉú¶ÌµÍÂö³å£¬
-     * ·ñÔò»áÔÚ¶ÁÈ¡»½ĞÑ´¥ÃşÇ°¸´Î»CST816S¡£
+     * å…ˆè®¾ç½®è¾“å‡ºå¯„å­˜å™¨å†åˆ‡æ¢å¼•è„šæ¨¡å¼ï¼Œé¿å…PB8äº§ç”ŸçŸ­ä½è„‰å†²ï¼Œ
+     * å¦åˆ™ä¼šåœ¨è¯»å–å”¤é†’è§¦æ‘¸å‰å¤ä½CST816Sã€‚
      */
     GPIO_SetBits(TOUCH_SCL_PORT, TOUCH_SCL_PIN);
     GPIO_SetBits(TOUCH_SDA_PORT, TOUCH_SDA_PIN);
@@ -77,9 +77,9 @@ void Touch_WakeResumeInit(void)
 }
 
 /**
- * @brief SDA·½Ïò: Êä³ö
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief SDAæ–¹å‘: è¾“å‡º
+ * @param  æ— 
+ * @retval æ— 
  */
 static void SDA_OUT(void)
 {
@@ -93,9 +93,9 @@ static void SDA_OUT(void)
 }
 
 /**
- * @brief SDA·½Ïò: ÊäÈë(ÉÏÀ­)
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief SDAæ–¹å‘: è¾“å…¥(ä¸Šæ‹‰)
+ * @param  æ— 
+ * @retval æ— 
  */
 static void SDA_IN(void)
 {
@@ -107,9 +107,9 @@ static void SDA_IN(void)
 }
 
 /**
- * @brief Èí¼şI2C: STARTĞÅºÅ
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief è½¯ä»¶I2C: STARTä¿¡å·
+ * @param  æ— 
+ * @retval æ— 
  */
 static void I2C_Start(void)
 {
@@ -123,9 +123,9 @@ static void I2C_Start(void)
 }
 
 /**
- * @brief Èí¼şI2C: STOPĞÅºÅ
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief è½¯ä»¶I2C: STOPä¿¡å·
+ * @param  æ— 
+ * @retval æ— 
  */
 static void I2C_Stop(void)
 {
@@ -138,9 +138,9 @@ static void I2C_Stop(void)
 }
 
 /**
- * @brief Èí¼şI2C: µÈ´ı´Ó»úACK
- * @param  ÎŞ
- * @retval 0=ACK, 1=³¬Ê±NACK
+ * @brief è½¯ä»¶I2C: ç­‰å¾…ä»æœºACK
+ * @param  æ— 
+ * @retval 0=ACK, 1=è¶…æ—¶NACK
  */
 static uint8_t I2C_WaitAck(void)
 {
@@ -162,9 +162,9 @@ static uint8_t I2C_WaitAck(void)
 }
 
 /**
- * @brief Èí¼şI2C: ·¢ËÍACK
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief è½¯ä»¶I2C: å‘é€ACK
+ * @param  æ— 
+ * @retval æ— 
  */
 static void I2C_Ack(void)
 {
@@ -179,9 +179,9 @@ static void I2C_Ack(void)
 }
 
 /**
- * @brief Èí¼şI2C: ·¢ËÍNACK
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief è½¯ä»¶I2C: å‘é€NACK
+ * @param  æ— 
+ * @retval æ— 
  */
 static void I2C_Nack(void)
 {
@@ -196,9 +196,9 @@ static void I2C_Nack(void)
 }
 
 /**
- * @brief Èí¼şI2C: ·¢ËÍÒ»¸ö×Ö½Ú
- * @param  dat ´ı·¢ËÍµÄ8Î»Êı¾İ
- * @retval ÎŞ
+ * @brief è½¯ä»¶I2C: å‘é€ä¸€ä¸ªå­—èŠ‚
+ * @param  dat å¾…å‘é€çš„8ä½æ•°æ®
+ * @retval æ— 
  */
 static void I2C_SendByte(uint8_t dat)
 {
@@ -220,9 +220,9 @@ static void I2C_SendByte(uint8_t dat)
 }
 
 /**
- * @brief Èí¼şI2C: ¶ÁÈ¡Ò»¸ö×Ö½Ú
- * @param  ack 1=·¢ËÍÓ¦´ğACK, 0=·¢ËÍ·ÇÓ¦´ğNACK
- * @retval ¶ÁÈ¡µ½µÄ8Î»Êı¾İ
+ * @brief è½¯ä»¶I2C: è¯»å–ä¸€ä¸ªå­—èŠ‚
+ * @param  ack 1=å‘é€åº”ç­”ACK, 0=å‘é€éåº”ç­”NACK
+ * @retval è¯»å–åˆ°çš„8ä½æ•°æ®
  */
 static uint8_t I2C_ReadByte(uint8_t ack)
 {
@@ -246,10 +246,10 @@ static uint8_t I2C_ReadByte(uint8_t ack)
 }
 
 /**
- * @brief CST816S Ğ´¼Ä´æÆ÷
- * @param  reg  ¼Ä´æÆ÷µØÖ·
- * @param  data Ğ´ÈëÖµ
- * @retval 1=³É¹¦, 0=Ê§°Ü
+ * @brief CST816S å†™å¯„å­˜å™¨
+ * @param  reg  å¯„å­˜å™¨åœ°å€
+ * @param  data å†™å…¥å€¼
+ * @retval 1=æˆåŠŸ, 0=å¤±è´¥
  */
 static uint8_t CST816S_WriteReg(uint8_t reg, uint8_t data)
 {
@@ -268,11 +268,11 @@ err:
 }
 
 /**
- * @brief CST816S ¶Á¼Ä´æÆ÷
- * @param  reg ÆğÊ¼¼Ä´æÆ÷µØÖ·
- * @param  buf Êı¾İ»º³åÇø
- * @param  len ¶ÁÈ¡³¤¶È
- * @retval 1=³É¹¦, 0=Ê§°Ü
+ * @brief CST816S è¯»å¯„å­˜å™¨
+ * @param  reg èµ·å§‹å¯„å­˜å™¨åœ°å€
+ * @param  buf æ•°æ®ç¼“å†²åŒº
+ * @param  len è¯»å–é•¿åº¦
+ * @retval 1=æˆåŠŸ, 0=å¤±è´¥
  */
 static uint8_t CST816S_ReadReg(uint8_t reg, uint8_t *buf, uint8_t len)
 {
@@ -298,9 +298,9 @@ err:
 
 
 /**
- * @brief µÈ´ı´¥ÃşÊäÈëÊÍ·Å
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief ç­‰å¾…è§¦æ‘¸è¾“å…¥é‡Šæ”¾
+ * @param  æ— 
+ * @retval æ— 
  */
 void Touch_WaitWakeInputsReleased(void)
 {
@@ -321,8 +321,8 @@ void Touch_WaitWakeInputsReleased(void)
     SDA_H();
 
     /*
-     * INTÖ»±íÊ¾´¥ÃşÊÂ¼ş£¬²»ÄÜÖ±½Ó´ú±íÊÖÖ¸ÊÍ·Å¡£
-     * ³ÖĞø¶ÁÈ¡ÊÖÖ¸ÊıºÍ×ø±ê£¬Ïû·ÑÎ´´¦ÀíÊÂ¼ş£¬Ö±µ½ÎÈ¶¨ÊÍ·Å100ms¡£
+     * INTåªè¡¨ç¤ºè§¦æ‘¸äº‹ä»¶ï¼Œä¸èƒ½ç›´æ¥ä»£è¡¨æ‰‹æŒ‡é‡Šæ”¾ã€‚
+     * æŒç»­è¯»å–æ‰‹æŒ‡æ•°å’Œåæ ‡ï¼Œæ¶ˆè´¹æœªå¤„ç†äº‹ä»¶ï¼Œç›´åˆ°ç¨³å®šé‡Šæ”¾100msã€‚
      */
     while (stable_count < 20) {
         uint8_t fingers = 0;
@@ -335,7 +335,7 @@ void Touch_WaitWakeInputsReleased(void)
                 CST816S_ReadReg(CST816S_REG_XH, coords, 5);
             }
         } else {
-            /* ´¥Ãşµôµç»òI2C²»¿ÉÓÃÊ±ÍË»ØINTµçÆ½ÅĞ¶Ï¡£ */
+            /* è§¦æ‘¸æ‰ç”µæˆ–I2Cä¸å¯ç”¨æ—¶é€€å›INTç”µå¹³åˆ¤æ–­ã€‚ */
             touch_released =
                 (GPIO_ReadInputDataBit(TOUCH_INT_PORT, TOUCH_INT_PIN) == Bit_SET);
         }
@@ -353,10 +353,10 @@ void Touch_WaitWakeInputsReleased(void)
 }
 
 /**
- * @brief ×ø±êÓ³Éä: raw Ó³Éäµ½ 0~239
- * @param  raw    Ô­Ê¼×ø±ê (0~240)
- * @param  mirror ÊÇ·ñ¾µÏñ
- * @retval Ó³Éäºó×ø±ê (0~239)
+ * @brief åæ ‡æ˜ å°„: raw æ˜ å°„åˆ° 0~239
+ * @param  raw    åŸå§‹åæ ‡ (0~240)
+ * @param  mirror æ˜¯å¦é•œåƒ
+ * @retval æ˜ å°„ååæ ‡ (0~239)
  */
 static uint16_t MapCoord(uint16_t raw, uint8_t mirror)
 {
@@ -368,9 +368,9 @@ static uint16_t MapCoord(uint16_t raw, uint8_t mirror)
     return mapped;
 }
 /**
- * @brief  Á½Êı²î¾ø¶ÔÖµ¡£
- * @param  a µÚÒ»¸öÊı
- * @param  b µÚ¶ş¸öÊı
+ * @brief  ä¸¤æ•°å·®ç»å¯¹å€¼ã€‚
+ * @param  a ç¬¬ä¸€ä¸ªæ•°
+ * @param  b ç¬¬äºŒä¸ªæ•°
  * @return |a-b|
  */
 
@@ -379,7 +379,7 @@ static uint16_t Touch_AbsDiff(uint16_t a, uint16_t b)
     return (a >= b) ? (a - b) : (b - a);
 }
 /**
- * @brief  ÖØÖÃ´¥Ãş×ø±êÂË²¨/È¥¶¶×´Ì¬¡£
+ * @brief  é‡ç½®è§¦æ‘¸åæ ‡æ»¤æ³¢/å»æŠ–çŠ¶æ€ã€‚
  */
 
 static void Touch_ResetCoordFilter(void)
@@ -388,10 +388,10 @@ static void Touch_ResetCoordFilter(void)
     g_touch_have_pending_sample = 0;
 }
 /**
- * @brief  Ó¦ÓÃÒ»´ÎÔ­Ê¼×ø±ê(ÂË²¨/È¥¶¶, ÅĞ¶¨ÊÇ·ñÓĞĞ§)¡£
- * @param  raw_x Ô­Ê¼ X
- * @param  raw_y Ô­Ê¼ Y
- * @return 1=×ø±êÓĞĞ§, 0=ºöÂÔ
+ * @brief  åº”ç”¨ä¸€æ¬¡åŸå§‹åæ ‡(æ»¤æ³¢/å»æŠ–, åˆ¤å®šæ˜¯å¦æœ‰æ•ˆ)ã€‚
+ * @param  raw_x åŸå§‹ X
+ * @param  raw_y åŸå§‹ Y
+ * @return 1=åæ ‡æœ‰æ•ˆ, 0=å¿½ç•¥
  */
 
 static uint8_t Touch_TryApplyCoords(uint16_t raw_x, uint16_t raw_y)
@@ -424,7 +424,7 @@ static uint8_t Touch_TryApplyCoords(uint16_t raw_x, uint16_t raw_y)
     {
         uint16_t mx = MapCoord(raw_x, 0);
         uint16_t my = MapCoord(raw_y, 0);
-        /* ¸ù¾İÆÁÄ»·½ÏòĞı×ª´¥Ãş×ø±ê */
+        /* æ ¹æ®å±å¹•æ–¹å‘æ—‹è½¬è§¦æ‘¸åæ ‡ */
         switch (g_orientation_index) {
         case 0: g_touch_x = mx;        g_touch_y = my;        break;
         case 1: g_touch_x = my;        g_touch_y = 239 - mx;  break;
@@ -441,47 +441,47 @@ static uint8_t Touch_TryApplyCoords(uint16_t raw_x, uint16_t raw_y)
 }
 
 /**
- * @brief ´¥Ãş³õÊ¼»¯ (Èí¼şI2C + INTÖĞ¶Ï)
- * @note  1. GPIO³õÊ¼»¯ (SCL/SDA/RST)  2. Ó²¼ş¸´Î»  3. ¼ì²âĞ¾Æ¬ID²¢È·ÈÏI2C
- *        4. Ğ´0xFA=0x40Ê¹ÄÜINT  5. ÅäÖÃPA8 EXTIÖĞ¶Ï¼ì²â
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief è§¦æ‘¸åˆå§‹åŒ– (è½¯ä»¶I2C + INTä¸­æ–­)
+ * @note  1. GPIOåˆå§‹åŒ– (SCL/SDA/RST)  2. ç¡¬ä»¶å¤ä½  3. æ£€æµ‹èŠ¯ç‰‡IDå¹¶ç¡®è®¤I2C
+ *        4. å†™0xFA=0x40ä½¿èƒ½INT  5. é…ç½®PA8 EXTIä¸­æ–­æ£€æµ‹
+ * @param  æ— 
+ * @retval æ— 
  */
 void Touch_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure = {0};
 
-    /* 1. GPIO³õÊ¼»¯ (SCL/SDA/RST) */
+    /* 1. GPIOåˆå§‹åŒ– (SCL/SDA/RST) */
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB, ENABLE);
 
-    /* SCL: PB10 ÍÆÍìÊä³ö */
+    /* SCL: PB10 æ¨æŒ½è¾“å‡º */
     GPIO_InitStructure.GPIO_Pin   = TOUCH_SCL_PIN;
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(TOUCH_SCL_PORT, &GPIO_InitStructure);
     SCL_H();
 
-    /* SDA: PB11 ÍÆÍìÊä³ö */
+    /* SDA: PB11 æ¨æŒ½è¾“å‡º */
     GPIO_InitStructure.GPIO_Pin   = TOUCH_SDA_PIN;
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(TOUCH_SDA_PORT, &GPIO_InitStructure);
     SDA_H();
 
-    /* RST: PB8 ÍÆÍìÊä³ö */
+    /* RST: PB8 æ¨æŒ½è¾“å‡º */
     GPIO_InitStructure.GPIO_Pin   = TOUCH_RST_PIN;
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
     GPIO_Init(TOUCH_RST_PORT, &GPIO_InitStructure);
     GPIO_SetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
 
-    /* 2. Ó²¼ş¸´Î»Ê±Ğò (À­µÍÔÙÀ­¸ß) */
+    /* 2. ç¡¬ä»¶å¤ä½æ—¶åº (æ‹‰ä½å†æ‹‰é«˜) */
     GPIO_ResetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
     Delay_Ms(10);
     GPIO_SetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
-    Delay_Ms(100);   /* CST816S ¸´Î»ÒªÇó: µÍµçÆ½>50ms, µÈ´ı100~200ms */
+    Delay_Ms(100);   /* CST816S å¤ä½è¦æ±‚: ä½ç”µå¹³>50ms, ç­‰å¾…100~200ms */
 
-    /* 3. ÑéÖ¤I2CÍ¨ĞÅ: ¶ÁĞ¾Æ¬ID (0xA7, Ô¤ÆÚ0xB4»ò0xB5), Ê§°ÜÖØÊÔ */
+    /* 3. éªŒè¯I2Cé€šä¿¡: è¯»èŠ¯ç‰‡ID (0xA7, é¢„æœŸ0xB4æˆ–0xB5), å¤±è´¥é‡è¯• */
     {
         uint8_t chip_id, retry = 0;
         do {
@@ -489,24 +489,24 @@ void Touch_Init(void)
         } while (!CST816S_ReadReg(CST816S_REG_CHIPID, &chip_id, 1) && ++retry < 5);
     }
 
-    /* 4. ÅäÖÃÖĞ¶Ï¿ØÖÆ¼Ä´æÆ÷: 0xFA = 0x40 (ÆôÓÃINT´¥·¢) */
+    /* 4. é…ç½®ä¸­æ–­æ§åˆ¶å¯„å­˜å™¨: 0xFA = 0x40 (å¯ç”¨INTè§¦å‘) */
     CST816S_WriteReg(CST816S_REG_IRQCTL, CST816S_IRQ_ENABLE);
     Delay_Ms(10);
 
-    /* 5. ½ûÓÃ×Ô¶¯ĞİÃß (±£Ö¤ÔËĞĞÆÚ¼ä´¥ÃşÏìÓ¦¼´Ê±) */
+    /* 5. ç¦ç”¨è‡ªåŠ¨ä¼‘çœ  (ä¿è¯è¿è¡ŒæœŸé—´è§¦æ‘¸å“åº”å³æ—¶) */
     CST816S_SleepDisable();
 
-    /* 6. ÅäÖÃPA8 EXTIÖĞ¶Ï¼ì²â */
+    /* 6. é…ç½®PA8 EXTIä¸­æ–­æ£€æµ‹ */
     {
         EXTI_InitTypeDef EXTI_InitStructure = {0};
         NVIC_InitTypeDef NVIC_InitStructure = {0};
 
-        /* PA8: ÉÏÀ­ÊäÈë */
+        /* PA8: ä¸Šæ‹‰è¾“å…¥ */
         GPIO_InitStructure.GPIO_Pin  = TOUCH_INT_PIN;
         GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
         GPIO_Init(TOUCH_INT_PORT, &GPIO_InitStructure);
 
-        /* EXTI8 ÖĞ¶ÏÅäÖÃ */
+        /* EXTI8 ä¸­æ–­é…ç½® */
         RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
         GPIO_EXTILineConfig(GPIO_PortSourceGPIOA, GPIO_PinSource8);
         EXTI_InitStructure.EXTI_Line    = EXTI_Line8;
@@ -528,15 +528,15 @@ void Touch_Init(void)
 }
 
 /**
- * @brief EXTI9_5ÖĞ¶Ï·şÎñ: PA8 INTÒı½Å ´¥Ãş
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief EXTI9_5ä¸­æ–­æœåŠ¡: PA8 INTå¼•è„š è§¦æ‘¸
+ * @param  æ— 
+ * @retval æ— 
  */
 void EXTI9_5_IRQHandler(void)
     __attribute__((interrupt("WCH-Interrupt-fast"), used, externally_visible));
 /**
- * @brief  ´¥ÃşÍâ²¿ÖĞ¶Ï(EXTI9_5)´¦Àí¡£
- * @note   ±ê×¼ ISR, »½ĞÑ/±ê¼Ç´¥ÃşÊÂ¼ş¡£
+ * @brief  è§¦æ‘¸å¤–éƒ¨ä¸­æ–­(EXTI9_5)å¤„ç†ã€‚
+ * @note   æ ‡å‡† ISR, å”¤é†’/æ ‡è®°è§¦æ‘¸äº‹ä»¶ã€‚
  */
 void EXTI9_5_IRQHandler(void)
 {
@@ -548,9 +548,9 @@ void EXTI9_5_IRQHandler(void)
 }
 
 /*********************************************************************
- * @brief  ÆôÓÃCST816S×Ô¶¯ĞİÃß (´ı»úÇ°µ÷ÓÃ, ½µµÍ¹¦ºÄ)
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief  å¯ç”¨CST816Sè‡ªåŠ¨ä¼‘çœ  (å¾…æœºå‰è°ƒç”¨, é™ä½åŠŸè€—)
+ * @param  æ— 
+ * @retval æ— 
  **********************************************************************/
 void CST816S_SleepEnable(void)
 {
@@ -560,9 +560,9 @@ void CST816S_SleepEnable(void)
 }
 
 /*********************************************************************
- * @brief  ½ûÓÃCST816S×Ô¶¯ĞİÃß (³õÊ¼»¯/»½ĞÑºóµ÷ÓÃ, ±£Ö¤´¥Ãş¼´Ê±ÏìÓ¦)
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief  ç¦ç”¨CST816Sè‡ªåŠ¨ä¼‘çœ  (åˆå§‹åŒ–/å”¤é†’åè°ƒç”¨, ä¿è¯è§¦æ‘¸å³æ—¶å“åº”)
+ * @param  æ— 
+ * @retval æ— 
  **********************************************************************/
 void CST816S_SleepDisable(void)
 {
@@ -570,9 +570,9 @@ void CST816S_SleepDisable(void)
 }
 
 /**
- * @brief »ñÈ¡´¥Ãş×´Ì¬ (¶ÁÈ¡»º´æ, ÎŞI2C, ¿ìËÙ·µ»Ø)
- * @param  state TouchState½á¹¹ÌåÖ¸Õë, ÓÃÓÚÌî³äÊı¾İ
- * @retval ÎŞ
+ * @brief è·å–è§¦æ‘¸çŠ¶æ€ (è¯»å–ç¼“å­˜, æ— I2C, å¿«é€Ÿè¿”å›)
+ * @param  state TouchStateç»“æ„ä½“æŒ‡é’ˆ, ç”¨äºå¡«å……æ•°æ®
+ * @retval æ— 
  */
 void Touch_Scan(TouchState *state)
 {
@@ -583,21 +583,21 @@ void Touch_Scan(TouchState *state)
 
 
 /**
- * @brief INTÒı½Å´¥Ãş¼ì²â (ÓÉINT´¥·¢, ÖĞ¶Ïµ÷ÓÃ)
- * @note  CST816SÄ£Ê½(0xFA=0x40): °´ÏÂ·¢INT, ³ÖĞø°´·¢INT, Ì§Æğ·¢INT, ¶¼·¢INT
- *        g_triggeredÂß¼­: Ê×´Î°´ÏÂ·µ»Ø1, ËÉ¿ªÖØÖÃ0, ³ÖĞø°´ÏÂ·µ»Ø0
- * @param  ÎŞ
- * @retval 1=Ê×´Î°´ÏÂ, 0=ÎŞ´¥Ãş
+ * @brief INTå¼•è„šè§¦æ‘¸æ£€æµ‹ (ç”±INTè§¦å‘, ä¸­æ–­è°ƒç”¨)
+ * @note  CST816Sæ¨¡å¼(0xFA=0x40): æŒ‰ä¸‹å‘INT, æŒç»­æŒ‰å‘INT, æŠ¬èµ·å‘INT, éƒ½å‘INT
+ *        g_triggeredé€»è¾‘: é¦–æ¬¡æŒ‰ä¸‹è¿”å›1, æ¾å¼€é‡ç½®0, æŒç»­æŒ‰ä¸‹è¿”å›0
+ * @param  æ— 
+ * @retval 1=é¦–æ¬¡æŒ‰ä¸‹, 0=æ— è§¦æ‘¸
  */
 uint8_t Touch_IsPressed(void)
 {
-    static uint8_t g_triggered = 0;  /* ´¥·¢×´Ì¬, ÓÃÓÚ·ÀÖ¹ÖØ¸´ÉÏ±¨ */
+    static uint8_t g_triggered = 0;  /* è§¦å‘çŠ¶æ€, ç”¨äºé˜²æ­¢é‡å¤ä¸ŠæŠ¥ */
 
     if (g_touch_int_flag)
     {
         g_touch_int_flag = 0;
 
-        /* ¶ÁÈ¡´¥ÃşµãÊıÁ¿, ×öÊÍ·Å/°´ÏÂÅĞ¶Ï */
+        /* è¯»å–è§¦æ‘¸ç‚¹æ•°é‡, åšé‡Šæ”¾/æŒ‰ä¸‹åˆ¤æ–­ */
         uint8_t fingers;
         if (!CST816S_ReadReg(CST816S_REG_FINGERNUM, &fingers, 1))
         {
@@ -613,7 +613,7 @@ uint8_t Touch_IsPressed(void)
             return 0;
         }
 
-        /* °´ÏÂ: ¶ÁÈ¡´¥Ãş×ø±êµ½È«¾Ö±äÁ¿ (Ó³Éäºó×ø±ê) */
+        /* æŒ‰ä¸‹: è¯»å–è§¦æ‘¸åæ ‡åˆ°å…¨å±€å˜é‡ (æ˜ å°„ååæ ‡) */
         {
             uint8_t buf[5];
             if (!CST816S_ReadReg(CST816S_REG_XH, buf, 5)) {
@@ -627,15 +627,15 @@ uint8_t Touch_IsPressed(void)
 
         g_touch_pressed = 1;
 
-        /* Ê×´Î¼ì²âµ½ ²Å·µ»Ø1 (Ê×´Î°´ÏÂ) */
+        /* é¦–æ¬¡æ£€æµ‹åˆ° æ‰è¿”å›1 (é¦–æ¬¡æŒ‰ä¸‹) */
         if (!g_triggered)
         {
             g_triggered = 1;
             return 1;
         }
-        /* ³ÖĞø°´ ²Å·µ»Ø0 (ÒÑ´¥·¢¹ı, ±ÜÃâÖØ¸´ÉÏ±¨) */
+        /* æŒç»­æŒ‰ æ‰è¿”å›0 (å·²è§¦å‘è¿‡, é¿å…é‡å¤ä¸ŠæŠ¥) */
     }
-    /* ÎŞINTµ«×´Ì¬ÈÔÎª°´ÏÂ: ÂÖÑ¯I2C¼ì²âÊÇ·ñÂ©µôÁËÊÍ·ÅINT */
+    /* æ— INTä½†çŠ¶æ€ä»ä¸ºæŒ‰ä¸‹: è½®è¯¢I2Cæ£€æµ‹æ˜¯å¦æ¼æ‰äº†é‡Šæ”¾INT */
     else if (g_touch_pressed)
     {
         uint8_t fingers;
@@ -686,9 +686,9 @@ void Touch_UpdateCoords(void)
 }
 
 /**
- * @brief  ÅäÖÃ PA8 ´¥Ãş»½ĞÑ¹¦ÄÜ (StandbyÄ£Ê½)
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief  é…ç½® PA8 è§¦æ‘¸å”¤é†’åŠŸèƒ½ (Standbyæ¨¡å¼)
+ * @param  æ— 
+ * @retval æ— 
  */
 void Touch_StandbyWakeupConfig(void)
 {
@@ -696,13 +696,13 @@ void Touch_StandbyWakeupConfig(void)
 
     RCC_APB2PeriphClockCmd(TOUCH_INT_RCC | RCC_APB2Periph_AFIO, ENABLE);
 
-    /* PA8: ÉÏÀ­ÊäÈë */
+    /* PA8: ä¸Šæ‹‰è¾“å…¥ */
     GPIO_InitTypeDef GPIO_InitStructure = {0};
     GPIO_InitStructure.GPIO_Pin   = TOUCH_INT_PIN;
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPU;
     GPIO_Init(TOUCH_INT_PORT, &GPIO_InitStructure);
 
-    /* EXTI8 ÊÂ¼şÅäÖÃ (ÎŞÖĞ¶Ï, ½öÓÃÓÚStandby»½ĞÑ) */
+    /* EXTI8 äº‹ä»¶é…ç½® (æ— ä¸­æ–­, ä»…ç”¨äºStandbyå”¤é†’) */
     GPIO_EXTILineConfig(GPIO_PortSourceGPIOA, GPIO_PinSource8);
     EXTI_InitStructure.EXTI_Line    = EXTI_Line8;
     EXTI_InitStructure.EXTI_Mode    = EXTI_Mode_Event;

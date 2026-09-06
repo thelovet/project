@@ -3,46 +3,46 @@
 
 #include "ch32v20x.h"
 
-/* ÓÎÏ·²ÎÊı */
-#define D2048_ROWS       4    /* 4ĞĞ */
-#define D2048_COLS       4    /* 4ÁĞ */
-#define D2048_TILE_SIZE  40   /* Ã¿¸ö¸ñ×Ó³ß´ç40x40 */
-#define D2048_GAP        5    /* ¸ñ×Ó¼ä¾à */
+/* æ¸¸æˆå‚æ•° */
+#define D2048_ROWS       4    /* 4è¡Œ */
+#define D2048_COLS       4    /* 4åˆ— */
+#define D2048_TILE_SIZE  40   /* æ¯ä¸ªæ ¼å­å°ºå¯¸40x40 */
+#define D2048_GAP        5    /* æ ¼å­é—´è· */
 #define D2048_GRID_W     (D2048_COLS * D2048_TILE_SIZE + (D2048_COLS - 1) * D2048_GAP)  /* 175 */
 #define D2048_GRID_X     ((240 - D2048_GRID_W) / 2)   /* 32 */
-#define D2048_GRID_Y     36   /* Íø¸ñYÆğµã (ÉÏ·½Áô¿Õ¸ø·ÖÊı) */
+#define D2048_GRID_Y     36   /* ç½‘æ ¼Yèµ·ç‚¹ (ä¸Šæ–¹ç•™ç©ºç»™åˆ†æ•°) */
 
-/* 16x32 Êı×Ö¾ÓÖĞÆ«ÒÆ */
+/* 16x32 æ•°å­—å±…ä¸­åç§» */
 #define D2048_DIGIT_W    16
 #define D2048_DIGIT_H    32
 #define D2048_DIGIT_OFFX ((D2048_TILE_SIZE - D2048_DIGIT_W) / 2)  /* 12 */
 #define D2048_DIGIT_OFFY ((D2048_TILE_SIZE - D2048_DIGIT_H) / 2)  /* 4 */
 
-/* ·ÖÊıÏÔÊ¾Î»ÖÃ */
+/* åˆ†æ•°æ˜¾ç¤ºä½ç½® */
 #define D2048_SCORE_X    120
 #define D2048_SCORE_Y    8
 
 /**
- * @brief 2048 ÓÎÏ·×´Ì¬
+ * @brief 2048 æ¸¸æˆçŠ¶æ€
  */
 typedef enum {
-    D2048_STATE_PLAYING = 0,   /* ÓÎÏ·½øĞĞÖĞ */
-    D2048_STATE_WON,           /* ´ï³É2048 */
-    D2048_STATE_LOST,          /* ÎŞ¿ÉÓÃÒÆ¶¯ */
-    D2048_STATE_EXIT_MENU,     /* ÍË³ö²Ëµ¥ÖĞ */
-    D2048_STATE_RESTART_MENU,  /* ÖØĞÂ¿ªÊ¼²Ëµ¥ */
+    D2048_STATE_PLAYING = 0,   /* æ¸¸æˆè¿›è¡Œä¸­ */
+    D2048_STATE_WON,           /* è¾¾æˆ2048 */
+    D2048_STATE_LOST,          /* æ— å¯ç”¨ç§»åŠ¨ */
+    D2048_STATE_EXIT_MENU,     /* é€€å‡ºèœå•ä¸­ */
+    D2048_STATE_RESTART_MENU,  /* é‡æ–°å¼€å§‹èœå• */
 } D2048State;
 
 /**
- * @brief ³õÊ¼»¯ / ¸üĞÂ / ÖØÆô / ´¥Ãş¸´Î»
+ * @brief åˆå§‹åŒ– / æ›´æ–° / é‡å¯ / è§¦æ‘¸å¤ä½
  */
 void    d2048_init(void);
-uint8_t d2048_update(void);    /* ·µ»Ø: 0=ÎŞ½»»¥, 1=ÓĞ½»»¥, 2=·µ»ØÊÓÆµ, 3=ÇĞ»»ÍÆÏä×Ó */
+uint8_t d2048_update(void);    /* è¿”å›: 0=æ— äº¤äº’, 1=æœ‰äº¤äº’, 2=è¿”å›è§†é¢‘, 3=åˆ‡æ¢æ¨ç®±å­ */
 void    d2048_reset_touch(void);
 void    d2048_full_redraw(void);
 uint8_t d2048_is_menu_visible(void);
 void    d2048_lowbatt_restore(void);
-/* ²Ëµ¥×´Ì¬»ú hook (¹©¶ş¼¶ÉèÖÃ²Ëµ¥·µ»Ø¸´ÓÃ, ÓëÒ»¼¶²Ëµ¥Ò»ÖÂ) */
+/* èœå•çŠ¶æ€æœº hook (ä¾›äºŒçº§è®¾ç½®èœå•è¿”å›å¤ç”¨, ä¸ä¸€çº§èœå•ä¸€è‡´) */
 void d2048_menu_mark_dirty(void);
 uint8_t d2048_menu_bg_redraw(void);
 uint8_t d2048_save_state(uint8_t *buf, uint8_t max_len);

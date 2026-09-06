@@ -3,21 +3,21 @@
 
 #include "lcd.h"
 
-// µç³Ø×´Ì¬
+// ç”µæ± çŠ¶æ€
 typedef enum {
-    BAT_NORMAL = 0,   // Î´³äµç
-    BAT_CHARGING,     // ³äµçÖĞ
-    BAT_FULL          // ÒÑ³äÂú
+    BAT_NORMAL = 0,   // æœªå……ç”µ
+    BAT_CHARGING,     // å……ç”µä¸­
+    BAT_FULL          // å·²å……æ»¡
 } BatteryStatus;
 
-// µç³ØµµÎ»£¬¾ßÌåÅĞ¶ÏµçÑ¹ÓÉ³äµçºÍÓÎÏ·½Ó¿Ú·Ö±ğ¶¨Òå
+// ç”µæ± æ¡£ä½ï¼Œå…·ä½“åˆ¤æ–­ç”µå‹ç”±å……ç”µå’Œæ¸¸æˆæ¥å£åˆ†åˆ«å®šä¹‰
 typedef enum {
     BAT_LEVEL_0 = 0,
     BAT_LEVEL_1,
     BAT_LEVEL_2,
     BAT_LEVEL_3,
     BAT_LEVEL_4,
-    BAT_LEVEL_5   // Âú¸ñ5¸ñ (Óë³äµçÆÁÍ³Ò»)
+    BAT_LEVEL_5   // æ»¡æ ¼5æ ¼ (ä¸å……ç”µå±ç»Ÿä¸€)
 } BatteryLevel;
 
 void Battery_Init(void);
@@ -28,6 +28,6 @@ BatteryLevel Battery_ChargeVoltageToLevel(uint16_t voltage_mv);
 BatteryLevel Battery_GameVoltageToLevel(uint16_t voltage_mv);
 void Battery_GameLevelAllowIncrease(void);
 void Battery_DrawIcon(BatteryStatus status, BatteryLevel level);
-void Battery_ResetDisplay(void);  // ´ò¶Ï¶¯»­Ê±µ÷ÓÃ£¬Ç¿ÖÆÇåÆÁÖØ»æ
+void Battery_ResetDisplay(void);  // æ‰“æ–­åŠ¨ç”»æ—¶è°ƒç”¨ï¼Œå¼ºåˆ¶æ¸…å±é‡ç»˜
 
 #endif

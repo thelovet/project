@@ -1,15 +1,3 @@
-/*********************************************************************
- * File Name          : lcd.c
- * Author             : WCH
- * Version            : V1.0.0
- * Date               : 2023/8/15
- * Description        : file for lcd screen.
- *********************************************************************************
-* Copyright (c) 2023 Nanjing Qinheng Microelectronics Co., Ltd.
-* Attention: This software (modified or not) and binary are used for 
-* microcontroller manufactured by Nanjing Qinheng Microelectronics.
-*******************************************************************************/
-
 #include "lcd.h"
 #include "debug.h"
 #include "spi.h"
@@ -27,23 +15,20 @@
 #define LCD_MEM_READ            (0x2e)
 
 #define USE_HORIZONTAL 0  //设置横屏或者竖屏显示 0或1为竖屏 2或3为横屏
+#define LCD_USE_TFT_INIT  0  // 1:启用旧版TFT_init初始化 0:禁用(节省Flash)
 u8 shared_buffer[FILL_BUFFER_SIZE] = { 0 };
 
 
 void FastFill_16bit_Repeat(uint8_t *buf, uint32_t len, uint8_t color_l, uint8_t color_h);//高效填充重复的16位颜色到缓冲区（自动适应长度）
 void LCD_drawImageWithSize_DMA(uint16_t count,uint8_t pre_count);//从flash读取数据发送到LCD屏幕
 void LCD_DMA_Write_Buffer(uint16_t color, uint32_t total_size);//将缓冲区数据发送到LCD屏幕
+static void LCD_Init_CmdTbl(const uint8_t *tbl);//遍历初始化序列表，依次发送寄存器命令与数据
 
 
-/*********************************************************************
- * @fn      LCD_WR_REG
- *
- * @brief   Write an 8-bit command to the LCD screen  
- * @brief   向液晶显示屏写入 8 位命令字
- * 
- * @param   data - Command value to be written
- *
- * @return  none
+/**
+ * @brief  向LCD写入8位命令字
+ * @param  data  要写入的命令字
+ * @return 无
  */
 void LCD_WR_REG(uint8_t data)
 {
@@ -53,14 +38,10 @@ void LCD_WR_REG(uint8_t data)
     //LCD_CS_SET;
 }
 
-/*********************************************************************
- * @fn      LCD_WR_DATA
- *
- * @brief   Write an 8-bit data to the LCD screen  
- * @brief   向液晶显示屏写入 8 位数据
- * 
- * @param   data - the data to write
- * 
+/**
+ * @brief  向LCD写入8位数据
+ * @param  data  要写入的数据
+ * @return 无
  */
 void LCD_WR_DATA(uint8_t data)
 {
@@ -71,11 +52,11 @@ void LCD_WR_DATA(uint8_t data)
 }
 
 
-/******************************************************************************
-      函数说明：LCD写入数据
-      入口数据：dat 写入的数据
-      返回值：  无
-******************************************************************************/
+/**
+ * @brief  向LCD写入16位数据
+ * @param  dat  要写入的16位数据
+ * @return 无
+ */
 void LCD_WR_DATA_16Bit(uint16_t dat)
 {
 	LCD_DC_SET;
@@ -86,16 +67,11 @@ void LCD_WR_DATA_16Bit(uint16_t dat)
     while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//等待发送完成
 }
 
-/*********************************************************************
- * @fn      LCD_WriteReg
- * 
- * @brief   Write a data to the register of the LCD screen  
- * @brief   向液晶显示屏寄存器写入数据
- * 
- * @param   LCD_Reg - register address
- *          LCD_RegValue - the data to write
- * 
- * @return  none
+/**
+ * @brief  向LCD寄存器写入值
+ * @param  LCD_Reg       寄存器地址
+ * @param  LCD_RegValue  要写入的值
+ * @return 无
  */
 void LCD_WriteReg(uint8_t LCD_Reg, uint8_t LCD_RegValue)
 {
@@ -103,14 +79,10 @@ void LCD_WriteReg(uint8_t LCD_Reg, uint8_t LCD_RegValue)
     LCD_WR_DATA(LCD_RegValue);
 }
 
-/*********************************************************************
- * @fn      Lcd_WriteData_16Bit
- * 
- * @brief   write two bytes to the lcd screen
- * 
- * @param   Data - the data to write
- * 
- * @return  none
+/**
+ * @brief  向LCD写入16位数据
+ * @param  Data  要写入的16位数据
+ * @return 无
  */
 void Lcd_WriteData_16Bit(uint16_t Data)
 {
@@ -121,12 +93,9 @@ void Lcd_WriteData_16Bit(uint16_t Data)
     //LCD_CS_SET;
 }
 
-/*********************************************************************
- * @fn      LCD_GPIOInit
- * 
- * @brief   Configuring the control gpio for the lcd screen
- * 
- * @return  none
+/**
+ * @brief  配置LCD控制引脚(DC/RST/CS)为推挽输出
+ * @return 无
  */
 void LCD_GPIOInit(void)
 {
@@ -152,14 +121,11 @@ void LCD_GPIOInit(void)
     GPIO_Init(LCD_CS_PORT, &GPIO_InitStructure);
 }
 
-/*********************************************************************
- * @fn      LCD_Backlight_PWM_Init
- *
- * @brief   初始化PB9为TIM4_CH4 PWM输出,控制LCD背光亮度
- *          TIM4时钟=72MHz, 预分频280, ARR=255 → PWM频率≈1kHz
- *          占空比分辨率: 8位 (0-255)
- *
- * @return  none
+/**
+ * @brief  初始化PB9为TIM4_CH4 PWM输出,控制LCD背光亮度
+ *         TIM4时钟=72MHz, 预分频280, ARR=255 → PWM频率≈1kHz
+ *         占空比分辨率: 8位 (0-255)
+ * @return 无
  */
 void LCD_Backlight_PWM_Init(void)
 {
@@ -203,13 +169,10 @@ void LCD_Backlight_PWM_Init(void)
     GPIO_Init(LCD_LED_PORT, &GPIO_InitStructure);
 }
 
-/*********************************************************************
- * @fn      LCD_Backlight_PWM_SetDuty
- *
- * @brief   设置背光PWM占空比(低电平占比)
- * @param   duty - 占空比 0-100, 表示低电平时间百分比(背光ON时间)
- *                0=全关, 100=全亮
- * @return  none
+/**
+ * @brief  设置背光PWM占空比(低电平占比)
+ * @param  duty  占空比0-100, 表示低电平时间百分比(背光ON时间), 0=全关,100=全亮
+ * @return 无
  */
 void LCD_Backlight_PWM_SetDuty(uint8_t duty)
 {
@@ -218,13 +181,10 @@ void LCD_Backlight_PWM_SetDuty(uint8_t duty)
     TIM_SetCompare4(TIM4, ccr);
 }
 
-/*********************************************************************
- * @fn      LCD_Backlight_PWM_Stop
- *
- * @brief   停止PWM输出,恢复PB9为GPIO推挽输出并置高(关闭背光)
- *          用于进入待机前关闭背光
- *
- * @return  none
+/**
+ * @brief  停止PWM输出,恢复PB9为GPIO推挽输出并置高(关闭背光)
+ *         用于进入待机前关闭背光
+ * @return 无
  */
 void LCD_Backlight_PWM_Stop(void)
 {
@@ -240,12 +200,9 @@ void LCD_Backlight_PWM_Stop(void)
     GPIO_Init(LCD_LED_PORT, &GPIO_InitStructure);
 }
 
-/*********************************************************************
- * @fn      LCD_RESET
- * 
- * @brief   reset the lcd screen by the rst pin
- * 
- * @return  none
+/**
+ * @brief  通过RST引脚复位LCD
+ * @return 无
  */
 void LCD_RESET(void)
 {
@@ -255,529 +212,160 @@ void LCD_RESET(void)
     Delay_Ms(50);
 }
 
-void TFT_init(void)	//GC9A01
+/**
+ * @brief  旧版TFT初始化序列 (GC9A01) - 当前未使用
+ * @note   由 LCD_USE_TFT_INIT 宏控制是否编译，默认0禁用以节省Flash
+ * @return 无
+ */
+#if LCD_USE_TFT_INIT
+static const uint8_t tft_init_tbl[] = {
+    0xFE, 0x00, 0xEF, 0x00, 0x80, 0x01, 0xFF, 0x81, 0x01, 0xFF, 0x82, 0x01,
+    0xFF, 0x83, 0x01, 0xFF, 0x84, 0x01, 0xFF, 0x85, 0x01, 0xFF, 0x86, 0x01,
+    0xFF, 0x87, 0x01, 0xFF, 0x88, 0x01, 0xFF, 0x89, 0x01, 0xFF, 0x8A, 0x01,
+    0xFF, 0x8B, 0x01, 0xFF, 0x8C, 0x01, 0xFF, 0x8D, 0x01, 0xFF, 0x8E, 0x01,
+    0xFF, 0x8F, 0x01, 0xFF, 0x3A, 0x01, 0x05, 0xEC, 0x01, 0x01, 0x74, 0x07,
+    0x02, 0x0E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x98, 0x01, 0x3E, 0x99, 0x01,
+    0x3E, 0xB5, 0x02, 0x0D, 0x0D, 0x60, 0x04, 0x38, 0x0F, 0x79, 0x67, 0x61,
+    0x04, 0x38, 0x11, 0x79, 0x67, 0x64, 0x06, 0x38, 0x17, 0x71, 0x5F, 0x79,
+    0x67, 0x65, 0x06, 0x38, 0x13, 0x71, 0x5B, 0x79, 0x67, 0x6A, 0x02, 0x00,
+    0x00, 0x6C, 0x07, 0x22, 0x02, 0x22, 0x02, 0x22, 0x22, 0x50, 0x6E, 0x20,
+    0x03, 0x03, 0x01, 0x01, 0x00, 0x00, 0x0f, 0x0f, 0x0d, 0x0d, 0x0b, 0x0b,
+    0x09, 0x09, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x0a, 0x0c, 0x0c, 0x0e, 0x0e,
+    0x10, 0x10, 0x00, 0x00, 0x02, 0x02, 0x04, 0x04, 0xBF, 0x01, 0x01, 0xF9,
+    0x01, 0x40, 0x9B, 0x01, 0x3b, 0x93, 0x03, 0x33, 0x7f, 0x00, 0x7E, 0x01,
+    0x30, 0x70, 0x06, 0x0d, 0x02, 0x08, 0x0d, 0x02, 0x08, 0x71, 0x03, 0x0d,
+    0x02, 0x08, 0x91, 0x02, 0x0E, 0x09, 0xC3, 0x01, 0x18, 0xC4, 0x01, 0x18,
+    0xC9, 0x01, 0x3c, 0xF0, 0x06, 0x13, 0x15, 0x04, 0x05, 0x01, 0x38, 0xF2,
+    0x06, 0x13, 0x15, 0x04, 0x05, 0x01, 0x34, 0xF1, 0x06, 0x4b, 0xb8, 0x7b,
+    0x34, 0x35, 0xef, 0xF3, 0x06, 0x47, 0xb4, 0x72, 0x34, 0x35, 0xda, 0x36,
+    0x01, 0x00,
+    0x00, 0x00, /* 结束标记 */
+};
+void TFT_init(void)
 {
-    SPI2_Init();//初始化SPI2
-    SPI2_DMA_Init();//初始化SPI2 DMA
-    LCD_GPIOInit();//初始化LCD GPIO
+    SPI2_Init();     // 初始化SPI2
+    SPI2_DMA_Init(); // 初始化SPI2 DMA
+    LCD_GPIOInit();  // 初始化LCD GPIO
 
-	LCD_CS_CLR;//片选有效状态
-	LCD_RST_CLR;//复位拉低
-	Delay_Ms(20);
-	LCD_RST_SET;//复位拉高，正常工作
-	Delay_Ms(20);
+    LCD_CS_CLR;      // 片选有效
+    LCD_RST_CLR;     // 复位拉低
+    Delay_Ms(20);
+    LCD_RST_SET;     // 复位拉高，正常工作
+    Delay_Ms(20);
 
-	LCD_CS_SET;
-	LCD_CS_CLR;
+    LCD_CS_SET;
+    LCD_CS_CLR;
 
-		
-	LCD_WR_REG(0xFE);			 
-	LCD_WR_REG(0xEF); 
-	 
-	LCD_WR_REG(0x80);
-	LCD_WR_DATA(0xFF);
-		
-	LCD_WR_REG(0x81);
-	LCD_WR_DATA(0xFF);
+    /* 初始化序列 (0xFE~0x36) */
+    LCD_Init_CmdTbl(tft_init_tbl);
 
-	LCD_WR_REG(0x82);
-	LCD_WR_DATA(0xFF);
+    LCD_WR_REG(0x11);  // 退出睡眠模式
+    Delay_Ms(200);
+    LCD_WR_REG(0x29);  // 开启显示
+    LCD_WR_REG(0x2C);  // 写单元格
+    LCD_CS_SET;        // 片选无效
+    Delay_Ms(100);
+}
+#endif /* LCD_USE_TFT_INIT */
 
-	LCD_WR_REG(0x83);
-	LCD_WR_DATA(0xFF);
-
-	LCD_WR_REG(0x84);			
-	LCD_WR_DATA(0xFF); 
-
-	LCD_WR_REG(0x85);
-	LCD_WR_DATA(0xFF); 
-
-	LCD_WR_REG(0x86);            
-	LCD_WR_DATA(0xFF); 
-
-	LCD_WR_REG(0x87);            
-	LCD_WR_DATA(0xFF);
-
-	LCD_WR_REG(0x88);            
-	LCD_WR_DATA(0xFF);
-
-	LCD_WR_REG(0x89);            
-	LCD_WR_DATA(0xFF);
-
-	LCD_WR_REG(0x8A);            
-	LCD_WR_DATA(0xFF);
-
-	LCD_WR_REG(0x8B);            
-	LCD_WR_DATA(0xFF);
-
-	LCD_WR_REG(0x8C);            
-	LCD_WR_DATA(0xFF);
-
-	LCD_WR_REG(0x8D);            
-	LCD_WR_DATA(0xFF);
-
-	LCD_WR_REG(0x8E);        
-	LCD_WR_DATA(0xFF); 
-
-	LCD_WR_REG(0x8F);     
-	LCD_WR_DATA(0xFF); 
-
-	LCD_WR_REG(0x3A);     
-	LCD_WR_DATA(0x05);
-
-	LCD_WR_REG(0xEC);     
-	LCD_WR_DATA(0x01);
-
-	LCD_WR_REG(0x74);		
-	LCD_WR_DATA(0x02);
-	LCD_WR_DATA(0x0E);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x00);
-
-	LCD_WR_REG(0x98);     
-	LCD_WR_DATA(0x3E);
-	LCD_WR_REG(0x99);     
-	LCD_WR_DATA(0x3E);
-
-	LCD_WR_REG(0xB5);			
-	LCD_WR_DATA(0x0D);
-	LCD_WR_DATA(0x0D);
-
-	LCD_WR_REG(0x60);	
-	LCD_WR_DATA(0x38);	
-	LCD_WR_DATA(0x0F);
-	LCD_WR_DATA(0x79);
-	LCD_WR_DATA(0x67);
-
-	LCD_WR_REG(0x61);	
-	LCD_WR_DATA(0x38);
-	LCD_WR_DATA(0x11);
-	LCD_WR_DATA(0x79);
-	LCD_WR_DATA(0x67);
-
-	LCD_WR_REG(0x64);		
-	LCD_WR_DATA(0x38);
-	LCD_WR_DATA(0x17);
-	LCD_WR_DATA(0x71);
-	LCD_WR_DATA(0x5F);
-	LCD_WR_DATA(0x79);
-	LCD_WR_DATA(0x67);
-
-	LCD_WR_REG(0x65);		
-	LCD_WR_DATA(0x38);
-	LCD_WR_DATA(0x13);
-	LCD_WR_DATA(0x71);
-	LCD_WR_DATA(0x5B);
-	LCD_WR_DATA(0x79);
-	LCD_WR_DATA(0x67);
-
-	LCD_WR_REG(0x6A);		
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x00);
-
-	LCD_WR_REG(0x6C);			
-	LCD_WR_DATA(0x22);
-	LCD_WR_DATA(0x02);
-	LCD_WR_DATA(0x22);
-	LCD_WR_DATA(0x02);
-	LCD_WR_DATA(0x22);
-	LCD_WR_DATA(0x22);
-	LCD_WR_DATA(0x50);
-
-	LCD_WR_REG(0x6E);
-	LCD_WR_DATA(0x03);
-	LCD_WR_DATA(0x03);
-	LCD_WR_DATA(0x01);
-	LCD_WR_DATA(0x01);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x0f);
-	LCD_WR_DATA(0x0f);
-	LCD_WR_DATA(0x0d);
-	LCD_WR_DATA(0x0d);
-	LCD_WR_DATA(0x0b);
-	LCD_WR_DATA(0x0b);
-	LCD_WR_DATA(0x09);
-	LCD_WR_DATA(0x09);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x0a);//
-	LCD_WR_DATA(0x0a);//
-	LCD_WR_DATA(0x0c);
-	LCD_WR_DATA(0x0c);
-	LCD_WR_DATA(0x0e);
-	LCD_WR_DATA(0x0e);
-	LCD_WR_DATA(0x10);
-	LCD_WR_DATA(0x10);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x02);
-	LCD_WR_DATA(0x02);
-	LCD_WR_DATA(0x04);
-	LCD_WR_DATA(0x04);
-
-	LCD_WR_REG(0xbf);			
-	LCD_WR_DATA(0x01);
-
-	LCD_WR_REG(0xF9);			
-	LCD_WR_DATA(0x40);
-
-	LCD_WR_REG(0x9b);			
-	LCD_WR_DATA(0x3b);
-	LCD_WR_REG(0x93);
-	LCD_WR_DATA(0x33);
-	LCD_WR_DATA(0x7f);
-	LCD_WR_DATA(0x00);
-
-	LCD_WR_REG(0x7E);     
-	LCD_WR_DATA(0x30);
-
-	LCD_WR_REG(0x70);
-	LCD_WR_DATA(0x0d);
-	LCD_WR_DATA(0x02);
-	LCD_WR_DATA(0x08);
-	LCD_WR_DATA(0x0d);
-	LCD_WR_DATA(0x02);
-	LCD_WR_DATA(0x08);
-
-	LCD_WR_REG(0x71);
-	LCD_WR_DATA(0x0d);
-	LCD_WR_DATA(0x02);
-	LCD_WR_DATA(0x08);
-
-	LCD_WR_REG(0x91);
-	LCD_WR_DATA(0x0E);
-	LCD_WR_DATA(0x09);
-
-	LCD_WR_REG(0xc3);
-	LCD_WR_DATA(0x18);
-	LCD_WR_REG(0xc4);
-	LCD_WR_DATA(0x18);
-	LCD_WR_REG(0xc9);
-	LCD_WR_DATA(0x3c);
-
-	LCD_WR_REG(0xf0);
-	LCD_WR_DATA(0x13);
-	LCD_WR_DATA(0x15);
-	LCD_WR_DATA(0x04);
-	LCD_WR_DATA(0x05);
-	LCD_WR_DATA(0x01);
-	LCD_WR_DATA(0x38);
-
-	LCD_WR_REG(0xf2);
-	LCD_WR_DATA(0x13);
-	LCD_WR_DATA(0x15);
-	LCD_WR_DATA(0x04);
-	LCD_WR_DATA(0x05);
-	LCD_WR_DATA(0x01);
-	LCD_WR_DATA(0x34);
-
-	LCD_WR_REG(0xf1);
-	LCD_WR_DATA(0x4b);
-	LCD_WR_DATA(0xb8);
-	LCD_WR_DATA(0x7b);
-	LCD_WR_DATA(0x34);
-	LCD_WR_DATA(0x35);
-	LCD_WR_DATA(0xef);
-
-	LCD_WR_REG(0xf3);
-	LCD_WR_DATA(0x47);
-	LCD_WR_DATA(0xb4);
-	LCD_WR_DATA(0x72);
-	LCD_WR_DATA(0x34);
-	LCD_WR_DATA(0x35);
-	LCD_WR_DATA(0xda);
-
-	LCD_WR_REG(0x36);			
-	LCD_WR_DATA(0x00);
-
-	LCD_WR_REG(0x11);
-	Delay_Ms(200); 
-
-	LCD_WR_REG(0x29);
-	LCD_WR_REG(0x2C);   
-	LCD_CS_SET;//片选有效状态
-	Delay_Ms(100);
+/**
+ * @brief  遍历初始化序列表，依次发送寄存器命令与数据
+ * @param  tbl  初始化序列表 (每项: 寄存器, 数据个数, 数据...)
+ * @note   表以 {0x00, 0x00} 作为结束标记
+ * @return 无
+ */
+static void LCD_Init_CmdTbl(const uint8_t *tbl)
+{
+    while (tbl[0] != 0x00 || tbl[1] != 0x00)
+    {
+        uint8_t reg = tbl[0];
+        uint8_t len = tbl[1];
+        LCD_WR_REG(reg);
+        tbl += 2;
+        while (len--)
+        {
+            LCD_WR_DATA(*tbl++);
+        }
+    }
 }
 
-/*********************************************************************
- * @fn      LCD_Init
- * 
- * @brief   Initialization LCD screen
- * 
- * @return  none
+/* 第1段初始化序列: 0xEF~0xB6 */
+static const uint8_t lcd_init_tbl_a[] = {
+    0xEF, 0x00, 0xEB, 0x01, 0x14, 0xFE, 0x00, 0xEF, 0x00, 0xEB, 0x01, 0x14,
+    0x84, 0x01, 0x40, 0x85, 0x01, 0xFF, 0x86, 0x01, 0xFF, 0x87, 0x01, 0xFF,
+    0x88, 0x01, 0x0A, 0x89, 0x01, 0x21, 0x8A, 0x01, 0x00, 0x8B, 0x01, 0x80,
+    0x8C, 0x01, 0x01, 0x8D, 0x01, 0x01, 0x8E, 0x01, 0xFF, 0x8F, 0x01, 0xFF,
+    0xB6, 0x02, 0x00, 0x20,
+    0x00, 0x00, /* 结束标记 */
+};
+
+/* 第2段初始化序列: 0x3A~0x21 */
+static const uint8_t lcd_init_tbl_b[] = {
+    0x3A, 0x01, 0x05, 0x90, 0x04, 0x08, 0x08, 0x08, 0x08, 0xBD, 0x01, 0x06,
+    0xBC, 0x01, 0x00, 0xFF, 0x03, 0x60, 0x01, 0x04, 0xC3, 0x01, 0x13, 0xC4,
+    0x01, 0x13, 0xC9, 0x01, 0x22, 0xBE, 0x01, 0x11, 0xE1, 0x02, 0x10, 0x0E,
+    0xDF, 0x03, 0x21, 0x0c, 0x02, 0xF0, 0x06, 0x45, 0x09, 0x08, 0x08, 0x26,
+    0x2A, 0xF1, 0x06, 0x43, 0x70, 0x72, 0x36, 0x37, 0x6F, 0xF2, 0x06, 0x45,
+    0x09, 0x08, 0x08, 0x26, 0x2A, 0xF3, 0x06, 0x43, 0x70, 0x72, 0x36, 0x37,
+    0x6F, 0xED, 0x02, 0x1B, 0x0B, 0xAE, 0x01, 0x77, 0xCD, 0x01, 0x63, 0x70,
+    0x09, 0x07, 0x07, 0x04, 0x0E, 0x0F, 0x09, 0x07, 0x08, 0x03, 0xE8, 0x01,
+    0x34, 0x62, 0x0C, 0x18, 0x0D, 0x71, 0xED, 0x70, 0x70, 0x18, 0x0F, 0x71,
+    0xEF, 0x70, 0x70, 0x63, 0x0C, 0x18, 0x11, 0x71, 0xF1, 0x70, 0x70, 0x18,
+    0x13, 0x71, 0xF3, 0x70, 0x70, 0x64, 0x07, 0x28, 0x29, 0xF1, 0x01, 0xF1,
+    0x00, 0x07, 0x66, 0x0A, 0x3C, 0x00, 0xCD, 0x67, 0x45, 0x45, 0x10, 0x00,
+    0x00, 0x00, 0x67, 0x0A, 0x00, 0x3C, 0x00, 0x00, 0x00, 0x01, 0x54, 0x10,
+    0x32, 0x98, 0x74, 0x07, 0x10, 0x85, 0x80, 0x00, 0x00, 0x4E, 0x00, 0x98,
+    0x02, 0x3e, 0x07, 0x35, 0x00, 0x21, 0x00,
+    0x00, 0x00, /* 结束标记 */
+};
+
+/**
+ * @brief  初始化LCD屏幕 (GC9A01)
+ * @note   初始化序列使用常量表 + 循环发送，节省Flash空间
+ * @return 无
  */
 void LCD_Init(void)
 {
-    SPI2_Init();//初始化SPI2
-    SPI2_DMA_Init();//初始化SPI2 DMA
-    LCD_GPIOInit();//初始化LCD GPIO
+    SPI2_Init();     // 初始化SPI2
+    SPI2_DMA_Init(); // 初始化SPI2 DMA
+    LCD_GPIOInit();  // 初始化LCD GPIO
 
-	LCD_CS_CLR;//片选有效状态
-	LCD_RST_CLR;//复位拉低
-	Delay_Ms(1);
-	LCD_RST_SET;//复位拉高，正常工作
-	Delay_Ms(5);
+    LCD_CS_CLR;      // 片选有效
+    LCD_RST_CLR;     // 复位拉低
+    Delay_Ms(1);
+    LCD_RST_SET;     // 复位拉高，正常工作
+    Delay_Ms(5);
 
-	LCD_CS_SET;
-	LCD_CS_CLR;
-	
-	LCD_WR_REG(0xEF);
-	LCD_WR_REG(0xEB);
-	LCD_WR_DATA(0x14); 
-	
-    LCD_WR_REG(0xFE);			 
-	LCD_WR_REG(0xEF); 
+    LCD_CS_SET;
+    LCD_CS_CLR;
 
-	LCD_WR_REG(0xEB);	
-	LCD_WR_DATA(0x14); 
+    /* 第1段初始化序列 (0xEF~0xB6) */
+    LCD_Init_CmdTbl(lcd_init_tbl_a);
 
-	LCD_WR_REG(0x84);			
-	LCD_WR_DATA(0x40); 
+    /* 显存访问方向控制 (由USE_HORIZONTAL决定) */
+    LCD_WR_REG(0x36);
+    LCD_WR_DATA(USE_HORIZONTAL == 0 ? 0x08 :
+                USE_HORIZONTAL == 1 ? 0xC8 :
+                USE_HORIZONTAL == 2 ? 0x68 : 0xA8);
 
-	LCD_WR_REG(0x85);			
-	LCD_WR_DATA(0xFF); 
+    /* 第2段初始化序列 (0x3A~0x21) */
+    LCD_Init_CmdTbl(lcd_init_tbl_b);
 
-	LCD_WR_REG(0x86);			
-	LCD_WR_DATA(0xFF); 
-
-	LCD_WR_REG(0x87);			
-	LCD_WR_DATA(0xFF);
-
-	LCD_WR_REG(0x88);			
-	LCD_WR_DATA(0x0A);
-
-	LCD_WR_REG(0x89);			
-	LCD_WR_DATA(0x21); 
-
-	LCD_WR_REG(0x8A);			
-	LCD_WR_DATA(0x00); 
-
-	LCD_WR_REG(0x8B);			
-	LCD_WR_DATA(0x80); 
-
-	LCD_WR_REG(0x8C);			
-	LCD_WR_DATA(0x01); 
-
-	LCD_WR_REG(0x8D);			
-	LCD_WR_DATA(0x01); 
-
-	LCD_WR_REG(0x8E);			
-	LCD_WR_DATA(0xFF); 
-
-	LCD_WR_REG(0x8F);			
-	LCD_WR_DATA(0xFF); 
-
-
-	LCD_WR_REG(0xB6);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x20);
-
-	LCD_WR_REG(0x36);
-	if(USE_HORIZONTAL==0)LCD_WR_DATA(0x08);
-	else if(USE_HORIZONTAL==1)LCD_WR_DATA(0xC8);
-	else if(USE_HORIZONTAL==2)LCD_WR_DATA(0x68);
-	else LCD_WR_DATA(0xA8);
-
-	LCD_WR_REG(0x3A);			
-	LCD_WR_DATA(0x05); 
-
-
-	LCD_WR_REG(0x90);			
-	LCD_WR_DATA(0x08);
-	LCD_WR_DATA(0x08);
-	LCD_WR_DATA(0x08);
-	LCD_WR_DATA(0x08); 
-
-	LCD_WR_REG(0xBD);			
-	LCD_WR_DATA(0x06);
-	
-	LCD_WR_REG(0xBC);			
-	LCD_WR_DATA(0x00);	
-
-	LCD_WR_REG(0xFF);			
-	LCD_WR_DATA(0x60);
-	LCD_WR_DATA(0x01);
-	LCD_WR_DATA(0x04);
-
-	LCD_WR_REG(0xC3);			
-	LCD_WR_DATA(0x13);
-	LCD_WR_REG(0xC4);			
-	LCD_WR_DATA(0x13);
-
-	LCD_WR_REG(0xC9);			
-	LCD_WR_DATA(0x22);
-
-	LCD_WR_REG(0xBE);			
-	LCD_WR_DATA(0x11); 
-
-	LCD_WR_REG(0xE1);			
-	LCD_WR_DATA(0x10);
-	LCD_WR_DATA(0x0E);
-
-	LCD_WR_REG(0xDF);			
-	LCD_WR_DATA(0x21);
-	LCD_WR_DATA(0x0c);
-	LCD_WR_DATA(0x02);
-
-	LCD_WR_REG(0xF0);   
-	LCD_WR_DATA(0x45);
-	LCD_WR_DATA(0x09);
-	LCD_WR_DATA(0x08);
-	LCD_WR_DATA(0x08);
-	LCD_WR_DATA(0x26);
- 	LCD_WR_DATA(0x2A);
-
- 	LCD_WR_REG(0xF1);    
- 	LCD_WR_DATA(0x43);
- 	LCD_WR_DATA(0x70);
- 	LCD_WR_DATA(0x72);
- 	LCD_WR_DATA(0x36);
- 	LCD_WR_DATA(0x37);  
- 	LCD_WR_DATA(0x6F);
-
-
- 	LCD_WR_REG(0xF2);   
- 	LCD_WR_DATA(0x45);
- 	LCD_WR_DATA(0x09);
- 	LCD_WR_DATA(0x08);
- 	LCD_WR_DATA(0x08);
- 	LCD_WR_DATA(0x26);
- 	LCD_WR_DATA(0x2A);
-
- 	LCD_WR_REG(0xF3);   
- 	LCD_WR_DATA(0x43);
- 	LCD_WR_DATA(0x70);
- 	LCD_WR_DATA(0x72);
- 	LCD_WR_DATA(0x36);
- 	LCD_WR_DATA(0x37); 
- 	LCD_WR_DATA(0x6F);
-
-	LCD_WR_REG(0xED);	
-	LCD_WR_DATA(0x1B); 
-	LCD_WR_DATA(0x0B); 
-
-	LCD_WR_REG(0xAE);			
-	LCD_WR_DATA(0x77);
-	
-	LCD_WR_REG(0xCD);			
-	LCD_WR_DATA(0x63);		
-
-
-	LCD_WR_REG(0x70);			
-	LCD_WR_DATA(0x07);
-	LCD_WR_DATA(0x07);
-	LCD_WR_DATA(0x04);
-	LCD_WR_DATA(0x0E); 
-	LCD_WR_DATA(0x0F); 
-	LCD_WR_DATA(0x09);
-	LCD_WR_DATA(0x07);
-	LCD_WR_DATA(0x08);
-	LCD_WR_DATA(0x03);
-
-	LCD_WR_REG(0xE8);			
-	LCD_WR_DATA(0x34);
-
-	LCD_WR_REG(0x62);			
-	LCD_WR_DATA(0x18);
-	LCD_WR_DATA(0x0D);
-	LCD_WR_DATA(0x71);
-	LCD_WR_DATA(0xED);
-	LCD_WR_DATA(0x70); 
-	LCD_WR_DATA(0x70);
-	LCD_WR_DATA(0x18);
-	LCD_WR_DATA(0x0F);
-	LCD_WR_DATA(0x71);
-	LCD_WR_DATA(0xEF);
-	LCD_WR_DATA(0x70); 
-	LCD_WR_DATA(0x70);
-
-	LCD_WR_REG(0x63);			
-	LCD_WR_DATA(0x18);
-	LCD_WR_DATA(0x11);
-	LCD_WR_DATA(0x71);
-	LCD_WR_DATA(0xF1);
-	LCD_WR_DATA(0x70); 
-	LCD_WR_DATA(0x70);
-	LCD_WR_DATA(0x18);
-	LCD_WR_DATA(0x13);
-	LCD_WR_DATA(0x71);
-	LCD_WR_DATA(0xF3);
-	LCD_WR_DATA(0x70); 
-	LCD_WR_DATA(0x70);
-
-	LCD_WR_REG(0x64);			
-	LCD_WR_DATA(0x28);
-	LCD_WR_DATA(0x29);
-	LCD_WR_DATA(0xF1);
-	LCD_WR_DATA(0x01);
-	LCD_WR_DATA(0xF1);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x07);
-
-	LCD_WR_REG(0x66);			
-	LCD_WR_DATA(0x3C);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0xCD);
-	LCD_WR_DATA(0x67);
-	LCD_WR_DATA(0x45);
-	LCD_WR_DATA(0x45);
-	LCD_WR_DATA(0x10);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x00);
-
-	LCD_WR_REG(0x67);			
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x3C);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x00);
-	LCD_WR_DATA(0x01);
-	LCD_WR_DATA(0x54);
-	LCD_WR_DATA(0x10);
-	LCD_WR_DATA(0x32);
-	LCD_WR_DATA(0x98);
-
-	LCD_WR_REG(0x74);			
-	LCD_WR_DATA(0x10);	
-	LCD_WR_DATA(0x85);	
-	LCD_WR_DATA(0x80);
-	LCD_WR_DATA(0x00); 
-	LCD_WR_DATA(0x00); 
-	LCD_WR_DATA(0x4E);
-	LCD_WR_DATA(0x00);					
-	
-  LCD_WR_REG(0x98);			
-	LCD_WR_DATA(0x3e);
-	LCD_WR_DATA(0x07);
-
-	LCD_WR_REG(0x35);	
-	LCD_WR_REG(0x21);
-
-	LCD_WR_REG(0x11);
-	Delay_Ms(120);
-	LCD_WR_REG(0x29);
-	LCD_CS_SET;//片选无效状态
-	Delay_Ms(100);	
+    LCD_WR_REG(0x11);  // 退出睡眠模式
+    Delay_Ms(120);
+    LCD_WR_REG(0x29);  // 开启显示
+    LCD_CS_SET;        // 片选无效
+    Delay_Ms(100);
 }
 
-/*********************************************************************
- * @fn      LCD_SetWindows
- * 
- * @brief   Setting LCD display window
- * 
- * @param   xStar -  the bebinning x coordinate of the LCD display window
- *          yStar -  the bebinning y coordinate of the LCD display window
- *          xEnd -  the endning x coordinate of the LCD display window
- *          yEnd -  the endning y coordinate of the LCD display window
- * 
- * @return  none
+
+/**
+ * @brief  设置LCD显示窗口
+ * @param  xStar  窗口起始X坐标
+ * @param  yStar  窗口起始Y坐标
+ * @param  xEnd   窗口结束X坐标
+ * @param  yEnd   窗口结束Y坐标
+ * @return 无
  */
 void LCD_SetWindows(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd)
 {
@@ -796,14 +384,10 @@ void LCD_SetWindows(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd
 }
 
 
-/*********************************************************************
- * @fn      LCD_Clear
- * 
- * @brief   Full screen filled LCD screen
- * 
- * @param   Color -   Filled color
- * 
- * @return  none
+/**
+ * @brief  全屏填充指定颜色
+ * @param  Color  填充颜色
+ * @return 无
  */
 void LCD_Clear(uint16_t Color)
 {
@@ -823,12 +407,14 @@ void LCD_Clear(uint16_t Color)
 
 
 
-/******************************************************************************
-      函数说明：设置起始和结束地址
-      入口数据：x1,x2 设置列的起始和结束地址
-                y1,y2 设置行的起始和结束地址
-      返回值：  无
-******************************************************************************/
+/**
+ * @brief  设置LCD起始和结束显示地址
+ * @param  x1  列起始地址
+ * @param  y1  行起始地址
+ * @param  x2  列结束地址
+ * @param  y2  行结束地址
+ * @return 无
+ */
 void LCD_Address_Set(uint16_t x1,uint16_t y1,uint16_t x2,uint16_t y2)
 {
 		//P_SWI = 0x00;
@@ -844,13 +430,14 @@ void LCD_Address_Set(uint16_t x1,uint16_t y1,uint16_t x2,uint16_t y2)
 
 
 
-/******************************************************************************
-      函数说明：DMA设置起始和结束地址
-      入口数据：x1,x2 设置列的起始和结束地址
-                y1,y2 设置行的起始和结束地址
-      返回值：  无
-******************************************************************************/
-
+/**
+ * @brief  DMA方式设置LCD起始和结束显示地址
+ * @param  x1  列起始地址
+ * @param  y1  行起始地址
+ * @param  x2  列结束地址
+ * @param  y2  行结束地址
+ * @return 无
+ */
 void LCD_Address_Set_DMA(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
 {
     uint8_t *buf = shared_buffer;
@@ -901,13 +488,14 @@ void LCD_Address_Set_DMA(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
 
 
 
-/******************************************************************************
-      函数说明：DMA设置起始和结束地址,用计算DMA发送剩余数量的方式切换DC
-      入口数据：x1,x2 设置列的起始和结束地址
-                y1,y2 设置行的起始和结束地址
-      返回值：  无
-******************************************************************************/
-
+/**
+ * @brief  DMA方式设置起始和结束地址, 用计算DMA发送剩余数量的方式切换DC
+ * @param  x1  列起始地址
+ * @param  y1  行起始地址
+ * @param  x2  列结束地址
+ * @param  y2  行结束地址
+ * @return 无
+ */
 void LCD_Address_Set_DMA_Calculate_remaining(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
 {
     uint8_t buf[11] = {0};
@@ -992,11 +580,10 @@ void LCD_Address_Set_DMA_Calculate_remaining(uint16_t x1, uint16_t y1, uint16_t 
     while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//等待SPI2空闲
 }
 
-/******************************************************************************
-      函数说明：DMA中断初始化
-      入口数据：无
-      返回值：  无
-******************************************************************************/
+/**
+ * @brief  DMA中断初始化
+ * @return 无
+ */
 void LCD_DMA_Interrupt_Init(void)
 {
     NVIC_InitTypeDef NVIC_InitStructure={0};
@@ -1014,72 +601,16 @@ void LCD_DMA_Interrupt_Init(void)
 
 
 
-/*********************************************************************
- * @fn      LCD_drawImageWithSize
- * 
- * @brief   从SPI Flash读取图像并显示在LCD屏幕上
- * 
- * @param   x - LCD屏幕的X坐标
- *          y - LCD屏幕的Y坐标
- *          width - 图像宽度
- *          height - 图像高度
- *          addr - SPI Flash中的图像地址
- * 
- * @return  无
+/**
+ * @brief  在指定区域填充颜色
+ * @param  xsta  起始X坐标
+ * @param  ysta  起始Y坐标
+ * @param  xend  终止X坐标
+ * @param  yend  终止Y坐标
+ * @param  color 要填充的颜色
+ * @return 无
  */
-// void LCD_drawImageWithSize(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint32_t addr)
-// {
-//     uint32_t m  = 0;
-//     uint16_t x2 = (x + width) - 1;
-//     uint16_t y2 = (y + height) - 1;
-//     LCD_WR_REG(LCD_SET_X);
-//     LCD_WR_DATA(x >> 8);
-//     LCD_WR_DATA(0x00FF & x);
-//     LCD_WR_DATA(x2 >> 8);
-//     LCD_WR_DATA(0x00FF & x2);
-
-//     LCD_WR_REG(LCD_SET_Y);
-//     LCD_WR_DATA(y >> 8);
-//     LCD_WR_DATA(0x00FF & y);
-//     LCD_WR_DATA(y2 >> 8);
-//     LCD_WR_DATA(0x00FF & y2);
-
-//     LCD_WR_REG(LCD_MEM_WRITE);
-//     LCD_CS_CLR;
-//     LCD_DC_SET;
-
-//     uint32_t count = width * height;
-
-//     uint32_t fill_count = count / FILL_BUFFER_COUNT;
-//     uint32_t else_count = count % FILL_BUFFER_COUNT;
-//     SPI_Flash_Read_dma_start(addr);
-
-//     SPI1_Read_DMA((uint8_t *)color_buffer[m], FILL_BUFFER_SIZE);
-
-//     while (fill_count > 0)
-//     {
-//         while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET)
-//             ;
-//         fill_count--;
-//         SPI2_Write_DMA((uint8_t *)color_buffer[m], FILL_BUFFER_SIZE);//写入DMA缓冲区数据
-//         m = !m;
-//         SPI1_Read_DMA((uint8_t *)color_buffer[m], FILL_BUFFER_SIZE);//读取DMA缓冲区数据
-//     }
-//     while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET)
-//         ;
-//     SPI2_Write_DMA((uint8_t *)color_buffer[m], else_count * COLOR_BYTE);
-//     SPI_Flash_Read_dma_end();
-// }
-
-
-/******************************************************************************
-      函数说明：在指定区域填充颜色
-      入口数据：xsta,ysta   起始坐标
-                xend,yend   终止坐标
-								color       要填充的颜色
-      返回值：  无
-******************************************************************************/
- void LCD_Fill(uint16_t xsta,uint16_t ysta,uint16_t xend,uint16_t yend,uint16_t color)
+void LCD_Fill(uint16_t xsta,uint16_t ysta,uint16_t xend,uint16_t yend,uint16_t color)
  {          
  	uint16_t i,j;
  	//LCD_LED_CLR;//打开背光
@@ -1099,13 +630,15 @@ void LCD_DMA_Interrupt_Init(void)
 
 
 
-/******************************************************************************
-      函数说明：DMA填充指定区域颜色
-      入口数据：xsta,ysta   起始坐标
-                xend,yend   终止坐标
-								color       要填充的颜色
-      返回值：  无
-******************************************************************************/
+/**
+ * @brief  DMA方式在指定区域填充颜色
+ * @param  xsta  起始X坐标
+ * @param  ysta  起始Y坐标
+ * @param  xend  终止X坐标
+ * @param  yend  终止Y坐标
+ * @param  color 要填充的颜色
+ * @return 无
+ */
 void LCD_Fill_DMA(uint16_t xsta, uint16_t ysta, uint16_t xend, uint16_t yend, uint16_t color)
 {
     uint32_t total_size = (xend - xsta) * (yend - ysta);
@@ -1126,12 +659,12 @@ void LCD_Fill_DMA(uint16_t xsta, uint16_t ysta, uint16_t xend, uint16_t yend, ui
 
 
 
-/******************************************************************************
-      函数说明：DMA写入LCD颜色缓冲区
-      入口数据：color       要填充的颜色
-                total_size  要填充的像素数
-      返回值：  无
-******************************************************************************/
+/**
+ * @brief  DMA写入LCD颜色缓冲区
+ * @param  color       要填充的颜色
+ * @param  total_size  要填充的像素数
+ * @return 无
+ */
 void LCD_DMA_Write_Buffer(uint16_t color, uint32_t total_size)
 {
     uint8_t color_bytes[2];
@@ -1170,12 +703,9 @@ void LCD_DMA_Write_Buffer(uint16_t color, uint32_t total_size)
     //while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);
 }
 
-/*********************************************************************
- * @fn      LCD_Enter_Sleep
- *
- * @brief   Enter sleep mode (power down LCD controller)
- *
- * @return  none
+/**
+ * @brief  进入睡眠模式(关闭LCD控制器)
+ * @return 无
  */
 void LCD_Enter_Sleep(void)
 {
@@ -1186,12 +716,9 @@ void LCD_Enter_Sleep(void)
     Delay_Ms(10);
 }
 
-/*********************************************************************
- * @fn      LCD_Exit_Sleep
- *
- * @brief   Exit sleep mode (wake up LCD controller)
- *
- * @return  none
+/**
+ * @brief  退出睡眠模式(唤醒LCD控制器)
+ * @return 无
  */
 void LCD_Exit_Sleep(void)
 {
@@ -1205,12 +732,13 @@ void LCD_Exit_Sleep(void)
 }
 
 
-/******************************************************************************
-      函数说明：DMA写入LCD颜色缓冲区
-      入口数据：color       要填充的颜色
-                total_size  要填充的像素数
-      返回值：  无
-******************************************************************************/
+/**
+ * @brief  DMA写入LCD颜色缓冲区(实时切换DC, 预填充后边发边填)
+ * @param  datah      颜色高字节
+ * @param  datal      颜色低字节
+ * @param  total_size 要填充的像素数
+ * @return 无
+ */
 #define DMA_PREFILL_COUNT    8     // DMA预填充字节数：先填前8字节就启动DMA，剩余边发边填
 void LCD_DMA_Write_Buffer_Add_coordinates(uint16_t datah, uint16_t datal, uint32_t total_size)
 {
@@ -1284,42 +812,26 @@ void LCD_DMA_Write_Buffer_Add_coordinates(uint16_t datah, uint16_t datal, uint32
 }
 
 
-/*********************************************************************
- * @fn      LCD_drawImageWithSize
- * 
- * @brief   从SPI Flash读取图像并显示在LCD屏幕上
- * 
- * @param   count - 图像像素数量
- *          addr - SPI Flash中的图像地址
- * 
- * @return  无
+/**
+ * @brief  从SPI Flash读取图像并显示到LCD屏幕(块状DMA方式)
+ * @param  count      图像像素数量
+ * @param  pre_count  已预读的像素数量
+ * @return 无
  */
-uint32_t byte_count;
-uint32_t block_size;
-uint32_t fill_count;
-uint32_t length;
-uint32_t front_count;
-uint32_t front_read_count;
-uint32_t remain_count;
-uint32_t remain_read_count;
-uint32_t current_count;
-uint32_t current_count1;
-uint32_t current_read_count;
-
-
 void LCD_drawImageWithSize_DMA(uint16_t count, uint8_t pre_count) {
-    byte_count = (uint32_t)count * 2;// //总数<<1为*2
-    block_size = PARALLEL_BUFFER_COUNT;
-    fill_count = byte_count / block_size;//完整块数
-    uint32_t else_count = byte_count % block_size;//剩余像素数
-    length = byte_count;
-     front_count = byte_count;//前面的数
-    front_read_count = 0;//前面读取的数量
-    remain_count = 0;// //剩下的数
-    remain_read_count = 0; //剩下读取的数量
-    current_count = 0;//当前发送的数
-    current_count1 = 0;//当前发送的数
-    current_read_count = 0;//当前读取的数量
+    // 以下变量仅在下方被注释掉的"情况2"代码块中使用，故注释保留（定义时赋值），不参与编译
+    // uint32_t fill_count = byte_count / block_size;
+    // uint32_t front_read_count = 0;
+    // uint32_t remain_read_count = 0;
+    // uint32_t current_count1 = 0;
+    // uint32_t current_read_count = 0;
+    uint32_t byte_count   = (uint32_t)count * 2;// //总数<<1为*2
+    uint32_t block_size   = PARALLEL_BUFFER_COUNT;
+    uint32_t length       = byte_count;
+    uint32_t front_count  = byte_count;//前面的数
+    uint32_t remain_count = 0;// //剩下的数
+    uint32_t current_count = 0;//当前发送的数
+    uint32_t else_count   = byte_count % block_size;//剩余像素数
     //uint32_t G = 0;
 
 
@@ -1399,11 +911,12 @@ void LCD_drawImageWithSize_DMA(uint16_t count, uint8_t pre_count) {
 }
 
 /**
- * @brief  高效填充重复的16位颜色到缓冲区（自动适应长度）
- * @param  buf     : 目标缓冲区
- * @param  len     : 填充字节数（必须偶数）
- * @param  color_l : 颜色低字节
- * @param  color_h : 颜色高字节
+ * @brief  高效填充重复的16位颜色到缓冲区(自动适应长度)
+ * @param  buf      目标缓冲区
+ * @param  len      填充字节数(必须偶数)
+ * @param  color_l  颜色低字节
+ * @param  color_h  颜色高字节
+ * @return 无
  */
 #define FASTFILL_DMA_THRESHOLD  128   // 小于此长度用 for 循环，否则用 DMA
 void FastFill_16bit_Repeat(uint8_t *buf, uint32_t len, uint8_t color_l, uint8_t color_h)
@@ -1429,23 +942,26 @@ void FastFill_16bit_Repeat(uint8_t *buf, uint32_t len, uint8_t color_l, uint8_t 
     DMA_InitTypeDef dma = {0};
     RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);   // 确保 DMA 时钟开启
 
+    // 复位DMA1通道6，按默认参数清零，准备复用
     DMA_DeInit(DMA1_Channel6);
-    dma.DMA_PeripheralBaseAddr = (uint32_t)buf;
-    dma.DMA_MemoryBaseAddr     = (uint32_t)(buf + 2);
-    dma.DMA_DIR                = DMA_DIR_PeripheralSRC;
-    dma.DMA_BufferSize         = len - 2;
-    dma.DMA_PeripheralInc      = DMA_PeripheralInc_Enable;
-    dma.DMA_MemoryInc          = DMA_MemoryInc_Enable;
-    dma.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
-    dma.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;
-    dma.DMA_Mode               = DMA_Mode_Normal;
-    dma.DMA_Priority           = DMA_Priority_High;
-    dma.DMA_M2M                = DMA_M2M_Enable;
 
-    DMA_Init(DMA1_Channel6, &dma);
-    DMA_ClearFlag(DMA1_FLAG_TC6);
-    DMA_Cmd(DMA1_Channel6, ENABLE);
+    // 配置DMA为"内存到内存"模式，把颜色数据从buf[0..1]向后复制扩散
+    dma.DMA_PeripheralBaseAddr = (uint32_t)buf;          // 源地址：buf首地址(已写入第一个像素种子)
+    dma.DMA_MemoryBaseAddr     = (uint32_t)(buf + 2);    // 目标地址：buf+2，从第2像素起续写
+    dma.DMA_DIR                = DMA_DIR_PeripheralSRC;  // 方向：源为外设(内存)
+    dma.DMA_BufferSize         = len - 2;                // 传输长度：减掉已写的2字节
+    dma.DMA_PeripheralInc      = DMA_PeripheralInc_Enable;  // 源地址自增
+    dma.DMA_MemoryInc          = DMA_MemoryInc_Enable;   // 目标地址自增
+    dma.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;  // 源数据宽度：字节
+    dma.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;     // 目标数据宽度：字节
+    dma.DMA_Mode               = DMA_Mode_Normal;        // 普通模式，传完即停
+    dma.DMA_Priority           = DMA_Priority_High;      // 高优先级
+    dma.DMA_M2M                = DMA_M2M_Enable;         // 开启内存到内存传输
 
-    while (DMA_GetFlagStatus(DMA1_FLAG_TC6) == RESET);
-    DMA_Cmd(DMA1_Channel6, DISABLE);
+    DMA_Init(DMA1_Channel6, &dma);      // 应用DMA配置
+    DMA_ClearFlag(DMA1_FLAG_TC6);       // 清除传输完成标志
+    DMA_Cmd(DMA1_Channel6, ENABLE);     // 启动DMA传输
+
+    while (DMA_GetFlagStatus(DMA1_FLAG_TC6) == RESET); // 等待传输完成
+    DMA_Cmd(DMA1_Channel6, DISABLE);    // 停止DMA
 }

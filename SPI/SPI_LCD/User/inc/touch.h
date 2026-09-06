@@ -7,7 +7,7 @@
 #define CST816S_LP_SCAN_THRESHOLD     32U
 
 /**
- * @brief CST816S ´¥ÃşÒı½Å¶¨Òå
+ * @brief CST816S è§¦æ‘¸å¼•è„šå®šä¹‰
  */
 #define TOUCH_RST_RCC     RCC_APB2Periph_GPIOB
 #define TOUCH_RST_PORT    GPIOB
@@ -18,7 +18,7 @@
 #define TOUCH_INT_PIN     GPIO_Pin_8          // INT: PA8 (EXTI8)
 
 /**
- * @brief Èí¼şI2CÒı½Å (SCL:PB10, SDA:PB11)
+ * @brief è½¯ä»¶I2Cå¼•è„š (SCL:PB10, SDA:PB11)
  */
 #define TOUCH_SCL_PORT    GPIOB
 #define TOUCH_SCL_PIN     GPIO_Pin_10
@@ -26,62 +26,62 @@
 #define TOUCH_SDA_PIN     GPIO_Pin_11
 
 /**
- * @brief CST816S I2CµØÖ·
+ * @brief CST816S I2Cåœ°å€
  */
-#define CST816S_ADDR      0x15                // 7Î»µØÖ·
+#define CST816S_ADDR      0x15                // 7ä½åœ°å€
 
 /**
- * @brief CST816S ÄÚ²¿¼Ä´æÆ÷µØÖ·
+ * @brief CST816S å†…éƒ¨å¯„å­˜å™¨åœ°å€
  */
-#define CST816S_REG_GESTURE    0x01           // ÊÖÊÆID
-#define CST816S_REG_FINGERNUM  0x02           // ÊÖÖ¸ÊıÁ¿
-#define CST816S_REG_XH         0x03           // X×ø±ê¸ß4Î» [11:8]
-#define CST816S_REG_XL         0x04           // X×ø±êµÍ8Î» [7:0]
-#define CST816S_REG_YH         0x05           // Y×ø±ê¸ß4Î» [11:8]
-#define CST816S_REG_YL         0x06           // Y×ø±êµÍ8Î» [7:0]
-#define CST816S_REG_CHIPID     0xA7           // Ğ¾Æ¬ID (Ô¤ÆÚ0xB4»ò0xB5)
+#define CST816S_REG_GESTURE    0x01           // æ‰‹åŠ¿ID
+#define CST816S_REG_FINGERNUM  0x02           // æ‰‹æŒ‡æ•°é‡
+#define CST816S_REG_XH         0x03           // Xåæ ‡é«˜4ä½ [11:8]
+#define CST816S_REG_XL         0x04           // Xåæ ‡ä½8ä½ [7:0]
+#define CST816S_REG_YH         0x05           // Yåæ ‡é«˜4ä½ [11:8]
+#define CST816S_REG_YL         0x06           // Yåæ ‡ä½8ä½ [7:0]
+#define CST816S_REG_CHIPID     0xA7           // èŠ¯ç‰‡ID (é¢„æœŸ0xB4æˆ–0xB5)
 
 /**
- * @brief CST816S ¿ØÖÆ¼Ä´æÆ÷
+ * @brief CST816S æ§åˆ¶å¯„å­˜å™¨
  */
-#define CST816S_REG_IRQCTL      0xFA           // ÖĞ¶Ï¿ØÖÆ (±ØĞëÅäÖÃ!)
-//   0xFA: [7]=Ê¹ÄÜ [6]=´¥Ãş²úÉúÖĞ¶Ï·½Ê½ [5:0]=±£Áô
-#define CST816S_IRQ_ENABLE      0x40           // Ê¹ÄÜ²¢ÖÜÆÚ²úÉúÖĞ¶Ï
+#define CST816S_REG_IRQCTL      0xFA           // ä¸­æ–­æ§åˆ¶ (å¿…é¡»é…ç½®!)
+//   0xFA: [7]=ä½¿èƒ½ [6]=è§¦æ‘¸äº§ç”Ÿä¸­æ–­æ–¹å¼ [5:0]=ä¿ç•™
+#define CST816S_IRQ_ENABLE      0x40           // ä½¿èƒ½å¹¶å‘¨æœŸäº§ç”Ÿä¸­æ–­
 
-#define CST816S_REG_AUTOSLEEP   0xFE           // ×Ô¶¯ĞİÃß¿ØÖÆ
-#define CST816S_SLEEP_ENABLE    0x00           // ÆôÓÃ×Ô¶¯ĞİÃß(ÎŞ´¥ÃşÔ¼2ÃëºóĞİÃß)
-#define CST816S_SLEEP_DISABLE   0x01           // ½ûÓÃ×Ô¶¯ĞİÃß(Ê¼ÖÕ±£³Ö»îÔ¾)
+#define CST816S_REG_AUTOSLEEP   0xFE           // è‡ªåŠ¨ä¼‘çœ æ§åˆ¶
+#define CST816S_SLEEP_ENABLE    0x00           // å¯ç”¨è‡ªåŠ¨ä¼‘çœ (æ— è§¦æ‘¸çº¦2ç§’åä¼‘çœ )
+#define CST816S_SLEEP_DISABLE   0x01           // ç¦ç”¨è‡ªåŠ¨ä¼‘çœ (å§‹ç»ˆä¿æŒæ´»è·ƒ)
 
 /**
- * @brief ´¥Ãş×´Ì¬½á¹¹Ìå
+ * @brief è§¦æ‘¸çŠ¶æ€ç»“æ„ä½“
  */
 typedef struct {
-    uint8_t  pressed;       // 1=ÓĞ´¥Ãş, 0=ÎŞ´¥Ãş
-    uint16_t x;             // X×ø±ê
-    uint16_t y;             // Y×ø±ê
+    uint8_t  pressed;       // 1=æœ‰è§¦æ‘¸, 0=æ— è§¦æ‘¸
+    uint16_t x;             // Xåæ ‡
+    uint16_t y;             // Yåæ ‡
 } TouchState;
 
 /**
- * @brief INT±êÖ¾Î» (ISRÖÃÎ»)
+ * @brief INTæ ‡å¿—ä½ (ISRç½®ä½)
  */
 extern volatile uint8_t g_touch_int_flag;
 extern uint8_t g_touch_pressed;
 
 /**
- * @brief º¯ÊıÉùÃ÷
+ * @brief å‡½æ•°å£°æ˜
  */
 void    Touch_Init(void);
-void    Touch_WakeResumeInit(void);              // »½ĞÑÈ·ÈÏÇ°»Ö¸´I2C£¬²»¸´Î»CST816S
+void    Touch_WakeResumeInit(void);              // å”¤é†’ç¡®è®¤å‰æ¢å¤I2Cï¼Œä¸å¤ä½CST816S
 uint8_t Touch_IsPressed(void);                    // INT trigger: press->1, release->0, cache coords
 void    Touch_Scan(TouchState *state);            // read cached coords (no I2C)
 void    Touch_UpdateCoords(void);                 // poll I2C for real-time coords (during hold)
-void    CST816S_SleepEnable(void);                // ÆôÓÃ×Ô¶¯ĞİÃß (´ı»úÇ°µ÷ÓÃ)
-void    CST816S_SleepDisable(void);               // ½ûÓÃ×Ô¶¯ĞİÃß (»½ĞÑºóµ÷ÓÃ)
+void    CST816S_SleepEnable(void);                // å¯ç”¨è‡ªåŠ¨ä¼‘çœ  (å¾…æœºå‰è°ƒç”¨)
+void    CST816S_SleepDisable(void);               // ç¦ç”¨è‡ªåŠ¨ä¼‘çœ  (å”¤é†’åè°ƒç”¨)
 
 /**
- * @brief Standby»½ĞÑÅäÖÃ
+ * @brief Standbyå”¤é†’é…ç½®
  */
-void    Touch_StandbyWakeupConfig(void);          // ÅäÖÃPA8 EXTIÊÂ¼ş»½ĞÑ
-void    Touch_WaitWakeInputsReleased(void);        // µÈ´ı´¥ÃşÍêÈ«ÊÍ·Å
+void    Touch_StandbyWakeupConfig(void);          // é…ç½®PA8 EXTIäº‹ä»¶å”¤é†’
+void    Touch_WaitWakeInputsReleased(void);        // ç­‰å¾…è§¦æ‘¸å®Œå…¨é‡Šæ”¾
 
 #endif

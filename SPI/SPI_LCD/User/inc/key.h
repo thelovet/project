@@ -3,20 +3,20 @@
 
 #include "ch32v20x.h"
 
-// °´¼ü×´Ì¬±êÖ¾
-// °´¼üÀàĞÍ¶¨Òå
-#define KEY_SHORT_PRESS        0x01    // ¶Ì°´
-#define KEY_LONG_PRESS         0x02    // ³¤°´
+// æŒ‰é”®çŠ¶æ€æ ‡å¿—
+// æŒ‰é”®ç±»å‹å®šä¹‰
+#define KEY_SHORT_PRESS        0x01    // çŸ­æŒ‰
+#define KEY_LONG_PRESS         0x02    // é•¿æŒ‰
 
-#define KEY_LONG_PRESS_ENABLE  1  // ³¤°´¿ª¹Ø£º1=³¤°´ÓĞĞ§£¬0=³¤°´ÎŞĞ§£¨ËÉÊÖ´¥·¢¶Ì°´£©
+#define KEY_LONG_PRESS_ENABLE  1  // é•¿æŒ‰å¼€å…³ï¼š1=é•¿æŒ‰æœ‰æ•ˆï¼Œ0=é•¿æŒ‰æ— æ•ˆï¼ˆæ¾æ‰‹è§¦å‘çŸ­æŒ‰ï¼‰
 
-// °´¼üÇı¶¯½Ó¿Úº¯Êı
+// æŒ‰é”®é©±åŠ¨æ¥å£å‡½æ•°
 void KEY_Init(void);
 uint8_t Get_Key_Status(void);
 void Clear_Key_Status(void);
 void KEY_Reset(void);
 void KEY_Poll(void);
 
-extern uint8_t key_response;       // °´¼üÏìÓ¦±êÖ¾
+extern uint8_t key_response;       // æŒ‰é”®å“åº”æ ‡å¿—
 
 #endif

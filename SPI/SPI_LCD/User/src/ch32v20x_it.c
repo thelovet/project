@@ -1,14 +1,3 @@
-/********************************** (C) COPYRIGHT *******************************
- * File Name          : ch32v20x_it.c
- * Author             : WCH
- * Version            : V1.0.0
- * Date               : 2023/12/29
- * Description        : Main Interrupt Service Routines.
-*********************************************************************************
-* Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
-* Attention: This software (modified or not) and binary are used for
-* microcontroller manufactured by Nanjing Qinheng Microelectronics.
-*******************************************************************************/
 #include "ch32v20x_it.h"
 
 void NMI_Handler(void)
@@ -16,16 +5,9 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
     __attribute__((interrupt("WCH-Interrupt-fast"), used, externally_visible));
 
-/*********************************************************************
- * @fn      NMI_Handler
- *
- * @brief   This function handles NMI exception.
- *
- * @return  none
- */
 /**
- * @brief  ²»¿ÉÆÁ±ÎÖĞ¶Ï´¦Àí¡£
- * @note   ±ê×¼ ISR(±£Áô)¡£
+ * @brief  ä¸å¯å±è”½ä¸­æ–­(NMI)å¤„ç†ã€‚
+ * @note   æ ‡å‡† ISR(ä¿ç•™)ã€‚
  */
 void NMI_Handler(void)
 {
@@ -34,16 +16,9 @@ void NMI_Handler(void)
   }
 }
 
-/*********************************************************************
- * @fn      HardFault_Handler
- *
- * @brief   This function handles Hard Fault exception.
- *
- * @return  none
- */
 /**
- * @brief  Ó²¼ş´íÎóÖĞ¶Ï´¦Àí¡£
- * @note   ±ê×¼ ISR, ²¶»ñºóËÀÑ­»·/¸´Î»¡£
+ * @brief  ç¡¬ä»¶é”™è¯¯(HardFault)ä¸­æ–­å¤„ç†ã€‚
+ * @note   æ ‡å‡† ISR, æ•è·åå¤ä½/æ­»å¾ªç¯ã€‚
  */
 void HardFault_Handler(void)
 {

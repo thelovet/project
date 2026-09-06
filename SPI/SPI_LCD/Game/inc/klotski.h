@@ -3,30 +3,30 @@
 
 #include "ch32v20x.h"
 
-/* »ªÈİµÀÅäÖÃ: 4x4 (15-puzzle) */
+/* åå®¹é“é…ç½®: 4x4 (15-puzzle) */
 #define KLOTSKI_ROWS      4
 #define KLOTSKI_COLS      4
 #define KLOTSKI_SIZE      16   /* 4x4 */
-#define KLOTSKI_TILE_SIZE 40   /* Ã¿¸ö·½¿é40x40 */
-#define KLOTSKI_GAP       5    /* ·½¿é¼ä¾à */
+#define KLOTSKI_TILE_SIZE 40   /* æ¯ä¸ªæ–¹å—40x40 */
+#define KLOTSKI_GAP       5    /* æ–¹å—é—´è· */
 #define KLOTSKI_GRID_W    (KLOTSKI_COLS * KLOTSKI_TILE_SIZE + (KLOTSKI_COLS - 1) * KLOTSKI_GAP)
 #define KLOTSKI_GRID_X    ((240 - KLOTSKI_GRID_W) / 2)
-#define KLOTSKI_GRID_Y    40   /* ¶¥²¿Áô¿Õ¸ø·ÖÊı/¹Ø¿¨ */
+#define KLOTSKI_GRID_Y    40   /* é¡¶éƒ¨ç•™ç©ºç»™åˆ†æ•°/å…³å¡ */
 
-/* 16x32 Êı×Ö¾ÓÖĞÆ«ÒÆ */
+/* 16x32 æ•°å­—å±…ä¸­åç§» */
 #define KLOTSKI_DIGIT_W    16
 #define KLOTSKI_DIGIT_H    32
 #define KLOTSKI_DIGIT_OFFX ((KLOTSKI_TILE_SIZE - KLOTSKI_DIGIT_W) / 2)
 #define KLOTSKI_DIGIT_OFFY ((KLOTSKI_TILE_SIZE - KLOTSKI_DIGIT_H) / 2)
 
 /**
- * @brief ÓÎÏ·×´Ì¬
+ * @brief æ¸¸æˆçŠ¶æ€
  */
 typedef enum {
-    KLOTSKI_STATE_PLAYING = 0,   /* ½øĞĞÖĞ */
-    KLOTSKI_STATE_WON,           /* Í¨¹Ø */
-    KLOTSKI_STATE_EXIT_MENU,     /* ÍË³ö²Ëµ¥ */
-    KLOTSKI_STATE_RESTART_MENU,  /* ÖØĞÂ¿ªÊ¼²Ëµ¥ */
+    KLOTSKI_STATE_PLAYING = 0,   /* è¿›è¡Œä¸­ */
+    KLOTSKI_STATE_WON,           /* é€šå…³ */
+    KLOTSKI_STATE_EXIT_MENU,     /* é€€å‡ºèœå• */
+    KLOTSKI_STATE_RESTART_MENU,  /* é‡æ–°å¼€å§‹èœå• */
 } KlotskiState;
 
 void    klotski_init(void);
@@ -35,7 +35,7 @@ void    klotski_reset_touch(void);
 void    klotski_full_redraw(void);
 uint8_t klotski_is_menu_visible(void);
 void    klotski_lowbatt_restore(void);
-/* ²Ëµ¥×´Ì¬»ú hook (¹©¶ş¼¶ÉèÖÃ²Ëµ¥·µ»Ø¸´ÓÃ, ÓëÒ»¼¶²Ëµ¥Ò»ÖÂ) */
+/* èœå•çŠ¶æ€æœº hook (ä¾›äºŒçº§è®¾ç½®èœå•è¿”å›å¤ç”¨, ä¸ä¸€çº§èœå•ä¸€è‡´) */
 void klotski_menu_mark_dirty(void);
 uint8_t klotski_menu_bg_redraw(void);
 uint8_t klotski_save_state(uint8_t *buf, uint8_t max_len);

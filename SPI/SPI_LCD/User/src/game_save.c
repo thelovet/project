@@ -1,10 +1,10 @@
 /**
  * @file    game_save.c
- * @brief   ÓÎÏ·×´Ì¬´æµµÄ£¿é: ½«¸÷ÓÎÏ·×´Ì¬Ğ´ÈëÄÚ²¿Flash´æµµÒ³²¢ÔÚ»½ĞÑºó»Ö¸´
- * @note    ´æµµÒ³¹Ì¶¨ 0x0800FF00(×îºóÒ»¸ö256×Ö½ÚÒ³), Ò³Í·: Ä§Êı/°æ±¾/Ä£Ê½/³¤¶È/CRC16;
- *          Ö§³ÖÍÆÏä×Ó/2048/¶íÂŞË¹·½¿é/»ªÈİµÀ/´óÓã³ÔĞ¡Óã(GameSave_IsSupportedMode)¡£
- *          »½ĞÑ»Ö¸´×ß BKP ºó±¸¼Ä´æÆ÷¼Ç»Ö¸´±êÖ¾(ÊÓÆµ/ÓÎÏ·), GameSave_RestoreWakeState
- *          ¶Á³öºóÓÉ GameSave_RestorePending µ÷ÓÃ¸÷ÓÎÏ· restore ½Ó¿Ú¡£
+ * @brief   æ¸¸æˆçŠ¶æ€å­˜æ¡£æ¨¡å—: å°†å„æ¸¸æˆçŠ¶æ€å†™å…¥å†…éƒ¨Flashå­˜æ¡£é¡µå¹¶åœ¨å”¤é†’åæ¢å¤
+ * @note    å­˜æ¡£é¡µå›ºå®š 0x0800FF00(æœ€åä¸€ä¸ª256å­—èŠ‚é¡µ), é¡µå¤´: é­”æ•°/ç‰ˆæœ¬/æ¨¡å¼/é•¿åº¦/CRC16;
+ *          æ”¯æŒæ¨ç®±å­/2048/ä¿„ç½—æ–¯æ–¹å—/åå®¹é“/å¤§é±¼åƒå°é±¼(GameSave_IsSupportedMode)ã€‚
+ *          å”¤é†’æ¢å¤èµ° BKP åå¤‡å¯„å­˜å™¨è®°æ¢å¤æ ‡å¿—(è§†é¢‘/æ¸¸æˆ), GameSave_RestoreWakeState
+ *          è¯»å‡ºåç”± GameSave_RestorePending è°ƒç”¨å„æ¸¸æˆ restore æ¥å£ã€‚
  */
 
 #include "string.h"
@@ -16,25 +16,25 @@
 #include "klotski.h"
 #include "fish.h"
 
-#define GAME_SAVE_PAGE_ADDR    0x0800FF00UL  /* ÄÚ²¿ Flash ×îºóÒ»¸ö 256 ×Ö½ÚÒ³µÄÆğÊ¼µØÖ· */
-#define GAME_SAVE_PAGE_SIZE    256           /* ´æµµÒ³×Ü´óĞ¡£¬µ¥Î»Îª×Ö½Ú */
-#define GAME_SAVE_HEADER_SIZE  12            /* Ä§Êı¡¢°æ±¾¡¢Ä£Ê½¡¢³¤¶ÈºÍ CRC ËùÕ¼µÄÒ³Í·´óĞ¡ */
-#define GAME_SAVE_PAYLOAD_SIZE (GAME_SAVE_PAGE_SIZE - GAME_SAVE_HEADER_SIZE) /* ÓÎÏ·×´Ì¬×î´ó³¤¶È */
-#define GAME_SAVE_MAGIC        0x31565347UL  /* ´æµµÓĞĞ§±êÖ¾£¬°´Ğ¡¶Ë×Ö½ÚĞò¶ÔÓ¦ "GSV1" */
-#define GAME_SAVE_VERSION      2             /* µ±Ç°´æµµ¸ñÊ½°æ±¾£¬ÓÃÓÚ¾Ü¾ø¾É¸ñÊ½Êı¾İ */
-#define GAME_SAVE_BKP_MAGIC_VIDEO  0xA5A5    /* BKP ÖĞµÄÊÓÆµ»Ö¸´ÀàĞÍ±êÖ¾ */
-#define GAME_SAVE_BKP_MAGIC_GAME   0x5A5A    /* BKP ÖĞµÄÓÎÏ·»Ö¸´ÀàĞÍ±êÖ¾ */
-#define GAME_SAVE_BKP_DR_MAGIC     BKP_DR1   /* ±£´æ»Ö¸´ÀàĞÍ±êÖ¾µÄ±¸·İ¼Ä´æÆ÷ */
-#define GAME_SAVE_BKP_DR_STATE     BKP_DR2   /* ±£´æÊÓÆµË÷Òı»òÓÎÏ·Ä£Ê½µÄ±¸·İ¼Ä´æÆ÷ */
+#define GAME_SAVE_PAGE_ADDR    0x0800FF00UL  /* å†…éƒ¨ Flash æœ€åä¸€ä¸ª 256 å­—èŠ‚é¡µçš„èµ·å§‹åœ°å€ */
+#define GAME_SAVE_PAGE_SIZE    256           /* å­˜æ¡£é¡µæ€»å¤§å°ï¼Œå•ä½ä¸ºå­—èŠ‚ */
+#define GAME_SAVE_HEADER_SIZE  12            /* é­”æ•°ã€ç‰ˆæœ¬ã€æ¨¡å¼ã€é•¿åº¦å’Œ CRC æ‰€å çš„é¡µå¤´å¤§å° */
+#define GAME_SAVE_PAYLOAD_SIZE (GAME_SAVE_PAGE_SIZE - GAME_SAVE_HEADER_SIZE) /* æ¸¸æˆçŠ¶æ€æœ€å¤§é•¿åº¦ */
+#define GAME_SAVE_MAGIC        0x31565347UL  /* å­˜æ¡£æœ‰æ•ˆæ ‡å¿—ï¼ŒæŒ‰å°ç«¯å­—èŠ‚åºå¯¹åº” "GSV1" */
+#define GAME_SAVE_VERSION      2             /* å½“å‰å­˜æ¡£æ ¼å¼ç‰ˆæœ¬ï¼Œç”¨äºæ‹’ç»æ—§æ ¼å¼æ•°æ® */
+#define GAME_SAVE_BKP_MAGIC_VIDEO  0xA5A5    /* BKP ä¸­çš„è§†é¢‘æ¢å¤ç±»å‹æ ‡å¿— */
+#define GAME_SAVE_BKP_MAGIC_GAME   0x5A5A    /* BKP ä¸­çš„æ¸¸æˆæ¢å¤ç±»å‹æ ‡å¿— */
+#define GAME_SAVE_BKP_DR_MAGIC     BKP_DR1   /* ä¿å­˜æ¢å¤ç±»å‹æ ‡å¿—çš„å¤‡ä»½å¯„å­˜å™¨ */
+#define GAME_SAVE_BKP_DR_STATE     BKP_DR2   /* ä¿å­˜è§†é¢‘ç´¢å¼•æˆ–æ¸¸æˆæ¨¡å¼çš„å¤‡ä»½å¯„å­˜å™¨ */
 
 static uint32_t s_game_save_buffer[GAME_SAVE_PAGE_SIZE / sizeof(uint32_t)];
 static uint8_t s_game_restore_pending = 0;
 static MainMode s_game_restore_mode = MAIN_MODE_VIDEO;
 
 /**
- * @brief  ÅĞ¶ÏÖ¸¶¨Ä£Ê½ÊÇ·ñÖ§³ÖÓÎÏ·´æµµ
- * @param  mode  ÒªÅĞ¶ÏµÄÖ÷Ä£Ê½
- * @return 1 ±íÊ¾Ö§³Ö´æµµ£¬0 ±íÊ¾²»Ö§³Ö
+ * @brief  åˆ¤æ–­æŒ‡å®šæ¨¡å¼æ˜¯å¦æ”¯æŒæ¸¸æˆå­˜æ¡£
+ * @param  mode  è¦åˆ¤æ–­çš„ä¸»æ¨¡å¼
+ * @return 1 è¡¨ç¤ºæ”¯æŒå­˜æ¡£ï¼Œ0 è¡¨ç¤ºä¸æ”¯æŒ
  */
 uint8_t GameSave_IsSupportedMode(MainMode mode)
 {
@@ -44,11 +44,11 @@ uint8_t GameSave_IsSupportedMode(MainMode mode)
 }
 
 /**
- * @brief  ¼ÆËãÓÎÏ·´æµµÔØºÉµÄ CRC16 Ğ£ÑéÖµ
- * @param  data  ´æµµÔØºÉÊı¾İ
- * @param  len   ´æµµÔØºÉ³¤¶È
- * @param  mode  ÓÎÏ·Ä£Ê½
- * @return ¼ÆËãµÃµ½µÄ CRC16 Ğ£ÑéÖµ
+ * @brief  è®¡ç®—æ¸¸æˆå­˜æ¡£è½½è·çš„ CRC16 æ ¡éªŒå€¼
+ * @param  data  å­˜æ¡£è½½è·æ•°æ®
+ * @param  len   å­˜æ¡£è½½è·é•¿åº¦
+ * @param  mode  æ¸¸æˆæ¨¡å¼
+ * @return è®¡ç®—å¾—åˆ°çš„ CRC16 æ ¡éªŒå€¼
  */
 static uint16_t GameSave_Crc16(const uint8_t *data, uint8_t len, MainMode mode)
 {
@@ -65,10 +65,10 @@ static uint16_t GameSave_Crc16(const uint8_t *data, uint8_t len, MainMode mode)
 }
 
 /**
- * @brief  µ÷ÓÃ¶ÔÓ¦ÓÎÏ·½Ó¿ÚĞòÁĞ»¯µ±Ç°×´Ì¬
- * @param  mode  Òª±£´æµÄÓÎÏ·Ä£Ê½
- * @param  buf   ´æµµÔØºÉÊä³ö»º³åÇø
- * @return Êµ¼ÊÔØºÉ³¤¶È£¬Ä£Ê½ÎŞĞ§»òĞòÁĞ»¯Ê§°ÜÊ±·µ»Ø 0
+ * @brief  è°ƒç”¨å¯¹åº”æ¸¸æˆæ¥å£åºåˆ—åŒ–å½“å‰çŠ¶æ€
+ * @param  mode  è¦ä¿å­˜çš„æ¸¸æˆæ¨¡å¼
+ * @param  buf   å­˜æ¡£è½½è·è¾“å‡ºç¼“å†²åŒº
+ * @return å®é™…è½½è·é•¿åº¦ï¼Œæ¨¡å¼æ— æ•ˆæˆ–åºåˆ—åŒ–å¤±è´¥æ—¶è¿”å› 0
  */
 static uint8_t GameSave_Serialize(MainMode mode, uint8_t *buf)
 {
@@ -89,9 +89,9 @@ static uint8_t GameSave_Serialize(MainMode mode, uint8_t *buf)
 }
 
 /**
- * @brief  ½«Ö¸¶¨ÓÎÏ·×´Ì¬Ğ´ÈëÄÚ²¿ Flash ´æµµÒ³
- * @param  mode  Òª±£´æµÄÓÎÏ·Ä£Ê½
- * @return 1 ±íÊ¾Ğ´Èë»òÄÚÈİ±È¶Ô³É¹¦£¬0 ±íÊ¾±£´æÊ§°Ü
+ * @brief  å°†æŒ‡å®šæ¸¸æˆçŠ¶æ€å†™å…¥å†…éƒ¨ Flash å­˜æ¡£é¡µ
+ * @param  mode  è¦ä¿å­˜çš„æ¸¸æˆæ¨¡å¼
+ * @return 1 è¡¨ç¤ºå†™å…¥æˆ–å†…å®¹æ¯”å¯¹æˆåŠŸï¼Œ0 è¡¨ç¤ºä¿å­˜å¤±è´¥
  */
 uint8_t GameSave_Write(MainMode mode)
 {
@@ -119,8 +119,8 @@ uint8_t GameSave_Write(MainMode mode)
     FLASH_Unlock_Fast();
     FLASH_ErasePage_Fast(GAME_SAVE_PAGE_ADDR);
     /*
-     * Fast²Á³ıÅ¼ÓĞ²»³¹µ×£º³é²éÒ³ÖĞ¼äÎ»ÖÃ£¬ÈôÎ´²ÁÎª0xFFÔòÖØÊÔÒ»´Î¡£
-     * µÚ¶ş´ÎĞ´ÈëÊ±FlashÒÑÓĞ¾ÉÊı¾İ£¬ÒÀÀµÕæ²Á³ı£¬Ê×´Î¿Õ°×Ò³²»ÊÜÓ°Ïì¡£
+     * Fastæ“¦é™¤å¶æœ‰ä¸å½»åº•ï¼šæŠ½æŸ¥é¡µä¸­é—´ä½ç½®ï¼Œè‹¥æœªæ“¦ä¸º0xFFåˆ™é‡è¯•ä¸€æ¬¡ã€‚
+     * ç¬¬äºŒæ¬¡å†™å…¥æ—¶Flashå·²æœ‰æ—§æ•°æ®ï¼Œä¾èµ–çœŸæ“¦é™¤ï¼Œé¦–æ¬¡ç©ºç™½é¡µä¸å—å½±å“ã€‚
      */
     if (((const uint8_t *)GAME_SAVE_PAGE_ADDR)[GAME_SAVE_PAGE_SIZE / 2] != 0xFF) {
         FLASH_ErasePage_Fast(GAME_SAVE_PAGE_ADDR);
@@ -132,9 +132,9 @@ uint8_t GameSave_Write(MainMode mode)
 }
 
 /**
- * @brief  Ğ£ÑéÄÚ²¿ Flash ´æµµ²¢»Ö¸´Ö¸¶¨ÓÎÏ·
- * @param  mode  Òª»Ö¸´µÄÓÎÏ·Ä£Ê½
- * @return 1 ±íÊ¾»Ö¸´³É¹¦£¬0 ±íÊ¾´æµµÎŞĞ§»ò»Ö¸´Ê§°Ü
+ * @brief  æ ¡éªŒå†…éƒ¨ Flash å­˜æ¡£å¹¶æ¢å¤æŒ‡å®šæ¸¸æˆ
+ * @param  mode  è¦æ¢å¤çš„æ¸¸æˆæ¨¡å¼
+ * @return 1 è¡¨ç¤ºæ¢å¤æˆåŠŸï¼Œ0 è¡¨ç¤ºå­˜æ¡£æ— æ•ˆæˆ–æ¢å¤å¤±è´¥
  */
 static uint8_t GameSave_Restore(MainMode mode)
 {
@@ -175,8 +175,8 @@ static uint8_t GameSave_Restore(MainMode mode)
 }
 
 /**
- * @brief  ½«ÊÓÆµ»Ö¸´±êÖ¾ºÍÊÓÆµË÷ÒıĞ´Èë±¸·İ¼Ä´æÆ÷
- * @param  video_index  µ±Ç°ÊÓÆµË÷Òı
+ * @brief  å°†è§†é¢‘æ¢å¤æ ‡å¿—å’Œè§†é¢‘ç´¢å¼•å†™å…¥å¤‡ä»½å¯„å­˜å™¨
+ * @param  video_index  å½“å‰è§†é¢‘ç´¢å¼•
  */
 void GameSave_SaveVideoWakeState(uint8_t video_index)
 {
@@ -188,8 +188,8 @@ void GameSave_SaveVideoWakeState(uint8_t video_index)
 }
 
 /**
- * @brief  ½«ÓÎÏ·»Ö¸´±êÖ¾ºÍÓÎÏ·Ä£Ê½Ğ´Èë±¸·İ¼Ä´æÆ÷
- * @param  mode  ĞİÃßÇ°µÄÓÎÏ·Ä£Ê½
+ * @brief  å°†æ¸¸æˆæ¢å¤æ ‡å¿—å’Œæ¸¸æˆæ¨¡å¼å†™å…¥å¤‡ä»½å¯„å­˜å™¨
+ * @param  mode  ä¼‘çœ å‰çš„æ¸¸æˆæ¨¡å¼
  */
 void GameSave_SaveGameWakeState(MainMode mode)
 {
@@ -201,10 +201,10 @@ void GameSave_SaveGameWakeState(MainMode mode)
 }
 
 /**
- * @brief  ¶ÁÈ¡²¢Çå³ı±¸·İ¼Ä´æÆ÷ÖĞµÄ»Ö¸´×´Ì¬
- * @param  video_index  ÊÓÆµË÷ÒıÊä³öµØÖ·
- * @param  video_count  ÊÓÆµ×ÜÊı
- * @return ÊÓÆµ¡¢ÓÎÏ·»òÎŞ»Ö¸´×´Ì¬
+ * @brief  è¯»å–å¹¶æ¸…é™¤å¤‡ä»½å¯„å­˜å™¨ä¸­çš„æ¢å¤çŠ¶æ€
+ * @param  video_index  è§†é¢‘ç´¢å¼•è¾“å‡ºåœ°å€
+ * @param  video_count  è§†é¢‘æ€»æ•°
+ * @return è§†é¢‘ã€æ¸¸æˆæˆ–æ— æ¢å¤çŠ¶æ€
  */
 GameSaveWakeType GameSave_RestoreWakeState(uint8_t *video_index,
                                            uint8_t video_count)
@@ -238,9 +238,9 @@ GameSaveWakeType GameSave_RestoreWakeState(uint8_t *video_index,
 }
 
 /**
- * @brief  »Ö¸´±¸·İ¼Ä´æÆ÷Ö¸¶¨µÄ´ı»Ö¸´ÓÎÏ·
- * @param  mode  »Ö¸´³É¹¦»ò´æµµÎŞĞ§Ê±Êä³öÄ¿±êÓÎÏ·Ä£Ê½
- * @return ÎŞ´ı»Ö¸´×´Ì¬¡¢»Ö¸´³É¹¦»ò´æµµÎŞĞ§
+ * @brief  æ¢å¤å¤‡ä»½å¯„å­˜å™¨æŒ‡å®šçš„å¾…æ¢å¤æ¸¸æˆ
+ * @param  mode  æ¢å¤æˆåŠŸæˆ–å­˜æ¡£æ— æ•ˆæ—¶è¾“å‡ºç›®æ ‡æ¸¸æˆæ¨¡å¼
+ * @return æ— å¾…æ¢å¤çŠ¶æ€ã€æ¢å¤æˆåŠŸæˆ–å­˜æ¡£æ— æ•ˆ
  */
 GameSavePendingResult GameSave_RestorePending(MainMode *mode)
 {

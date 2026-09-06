@@ -1,44 +1,44 @@
 /**
  * @file    flash_store.c
- * @brief   FlashÊı¾İ´æ´¢³ÌĞò
- * @note    ½«¹Ì¼şÄÚËùÓĞ×Ö¿â×ÊÔ´ÓëÍ¼Æ¬Êı¾İÉÕÂ¼µ½Íâ²¿SPI Flash¡£
- *          ÔÚmain.cÖĞ¶¨Òå FLASH_DATA_STORE_MODE ºó½øÈë±¾Ä£Ê½Ö´ĞĞÉÕÂ¼,
- *          ÆÁÄ»ÉÏÊµÊ±ÏÔÊ¾½ø¶È°Ù·Ö±È, ÉÕÂ¼+Ğ£ÑéÍê³ÉºóÏÔÊ¾100%¡£
- *          ×¢ÊÍµô FLASH_DATA_STORE_MODE ¼´»Ö¸´Õı³£ÓÎÏ·³ÌĞò¡£
+ * @brief   Flashæ•°æ®å­˜å‚¨ç¨‹åº
+ * @note    å°†å›ºä»¶å†…æ‰€æœ‰å­—åº“èµ„æºä¸å›¾ç‰‡æ•°æ®çƒ§å½•åˆ°å¤–éƒ¨SPI Flashã€‚
+ *          åœ¨main.cä¸­å®šä¹‰ FLASH_DATA_STORE_MODE åè¿›å…¥æœ¬æ¨¡å¼æ‰§è¡Œçƒ§å½•,
+ *          å±å¹•ä¸Šå®æ—¶æ˜¾ç¤ºè¿›åº¦ç™¾åˆ†æ¯”, çƒ§å½•+æ ¡éªŒå®Œæˆåæ˜¾ç¤º100%ã€‚
+ *          æ³¨é‡Šæ‰ FLASH_DATA_STORE_MODE å³æ¢å¤æ­£å¸¸æ¸¸æˆç¨‹åºã€‚
  *
- *          ´æ´¢²¼¾Ö(´Ó64MB FlashÄ©Î²ÍùÇ°):
- *          [Êı¾İÇø: ´Ódata_startË³ĞòĞ´Èë¸÷×ÊÔ´] [Ä¿Â¼Çø: Î»ÓÚFlash×îÄ©Î²]
- *          data_start = FLASH_SIZE - Ä¿Â¼´óĞ¡ - Êı¾İ×Ü´óĞ¡
+ *          å­˜å‚¨å¸ƒå±€(ä»64MB Flashæœ«å°¾å¾€å‰):
+ *          [æ•°æ®åŒº: ä»data_starté¡ºåºå†™å…¥å„èµ„æº] [ç›®å½•åŒº: ä½äºFlashæœ€æœ«å°¾]
+ *          data_start = FLASH_SIZE - ç›®å½•å¤§å° - æ•°æ®æ€»å¤§å°
  */
 
 #include "flash_store.h"
 #include "flash.h"
 #include "lcd.h"
-#include "display.h"       /* LCD_ShowNum(´®¿ÚÉÕÂ¼ÊÕ°ü¼ÆÊı) */
-#include "timer.h"         /* GetTimerCount(´®¿Ú¿ÕÏĞ³¬Ê±) */
+#include "display.h"       /* LCD_ShowNum(ä¸²å£çƒ§å½•æ”¶åŒ…è®¡æ•°) */
+#include "timer.h"         /* GetTimerCount(ä¸²å£ç©ºé—²è¶…æ—¶) */
 #include "debug.h"
-#include "ch32v20x_usart.h"  /* ´®¿ÚÉÕÂ¼: USART1 */
+#include "ch32v20x_usart.h"  /* ä¸²å£çƒ§å½•: USART1 */
 
-#include "chinese_fonts.h"   /* 24x24ÖĞÎÄµãÕó×Ö¿â */
-#include "sok_img_win.h"     /* 32x32ÖĞÎÄ×Ö¿â + 16x32Êı×Ö×Ö¿â */
-#include "sokoban.h"         /* ÍÆÏä×ÓÍ¼ÏñÊı¾İ */
-#include "sok_img_prev.h"    /* ÉÏÒ»¹ØÍ¼±ê */
-#include "sok_img_next.h"    /* ÏÂÒ»¹ØÍ¼±ê */
-#include "sok_img_restart.h" /* ÖØĞÂ¿ªÊ¼Í¼±ê */
-#include "fish_imgs.h"       /* ´óÓã³ÔĞ¡ÓãÍ¼Æ¬ */
-#include "player_imgs.h"     /* ´óÓã³ÔĞ¡ÓãÍæ¼ÒĞÎÏó */
+#include "chinese_fonts.h"   /* 24x24ä¸­æ–‡ç‚¹é˜µå­—åº“ */
+#include "sok_img_win.h"     /* 32x32ä¸­æ–‡å­—åº“ + 16x32æ•°å­—å­—åº“ */
+#include "sokoban.h"         /* æ¨ç®±å­å›¾åƒæ•°æ® */
+#include "sok_img_prev.h"    /* ä¸Šä¸€å…³å›¾æ ‡ */
+#include "sok_img_next.h"    /* ä¸‹ä¸€å…³å›¾æ ‡ */
+#include "sok_img_restart.h" /* é‡æ–°å¼€å§‹å›¾æ ‡ */
+#include "fish_imgs.h"       /* å¤§é±¼åƒå°é±¼å›¾ç‰‡ */
+#include "player_imgs.h"     /* å¤§é±¼åƒå°é±¼ç©å®¶å½¢è±¡ */
 
 /* ================================================================
- * ×ÊÔ´±í: ¹Ì¼şÄÚÈ«²¿ĞèÒªÉÕÂ¼µÄ×Ö¿âÓëÍ¼Æ¬Êı¾İ
+ * èµ„æºè¡¨: å›ºä»¶å†…å…¨éƒ¨éœ€è¦çƒ§å½•çš„å­—åº“ä¸å›¾ç‰‡æ•°æ®
  * ================================================================ */
 typedef struct {
-    const void *data;   /* Êı¾İÔ´Ö¸Õë(ÄÚ²¿Flash constÇø) */
-    uint32_t    size;   /* Êı¾İ³¤¶È(×Ö½Ú) */
+    const void *data;   /* æ•°æ®æºæŒ‡é’ˆ(å†…éƒ¨Flash conståŒº) */
+    uint32_t    size;   /* æ•°æ®é•¿åº¦(å­—èŠ‚) */
 } FlashStoreRes;
 
 #ifdef FLASH_DATA_STORE_MODE
 static const FlashStoreRes s_resources[] = {
-    /* ---- 24x24ÖĞÎÄµãÕó×Ö¿â (chinese_fonts.c, 72×Ö½Ú/×Ö) ---- */
+    /* ---- 24x24ä¸­æ–‡ç‚¹é˜µå­—åº“ (chinese_fonts.c, 72å­—èŠ‚/å­—) ---- */
     { font_tui,     72 }, { font_xiang,   72 }, { font_zi,     72 },
     { font_shi,     72 }, { font_pin,     72 }, { font_fan,    72 },
     { font_chong,   72 }, { font_xin2,    72 }, { font_kai2,   72 },
@@ -47,13 +47,13 @@ static const FlashStoreRes s_resources[] = {
     { font_zhi,     72 }, { font_xi2,     72 }, { font_ping,   72 },
     { font_shi2,    72 }, { font_jian,    72 }, { font_mu,     72 },
     { font_fan2,    72 }, { font_xiang2,  72 },
-    /* ---- 32x32ÖĞÎÄ×Ö¿â (sok_img_win.c, 128×Ö½Ú/×Ö) ---- */
+    /* ---- 32x32ä¸­æ–‡å­—åº“ (sok_img_win.c, 128å­—èŠ‚/å­—) ---- */
     { font_gong,    128 }, { font_xi,     128 }, { font_tong,   128 },
     { font_guan,    128 }, { font_ka,     128 }, { font_you,    128 },
     { font_xi3,     128 }, { font_jie,    128 }, { font_shu,    128 },
-    /* ---- 16x32Êı×Ö×Ö¿â ---- */
+    /* ---- 16x32æ•°å­—å­—åº“ ---- */
     { font_digits,  640 },
-    /* ---- ÍÆÏä×ÓÍ¼ÏñÊı¾İ (sok_img_*.c) ---- */
+    /* ---- æ¨ç®±å­å›¾åƒæ•°æ® (sok_img_*.c) ---- */
     { sok_img_bg_palette,             103 * 2 },
     { sok_img_bg,                     SOK_TILE_PIXELS },
     { sok_img_wall_palette,            54 * 2 },
@@ -65,11 +65,11 @@ static const FlashStoreRes s_resources[] = {
     { sok_img_target_palette,          36 * 2 },
     { sok_img_target,                  SOK_TARGET_PIXELS },
     { sok_img_player,                  SOK_PLAYER_PIXELS * 2 },
-    /* ---- µ¼º½Í¼±ê (30x31 RGB565) ---- */
+    /* ---- å¯¼èˆªå›¾æ ‡ (30x31 RGB565) ---- */
     { sok_img_prev,     PREV_IMG_W * PREV_IMG_H * 2 },
     { sok_img_next,     NEXT_IMG_W * NEXT_IMG_H * 2 },
     { sok_img_restart,  RESTART_IMG_W * RESTART_IMG_H * 2 },
-    /* ---- ´óÓã³ÔĞ¡Óã 10ÌõÓãÍ¼Æ¬ (RGB565 Ğ¡¶ËĞò, °×É«Í¸Ã÷) ---- */
+    /* ---- å¤§é±¼åƒå°é±¼ 10æ¡é±¼å›¾ç‰‡ (RGB565 å°ç«¯åº, ç™½è‰²é€æ˜) ---- */
     { fish_img_0, FISH_0_W * FISH_0_H * 2 },
     { fish_img_1, FISH_1_W * FISH_1_H * 2 },
     { fish_img_2, FISH_2_W * FISH_2_H * 2 },
@@ -80,7 +80,7 @@ static const FlashStoreRes s_resources[] = {
     { fish_img_7, FISH_7_W * FISH_7_H * 2 },
     { fish_img_8, FISH_8_W * FISH_8_H * 2 },
     { fish_img_9, FISH_9_W * FISH_9_H * 2 },
-    /* ---- ´óÓã³ÔĞ¡Óã 9ÕÅÍæ¼ÒĞÎÏó (RGB565 Ğ¡¶ËĞò, °×É«Í¸Ã÷) ---- */
+    /* ---- å¤§é±¼åƒå°é±¼ 9å¼ ç©å®¶å½¢è±¡ (RGB565 å°ç«¯åº, ç™½è‰²é€æ˜) ---- */
     { player_img_0, PLAYER_0_W * PLAYER_0_H * 2 },
     { player_img_1, PLAYER_1_W * PLAYER_1_H * 2 },
     { player_img_2, PLAYER_2_W * PLAYER_2_H * 2 },
@@ -93,33 +93,33 @@ static const FlashStoreRes s_resources[] = {
 };
 #endif /* FLASH_DATA_STORE_MODE */
 
-#define FLASH_STORE_RES_COUNT  (FLASH_STORE_ID_COUNT)  /* ×ÊÔ´×ÜÊı = Ã¶¾ÙIDÊıÁ¿(±àÒëÆÚÒ»ÖÂ) */
+#define FLASH_STORE_RES_COUNT  (FLASH_STORE_ID_COUNT)  /* èµ„æºæ€»æ•° = æšä¸¾IDæ•°é‡(ç¼–è¯‘æœŸä¸€è‡´) */
 
 #ifdef FLASH_DATA_STORE_MODE
-/* ×ÊÔ´±íÊıÁ¿±ØĞëÓëflash_store.hÖĞ¶¨ÒåµÄ×ÊÔ´IDÊıÁ¿Ò»ÖÂ(±àÒëÆÚ¼ì²é) */
+/* èµ„æºè¡¨æ•°é‡å¿…é¡»ä¸flash_store.hä¸­å®šä¹‰çš„èµ„æºIDæ•°é‡ä¸€è‡´(ç¼–è¯‘æœŸæ£€æŸ¥) */
 typedef char flash_store_count_check[
     ((FLASH_STORE_ID_COUNT == FLASH_STORE_RES_COUNT) ? 1 : -1)];
 #endif /* FLASH_DATA_STORE_MODE */
 
-/* Ä¿Â¼»º³å(Î»ÓÚFlash×îÄ©Î²) */
+/* ç›®å½•ç¼“å†²(ä½äºFlashæœ€æœ«å°¾) */
 #define FLASH_STORE_DIR_SIZE \
     (FLASH_STORE_DIR_HEADER_SIZE + FLASH_STORE_RES_COUNT * FLASH_STORE_ENTRY_SIZE)
 static uint8_t s_dir_buf[FLASH_STORE_DIR_SIZE];
 
-/* ÔËĞĞÆÚ¹²Ïíscratch»º³åÇø(×î´ó×ÊÔ´: Íæ¼Ò52x41 Í¼Æ¬4264×Ö½Ú) */
+/* è¿è¡ŒæœŸå…±äº«scratchç¼“å†²åŒº(æœ€å¤§èµ„æº: ç©å®¶52x41 å›¾ç‰‡4264å­—èŠ‚) */
 #define FLASH_STORE_SCRATCH_SIZE  4352
 static uint8_t s_scratch[FLASH_STORE_SCRATCH_SIZE];
 
 /* ================================================================
- * CRC16 (MODBUS: ¶àÏîÊ½0x8005·´Ïò0xA001, ³õÖµ0xFFFF)
- * ½öÉÕÂ¼Ä£Ê½Ê¹ÓÃ(Ğ´Èë/Ğ£Ñé), ÓÎÏ·Ä£Ê½²»±àÒëÒÔÏû³ı¾¯¸æ
+ * CRC16 (MODBUS: å¤šé¡¹å¼0x8005åå‘0xA001, åˆå€¼0xFFFF)
+ * ä»…çƒ§å½•æ¨¡å¼ä½¿ç”¨(å†™å…¥/æ ¡éªŒ), æ¸¸æˆæ¨¡å¼ä¸ç¼–è¯‘ä»¥æ¶ˆé™¤è­¦å‘Š
  * ================================================================ */
 #if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
 /**
- * @brief  CRC16 µü´ú¸üĞÂ(Ã¿×Ö½Ú)¡£
- * @param  crc  µ±Ç° CRC
- * @param  byte ´ı¸üĞÂ×Ö½Ú
- * @return ¸üĞÂºó CRC
+ * @brief  CRC16 è¿­ä»£æ›´æ–°(æ¯å­—èŠ‚)ã€‚
+ * @param  crc  å½“å‰ CRC
+ * @param  byte å¾…æ›´æ–°å­—èŠ‚
+ * @return æ›´æ–°å CRC
  */
 static uint16_t flash_store_crc16_update(uint16_t crc, uint8_t byte)
 {
@@ -131,12 +131,11 @@ static uint16_t flash_store_crc16_update(uint16_t crc, uint8_t byte)
     return crc;
 }
 /**
- * @brief  ¼ÆËãÒ»¶ÎÊı¾İµÄ CRC16¡£
- * @param  data Êı¾İÖ¸Õë
- * @param  len  ³¤¶È
- * @return CRC16 Öµ
+ * @brief  è®¡ç®—ä¸€æ®µæ•°æ®çš„ CRC16ã€‚
+ * @param  data æ•°æ®æŒ‡é’ˆ
+ * @param  len  é•¿åº¦
+ * @return CRC16 å€¼
  */
-
 static uint16_t flash_store_crc16(const uint8_t *data, uint32_t len)
 {
     uint16_t crc = 0xFFFF;
@@ -146,14 +145,13 @@ static uint16_t flash_store_crc16(const uint8_t *data, uint32_t len)
 #endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE */
 
 /* ================================================================
- * 4×Ö½ÚµØÖ·SPI Flash·ÃÎÊ (¼æÈİ >16MB µØÖ·ÇøÓò, ²»¸Ä±äĞ¾Æ¬µØÖ·Ä£Ê½)
- * ²Á³ı/Ğ´Èë½öÉÕÂ¼Ä£Ê½Ê¹ÓÃ; ¶ÁÈ¡ÓÎÏ·Ä£Ê½Ò²ÓÃ, ²»²ÎÓëÌõ¼ş±àÒë
+ * 4å­—èŠ‚åœ°å€SPI Flashè®¿é—® (å…¼å®¹ >16MB åœ°å€åŒºåŸŸ, ä¸æ”¹å˜èŠ¯ç‰‡åœ°å€æ¨¡å¼)
+ * æ“¦é™¤/å†™å…¥ä»…çƒ§å½•æ¨¡å¼ä½¿ç”¨; è¯»å–æ¸¸æˆæ¨¡å¼ä¹Ÿç”¨, ä¸å‚ä¸æ¡ä»¶ç¼–è¯‘
  * ================================================================ */
 #if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
-/* ÉÈÇø²Á³ı(4K) */
 /**
- * @brief  ÓÃ 4B Ö¸Áî²Á³ıÍâ²¿ Flash ÉÈÇø¡£
- * @param  addr ÉÈÇøµØÖ·
+ * @brief  ç”¨ 4B æŒ‡ä»¤æ“¦é™¤å¤–éƒ¨ Flash æ‰‡åŒºã€‚
+ * @param  addr æ‰‡åŒºåœ°å€
  */
 static void flash_store_erase_sector_4b(uint32_t addr)
 {
@@ -169,12 +167,11 @@ static void flash_store_erase_sector_4b(uint32_t addr)
     SPI_Flash_Wait_Busy();
 }
 
-/* Ò³±à³Ì(µ¥Ò³¡Ü256×Ö½Ú, ²»ÄÜ¿çÒ³) */
 /**
- * @brief  ÓÃ 4B Ö¸Áî±à³ÌÒ»Ò³Êı¾İ¡£
- * @param  src  Ô´Êı¾İ
- * @param  addr Ä¿±êµØÖ·
- * @param  len  ³¤¶È
+ * @brief  ç”¨ 4B æŒ‡ä»¤ç¼–ç¨‹ä¸€é¡µæ•°æ®ã€‚
+ * @param  src  æºæ•°æ®
+ * @param  addr ç›®æ ‡åœ°å€
+ * @param  len  é•¿åº¦
  */
 static void flash_store_page_program_4b(const uint8_t *src, uint32_t addr, uint16_t len)
 {
@@ -190,17 +187,16 @@ static void flash_store_page_program_4b(const uint8_t *src, uint32_t addr, uint1
     SPI_Flash_Wait_Busy();
 }
 
-/* ¿çÒ³Ğ´ */
 /**
- * @brief  ÓÃ 4B Ö¸ÁîĞ´ÈëÊı¾İ(×Ô¶¯²ÁÒ³+±à³Ì)¡£
- * @param  src  Ô´Êı¾İ
- * @param  addr Ä¿±êµØÖ·
- * @param  len  ³¤¶È
+ * @brief  ç”¨ 4B æŒ‡ä»¤å†™å…¥æ•°æ®(è‡ªåŠ¨æ“¦é¡µ+ç¼–ç¨‹)ã€‚
+ * @param  src  æºæ•°æ®
+ * @param  addr ç›®æ ‡åœ°å€
+ * @param  len  é•¿åº¦
  */
 static void flash_store_write_4b(const uint8_t *src, uint32_t addr, uint32_t len)
 {
     while (len) {
-        uint16_t chunk = (uint16_t)(256 - (addr & 0xFF)); /* ±¾Ò³Ê£Óà×Ö½ÚÊı */
+        uint16_t chunk = (uint16_t)(256 - (addr & 0xFF)); /* æœ¬é¡µå‰©ä½™å­—èŠ‚æ•° */
         if (chunk > len) chunk = (uint16_t)len;
         flash_store_page_program_4b(src, addr, chunk);
         src  += chunk;
@@ -210,12 +206,11 @@ static void flash_store_write_4b(const uint8_t *src, uint32_t addr, uint32_t len
 }
 #endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE */
 
-/* ¶ÁÊı¾İ(4×Ö½ÚµØÖ·) */
 /**
- * @brief  ÓÃ 4B Ö¸Áî¶ÁÈ¡Íâ²¿ Flash Êı¾İ¡£
- * @param  buf  Êä³ö»º³å
- * @param  addr ¶ÁÈ¡µØÖ·
- * @param  len  ³¤¶È
+ * @brief  ç”¨ 4B æŒ‡ä»¤è¯»å–å¤–éƒ¨ Flash æ•°æ®ã€‚
+ * @param  buf  è¾“å‡ºç¼“å†²
+ * @param  addr è¯»å–åœ°å€
+ * @param  len  é•¿åº¦
  */
 static void flash_store_read_4b(uint8_t *buf, uint32_t addr, uint16_t len)
 {
@@ -230,15 +225,14 @@ static void flash_store_read_4b(uint8_t *buf, uint32_t addr, uint16_t len)
 }
 
 /* ================================================================
- * Ğ¾Æ¬ÈİÁ¿¼ì²â + Í³Ò»µØÖ··ÃÎÊ·â×°
- * ¶àÊıÉè±¸Îª8MB(W25Q64, ½öÖ§³Ö3×Ö½ÚµØÖ·); >16MBĞ¾Æ¬²ÅÓÃ4×Ö½ÚµØÖ·
+ * èŠ¯ç‰‡å®¹é‡æ£€æµ‹ + ç»Ÿä¸€åœ°å€è®¿é—®å°è£…
+ * å¤šæ•°è®¾å¤‡ä¸º8MB(W25Q64, ä»…æ”¯æŒ3å­—èŠ‚åœ°å€); >16MBèŠ¯ç‰‡æ‰ç”¨4å­—èŠ‚åœ°å€
  * ================================================================ */
-static uint32_t s_flash_size = FLASH_STORE_FLASH_SIZE; /* Êµ¼ÊÈİÁ¿(¼ì²âºó¸üĞÂ) */
-static uint8_t  s_use_4b     = 0;                       /* 1=Ê¹ÓÃ4×Ö½ÚµØÖ·Ö¸Áî */
+static uint32_t s_flash_size = FLASH_STORE_FLASH_SIZE; /* å®é™…å®¹é‡(æ£€æµ‹åæ›´æ–°) */
+static uint8_t  s_use_4b     = 0;                       /* 1=ä½¿ç”¨4å­—èŠ‚åœ°å€æŒ‡ä»¤ */
 
-/* ¸ù¾İJEDEC IDÈİÁ¿×Ö½ÚÊ¶±ğĞ¾Æ¬´óĞ¡ */
 /**
- * @brief  ¼ì²âÍâ²¿ Flash Ğ¾Æ¬ĞÍºÅ(¶Á ID)¡£
+ * @brief  æ£€æµ‹å¤–éƒ¨ Flash èŠ¯ç‰‡å‹å·(è¯» ID)ã€‚
  */
 static void flash_store_detect_chip(void)
 {
@@ -248,35 +242,33 @@ static void flash_store_detect_chip(void)
     case 0x18: s_flash_size = 16UL * 1024 * 1024; break;  /* W25Q128 (128Mbit) */
     case 0x19: s_flash_size = 32UL * 1024 * 1024; break;  /* W25Q256 (256Mbit) */
     case 0x20: s_flash_size = 64UL * 1024 * 1024; break;  /* W25Q512 (512Mbit) */
-    default:   s_flash_size = FLASH_STORE_FLASH_SIZE; break; /* Î´ÖªĞ¾Æ¬: ÓÃºêÄ¬ÈÏÖµ */
+    default:   s_flash_size = FLASH_STORE_FLASH_SIZE; break; /* æœªçŸ¥èŠ¯ç‰‡: ç”¨å®é»˜è®¤å€¼ */
     }
     s_use_4b = (s_flash_size > 16UL * 1024 * 1024);
 }
 
 /* ================================================================
- * Í³Ò»ÉÈÇø²Á³ı/¿çÒ³Ğ´ (½öÉÕÂ¼Ä£Ê½Ê¹ÓÃ)
+ * ç»Ÿä¸€æ‰‡åŒºæ“¦é™¤/è·¨é¡µå†™ (ä»…çƒ§å½•æ¨¡å¼ä½¿ç”¨)
  * ================================================================ */
 #if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
-/* Í³Ò»ÉÈÇø²Á³ı(°´Êµ¼ÊµØÖ·Ä£Ê½) */
 /**
- * @brief  ²Á³ıÍâ²¿ Flash ÉÈÇø(ÆÕÍ¨Ö¸Áî)¡£
- * @param  addr ÉÈÇøµØÖ·
+ * @brief  æ“¦é™¤å¤–éƒ¨ Flash æ‰‡åŒº(æ™®é€šæŒ‡ä»¤)ã€‚
+ * @param  addr æ‰‡åŒºåœ°å€
  */
 static void flash_store_erase_sector(uint32_t addr)
 {
     if (s_use_4b) {
         flash_store_erase_sector_4b(addr);
     } else {
-        SPI_Flash_Erase_Sector(addr / 4096);   /* 3×Ö½ÚµØÖ·, ²ÎÊıÎªÉÈÇøĞòºÅ */
+        SPI_Flash_Erase_Sector(addr / 4096);   /* 3å­—èŠ‚åœ°å€, å‚æ•°ä¸ºæ‰‡åŒºåºå· */
     }
 }
 
-/* Í³Ò»¿çÒ³Ğ´(°´Êµ¼ÊµØÖ·Ä£Ê½) */
 /**
- * @brief  Ğ´ÈëÊı¾İµ½Íâ²¿ Flash(ÆÕÍ¨Ö¸Áî)¡£
- * @param  src  Ô´Êı¾İ
- * @param  addr Ä¿±êµØÖ·
- * @param  len  ³¤¶È
+ * @brief  å†™å…¥æ•°æ®åˆ°å¤–éƒ¨ Flash(æ™®é€šæŒ‡ä»¤)ã€‚
+ * @param  src  æºæ•°æ®
+ * @param  addr ç›®æ ‡åœ°å€
+ * @param  len  é•¿åº¦
  */
 static void flash_store_write(const uint8_t *src, uint32_t addr, uint32_t len)
 {
@@ -288,36 +280,34 @@ static void flash_store_write(const uint8_t *src, uint32_t addr, uint32_t len)
 }
 #endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE */
 
-/* Í³Ò»¶ÁÊı¾İ(°´Êµ¼ÊµØÖ·Ä£Ê½; 3×Ö½ÚµØÖ·ÓÃDMA¶ÁÈ¡, ÊÍ·ÅCPU) */
 /**
- * @brief  ¶ÁÈ¡Íâ²¿ Flash Êı¾İ(ÆÕÍ¨Ö¸Áî)¡£
- * @param  buf  Êä³ö»º³å
- * @param  addr ¶ÁÈ¡µØÖ·
- * @param  len  ³¤¶È
+ * @brief  è¯»å–å¤–éƒ¨ Flash æ•°æ®(æ™®é€šæŒ‡ä»¤)ã€‚
+ * @param  buf  è¾“å‡ºç¼“å†²
+ * @param  addr è¯»å–åœ°å€
+ * @param  len  é•¿åº¦
  */
 static void flash_store_read(uint8_t *buf, uint32_t addr, uint16_t len)
 {
     if (s_use_4b) {
         flash_store_read_4b(buf, addr, len);
     } else {
-        SPI_Flash_Read_dma_start(addr); /* ·¢FastReadÃüÁî+µØÖ·+dummy, Ê¹ÄÜSPI DMA */
-        SPI1_Read_DMA(buf, len);        /* DMA¶Álen×Ö½Ú(TX·¢0xFFÌá¹©Ê±ÖÓ, RXÊÕÊı¾İ) */
-        SPI_Flash_Read_dma_end();       /* CSÀ­¸ß, ½ûÓÃSPI DMA */
+        SPI_Flash_Read_dma_start(addr); /* å‘FastReadå‘½ä»¤+åœ°å€+dummy, ä½¿èƒ½SPI DMA */
+        SPI1_Read_DMA(buf, len);        /* DMAè¯»lenå­—èŠ‚(TXå‘0xFFæä¾›æ—¶é’Ÿ, RXæ”¶æ•°æ®) */
+        SPI_Flash_Read_dma_end();       /* CSæ‹‰é«˜, ç¦ç”¨SPI DMA */
     }
 }
 
 /* ================================================================
- * ÔËĞĞÆÚ×ÊÔ´¶ÁÈ¡ (ÓÎÏ·Ä£Ê½: ´ÓÍâ²¿Flash°´ID¶ÁÈ¡ÒÑÉÕÂ¼µÄ×Ö¿â/Í¼Æ¬)
+ * è¿è¡ŒæœŸèµ„æºè¯»å– (æ¸¸æˆæ¨¡å¼: ä»å¤–éƒ¨FlashæŒ‰IDè¯»å–å·²çƒ§å½•çš„å­—åº“/å›¾ç‰‡)
  * ================================================================ */
-static uint8_t  s_res_valid = 0;     /* Ä¿Â¼»º´æÊÇ·ñÓĞĞ§ */
-static uint32_t s_data_start = 0;    /* Êı¾İÇøÆğÊ¼µØÖ·(À´×ÔÄ¿Â¼Í·) */
+static uint8_t  s_res_valid = 0;     /* ç›®å½•ç¼“å­˜æ˜¯å¦æœ‰æ•ˆ */
+static uint32_t s_data_start = 0;    /* æ•°æ®åŒºèµ·å§‹åœ°å€(æ¥è‡ªç›®å½•å¤´) */
 
-/* Ä¿Â¼Ïî½âÎö¸¨Öú: ¶ÁÈ¡ÌõÄ¿ÖĞµÄ4×Ö½Ú´ó¶Ë×Ö¶Î */
 /**
- * @brief  ¶ÁÈ¡×ÊÔ´Ä¿Â¼ÏîÖĞµÄ×Ö¶Î¡£
- * @param  e   Ä¿Â¼ÏîÖ¸Õë
- * @param  off ×Ö¶ÎÆ«ÒÆ
- * @return ×Ö¶ÎÖµ
+ * @brief  è¯»å–èµ„æºç›®å½•é¡¹ä¸­çš„å­—æ®µã€‚
+ * @param  e   ç›®å½•é¡¹æŒ‡é’ˆ
+ * @param  off å­—æ®µåç§»
+ * @return å­—æ®µå€¼
  */
 static uint32_t flash_store_dir_field(const uint8_t *e, uint8_t off)
 {
@@ -325,15 +315,14 @@ static uint32_t flash_store_dir_field(const uint8_t *e, uint8_t off)
            ((uint32_t)e[off + 2] << 8) | (uint32_t)e[off + 3];
 }
 /**
- * @brief  ³õÊ¼»¯Íâ²¿ Flash ×ÊÔ´±í(Ì½²âĞ¾Æ¬¡¢½¨Á¢Ë÷Òı)¡£
- * @return 1=³É¹¦, 0=Ê§°Ü
+ * @brief  åˆå§‹åŒ–å¤–éƒ¨ Flash èµ„æºè¡¨(æ¢æµ‹èŠ¯ç‰‡ã€å»ºç«‹ç´¢å¼•)ã€‚
+ * @return 1=æˆåŠŸ, 0=å¤±è´¥
  */
-
 uint8_t FlashStore_ResInit(void)
 {
     uint8_t try;
     for (try = 0; try < 3; try++) {
-        flash_store_detect_chip();   /* Ê¶±ğĞ¾Æ¬ÈİÁ¿ÓëµØÖ·Ä£Ê½ */
+        flash_store_detect_chip();   /* è¯†åˆ«èŠ¯ç‰‡å®¹é‡ä¸åœ°å€æ¨¡å¼ */
 
         uint32_t dir_addr = s_flash_size - FLASH_STORE_DIR_SIZE;
         flash_store_read(s_dir_buf, dir_addr, FLASH_STORE_DIR_SIZE);
@@ -346,28 +335,27 @@ uint8_t FlashStore_ResInit(void)
             s_res_valid  = 1;
             return 1;
         }
-        /* ¿ª»úÔçÆÚFlash¸Õ´ÓPowerDown»½ĞÑ¿ÉÄÜÎ´¾ÍĞ÷, ÑÓÊ±ºóÖØÊÔ */
+        /* å¼€æœºæ—©æœŸFlashåˆšä»PowerDownå”¤é†’å¯èƒ½æœªå°±ç»ª, å»¶æ—¶åé‡è¯• */
         Delay_Ms(20);
     }
     s_res_valid = 0;
     return 0;
 }
 /**
- * @brief  Á÷Ê½¶ÁÈ¡×ÊÔ´Êı¾İ(¾­ SPI DMA)¡£
- * @param  id     ×ÊÔ´ ID
- * @param  offset ×ÊÔ´ÄÚÆ«ÒÆ
- * @param  buf    Êä³ö»º³å
- * @param  len    ³¤¶È
- * @return Êµ¼Ê¶ÁÈ¡×Ö½ÚÊı
+ * @brief  æµå¼è¯»å–èµ„æºæ•°æ®(ç» SPI DMA)ã€‚
+ * @param  id     èµ„æº ID
+ * @param  offset èµ„æºå†…åç§»
+ * @param  buf    è¾“å‡ºç¼“å†²
+ * @param  len    é•¿åº¦
+ * @return å®é™…è¯»å–å­—èŠ‚æ•°
  */
-
 uint16_t FlashStore_ResRead(FlashStoreId id, uint32_t offset, uint8_t *buf, uint16_t len)
 {
     if (!s_res_valid || (uint32_t)id >= FLASH_STORE_RES_COUNT) return 0;
 
     const uint8_t *e = &s_dir_buf[FLASH_STORE_DIR_HEADER_SIZE + (uint32_t)id * FLASH_STORE_ENTRY_SIZE];
-    uint32_t off    = flash_store_dir_field(e, 4);   /* Ïà¶ÔÊı¾İÇøÆğÊ¼µÄÆ«ÒÆ */
-    uint32_t length = flash_store_dir_field(e, 8);   /* ×ÊÔ´³¤¶È */
+    uint32_t off    = flash_store_dir_field(e, 4);   /* ç›¸å¯¹æ•°æ®åŒºèµ·å§‹çš„åç§» */
+    uint32_t length = flash_store_dir_field(e, 8);   /* èµ„æºé•¿åº¦ */
     if (offset >= length) return 0;
 
     uint16_t n = len;
@@ -389,55 +377,52 @@ uint8_t *FlashStore_Scratch(void)
 }
 
 /* ================================================================
- * ½ø¶ÈÌõUI (240x240ÆÁÄ», ½öÉÕÂ¼Ä£Ê½Ê¹ÓÃ)
+ * è¿›åº¦æ¡UI (240x240å±å¹•, ä»…çƒ§å½•æ¨¡å¼ä½¿ç”¨)
  * ================================================================ */
 #if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
-#define UI_BAR_X0      17   /* ½ø¶ÈÌõÌî³äÇø×ó±ß½ç */
-#define UI_BAR_X1      225  /* ½ø¶ÈÌõÌî³äÇøÓÒ±ß½ç(²»º¬) */
-#define UI_BAR_Y0      92   /* ½ø¶ÈÌõÌî³äÇøÉÏ±ß½ç */
-#define UI_BAR_Y1      150  /* ½ø¶ÈÌõÌî³äÇøÏÂ±ß½ç(²»º¬) */
+#define UI_BAR_X0      17   /* è¿›åº¦æ¡å¡«å……åŒºå·¦è¾¹ç•Œ */
+#define UI_BAR_X1      225  /* è¿›åº¦æ¡å¡«å……åŒºå³è¾¹ç•Œ(ä¸å«) */
+#define UI_BAR_Y0      92   /* è¿›åº¦æ¡å¡«å……åŒºä¸Šè¾¹ç•Œ */
+#define UI_BAR_Y1      150  /* è¿›åº¦æ¡å¡«å……åŒºä¸‹è¾¹ç•Œ(ä¸å«) */
 #define UI_BAR_WIDTH   (UI_BAR_X1 - UI_BAR_X0)
 
-static uint8_t  s_ui_last_pct  = 0xFF; /* ÉÏ´Î»æÖÆ°Ù·Ö±È(½ö±ä»¯Ê±ÖØ»æ) */
-static uint16_t s_ui_last_fill = 0;    /* ÉÏ´ÎÒÑÌî³ä¿í¶È */
+static uint8_t  s_ui_last_pct  = 0xFF; /* ä¸Šæ¬¡ç»˜åˆ¶ç™¾åˆ†æ¯”(ä»…å˜åŒ–æ—¶é‡ç»˜) */
+static uint16_t s_ui_last_fill = 0;    /* ä¸Šæ¬¡å·²å¡«å……å®½åº¦ */
 
-/* »æÖÆ%·ûºÅ: Á½¸öÔ²µã+Ğ±Ïß */
 /**
- * @brief  »æÖÆÉÕÂ¼°Ù·Ö±ÈÎÄ×Ö¡£
- * @param  x     Î»ÖÃ X
- * @param  y     Î»ÖÃ Y
- * @param  color ÎÄ×ÖÑÕÉ«
+ * @brief  ç»˜åˆ¶çƒ§å½•ç™¾åˆ†æ¯”æ–‡å­—ã€‚
+ * @param  x     ä½ç½® X
+ * @param  y     ä½ç½® Y
+ * @param  color æ–‡å­—é¢œè‰²
  */
 static void flash_store_draw_percent(uint16_t x, uint16_t y, uint16_t color)
 {
-    LCD_Fill(x,     y,      x + 4, y + 4, color); /* ÓÒÉÏÔ²µã */
-    LCD_Fill(x + 2, y + 14, x + 6, y + 18, color); /* ×óÏÂÔ²µã */
-    for (uint8_t i = 0; i < 7; i++) {              /* Ğ±Ïß */
+    LCD_Fill(x,     y,      x + 4, y + 4, color); /* å³ä¸Šåœ†ç‚¹ */
+    LCD_Fill(x + 2, y + 14, x + 6, y + 18, color); /* å·¦ä¸‹åœ†ç‚¹ */
+    for (uint8_t i = 0; i < 7; i++) {              /* æ–œçº¿ */
         LCD_Fill(x + 1 + i * 2, y + 3 + i * 2, x + 3 + i * 2, y + 5 + i * 2, color);
     }
 }
 
-/* ³õÊ¼»¯UI: ÇåÆÁ + »­½ø¶ÈÌõ±ß¿ò */
 /**
- * @brief  ³õÊ¼»¯ÉÕÂ¼½ø¶È UI(±³¾°/±êÌâ)¡£
+ * @brief  åˆå§‹åŒ–çƒ§å½•è¿›åº¦ UI(èƒŒæ™¯/æ ‡é¢˜)ã€‚
  */
 static void flash_store_ui_init(void)
 {
     s_ui_last_pct  = 0xFF;
     s_ui_last_fill = 0;
     LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
-    /* ½ø¶ÈÌõ±ß¿ò(°×É«) */
+    /* è¿›åº¦æ¡è¾¹æ¡†(ç™½è‰²) */
     LCD_Fill(UI_BAR_X0 - 2, UI_BAR_Y0 - 2, UI_BAR_X1 + 2, UI_BAR_Y0 - 1, LCD_WHITE);
     LCD_Fill(UI_BAR_X0 - 2, UI_BAR_Y1,     UI_BAR_X1 + 2, UI_BAR_Y1 + 1, LCD_WHITE);
     LCD_Fill(UI_BAR_X0 - 2, UI_BAR_Y0 - 2, UI_BAR_X0 - 1, UI_BAR_Y1 + 1, LCD_WHITE);
     LCD_Fill(UI_BAR_X1,     UI_BAR_Y0 - 2, UI_BAR_X1 + 1, UI_BAR_Y1 + 1, LCD_WHITE);
 }
 
-/* »æÖÆ°Ù·Ö±ÈÊı×Ö(¾ÓÖĞ, Ö¸¶¨ÑÕÉ«) */
 /**
- * @brief  »æÖÆÉÕÂ¼½ø¶ÈÌõ¡£
- * @param  pct   °Ù·Ö±È(0~100)
- * @param  color Ìî³äÑÕÉ«
+ * @brief  ç»˜åˆ¶çƒ§å½•è¿›åº¦æ¡ã€‚
+ * @param  pct   ç™¾åˆ†æ¯”(0~100)
+ * @param  color å¡«å……é¢œè‰²
  */
 static void flash_store_ui_draw_pct(uint8_t pct, uint16_t color)
 {
@@ -459,17 +444,16 @@ static void flash_store_ui_draw_pct(uint8_t pct, uint16_t color)
     LCD_CS_SET;
 }
 
-/* ¸üĞÂ½ø¶ÈÌõÌî³äÓë°Ù·Ö±ÈÊıÖµ */
 /**
- * @brief  ¸üĞÂÉÕÂ¼½ø¶ÈÏÔÊ¾¡£
- * @param  pct °Ù·Ö±È(0~100)
+ * @brief  æ›´æ–°çƒ§å½•è¿›åº¦æ˜¾ç¤ºã€‚
+ * @param  pct ç™¾åˆ†æ¯”(0~100)
  */
 static void flash_store_ui_update(uint8_t pct)
 {
     if (pct > 100) pct = 100;
     if (pct == s_ui_last_pct) return;
 
-    /* 1. ½ø¶ÈÌõÌî³ä(½ö²¹»­ĞÂÔö²¿·Ö) */
+    /* 1. è¿›åº¦æ¡å¡«å……(ä»…è¡¥ç”»æ–°å¢éƒ¨åˆ†) */
     uint16_t fill_w = (uint16_t)pct * UI_BAR_WIDTH / 100;
     if (fill_w > s_ui_last_fill) {
         LCD_Fill(UI_BAR_X0 + s_ui_last_fill, UI_BAR_Y0,
@@ -477,24 +461,22 @@ static void flash_store_ui_update(uint8_t pct)
         s_ui_last_fill = fill_w;
     }
 
-    /* 2. °Ù·Ö±ÈÊıÖµ */
+    /* 2. ç™¾åˆ†æ¯”æ•°å€¼ */
     flash_store_ui_draw_pct(pct, LCD_WHITE);
     s_ui_last_pct = pct;
 }
 
-/* ÉÕÂ¼Íê³É: ÂÌÉ«Í»³öÏÔÊ¾100% */
 /**
- * @brief  ÉÕÂ¼Íê³É UI ÌáÊ¾¡£
+ * @brief  çƒ§å½•å®Œæˆ UI æç¤ºã€‚
  */
 static void flash_store_ui_done(void)
 {
     flash_store_ui_draw_pct(100, LCD_GREEN);
 }
 
-/* Ğ£ÑéÊ§°Ü: ½ø¶ÈÌõ±äºì, °Ù·Ö±ÈÊı×Ö±äºìÌáÊ¾ */
 /**
- * @brief  ÉÕÂ¼Ê§°Ü UI ÌáÊ¾¡£
- * @param  pct Ê§°ÜÊ±°Ù·Ö±È
+ * @brief  çƒ§å½•å¤±è´¥ UI æç¤ºã€‚
+ * @param  pct å¤±è´¥æ—¶ç™¾åˆ†æ¯”
  */
 static void flash_store_ui_fail(uint8_t pct)
 {
@@ -504,35 +486,35 @@ static void flash_store_ui_fail(uint8_t pct)
 #endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE */
 
 /* ================================================================
- * ÉÕÂ¼Ö÷Á÷³Ì (FLASH_DATA_STORE_MODE: ×Ö¿â/Í¼Æ¬×ÊÔ´ÉÕÂ¼)
+ * çƒ§å½•ä¸»æµç¨‹ (FLASH_DATA_STORE_MODE: å­—åº“/å›¾ç‰‡èµ„æºçƒ§å½•)
  * ================================================================ */
 #ifdef FLASH_DATA_STORE_MODE
 /**
- * @brief  ÉÕÂ¼È«²¿×ÊÔ´µ½Íâ²¿ Flash(´ø½ø¶È UI)¡£
+ * @brief  çƒ§å½•å…¨éƒ¨èµ„æºåˆ°å¤–éƒ¨ Flash(å¸¦è¿›åº¦ UI)ã€‚
  */
 void FlashStore_BurnAll(void)
 {
     uint32_t i;
 
-    /* 0. Ê¶±ğĞ¾Æ¬ÈİÁ¿ÓëµØÖ·Ä£Ê½(8MBĞ¾Æ¬ÓÃ3×Ö½ÚµØÖ·, >16MBÓÃ4×Ö½Ú) */
+    /* 0. è¯†åˆ«èŠ¯ç‰‡å®¹é‡ä¸åœ°å€æ¨¡å¼(8MBèŠ¯ç‰‡ç”¨3å­—èŠ‚åœ°å€, >16MBç”¨4å­—èŠ‚) */
     flash_store_detect_chip();
 
-    /* 1. ¼ÆËãÈ«²¿×ÊÔ´×Ü´óĞ¡ */
+    /* 1. è®¡ç®—å…¨éƒ¨èµ„æºæ€»å¤§å° */
     uint32_t total = 0;
     for (i = 0; i < FLASH_STORE_RES_COUNT; i++) {
         total += s_resources[i].size;
     }
 
-    /* 2. ´ÓÊµ¼ÊFlashÄ©Î²ÍùÇ°²¼¾Ö:
-     *    Ä¿Â¼ÇøÎ»ÓÚ×îÄ©Î², Êı¾İÇø½ôËæÆäÇ°(´ÓÇ°ÍùºóË³ĞòĞ´Èë) */
+    /* 2. ä»å®é™…Flashæœ«å°¾å¾€å‰å¸ƒå±€:
+     *    ç›®å½•åŒºä½äºæœ€æœ«å°¾, æ•°æ®åŒºç´§éšå…¶å‰(ä»å‰å¾€åé¡ºåºå†™å…¥) */
     uint32_t dir_start  = s_flash_size - FLASH_STORE_DIR_SIZE;
     uint32_t data_start = dir_start - total;
 
-    /* 3. ³õÊ¼»¯ÏÔÊ¾ */
+    /* 3. åˆå§‹åŒ–æ˜¾ç¤º */
     flash_store_ui_init();
     flash_store_ui_update(0);
 
-    /* 4. ²Á³ı¸²¸ÇÇøÓò(°´Êµ¼ÊµØÖ·Ä£Ê½, 4KÉÈÇø) */
+    /* 4. æ“¦é™¤è¦†ç›–åŒºåŸŸ(æŒ‰å®é™…åœ°å€æ¨¡å¼, 4Kæ‰‡åŒº) */
     {
         uint32_t erase_start = (data_start / 4096) * 4096;
         uint32_t erase_total = s_flash_size - erase_start;
@@ -544,7 +526,7 @@ void FlashStore_BurnAll(void)
         }
     }
 
-    /* 5. ´ÓÇ°ÍùºóĞ´Èë¸÷×ÊÔ´, Í¬Ê±¹¹½¨Ä¿Â¼ */
+    /* 5. ä»å‰å¾€åå†™å…¥å„èµ„æº, åŒæ—¶æ„å»ºç›®å½• */
     {
         uint8_t *pe = s_dir_buf;
         pe[0] = FLASH_STORE_DIR_MAGIC0;
@@ -566,7 +548,7 @@ void FlashStore_BurnAll(void)
             flash_store_write(src, cur, size);
             uint16_t crc = flash_store_crc16(src, size);
 
-            /* Ä¿Â¼Ïî */
+            /* ç›®å½•é¡¹ */
             uint32_t offset = cur - data_start;
             pe[0]  = (uint8_t)i;
             pe[1]  = 0;
@@ -587,12 +569,12 @@ void FlashStore_BurnAll(void)
             flash_store_ui_update((uint8_t)(10 + 80UL * written / total));
         }
 
-        /* 6. Ğ´ÈëÄ¿Â¼Çø */
+        /* 6. å†™å…¥ç›®å½•åŒº */
         flash_store_write(s_dir_buf, dir_start, FLASH_STORE_DIR_SIZE);
         flash_store_ui_update(90);
     }
 
-    /* 7. »Ø¶ÁĞ£Ñé: Öğ×ÊÔ´±È¶ÔCRC16 */
+    /* 7. å›è¯»æ ¡éªŒ: é€èµ„æºæ¯”å¯¹CRC16 */
     {
         uint8_t ok  = 1;
         uint8_t rbuf[64];
@@ -619,16 +601,16 @@ void FlashStore_BurnAll(void)
             flash_store_ui_update((uint8_t)(90 + 10UL * (i + 1) / FLASH_STORE_RES_COUNT));
         }
 
-        /* 8. Íê³ÉÏÔÊ¾ */
+        /* 8. å®Œæˆæ˜¾ç¤º */
         if (ok) {
             flash_store_ui_update(100);
-            flash_store_ui_done(); /* ÂÌÉ«100% */
+            flash_store_ui_done(); /* ç»¿è‰²100% */
         } else {
-            flash_store_ui_fail(s_ui_last_pct); /* ºìÉ«½ø¶ÈÌõ+ºìÉ«°Ù·Ö±ÈÌáÊ¾Ğ£ÑéÊ§°Ü */
+            flash_store_ui_fail(s_ui_last_pct); /* çº¢è‰²è¿›åº¦æ¡+çº¢è‰²ç™¾åˆ†æ¯”æç¤ºæ ¡éªŒå¤±è´¥ */
         }
     }
 
-    /* ÉÕÂ¼/Ğ£ÑéÍê³Éºó±£³Ö»­ÃæÏÔÊ¾ */
+    /* çƒ§å½•/æ ¡éªŒå®Œæˆåä¿æŒç”»é¢æ˜¾ç¤º */
     while (1) {
         Delay_Ms(1000);
     }
@@ -636,31 +618,31 @@ void FlashStore_BurnAll(void)
 #endif /* FLASH_DATA_STORE_MODE */
 
 /* ================================================================
- * ÊÓÆµÊı¾İ¿éÉÕÂ¼ (VIDEO_CHUNK_STORE_MODE)
- * Ç¶Èë¹Ì¼şµÄÊı¾İ¿é(video_chunk.c)ÉÕÂ¼µ½Íâ²¿FlashµØÖ·0(ÊÓÆµÇøÓò)Æ«ÒÆ´¦,
- * ¿é´óĞ¡/Æ«ÒÆÓÉ gen_video_chunk.py Éú³ÉµÄ video_chunk.h Ö¸¶¨(4KB¶ÔÆë);
- * ÆÁÄ»ÏÔÊ¾°Ù·Ö±È: ²Á³ı½×¶Î0-10%, Ğ´Èë½×¶Î10-90%, »Ø¶ÁĞ£Ñé90-100%¡£
+ * è§†é¢‘æ•°æ®å—çƒ§å½• (VIDEO_CHUNK_STORE_MODE)
+ * åµŒå…¥å›ºä»¶çš„æ•°æ®å—(video_chunk.c)çƒ§å½•åˆ°å¤–éƒ¨Flashåœ°å€0(è§†é¢‘åŒºåŸŸ)åç§»å¤„,
+ * å—å¤§å°/åç§»ç”± gen_video_chunk.py ç”Ÿæˆçš„ video_chunk.h æŒ‡å®š(4KBå¯¹é½);
+ * å±å¹•æ˜¾ç¤ºç™¾åˆ†æ¯”: æ“¦é™¤é˜¶æ®µ0-10%, å†™å…¥é˜¶æ®µ10-90%, å›è¯»æ ¡éªŒ90-100%ã€‚
  * ================================================================ */
 #ifdef VIDEO_CHUNK_STORE_MODE
 #include "video_chunk.h"
 
 /**
- * @brief  ÊÓÆµÊı¾İ¿éÉÕÂ¼Ö÷Á÷³Ì (²»·µ»Ø)
- * @note   ½øÈëÇ°ĞèÒÑ³õÊ¼»¯SPI FlashÓëLCD;
- *         ½«Ç¶Èë¹Ì¼şµÄ g_video_chunk[VIDEO_CHUNK_SIZE] ´ÓÍâ²¿FlashµÄ
- *         VIDEO_CHUNK_OFFSET ¿ªÊ¼Ë³ĞòĞ´Èë(ÉÈÇø²Á³ı+Ğ´Èë), Íê³Éºó»Ø¶ÁCRCĞ£Ñé
+ * @brief  è§†é¢‘æ•°æ®å—çƒ§å½•ä¸»æµç¨‹ (ä¸è¿”å›)
+ * @note   è¿›å…¥å‰éœ€å·²åˆå§‹åŒ–SPI Flashä¸LCD;
+ *         å°†åµŒå…¥å›ºä»¶çš„ g_video_chunk[VIDEO_CHUNK_SIZE] ä»å¤–éƒ¨Flashçš„
+ *         VIDEO_CHUNK_OFFSET å¼€å§‹é¡ºåºå†™å…¥(æ‰‡åŒºæ“¦é™¤+å†™å…¥), å®Œæˆåå›è¯»CRCæ ¡éªŒ
  */
 void VideoChunkStore_BurnAll(void)
 {
-    flash_store_detect_chip();   /* Ê¶±ğĞ¾Æ¬ÈİÁ¿ÓëµØÖ·Ä£Ê½ */
+    flash_store_detect_chip();   /* è¯†åˆ«èŠ¯ç‰‡å®¹é‡ä¸åœ°å€æ¨¡å¼ */
 
     flash_store_ui_init();
     flash_store_ui_update(0);
 
-    /* ÏÔÊ¾Ê£ÓàÉÕÂ¼´ÎÊı(µ±Ç°¿éÖ®ºóµÄ¿éÊı, ¹©¹Û²ìÉÕÂ¼½ø¶È) */
+    /* æ˜¾ç¤ºå‰©ä½™çƒ§å½•æ¬¡æ•°(å½“å‰å—ä¹‹åçš„å—æ•°, ä¾›è§‚å¯Ÿçƒ§å½•è¿›åº¦) */
     LCD_ShowNum((uint16_t)(VIDEO_BLOCK_COUNT - VIDEO_CHUNK_INDEX - 1), 175);
 
-    /* 1. ±ß½ç¼ì²é: ±¾¿é²»µÃ³¬³öÊÓÆµÇøÓò(FlashÈİÁ¿ÄÚ) */
+    /* 1. è¾¹ç•Œæ£€æŸ¥: æœ¬å—ä¸å¾—è¶…å‡ºè§†é¢‘åŒºåŸŸ(Flashå®¹é‡å†…) */
     uint32_t start = VIDEO_CHUNK_OFFSET;
     uint32_t end   = start + VIDEO_CHUNK_SIZE;
     if (end > s_flash_size) {
@@ -668,7 +650,7 @@ void VideoChunkStore_BurnAll(void)
         while (1) { Delay_Ms(1000); }
     }
 
-    /* 2. ²Á³ı±¾¿é¸²¸ÇµÄÈ«²¿ÉÈÇø(4KB¶ÔÆë) */
+    /* 2. æ“¦é™¤æœ¬å—è¦†ç›–çš„å…¨éƒ¨æ‰‡åŒº(4KBå¯¹é½) */
     {
         uint32_t erase_total = ((end + 4095) & ~((uint32_t)4095)) -
                                (start & ~((uint32_t)4095));
@@ -681,7 +663,7 @@ void VideoChunkStore_BurnAll(void)
         }
     }
 
-    /* 3. Ğ´ÈëÊı¾İ(Ã¿´Î1¸öÉÈÇø´óĞ¡, ±ãÓÚ½ø¶È¸üĞÂ) */
+    /* 3. å†™å…¥æ•°æ®(æ¯æ¬¡1ä¸ªæ‰‡åŒºå¤§å°, ä¾¿äºè¿›åº¦æ›´æ–°) */
     {
         uint32_t written = 0;
         while (written < VIDEO_CHUNK_SIZE) {
@@ -693,7 +675,7 @@ void VideoChunkStore_BurnAll(void)
         }
     }
 
-    /* 4. »Ø¶ÁĞ£Ñé: ÓëÔ´Êı¾İCRC±È¶Ô */
+    /* 4. å›è¯»æ ¡éªŒ: ä¸æºæ•°æ®CRCæ¯”å¯¹ */
     {
         uint8_t rbuf[64];
         uint32_t left = VIDEO_CHUNK_SIZE;
@@ -713,13 +695,13 @@ void VideoChunkStore_BurnAll(void)
         }
         if (c == flash_store_crc16(g_video_chunk, VIDEO_CHUNK_SIZE)) {
             flash_store_ui_update(100);
-            flash_store_ui_done();     /* ÂÌÉ«100% */
+            flash_store_ui_done();     /* ç»¿è‰²100% */
         } else {
-            flash_store_ui_fail(s_ui_last_pct);  /* ºìÉ« */
+            flash_store_ui_fail(s_ui_last_pct);  /* çº¢è‰² */
         }
     }
 
-    /* ÉÕÂ¼/Ğ£ÑéÍê³Éºó±£³Ö»­ÃæÏÔÊ¾ */
+    /* çƒ§å½•/æ ¡éªŒå®Œæˆåä¿æŒç”»é¢æ˜¾ç¤º */
     while (1) {
         Delay_Ms(1000);
     }

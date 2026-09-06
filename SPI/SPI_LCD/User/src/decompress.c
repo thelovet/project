@@ -1,6 +1,6 @@
-#include "decompress.h"    // ½âÑ¹ËõËã·¨Í·ÎÄ¼ş
-#include "lcd.h"           // LCDÏÔÊ¾½Ó¿Ú
-#include "SPI.h"     // SPI Flash¶ÁĞ´½Ó¿Ú
+#include "decompress.h"    // è§£å‹ç¼©ç®—æ³•å¤´æ–‡ä»¶
+#include "lcd.h"           // LCDæ˜¾ç¤ºæ¥å£
+#include "SPI.h"     // SPI Flashè¯»å†™æ¥å£
 #include "flash.h"
 #include "display.h"
 #include "battery.h"
@@ -10,37 +10,37 @@
 #include "settings.h"
 
 
-uint8_t key_response = 0;       // ´¥Ãş²Ëµ¥ÊäÈëÏìÓ¦±êÖ¾
-uint8_t blink_touched = 0;      // ÉÁË¸ÆÚ¼ä±»´¥Ãş£¬main.c¶ÁÈ¡ºóÇåÁã
+uint8_t key_response = 0;       // è§¦æ‘¸èœå•è¾“å…¥å“åº”æ ‡å¿—
+uint8_t blink_touched = 0;      // é—ªçƒæœŸé—´è¢«è§¦æ‘¸ï¼Œmain.cè¯»å–åæ¸…é›¶
 
-u16  input_pos3 = 0;    // FlashµØÖ·×î¸ßÎ»×Ö½Ú(32Î»µØÖ·µÄµÚ24-32Î»)
-u16 input_pos2 = 0;    // FlashµØÖ·´Î¸ßÎ»×Ö½Ú(24Î»µØÖ·µÄµÚ16-23Î»)
-u16 input_pos1 = 0;   // FlashµØÖ·´ÎµÍÎ»×Ö½Ú(8-15Î»)
-u16 input_pos0 = 0;   // FlashµØÖ·×îµÍÎ»×Ö½Ú(0-7Î»)
-u32 input_pos = 0;   // FlashµØÖ·(34Î»µØÖ·)
-u16 start_x;//µ±Ç°»­ÃæµÄÆğÊ¼x×ø±ê
-u16 start_y;//µ±Ç°»­ÃæµÄÆğÊ¼y×ø±ê
-u16 end_x;//µ±Ç°»­ÃæµÄ½áÊøx×ø±ê
-u16 end_y;//µ±Ç°»­ÃæµÄ½áÊøy×ø±ê
-uint8_t end_flag = 0;//ÊÇ·ñ²¥·ÅÍê
-uint8_t lcd_blink_flag = 0;//lCDÉÁË¸±êÖ¾Î»
-uint32_t seg_end = 0;//µ±Ç°Êı¾İ¶Î½áÊøµØÖ·
-uint32_t last_seg_end = 0;//×îºóÒ»¸öÊı¾İ¶Î½áÊøµØÖ·
-uint8_t pre_data[PARALLEL_BUFFER_COUNT];//Ô¤¶ÁÊı¾İÊı×é
+u16  input_pos3 = 0;    // Flashåœ°å€æœ€é«˜ä½å­—èŠ‚(32ä½åœ°å€çš„ç¬¬24-32ä½)
+u16 input_pos2 = 0;    // Flashåœ°å€æ¬¡é«˜ä½å­—èŠ‚(24ä½åœ°å€çš„ç¬¬16-23ä½)
+u16 input_pos1 = 0;   // Flashåœ°å€æ¬¡ä½ä½å­—èŠ‚(8-15ä½)
+u16 input_pos0 = 0;   // Flashåœ°å€æœ€ä½ä½å­—èŠ‚(0-7ä½)
+u32 input_pos = 0;   // Flashåœ°å€(34ä½åœ°å€)
+u16 start_x;//å½“å‰ç”»é¢çš„èµ·å§‹xåæ ‡
+u16 start_y;//å½“å‰ç”»é¢çš„èµ·å§‹yåæ ‡
+u16 end_x;//å½“å‰ç”»é¢çš„ç»“æŸxåæ ‡
+u16 end_y;//å½“å‰ç”»é¢çš„ç»“æŸyåæ ‡
+uint8_t end_flag = 0;//æ˜¯å¦æ’­æ”¾å®Œ
+uint8_t lcd_blink_flag = 0;//lCDé—ªçƒæ ‡å¿—ä½
+uint32_t seg_end = 0;//å½“å‰æ•°æ®æ®µç»“æŸåœ°å€
+uint32_t last_seg_end = 0;//æœ€åä¸€ä¸ªæ•°æ®æ®µç»“æŸåœ°å€
+uint8_t pre_data[PARALLEL_BUFFER_COUNT];//é¢„è¯»æ•°æ®æ•°ç»„
 
-#define AVG_FRAME_COUNT       10    // »¬¶¯´°10Ö¡ÇóÆ½¾ùÖµ
-#define TARGET_FPS            40    // Ä¿±êÖ¡ÂÊ£¬¸ÄÕâÒ»¸öÖµ¼´¿É
-#define INIT_FRAME_TIME_US    (1000000 / TARGET_FPS)  // ×Ô¶¯¼ÆËãÃ¿Ö¡Î¢ÃëÊı£¬60FPS=16666us
+#define AVG_FRAME_COUNT       10    // æ»‘åŠ¨çª—10å¸§æ±‚å¹³å‡å€¼
+#define TARGET_FPS            40    // ç›®æ ‡å¸§ç‡ï¼Œæ”¹è¿™ä¸€ä¸ªå€¼å³å¯
+#define INIT_FRAME_TIME_US    (1000000 / TARGET_FPS)  // è‡ªåŠ¨è®¡ç®—æ¯å¸§å¾®ç§’æ•°ï¼Œ60FPS=16666us
 
-/* VIDEO_BLINK_WAKE_ENABLE: 1=ÆôÓÃ(²¥·ÅÍêÒ»±éºóÔÊĞí±³¹âÉÁË¸+´¥ÃşÇĞ»»/»½ĞÑ), 0=½ûÓÃ(²¥ÍêÖ±½Ó½áÊøÑ­»·ĞİÃß) */
+/* VIDEO_BLINK_WAKE_ENABLE: 1=å¯ç”¨(æ’­æ”¾å®Œä¸€éåå…è®¸èƒŒå…‰é—ªçƒ+è§¦æ‘¸åˆ‡æ¢/å”¤é†’), 0=ç¦ç”¨(æ’­å®Œç›´æ¥ç»“æŸå¾ªç¯ä¼‘çœ ) */
 #define VIDEO_BLINK_WAKE_ENABLE  1
 
-//µ±Ç°ÊÓÆµ¶Î
+//å½“å‰è§†é¢‘æ®µ
 uint8_t current_video_index = 0;
-//×î´óÊÓÆµ¶ÎÊı
+//æœ€å¤§è§†é¢‘æ®µæ•°
 uint8_t max_video_count = VIDEO_SEGMENT_COUNT;
 
-// ÊÓÆµ¶ÎµØÖ··¶Î§¶¨Òå£¨Ã¿×é{ÆğÊ¼µØÖ·4×Ö½Ú, ½áÊøµØÖ·4×Ö½Ú}£©
+// è§†é¢‘æ®µåœ°å€èŒƒå›´å®šä¹‰ï¼ˆæ¯ç»„{èµ·å§‹åœ°å€4å­—èŠ‚, ç»“æŸåœ°å€4å­—èŠ‚}ï¼‰
 const uint8_t video_ranges[VIDEO_SEGMENT_COUNT][8] = {
 	{0x00, 0x00, 0x00, 0x00, 0x00, 0x7E, 0xBC, 0x25},
 	// {0x00, 0x00, 0x00, 0x00, 0x00, 0x0A, 0xD1, 0xE2},
@@ -52,18 +52,18 @@ const uint8_t video_ranges[VIDEO_SEGMENT_COUNT][8] = {
 
 
 
-// Ö¡Ê±¼äÑù±¾Êı×é£¬ÓÃÓÚ¼ÆËãÆ½¾ùÖ¡Ê±¼ä (Áã³õÊ¼»¯£¬Ê×10Ö¡ºó×ÔÈ»ÊÕÁ²)
+// å¸§æ—¶é—´æ ·æœ¬æ•°ç»„ï¼Œç”¨äºè®¡ç®—å¹³å‡å¸§æ—¶é—´ (é›¶åˆå§‹åŒ–ï¼Œé¦–10å¸§åè‡ªç„¶æ”¶æ•›)
 static uint32_t frame_time_samples[AVG_FRAME_COUNT];
-static uint8_t sample_index = 0;           // µ±Ç°Ñù±¾Ë÷Òı£¨Ñ­»·¸²¸Ç¾ÉÊı¾İ£©
-static uint32_t avg_frame_time = INIT_FRAME_TIME_US;    // Æ½¾ùÖ¡Ê±¼ä£¨Î¢Ãë£©£¬ÓÃÓÚ¶¯Ì¬Ö¡ÂÊÑÓ³Ù
+static uint8_t sample_index = 0;           // å½“å‰æ ·æœ¬ç´¢å¼•ï¼ˆå¾ªç¯è¦†ç›–æ—§æ•°æ®ï¼‰
+static uint32_t avg_frame_time = INIT_FRAME_TIME_US;    // å¹³å‡å¸§æ—¶é—´ï¼ˆå¾®ç§’ï¼‰ï¼Œç”¨äºåŠ¨æ€å¸§ç‡å»¶è¿Ÿ
 
 
 /**
- * @brief ¸üĞÂÆ½¾ùÖ¡Ê±¼ä
+ * @brief æ›´æ–°å¹³å‡å¸§æ—¶é—´
  *
- * »¬¶¯´°10Ö¡µÄÆ½¾ùÊ±¼ä£¬ÓÃÓÚµ÷ÕûÏÔÊ¾ËÙ¶È
+ * æ»‘åŠ¨çª—10å¸§çš„å¹³å‡æ—¶é—´ï¼Œç”¨äºè°ƒæ•´æ˜¾ç¤ºé€Ÿåº¦
  *
- * @param frame_duration µ±Ç°Ö¡Ê±¼ä
+ * @param frame_duration å½“å‰å¸§æ—¶é—´
  */
 void UpdateAvgFrameTime(uint32_t frame_duration) {
 	frame_time_samples[sample_index] = frame_duration;
@@ -81,154 +81,154 @@ void UpdateAvgFrameTime(uint32_t frame_duration) {
 }
 
 /**
- * @brief ½øÈë4×Ö½ÚµØÖ·Ä£Ê½
+ * @brief è¿›å…¥4å­—èŠ‚åœ°å€æ¨¡å¼
  *
- * ÅäÖÃSPI Flash½øÈë4×Ö½ÚµØÖ·Ä£Ê½
+ * é…ç½®SPI Flashè¿›å…¥4å­—èŠ‚åœ°å€æ¨¡å¼
  */
-void byte_address_mode() {//4×Ö½ÚµØÖ·Ä£Ê½
+void byte_address_mode() {//4å­—èŠ‚åœ°å€æ¨¡å¼
 	u16 i = 5;
-	FLASH_CS_SET;//À­¸ßFlash CS
-	FLASH_CS_CLR;//À­µÍFlash CSÑ¡ÖĞ
-	FLASH_Write(W25X_WriteEnable); // Ğ´Ê¹ÄÜ
+	FLASH_CS_SET;//æ‹‰é«˜Flash CS
+	FLASH_CS_CLR;//æ‹‰ä½Flash CSé€‰ä¸­
+	FLASH_Write(W25X_WriteEnable); // å†™ä½¿èƒ½
 	while (i--) {
-		FLASH_CS_SET;//À­¸ßFlash CS
+		FLASH_CS_SET;//æ‹‰é«˜Flash CS
 	}
 
-	FLASH_CS_CLR;//À­µÍFlash CSÑ¡ÖĞ
-	FLASH_Write(W25X_Enter4ByteAddressMode); // ½øÈë4×Ö½ÚµØÖ·Ä£Ê½
+	FLASH_CS_CLR;//æ‹‰ä½Flash CSé€‰ä¸­
+	FLASH_Write(W25X_Enter4ByteAddressMode); // è¿›å…¥4å­—èŠ‚åœ°å€æ¨¡å¼
 	i = 5;
 	while (i--) {
-		FLASH_CS_SET;//À­¸ßFlash CS
+		FLASH_CS_SET;//æ‹‰é«˜Flash CS
 	}
 }
 
 
 
 /**
- * @brief ÉèÖÃÏÔÊ¾·¶Î§
+ * @brief è®¾ç½®æ˜¾ç¤ºèŒƒå›´
  *
- * ¶ÁÈ¡×ø±êºóÅäÖÃÆÁÄ»ÏÔÊ¾Î»ÖÃ
+ * è¯»å–åæ ‡åé…ç½®å±å¹•æ˜¾ç¤ºä½ç½®
  *
- * @param total_x Í¼Ïñ×Ü¿í¶È
- * @param picture_x Í¼ÏñÆğÊ¼X×ø±ê
- * @param picture_y Í¼ÏñÆğÊ¼Y×ø±ê
- * @param length Í¼Ïñ³¤¶È
+ * @param total_x å›¾åƒæ€»å®½åº¦
+ * @param picture_x å›¾åƒèµ·å§‹Xåæ ‡
+ * @param picture_y å›¾åƒèµ·å§‹Yåæ ‡
+ * @param length å›¾åƒé•¿åº¦
  */
-void Set_display_range() {//¶ÁÈ¡×ø±êºóÅäÖÃÆÁÄ»ÏÔÊ¾Î»ÖÃ
-	LCD_CS_CLR;//Ñ¡ÖĞLCD
-	LCD_Address_Set(start_x, start_y, end_x, end_y);//ÉèÖÃÏÔÊ¾·¶Î§
-	//LCD_DC_SET;//LCDÊı¾İ/ÃüÁîÇĞ»»Îª¸ß (Êı¾İÄ£Ê½)
+void Set_display_range() {//è¯»å–åæ ‡åé…ç½®å±å¹•æ˜¾ç¤ºä½ç½®
+	LCD_CS_CLR;//é€‰ä¸­LCD
+	LCD_Address_Set(start_x, start_y, end_x, end_y);//è®¾ç½®æ˜¾ç¤ºèŒƒå›´
+	//LCD_DC_SET;//LCDæ•°æ®/å‘½ä»¤åˆ‡æ¢ä¸ºé«˜ (æ•°æ®æ¨¡å¼)
 }
 
 /**
- * @brief ÉèÖÃÏÔÊ¾·¶Î§£¨DMAÄ£Ê½£©
+ * @brief è®¾ç½®æ˜¾ç¤ºèŒƒå›´ï¼ˆDMAæ¨¡å¼ï¼‰
  *
- * ¶ÁÈ¡×ø±êºóÅäÖÃÆÁÄ»ÏÔÊ¾Î»ÖÃ£¬Ê¹ÓÃDMAÄ£Ê½´«Êä
+ * è¯»å–åæ ‡åé…ç½®å±å¹•æ˜¾ç¤ºä½ç½®ï¼Œä½¿ç”¨DMAæ¨¡å¼ä¼ è¾“
  *
- * @param total_x Í¼Ïñ×Ü¿í¶È
- * @param picture_x Í¼ÏñÆğÊ¼X×ø±ê
- * @param picture_y Í¼ÏñÆğÊ¼Y×ø±ê
- * @param length Í¼Ïñ³¤¶È
+ * @param total_x å›¾åƒæ€»å®½åº¦
+ * @param picture_x å›¾åƒèµ·å§‹Xåæ ‡
+ * @param picture_y å›¾åƒèµ·å§‹Yåæ ‡
+ * @param length å›¾åƒé•¿åº¦
  */
-void Set_display_range_DMA() {//¶ÁÈ¡×ø±êºóÅäÖÃÆÁÄ»ÏÔÊ¾Î»ÖÃ
-	//while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//µÈ´ıSPI2¿ÕÏĞ
-	LCD_CS_CLR;//Ñ¡ÖĞLCD
-	LCD_Address_Set_DMA_Calculate_remaining(start_x, start_y, end_x, end_y);//ÉèÖÃÏÔÊ¾·¶Î§
-	//LCD_Address_Set_DMA_Calculate_remaining(start_x, start_y, end_x, end_y);//ÉèÖÃÏÔÊ¾·¶Î§
+void Set_display_range_DMA() {//è¯»å–åæ ‡åé…ç½®å±å¹•æ˜¾ç¤ºä½ç½®
+	//while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//ç­‰å¾…SPI2ç©ºé—²
+	LCD_CS_CLR;//é€‰ä¸­LCD
+	LCD_Address_Set_DMA_Calculate_remaining(start_x, start_y, end_x, end_y);//è®¾ç½®æ˜¾ç¤ºèŒƒå›´
+	//LCD_Address_Set_DMA_Calculate_remaining(start_x, start_y, end_x, end_y);//è®¾ç½®æ˜¾ç¤ºèŒƒå›´
 }
 
 /**
- * @brief ½âÑ¹Ëõ²¢ÏÔÊ¾SPI FlashÖĞµÄÍ¼ÏñÊı¾İµ½LCD
+ * @brief è§£å‹ç¼©å¹¶æ˜¾ç¤ºSPI Flashä¸­çš„å›¾åƒæ•°æ®åˆ°LCD
  *
- * @param location4    ´ı¶ÁÈ¡µÄflashÎ»ÖÃ¸ß×Ö½Ú
- * @param location3    ´ı¶ÁÈ¡µÄflashÎ»ÖÃ´Î¸ß×Ö½Ú
- * @param location2    ´ı¶ÁÈ¡µÄflashÎ»ÖÃ´ÎµÍ×Ö½Ú
- * @param location1    ´ı¶ÁÈ¡µÄflashÎ»ÖÃµÍ×Ö½Ú
+ * @param location4    å¾…è¯»å–çš„flashä½ç½®é«˜å­—èŠ‚
+ * @param location3    å¾…è¯»å–çš„flashä½ç½®æ¬¡é«˜å­—èŠ‚
+ * @param location2    å¾…è¯»å–çš„flashä½ç½®æ¬¡ä½å­—èŠ‚
+ * @param location1    å¾…è¯»å–çš„flashä½ç½®ä½å­—èŠ‚
  *
- * ¹¦ÄÜËµÃ÷£º
- * 1. ´ÓSPI Flash¶ÁÈ¡×Ô¶¨ÒåÑ¹Ëõ¸ñÊ½µÄÍ¼ÏñÊı¾İ
- * 2. ÊµÊ±½âÑ¹Í¼ÏñÊı¾İ£¨Ö§³ÖRLEÖØ¸´¿é/·ÇÖØ¸´¿é£©
- * 3. ½«½âÑ¹ºóµÄÊı¾İÖ±½ÓĞ´ÈëLCDÏÔÊ¾»º³åÇø
- * 4. Ê¹ÓÃ24Î»È«¾ÖµØÖ·Ö¸Õë(input_pos2/1/0)¼ÓËÙ¶ÁÈ¡Î»ÖÃ
+ * åŠŸèƒ½è¯´æ˜ï¼š
+ * 1. ä»SPI Flashè¯»å–è‡ªå®šä¹‰å‹ç¼©æ ¼å¼çš„å›¾åƒæ•°æ®
+ * 2. å®æ—¶è§£å‹å›¾åƒæ•°æ®ï¼ˆæ”¯æŒRLEé‡å¤å—/éé‡å¤å—ï¼‰
+ * 3. å°†è§£å‹åçš„æ•°æ®ç›´æ¥å†™å…¥LCDæ˜¾ç¤ºç¼“å†²åŒº
+ * 4. ä½¿ç”¨24ä½å…¨å±€åœ°å€æŒ‡é’ˆ(input_pos2/1/0)åŠ é€Ÿè¯»å–ä½ç½®
  */
 u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16* location1) {
-	u16 length = 0;      // µ±Ç°Êı¾İ¿éµÄÊµ¼Ê³¤¶È	
-	uint32_t frame_start = GetTimerCount();  // ¼ÇÂ¼Ö¡¿ªÊ¼Ê±¼ä	
-	u8 header = 0;     // Êı¾İ¿éÍ·×Ö½Ú±êÊ¶
-	u8 header1 = 0;     // Êı¾İ¿éÍ·×Ö½Ú±êÊ¶
-	u8 header2 = 0;     // Êı¾İ¿éÍ·×Ö½Ú±êÊ¶														 
-	u8 is_repeat = 0;      // Êı¾İÀàĞÍ±ê¼Ç£º1=ÖØ¸´¿é£¬0=·ÇÖØ¸´¿é
-	u8 len_high = 0;    // ³¤¶ÈÀ©Õ¹×Ö½Ú¸ßÎ»£¨µ±³¤¶È>127Ê±Ê¹ÓÃ£©
-	u8 len_low = 0;    // ³¤¶ÈÀ©Õ¹×Ö½ÚµÍÎ»£¨µ±³¤¶È>127Ê±Ê¹ÓÃ£©
-	u8 datah = 0;   // µ±Ç°ÏñËØµÄ¸ß×Ö½Ú£¨Ä¬ÈÏÖµ£©
-	u8 datal = 0;   // µ±Ç°ÏñËØµÄµÍ×Ö½Ú£¨Ä¬ÈÏÖµ£©			
-	uint8_t pre_count = 0;//Ô¤¶ÁÏñËØÊıÁ¿
+	u16 length = 0;      // å½“å‰æ•°æ®å—çš„å®é™…é•¿åº¦	
+	uint32_t frame_start = GetTimerCount();  // è®°å½•å¸§å¼€å§‹æ—¶é—´	
+	u8 header = 0;     // æ•°æ®å—å¤´å­—èŠ‚æ ‡è¯†
+	u8 header1 = 0;     // æ•°æ®å—å¤´å­—èŠ‚æ ‡è¯†
+	u8 header2 = 0;     // æ•°æ®å—å¤´å­—èŠ‚æ ‡è¯†														 
+	u8 is_repeat = 0;      // æ•°æ®ç±»å‹æ ‡è®°ï¼š1=é‡å¤å—ï¼Œ0=éé‡å¤å—
+	u8 len_high = 0;    // é•¿åº¦æ‰©å±•å­—èŠ‚é«˜ä½ï¼ˆå½“é•¿åº¦>127æ—¶ä½¿ç”¨ï¼‰
+	u8 len_low = 0;    // é•¿åº¦æ‰©å±•å­—èŠ‚ä½ä½ï¼ˆå½“é•¿åº¦>127æ—¶ä½¿ç”¨ï¼‰
+	u8 datah = 0;   // å½“å‰åƒç´ çš„é«˜å­—èŠ‚ï¼ˆé»˜è®¤å€¼ï¼‰
+	u8 datal = 0;   // å½“å‰åƒç´ çš„ä½å­—èŠ‚ï¼ˆé»˜è®¤å€¼ï¼‰			
+	uint8_t pre_count = 0;//é¢„è¯»åƒç´ æ•°é‡
 
 	last_seg_end = ((uint32_t)video_ranges[max_video_count - 1][4] << 24) |
 		((uint32_t)video_ranges[max_video_count - 1][5] << 16) |
 		((uint32_t)video_ranges[max_video_count - 1][6] << 8) |
-		(uint32_t)video_ranges[max_video_count - 1][7];//×îºóÒ»¸öÊı¾İ¶Î½áÊøµØÖ·
+		(uint32_t)video_ranges[max_video_count - 1][7];//æœ€åä¸€ä¸ªæ•°æ®æ®µç»“æŸåœ°å€
 
 	seg_end = ((uint32_t)video_ranges[current_video_index][4] << 24) |
 		((uint32_t)video_ranges[current_video_index][5] << 16) |
 		((uint32_t)video_ranges[current_video_index][6] << 8) |
-		(uint32_t)video_ranges[current_video_index][7];//µ±Ç°Êı¾İ¶Î½áÊøµØÖ·
+		(uint32_t)video_ranges[current_video_index][7];//å½“å‰æ•°æ®æ®µç»“æŸåœ°å€
 
 	input_pos3 = *location4;
 	input_pos2 = *location3;
 	input_pos1 = *location2;
 	input_pos0 = *location1;
-	input_pos = (uint32_t)input_pos3 << 24 | (uint32_t)input_pos2 << 16 | (uint32_t)input_pos1 << 8 | input_pos0;//34Î»µØÖ·
+	input_pos = (uint32_t)input_pos3 << 24 | (uint32_t)input_pos2 << 16 | (uint32_t)input_pos1 << 8 | input_pos0;//34ä½åœ°å€
 
 
-	//byte_address_mode();//4×Ö½ÚµØÖ·Ä£Ê½
-	/* ¶ÁÈ¡¿éÍ·ĞÅÏ¢£¨1×Ö½Ú£© */
-	LCD_CS_SET;//È¡ÏûÑ¡ÖĞLCD
-	FLASH_CS_CLR;//Ñ¡ÖĞFlash
-	//LCD_LED_CLR;//¿ªÆôLCD±³¹â
+	//byte_address_mode();//4å­—èŠ‚åœ°å€æ¨¡å¼
+	/* è¯»å–å—å¤´ä¿¡æ¯ï¼ˆ1å­—èŠ‚ï¼‰ */
+	LCD_CS_SET;//å–æ¶ˆé€‰ä¸­LCD
+	FLASH_CS_CLR;//é€‰ä¸­Flash
+	//LCD_LED_CLR;//å¼€å¯LCDèƒŒå…‰
 
-	// Ê¹ÓÃDMA·¢ËÍÃüÁîºÍµØÖ·£¬Ìá¸ß´«ÊäĞ§ÂÊ
+	// ä½¿ç”¨DMAå‘é€å‘½ä»¤å’Œåœ°å€ï¼Œæé«˜ä¼ è¾“æ•ˆç‡
 	// static uint8_t flash_cmd[5];
-	// flash_cmd[0] = W25X_FastRead;  // ¿ìËÙ¶ÁÈ¡
-	// flash_cmd[1] = input_pos3;      // 32Î»µØÖ·
+	// flash_cmd[0] = W25X_FastRead;  // å¿«é€Ÿè¯»å–
+	// flash_cmd[1] = input_pos3;      // 32ä½åœ°å€
 	// flash_cmd[2] = input_pos2;
 	// flash_cmd[3] = input_pos1;
 	// flash_cmd[4] = input_pos0;
-	// SPI1_Write_DMA(flash_cmd, 5);   // DMA·¢ËÍÃüÁîºÍµØÖ·£¨ÄÚ²¿×Ô¶¯µÈ´ıDMA½áÊø£©
+	// SPI1_Write_DMA(flash_cmd, 5);   // DMAå‘é€å‘½ä»¤å’Œåœ°å€ï¼ˆå†…éƒ¨è‡ªåŠ¨ç­‰å¾…DMAç»“æŸï¼‰
 
-	FLASH_Write(W25X_FastRead);// ·¢ËÍ¿ìËÙ¶ÁÈ¡ÃüÁî£¨0x0B£©
-	//FLASH_Write(input_pos3);// ·¢ËÍ32Î»µØÖ·
+	FLASH_Write(W25X_FastRead);// å‘é€å¿«é€Ÿè¯»å–å‘½ä»¤ï¼ˆ0x0Bï¼‰
+	//FLASH_Write(input_pos3);// å‘é€32ä½åœ°å€
 	FLASH_Write(input_pos2);
 	FLASH_Write(input_pos1);
 	FLASH_Write(input_pos0);
 
-	FLASH_Read();   // ¶ªÆú0xFFµÈ´ı
-	SPI_I2S_DMACmd(SPI1, SPI_I2S_DMAReq_Tx | SPI_I2S_DMAReq_Rx, ENABLE);  // Ê¹ÄÜSPI1 DMA
+	FLASH_Read();   // ä¸¢å¼ƒ0xFFç­‰å¾…
+	SPI_I2S_DMACmd(SPI1, SPI_I2S_DMAReq_Tx | SPI_I2S_DMAReq_Rx, ENABLE);  // ä½¿èƒ½SPI1 DMA
 	while (1) {
 	next_block:
 		//SPI1_DMA_WaitComplete();
-		start_x = FLASH_Read();//¶ÁÈ¡»­ÃæÆğÊ¼Î»ÖÃx
-		start_y = FLASH_Read();//¶ÁÈ¡»­ÃæÆğÊ¼Î»ÖÃy
-		end_x = FLASH_Read();//¶ÁÈ¡»­Ãæ½áÊøÎ»ÖÃx
-		end_y = FLASH_Read();//¶ÁÈ¡»­Ãæ½áÊøÎ»ÖÃy			
-		input_pos += 4;//µØÖ·¼Ó4
-		while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//µÈ´ıSPI2ÆÁÄ»Ë¢ĞÂÍê³É
+		start_x = FLASH_Read();//è¯»å–ç”»é¢èµ·å§‹ä½ç½®x
+		start_y = FLASH_Read();//è¯»å–ç”»é¢èµ·å§‹ä½ç½®y
+		end_x = FLASH_Read();//è¯»å–ç”»é¢ç»“æŸä½ç½®x
+		end_y = FLASH_Read();//è¯»å–ç”»é¢ç»“æŸä½ç½®y			
+		input_pos += 4;//åœ°å€åŠ 4
+		while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//ç­‰å¾…SPI2å±å¹•åˆ·æ–°å®Œæˆ
 
-		if (start_x == 0xF1 && start_y == 0xF1) {// ¼ì²éÊÇ·ñÊÇÖ¡½áÊø±êÖ¾ (0xF1,0xF1,0xFF,0xFF,0xFF)
-			if (end_x == 0xFF && end_y == 0xFF) {//·ûºÏÖ¡½áÊø±êÖ¾
-				uint32_t frame_end = GetTimerCount();//¼ÇÂ¼Ö¡½áÊøÊ±¼ä
-				uint32_t frame_duration = frame_end - frame_start;//¼ÆËãµ±Ç°Ö¡´¦ÀíÊ±¼ä
-				//UpdateMaxFrameTime(frame_duration);//¸üĞÂ×î´óÖ¡ºÄÊ±£¬ÓÃÓÚ×îµÍÖ¡ÂÊ
-				LCD_Backlight_PWM_SetDuty(g_brightness);//¿ªÆôLCD±³¹â(ÓÃ»§ÁÁ¶È)
-				input_pos += 1;//µØÖ·¼Ó1
+		if (start_x == 0xF1 && start_y == 0xF1) {// æ£€æŸ¥æ˜¯å¦æ˜¯å¸§ç»“æŸæ ‡å¿— (0xF1,0xF1,0xFF,0xFF,0xFF)
+			if (end_x == 0xFF && end_y == 0xFF) {//ç¬¦åˆå¸§ç»“æŸæ ‡å¿—
+				uint32_t frame_end = GetTimerCount();//è®°å½•å¸§ç»“æŸæ—¶é—´
+				uint32_t frame_duration = frame_end - frame_start;//è®¡ç®—å½“å‰å¸§å¤„ç†æ—¶é—´
+				//UpdateMaxFrameTime(frame_duration);//æ›´æ–°æœ€å¤§å¸§è€—æ—¶ï¼Œç”¨äºæœ€ä½å¸§ç‡
+				LCD_Backlight_PWM_SetDuty(g_brightness);//å¼€å¯LCDèƒŒå…‰(ç”¨æˆ·äº®åº¦)
+				input_pos += 1;//åœ°å€åŠ 1
 
-				*location4 = input_pos >> 24;//32Î»µØÖ·
-				*location3 = input_pos >> 16;//24Î»µØÖ·
-				*location2 = input_pos >> 8;//16Î»µØÖ·
-				*location1 = input_pos;//8Î»µØÖ·
+				*location4 = input_pos >> 24;//32ä½åœ°å€
+				*location3 = input_pos >> 16;//24ä½åœ°å€
+				*location2 = input_pos >> 8;//16ä½åœ°å€
+				*location1 = input_pos;//8ä½åœ°å€
 
-				// ¼ì²éÊÇ·ñµ½´ïµ±Ç°¶ÎÄ©Î²£¬ÇĞ»»µ½ÏÂÒ»¶Î
-				if (input_pos >= seg_end || key_response != 0) {//µ½´ïµ±Ç°¶ÎÄ©Î²»òÊÕµ½ÊäÈëÏìÓ¦
+				// æ£€æŸ¥æ˜¯å¦åˆ°è¾¾å½“å‰æ®µæœ«å°¾ï¼Œåˆ‡æ¢åˆ°ä¸‹ä¸€æ®µ
+				if (input_pos >= seg_end || key_response != 0) {//åˆ°è¾¾å½“å‰æ®µæœ«å°¾æˆ–æ”¶åˆ°è¾“å…¥å“åº”
 					*location4 = video_ranges[current_video_index][0];
 					*location3 = video_ranges[current_video_index][1];
 					*location2 = video_ranges[current_video_index][2];
@@ -236,15 +236,15 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 					input_pos = ((uint32_t)*location4 << 24) | ((uint32_t)*location3 << 16) |
 						((uint32_t)*location2 << 8) | (uint32_t)*location1;
 					//Delay_Ms(100);
-					 if (!key_response) {//Ã»ÓĞÊäÈëÏìÓ¦£¬²¥·ÅÒ»±éºóÉÁË¸ÔÙĞİÃß
+					 if (!key_response) {//æ²¡æœ‰è¾“å…¥å“åº”ï¼Œæ’­æ”¾ä¸€éåé—ªçƒå†ä¼‘çœ 
 					 #if VIDEO_BLINK_WAKE_ENABLE
 						if (Battery_GetStatus() != BAT_CHARGING) {
-							/* ÉÁË¸Ç°ÒÑÔÚ°´×Å: I2C´¥Ãş×´Ì¬±ÈPA8Âö³å¿É¿¿, Ìø¹ı¼ì²â */
+							/* é—ªçƒå‰å·²åœ¨æŒ‰ç€: I2Cè§¦æ‘¸çŠ¶æ€æ¯”PA8è„‰å†²å¯é , è·³è¿‡æ£€æµ‹ */
 							uint8_t blink_check = !g_touch_pressed;
-							if (blink_check) g_touch_int_flag = 0;  /* Î´ÔÚ°´, Çå¾É±êÖ¾µÈĞÂ°´ÏÂ */
+							if (blink_check) g_touch_int_flag = 0;  /* æœªåœ¨æŒ‰, æ¸…æ—§æ ‡å¿—ç­‰æ–°æŒ‰ä¸‹ */
 							uint8_t b = 2;
 							do {
-								LCD_Backlight_PWM_SetDuty(0);//Ãğ
+								LCD_Backlight_PWM_SetDuty(0);//ç­
 							for (uint8_t i = 0; i < 35; i++) {
 								IWDG_ReloadCounter(); Delay_Ms(10);
 								if (Battery_GetStatus() == BAT_CHARGING || Battery_GetStatus() == BAT_FULL) {
@@ -252,7 +252,7 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 									goto blink_out;
 								}
 							}
-							LCD_Backlight_PWM_SetDuty(g_brightness);//ÁÁ
+							LCD_Backlight_PWM_SetDuty(g_brightness);//äº®
 							for (uint8_t i = 0; i < 35; i++) {
 								IWDG_ReloadCounter(); Delay_Ms(10);
 								if (blink_check && g_touch_int_flag) {
@@ -272,20 +272,20 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 							} while (--b);
 						}
 					 	#endif
-					 	end_flag = 1;//½áÊøÒ»¸öÑ­»·
+					 	end_flag = 1;//ç»“æŸä¸€ä¸ªå¾ªç¯
 					 }
-					key_response = 0;//Çå³ıÊäÈëÏìÓ¦±êÖ¾
+					key_response = 0;//æ¸…é™¤è¾“å…¥å“åº”æ ‡å¿—
 				#if VIDEO_BLINK_WAKE_ENABLE
 				blink_out:;
 				#endif
 				}
-				while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//µÈ´ıÆÁÄ»Ë¢ĞÂÍê³É
-				//while ((SPI2_DMA_TX_CH->CNTR) > 0);//µÈ´ıSPI2ÆÁÄ»Ë¢ĞÂÍê³É
-				FLASH_CS_SET;// ÊÍ·ÅFlash
-				//FrameTrigger();//´¥·¢Ö¡ÂÊ¼ÆËã£¬ÓÃÓÚÏÔÊ¾Ö¡ÂÊ¡ª¡ªÒÑ×¢ÊÍ£¬²»ĞèÒªÏÔÊ¾Ö¡ÂÊ
-				// LCD_ShowNum(GetLowestFPS(), START_Y - SEG_HEIGHT - 4);//ÏÔÊ¾×îµÍÖ¡ÂÊ
-				// LCD_ShowNum(GetFPS(), START_Y);//ÏÔÊ¾µ±Ç°Ö¡ÂÊ
-				// ´¥Ãş×ø±êµ÷ÊÔ: È·ÈÏ´¥ÃşICÕı³£ºóÔÙÈ¡Ïû×¢ÊÍ
+				while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//ç­‰å¾…å±å¹•åˆ·æ–°å®Œæˆ
+				//while ((SPI2_DMA_TX_CH->CNTR) > 0);//ç­‰å¾…SPI2å±å¹•åˆ·æ–°å®Œæˆ
+				FLASH_CS_SET;// é‡Šæ”¾Flash
+				//FrameTrigger();//è§¦å‘å¸§ç‡è®¡ç®—ï¼Œç”¨äºæ˜¾ç¤ºå¸§ç‡â€”â€”å·²æ³¨é‡Šï¼Œä¸éœ€è¦æ˜¾ç¤ºå¸§ç‡
+				// LCD_ShowNum(GetLowestFPS(), START_Y - SEG_HEIGHT - 4);//æ˜¾ç¤ºæœ€ä½å¸§ç‡
+				// LCD_ShowNum(GetFPS(), START_Y);//æ˜¾ç¤ºå½“å‰å¸§ç‡
+				// è§¦æ‘¸åæ ‡è°ƒè¯•: ç¡®è®¤è§¦æ‘¸ICæ­£å¸¸åå†å–æ¶ˆæ³¨é‡Š
 				// TouchState ts;
 				// Touch_Scan(&ts);
 				// if (ts.pressed) {
@@ -293,99 +293,99 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 				// 	LCD_ShowNum(ts.x, START_Y);
 				// }
 
-				SPI_I2S_DMACmd(SPI1, SPI_I2S_DMAReq_Tx | SPI_I2S_DMAReq_Rx, DISABLE);//¹Ø±ÕSPI1 DMA
+				SPI_I2S_DMACmd(SPI1, SPI_I2S_DMAReq_Tx | SPI_I2S_DMAReq_Rx, DISABLE);//å…³é—­SPI1 DMA
 
-				// ³äµç¼ì²â£º´ËÊ±ÍË³öÊÓÆµ²¥·Å£¬ÓÉmain.cÖĞelse·ÖÖ§½Ó¹Ü³äµçÏÔÊ¾
+				// å……ç”µæ£€æµ‹ï¼šæ­¤æ—¶é€€å‡ºè§†é¢‘æ’­æ”¾ï¼Œç”±main.cä¸­elseåˆ†æ”¯æ¥ç®¡å……ç”µæ˜¾ç¤º
 				if (Battery_GetStatus() == BAT_CHARGING || Battery_GetStatus() == BAT_FULL) {
 					end_flag = 1;
 				}
 
-				if (frame_duration > 10000)//ÅÅ³ıÒì³£Öµ£¨Ğ¡ÓÚ10ms²»Í³¼Æ£©
-					UpdateAvgFrameTime(frame_duration);//¸üĞÂÆ½¾ùÖ¡Ê±¼ä
+				if (frame_duration > 10000)//æ’é™¤å¼‚å¸¸å€¼ï¼ˆå°äº10msä¸ç»Ÿè®¡ï¼‰
+					UpdateAvgFrameTime(frame_duration);//æ›´æ–°å¹³å‡å¸§æ—¶é—´
 
-				if (frame_duration < avg_frame_time) {//µÈ´ıÊ£ÓàÊ±¼ä
+				if (frame_duration < avg_frame_time) {//ç­‰å¾…å‰©ä½™æ—¶é—´
 					while ((GetTimerCount() - frame_end) < (avg_frame_time - frame_duration));
 				}
-				LCD_CS_SET;//È¡ÏûÑ¡ÖĞLCD
+				LCD_CS_SET;//å–æ¶ˆé€‰ä¸­LCD
 				return 0;
 			}
 		}
-		// ¼ì²éÊÇ·ñµ½´ï×îºóÒ»¸öÖ¡¶ÎÄ©Î²£¬ÉÁË¸ºó½áÊø
+		// æ£€æŸ¥æ˜¯å¦åˆ°è¾¾æœ€åä¸€ä¸ªå¸§æ®µæœ«å°¾ï¼Œé—ªçƒåç»“æŸ
 		if (input_pos >= last_seg_end) {
 			*location4 = 0;
 			*location3 = 0;
 			*location2 = 0;
 			*location1 = 0;
-			end_flag = 1;//ÒâÍâÔ½½ç£¬°²È«ÍË³ö
+			end_flag = 1;//æ„å¤–è¶Šç•Œï¼Œå®‰å…¨é€€å‡º
 			SPI_I2S_DMACmd(SPI1, SPI_I2S_DMAReq_Tx | SPI_I2S_DMAReq_Rx, DISABLE);
 			LCD_CS_SET; FLASH_CS_SET;
 			LCD_LED_SET;
 			return 0;
 		}
-		Set_display_range_DMA();//ÉèÖÃÏÔÊ¾·¶Î§
+		Set_display_range_DMA();//è®¾ç½®æ˜¾ç¤ºèŒƒå›´
 		while (1) {
-			header = FLASH_Read();//¶ÁÈ¡Í·£¨SPI1ÕıÔÚ¶ÁÈ¡Ê±£¬SPI2ÕıÔÚ·¢ËÍ£©
-			// µÈ´ıSPI2·¢ËÍÍê³É£¨DMAµÄBSYµÈ´ıÍ³Ò»·Å»Ø´Ë´¦£©
-			// ÔÚFLASH_Read()µÄSPI1Í¨Ñ¶Ê±£¬SPI2»¹Ê£×îºó¼¸Î»Êı¾İ
-			input_pos0++;//µÍ×Ö½ÚµØÖ·¼Ó1
-			input_pos++;//µØÖ·¼Ó1
-			is_repeat = (header & 0x80) == 0;// Êı¾İÀàĞÍÅĞ¶Ï£º×î¸ßÎ»=0±íÊ¾ÖØ¸´¿é£¬1±íÊ¾·ÇÖØ¸´¿é
+			header = FLASH_Read();//è¯»å–å¤´ï¼ˆSPI1æ­£åœ¨è¯»å–æ—¶ï¼ŒSPI2æ­£åœ¨å‘é€ï¼‰
+			// ç­‰å¾…SPI2å‘é€å®Œæˆï¼ˆDMAçš„BSYç­‰å¾…ç»Ÿä¸€æ”¾å›æ­¤å¤„ï¼‰
+			// åœ¨FLASH_Read()çš„SPI1é€šè®¯æ—¶ï¼ŒSPI2è¿˜å‰©æœ€åå‡ ä½æ•°æ®
+			input_pos0++;//ä½å­—èŠ‚åœ°å€åŠ 1
+			input_pos++;//åœ°å€åŠ 1
+			is_repeat = (header & 0x80) == 0;// æ•°æ®ç±»å‹åˆ¤æ–­ï¼šæœ€é«˜ä½=0è¡¨ç¤ºé‡å¤å—ï¼Œ1è¡¨ç¤ºéé‡å¤å—
 
-			/* ÖØ¸´¿é´¦Àí£¨ÏàÍ¬ÏñËØÖµ¶à´Î¸´ÖÆ£©*/
+			/* é‡å¤å—å¤„ç†ï¼ˆç›¸åŒåƒç´ å€¼å¤šæ¬¡å¤åˆ¶ï¼‰*/
 			if (is_repeat) {
-				// ³¤ÖØ¸´¿é´¦Àí£¨³¤¶È128~32767£©
+				// é•¿é‡å¤å—å¤„ç†ï¼ˆé•¿åº¦128~32767ï¼‰
 				switch (header & 0x7F) {
 				case 0:
-					len_high = FLASH_Read();// ¶ÁÈ¡³¤¶È¸ß×Ö½Ú
-					len_low = FLASH_Read(); // ¶ÁÈ¡³¤¶ÈµÍ×Ö½Ú
-					datah = FLASH_Read(); //¶ÁÈ¡Êı¾İ¸ß×Ö½Ú
-					datal = FLASH_Read(); //¶ÁÈ¡Êı¾İµÍ×Ö½Ú
-					while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//µÈ´ıSPI2ÆÁÄ»Ë¢ĞÂÍê³É
-					//while ((SPI2_DMA_TX_CH->CNTR) > 0);//µÈ´ıSPI2ÆÁÄ»Ë¢ĞÂÍê³É
-					input_pos += 4;//µØÖ·¼Ó4
-					length = ((u32)len_high << 8) + (u32)len_low;  // Êµ¼Ê³¤¶È=¸ß×Ö½Ú¼ÓµÍ×Ö½ÚÖµ
+					len_high = FLASH_Read();// è¯»å–é•¿åº¦é«˜å­—èŠ‚
+					len_low = FLASH_Read(); // è¯»å–é•¿åº¦ä½å­—èŠ‚
+					datah = FLASH_Read(); //è¯»å–æ•°æ®é«˜å­—èŠ‚
+					datal = FLASH_Read(); //è¯»å–æ•°æ®ä½å­—èŠ‚
+					while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//ç­‰å¾…SPI2å±å¹•åˆ·æ–°å®Œæˆ
+					//while ((SPI2_DMA_TX_CH->CNTR) > 0);//ç­‰å¾…SPI2å±å¹•åˆ·æ–°å®Œæˆ
+					input_pos += 4;//åœ°å€åŠ 4
+					length = ((u32)len_high << 8) + (u32)len_low;  // å®é™…é•¿åº¦=é«˜å­—èŠ‚åŠ ä½å­—èŠ‚å€¼
 
-					LCD_DMA_Write_Buffer_Add_coordinates((uint16_t)datah, (uint16_t)datal, length);//·¢ËÍÊı¾İµ½LCDÆÁÄ»
+					LCD_DMA_Write_Buffer_Add_coordinates((uint16_t)datah, (uint16_t)datal, length);//å‘é€æ•°æ®åˆ°LCDå±å¹•
 					break;
-				default:// ¶ÌÖØ¸´¿é´¦Àí£¨³¤¶È1~127£©
-					header1 = FLASH_Read();//¶ÁÈ¡Êı¾İ¸ß×Ö½Ú
-					header2 = FLASH_Read();//¶ÁÈ¡Êı¾İµÍ×Ö½Ú
-					while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//µÈ´ıSPI2ÆÁÄ»Ë¢ĞÂÍê³É
-					//while ((SPI2_DMA_TX_CH->CNTR) > 0);//µÈ´ıSPI2ÆÁÄ»Ë¢ĞÂÍê³É
-					length = header & 0x7F;  // Ö±½Ó»ñÈ¡³¤¶È
+				default:// çŸ­é‡å¤å—å¤„ç†ï¼ˆé•¿åº¦1~127ï¼‰
+					header1 = FLASH_Read();//è¯»å–æ•°æ®é«˜å­—èŠ‚
+					header2 = FLASH_Read();//è¯»å–æ•°æ®ä½å­—èŠ‚
+					while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//ç­‰å¾…SPI2å±å¹•åˆ·æ–°å®Œæˆ
+					//while ((SPI2_DMA_TX_CH->CNTR) > 0);//ç­‰å¾…SPI2å±å¹•åˆ·æ–°å®Œæˆ
+					length = header & 0x7F;  // ç›´æ¥è·å–é•¿åº¦
 					datah = header1;
 					datal = header2;
-					input_pos += 2;//µØÖ·¼Ó2
+					input_pos += 2;//åœ°å€åŠ 2
 
-					LCD_DMA_Write_Buffer_Add_coordinates((uint16_t)datah, (uint16_t)datal, length);//·¢ËÍÊı¾İµ½LCDÆÁÄ»
+					LCD_DMA_Write_Buffer_Add_coordinates((uint16_t)datah, (uint16_t)datal, length);//å‘é€æ•°æ®åˆ°LCDå±å¹•
 					break;
 				}
 			}
-			/* ·ÇÖØ¸´¿é´¦Àí£¨Ô­Ê¼Êı¾İĞòÁĞ£©*/
+			/* éé‡å¤å—å¤„ç†ï¼ˆåŸå§‹æ•°æ®åºåˆ—ï¼‰*/
 			else {
-				// ³¤·ÇÖØ¸´¿é´¦Àí£¨³¤¶È128~255£©
+				// é•¿éé‡å¤å—å¤„ç†ï¼ˆé•¿åº¦128~255ï¼‰
 				switch (header & 0x7F) {
 				case 0:
-					header1 = FLASH_Read();//¶ÁÈ¡³¤¶È
-					((uint16_t*)shared_buffer)[0] = FLASH_Read() | ((uint16_t)FLASH_Read() << 8);//Ô¤¶ÁÈ¡µÚÒ»¸öÏñËØ
-					if (header == 0xF2 && header1 == 0xF2 && (((uint16_t*)shared_buffer)[0] & 0xFF) == 0xFF && (((uint16_t*)shared_buffer)[0] >> 8) == 0xFF) {// Ö¡½áÊø±êÖ¾: header==0xF2 ¡ú ÍË³öÄÚ²ãÑ­»·
-						FLASH_Read();//¶ÁÈ¡Ê£ÏÂµÄ0xFF
-						input_pos += 4;//µØÖ·¼Ó4
-						while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//µÈ´ıÆÁÄ»Ë¢ĞÂÍê³É	
-						//while ((SPI2_DMA_TX_CH->CNTR) > 0);//µÈ´ıSPI2ÆÁÄ»Ë¢ĞÂÍê³É
+					header1 = FLASH_Read();//è¯»å–é•¿åº¦
+					((uint16_t*)shared_buffer)[0] = FLASH_Read() | ((uint16_t)FLASH_Read() << 8);//é¢„è¯»å–ç¬¬ä¸€ä¸ªåƒç´ 
+					if (header == 0xF2 && header1 == 0xF2 && (((uint16_t*)shared_buffer)[0] & 0xFF) == 0xFF && (((uint16_t*)shared_buffer)[0] >> 8) == 0xFF) {// å¸§ç»“æŸæ ‡å¿—: header==0xF2 â†’ é€€å‡ºå†…å±‚å¾ªç¯
+						FLASH_Read();//è¯»å–å‰©ä¸‹çš„0xFF
+						input_pos += 4;//åœ°å€åŠ 4
+						while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//ç­‰å¾…å±å¹•åˆ·æ–°å®Œæˆ	
+						//while ((SPI2_DMA_TX_CH->CNTR) > 0);//ç­‰å¾…SPI2å±å¹•åˆ·æ–°å®Œæˆ
 						goto next_block;
 					}
 
 					len_low = header1;
-					input_pos0++;//µÍ×Ö½ÚµØÖ·¼Ó1
-					input_pos++;//µØÖ·¼Ó1
-					length = len_low;  // Êµ¼Ê³¤¶È
-					input_pos += length * 2;//µØÖ·¼Ólength*2
-					length--;//Êµ¼Ê³¤¶È¼õ1£¬ÒòÎªÒÑ¾­¶ÁÈ¡ÁËÒ»¸öÊı¾İ
+					input_pos0++;//ä½å­—èŠ‚åœ°å€åŠ 1
+					input_pos++;//åœ°å€åŠ 1
+					length = len_low;  // å®é™…é•¿åº¦
+					input_pos += length * 2;//åœ°å€åŠ length*2
+					length--;//å®é™…é•¿åº¦å‡1ï¼Œå› ä¸ºå·²ç»è¯»å–äº†ä¸€ä¸ªæ•°æ®
 
 					pre_count = 1;
-					while (length > 0 && ((SPI2_DMA_TX_CH->CNTR) > 9 || length < 2)) {//ÆÁÄ»ÔÚ·¢ËÍÊ±»òÊ£ÓàºÜÉÙÊ±Ô¤¶ÁÈ¡Êı¾İ
-						((uint16_t*)shared_buffer)[pre_count] = FLASH_Read() | ((uint16_t)FLASH_Read() << 8);//Ô¤¶ÁÈ¡µÚ¶ş¸öÏñËØ
+					while (length > 0 && ((SPI2_DMA_TX_CH->CNTR) > 9 || length < 2)) {//å±å¹•åœ¨å‘é€æ—¶æˆ–å‰©ä½™å¾ˆå°‘æ—¶é¢„è¯»å–æ•°æ®
+						((uint16_t*)shared_buffer)[pre_count] = FLASH_Read() | ((uint16_t)FLASH_Read() << 8);//é¢„è¯»å–ç¬¬äºŒä¸ªåƒç´ 
 						length--;
 						pre_count++;
 					}
@@ -393,27 +393,27 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 					// 	LCD_WR_DATA(FLASH_Read());
 					// 	LCD_WR_DATA(FLASH_Read());
 					// }
-					(void)SPI1->DATAR;  // Çå¿Õ½ÓÊÕ»º³åÇø²ĞÁôÊı¾İ
-					LCD_drawImageWithSize_DMA(length, pre_count);//¶ÁÈ¡flashÊı¾İ·¢ËÍµ½LCDÆÁÄ»
+					(void)SPI1->DATAR;  // æ¸…ç©ºæ¥æ”¶ç¼“å†²åŒºæ®‹ç•™æ•°æ®
+					LCD_drawImageWithSize_DMA(length, pre_count);//è¯»å–flashæ•°æ®å‘é€åˆ°LCDå±å¹•
 					break;
-				default:// ¶Ì·ÇÖØ¸´¿é´¦Àí£¨³¤¶È1~127£©
-					((uint16_t*)shared_buffer)[0] = FLASH_Read() | ((uint16_t)FLASH_Read() << 8);//Ô¤¶ÁÈ¡µÚÒ»¸öÏñËØ
-					if (header == 0xF2 && (((uint16_t*)shared_buffer)[0] & 0xFF) == 0xF2 && (((uint16_t*)shared_buffer)[0] >> 8) == 0xFF) {// Ö¡½áÊø±êÖ¾: header==0xF2 ¡ú ÍË³öÄÚ²ãÑ­»·
-						FLASH_Read();//¶ÁÈ¡Ê£ÏÂµÄ0xFF
-						FLASH_Read();//¶ÁÈ¡Ê£ÏÂµÄ0xFF
-						input_pos += 4;//µØÖ·¼Ó4
-						while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//µÈ´ıÆÁÄ»Ë¢ĞÂÍê³É
-						//while ((SPI2_DMA_TX_CH->CNTR) > 0);//µÈ´ıSPI2ÆÁÄ»Ë¢ĞÂÍê³É
+				default:// çŸ­éé‡å¤å—å¤„ç†ï¼ˆé•¿åº¦1~127ï¼‰
+					((uint16_t*)shared_buffer)[0] = FLASH_Read() | ((uint16_t)FLASH_Read() << 8);//é¢„è¯»å–ç¬¬ä¸€ä¸ªåƒç´ 
+					if (header == 0xF2 && (((uint16_t*)shared_buffer)[0] & 0xFF) == 0xF2 && (((uint16_t*)shared_buffer)[0] >> 8) == 0xFF) {// å¸§ç»“æŸæ ‡å¿—: header==0xF2 â†’ é€€å‡ºå†…å±‚å¾ªç¯
+						FLASH_Read();//è¯»å–å‰©ä¸‹çš„0xFF
+						FLASH_Read();//è¯»å–å‰©ä¸‹çš„0xFF
+						input_pos += 4;//åœ°å€åŠ 4
+						while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//ç­‰å¾…å±å¹•åˆ·æ–°å®Œæˆ
+						//while ((SPI2_DMA_TX_CH->CNTR) > 0);//ç­‰å¾…SPI2å±å¹•åˆ·æ–°å®Œæˆ
 						goto next_block;
 					}
 
-					length = header & 0x7F;  // Ö±½Ó»ñÈ¡³¤¶È
-					input_pos += length * 2;//µØÖ·¼Ólength*2
-					length--;//Êµ¼Ê³¤¶È¼õ1£¬ÒòÎªÒÑ¾­¶ÁÈ¡ÁËÒ»¸öÊı¾İ
+					length = header & 0x7F;  // ç›´æ¥è·å–é•¿åº¦
+					input_pos += length * 2;//åœ°å€åŠ length*2
+					length--;//å®é™…é•¿åº¦å‡1ï¼Œå› ä¸ºå·²ç»è¯»å–äº†ä¸€ä¸ªæ•°æ®
 
 					pre_count = 1;
-					while (length > 0 && ((SPI2_DMA_TX_CH->CNTR) > 9 || length < 2)) {//ÆÁÄ»ÔÚ·¢ËÍÊ±»òÊ£ÓàºÜÉÙÊ±Ô¤¶ÁÈ¡Êı¾İ
-						((uint16_t*)shared_buffer)[pre_count] = FLASH_Read() | ((uint16_t)FLASH_Read() << 8);//Ô¤¶ÁÈ¡µÚ¶ş¸öÏñËØ
+					while (length > 0 && ((SPI2_DMA_TX_CH->CNTR) > 9 || length < 2)) {//å±å¹•åœ¨å‘é€æ—¶æˆ–å‰©ä½™å¾ˆå°‘æ—¶é¢„è¯»å–æ•°æ®
+						((uint16_t*)shared_buffer)[pre_count] = FLASH_Read() | ((uint16_t)FLASH_Read() << 8);//é¢„è¯»å–ç¬¬äºŒä¸ªåƒç´ 
 						length--;
 						pre_count++;
 					}
@@ -421,8 +421,8 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 					// 	LCD_WR_DATA(FLASH_Read());
 					// 	LCD_WR_DATA(FLASH_Read());
 					// }
-					(void)SPI1->DATAR;  // Çå¿Õ½ÓÊÕ»º³åÇø²ĞÁôÊı¾İ
-					LCD_drawImageWithSize_DMA(length, pre_count);//¶ÁÈ¡flashÊı¾İ·¢ËÍµ½LCDÆÁÄ»
+					(void)SPI1->DATAR;  // æ¸…ç©ºæ¥æ”¶ç¼“å†²åŒºæ®‹ç•™æ•°æ®
+					LCD_drawImageWithSize_DMA(length, pre_count);//è¯»å–flashæ•°æ®å‘é€åˆ°LCDå±å¹•
 					break;
 				}
 			}

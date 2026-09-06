@@ -1,9 +1,9 @@
 /**
  * @file    settings.c
- * @brief   ÉèÖÃÄ£¿é: ÁÁ¶È / Ï¢ÆÁÊ±¼ä / ÆÁÄ»·½Ïò Èı¸öÉèÖÃÒ³
- * @note    ÊÓÆµÉÏ»¬²Ëµ¥Óë¸÷ÓÎÏ·µÄÉèÖÃ¶ş¼¶²Ëµ¥¶¼¸´ÓÃ±¾Ä£¿é;
- *          ²ÎÊı¾­ BKP ºó±¸¼Ä´æÆ÷³Ö¾Ã»¯(Settings_SaveAll), ÉèÖÃÒ³ÓÉ main.c
- *          µÄ Settings_Update Í³Ò»µ÷¶È, ·µ»Ø¼ü/ÏÂ»¬·µ»ØÔÚ main.c ´¦Àí¡£
+ * @brief   è®¾ç½®æ¨¡å—: äº®åº¦ / æ¯å±æ—¶é—´ / å±å¹•æ–¹å‘ ä¸‰ä¸ªè®¾ç½®é¡µ
+ * @note    è§†é¢‘ä¸Šæ»‘èœå•ä¸å„æ¸¸æˆçš„è®¾ç½®äºŒçº§èœå•éƒ½å¤ç”¨æœ¬æ¨¡å—;
+ *          å‚æ•°ç» BKP åå¤‡å¯„å­˜å™¨æŒä¹…åŒ–(Settings_SaveAll), è®¾ç½®é¡µç”± main.c
+ *          çš„ Settings_Update ç»Ÿä¸€è°ƒåº¦, è¿”å›é”®/ä¸‹æ»‘è¿”å›åœ¨ main.c å¤„ç†ã€‚
  */
 
 #include "settings.h"
@@ -13,61 +13,61 @@
 #include "sok_img_win.h"
 #include "ch32v20x_bkp.h"
 
-/* ================= ³£Á¿ÓëÈ«¾ÖÉèÖÃ¶¨Òå(Í³Ò»ÖÃ¶¥) ================= */
+/* ================= å¸¸é‡ä¸å…¨å±€è®¾ç½®å®šä¹‰(ç»Ÿä¸€ç½®é¡¶) ================= */
 
-/* ---- ÉèÖÃ³Ö¾Ã»¯(BKP ºó±¸¼Ä´æÆ÷) ---- */
+/* ---- è®¾ç½®æŒä¹…åŒ–(BKP åå¤‡å¯„å­˜å™¨) ---- */
 #define BKP_SLEEP_MAGIC  0xB071
 #define BKP_SLEEP_DR_MAGIC  BKP_DR6
 #define BKP_SLEEP_DR_INDEX  BKP_DR7
 #define BKP_BRIGHT_DR       BKP_DR8
 #define BKP_ORIENT_DR       BKP_DR10
 
-/* ---- Êı×Ö»æÖÆ³ß´ç ---- */
+/* ---- æ•°å­—ç»˜åˆ¶å°ºå¯¸ ---- */
 #define DIGIT_W 14
 #define DIGIT_H 28
 
-/* ---- ÁÁ¶ÈÉèÖÃÒ³ ---- */
-#define BR_X    44   /* (240-152)/2 ¾ÓÖĞ */
+/* ---- äº®åº¦è®¾ç½®é¡µ ---- */
+#define BR_X    44   /* (240-152)/2 å±…ä¸­ */
 #define BR_W    152
 #define BR_Y    108
 #define BR_H    12
 #define BR_KNOB_W 10
 #define BR_KNOB_H 20
-#define BR_NUM_CX  120                       /* Êı×Ö¾ÓÖĞX */
-#define BR_NUM_Y   (BR_Y - 30)               /* Êı×ÖYÖĞĞÄ (78) */
+#define BR_NUM_CX  120                       /* æ•°å­—å±…ä¸­X */
+#define BR_NUM_Y   (BR_Y - 30)               /* æ•°å­—Yä¸­å¿ƒ (78) */
 #define TAP_THRESHOLD 15
-static uint8_t  s_br_drag = 0;              /* ÁÁ¶ÈÍÏ¶¯ÖĞ±êÖ¾ */
-static int16_t  s_br_pos = BR_X + BR_W;     /* µ±Ç°»¬¿éÎ»ÖÃ */
+static uint8_t  s_br_drag = 0;              /* äº®åº¦æ‹–åŠ¨ä¸­æ ‡å¿— */
+static int16_t  s_br_pos = BR_X + BR_W;     /* å½“å‰æ»‘å—ä½ç½® */
 
-/* ---- Ï¢ÆÁÊ±¼äÉèÖÃÒ³ ---- */
+/* ---- æ¯å±æ—¶é—´è®¾ç½®é¡µ ---- */
 #define ST_Y   100
 #define ST_H   34
 #define ST_W   38
 #define ST_LX  46
 #define ST_RX  156
-#define ST_NUM_CX 120                       /* Êı×Ö¾ÓÖĞX */
-#define ST_NUM_Y  122                       /* Êı×ÖÖĞĞÄY */
-static uint8_t s_st_prev = 0;               /* ÉÏ´Î°´ÏÂ×´Ì¬ */
-static uint16_t s_st_start_x = 0;           /* °´ÏÂÆğµãX */
-static uint16_t s_st_start_y = 0;           /* °´ÏÂÆğµãY */
+#define ST_NUM_CX 120                       /* æ•°å­—å±…ä¸­X */
+#define ST_NUM_Y  122                       /* æ•°å­—ä¸­å¿ƒY */
+static uint8_t s_st_prev = 0;               /* ä¸Šæ¬¡æŒ‰ä¸‹çŠ¶æ€ */
+static uint16_t s_st_start_x = 0;           /* æŒ‰ä¸‹èµ·ç‚¹X */
+static uint16_t s_st_start_y = 0;           /* æŒ‰ä¸‹èµ·ç‚¹Y */
 
-/* ---- ÆÁÄ»·½ÏòÉèÖÃÒ³ ---- */
+/* ---- å±å¹•æ–¹å‘è®¾ç½®é¡µ ---- */
 #define OR_X  120
 #define OR_Y  120
-#define OR_SZ 60                            /* ¼ıÍ·¸ü´ó */
-static uint8_t s_or_prev = 0;               /* ÉÏ´Î°´ÏÂ×´Ì¬ */
-static uint16_t s_or_start_x = 0;           /* °´ÏÂÆğµãX */
-static uint16_t s_or_start_y = 0;           /* °´ÏÂÆğµãY */
+#define OR_SZ 60                            /* ç®­å¤´æ›´å¤§ */
+static uint8_t s_or_prev = 0;               /* ä¸Šæ¬¡æŒ‰ä¸‹çŠ¶æ€ */
+static uint16_t s_or_start_x = 0;           /* æŒ‰ä¸‹èµ·ç‚¹X */
+static uint16_t s_or_start_y = 0;           /* æŒ‰ä¸‹èµ·ç‚¹Y */
 
-/* ---- È«¾ÖÉèÖÃ±äÁ¿ ---- */
-uint8_t g_brightness = 100;                 /* ÁÁ¶È 1~100 */
-uint8_t g_sleep_time_index = 2;             /* Ï¢ÆÁÊ±¼äË÷Òı(0=2s ... 5=60s) */
-uint8_t g_orientation_index = 0;            /* ÆÁÄ»·½ÏòË÷Òı 0~3 */
-const uint16_t g_sleep_times[6] = {2, 5, 10, 20, 30, 60};   /* ¿ÉÑ¡Ï¢ÆÁÃëÊı */
-static const uint8_t madctl_rotations[4] = {0x08, 0x68, 0xC8, 0xA8};  /* MADCTL ·½Ïò */
-static SettingsMode s_mode = SETTINGS_NONE;  /* µ±Ç°ÉèÖÃÒ³ */
+/* ---- å…¨å±€è®¾ç½®å˜é‡ ---- */
+uint8_t g_brightness = 100;                 /* äº®åº¦ 1~100 */
+uint8_t g_sleep_time_index = 2;             /* æ¯å±æ—¶é—´ç´¢å¼•(0=2s ... 5=60s) */
+uint8_t g_orientation_index = 0;            /* å±å¹•æ–¹å‘ç´¢å¼• 0~3 */
+const uint16_t g_sleep_times[6] = {2, 5, 10, 20, 30, 60};   /* å¯é€‰æ¯å±ç§’æ•° */
+static const uint8_t madctl_rotations[4] = {0x08, 0x68, 0xC8, 0xA8};  /* MADCTL æ–¹å‘ */
+static SettingsMode s_mode = SETTINGS_NONE;  /* å½“å‰è®¾ç½®é¡µ */
 
-/* ---- ¸÷ÉèÖÃÒ³º¯ÊıÇ°ÖÃÉùÃ÷ ---- */
+/* ---- å„è®¾ç½®é¡µå‡½æ•°å‰ç½®å£°æ˜ ---- */
 static void Brightness_Draw(void);
 static void Brightness_DrawSlider(void);
 static void SleepTime_Draw(void);
@@ -76,8 +76,8 @@ static void Sleep_DrawBody(void);
 static void Orientation_DrawBody(void);
 
 /**
-* @brief  Í³Ò»±£´æËùÓĞÉèÖÃµ½ BKP ºó±¸¼Ä´æÆ÷(Ä§Êı/Ï¢ÆÁÊ±¼ä/ÁÁ¶È/·½Ïò)¡£
-* @note   È·±£ DR6/DR7/DR8/DR10 Í¬Ê±ÓĞĞ§, ±ÜÃâÖ»´æÒ»ÏîÊ±ÁíÒ»ÏîÎª 0 µ¼ÖÂ»½ĞÑºó²»ÁÁ¡£
+* @brief  ç»Ÿä¸€ä¿å­˜æ‰€æœ‰è®¾ç½®åˆ° BKP åå¤‡å¯„å­˜å™¨(é­”æ•°/æ¯å±æ—¶é—´/äº®åº¦/æ–¹å‘)ã€‚
+* @note   ç¡®ä¿ DR6/DR7/DR8/DR10 åŒæ—¶æœ‰æ•ˆ, é¿å…åªå­˜ä¸€é¡¹æ—¶å¦ä¸€é¡¹ä¸º 0 å¯¼è‡´å”¤é†’åä¸äº®ã€‚
 */
 static void Settings_SaveAll(void)
 {
@@ -88,8 +88,8 @@ static void Settings_SaveAll(void)
 }
 
 /**
-* @brief  ÖØ»æµ±Ç°ÉèÖÃÒ³(ÕûÒ³: ÇåºÚ+·µ»Ø¼ü+ÄÚÈİ)¡£
-* @note   Ö»ÖØ»æ¡¢²»´¦Àí´¥Ãş, ¹©ÉèÖÃÒ³Ë¢ĞÂ/½øÈëÊ±µ÷ÓÃ¡£
+* @brief  é‡ç»˜å½“å‰è®¾ç½®é¡µ(æ•´é¡µ: æ¸…é»‘+è¿”å›é”®+å†…å®¹)ã€‚
+* @note   åªé‡ç»˜ã€ä¸å¤„ç†è§¦æ‘¸, ä¾›è®¾ç½®é¡µåˆ·æ–°/è¿›å…¥æ—¶è°ƒç”¨ã€‚
 */
 void Settings_Redraw(void)
 {
@@ -102,12 +102,12 @@ void Settings_Redraw(void)
 }
 
 /**
-* @brief  µÍµçÃğ¶Î»Ö¸´: Ö»ÖØ»æµç³ØÍ¼±ê¸²¸ÇÇøÄÚµÄµ±Ç°ÉèÖÃÒ³ÄÚÈİ¡£
-* @note   ÏÈÇåºìÉ«µÍµçÍ¼±ê(ºì¡úºÚ), ÔÙ°´ s_mode ¾Ö²¿ÖØ»æ, ²»ÕûÆÁÇåºÚ, ±ÜÃâÏûÊ§ºóÕûÆÁÉÁÒ»ÏÂ¡£
+* @brief  ä½ç”µç­æ®µæ¢å¤: åªé‡ç»˜ç”µæ± å›¾æ ‡è¦†ç›–åŒºå†…çš„å½“å‰è®¾ç½®é¡µå†…å®¹ã€‚
+* @note   å…ˆæ¸…çº¢è‰²ä½ç”µå›¾æ ‡(çº¢â†’é»‘), å†æŒ‰ s_mode å±€éƒ¨é‡ç»˜, ä¸æ•´å±æ¸…é»‘, é¿å…æ¶ˆå¤±åæ•´å±é—ªä¸€ä¸‹ã€‚
 */
 void Settings_RedrawRegion(void)
 {
-    LCD_ClearLowBatteryOverlay();   /* ÇåºìÉ«Í¼±ê(ºì¡úºÚ) */
+    LCD_ClearLowBatteryOverlay();   /* æ¸…çº¢è‰²å›¾æ ‡(çº¢â†’é»‘) */
     switch (s_mode) {
     case SETTINGS_BRIGHTNESS:  Brightness_DrawSlider();  break;
     case SETTINGS_SLEEP_TIME:  Sleep_DrawBody();         break;
@@ -118,12 +118,12 @@ void Settings_RedrawRegion(void)
 
 
 /**
-* @brief  ÓÃ 2048 ×Ö¿â°ÑÊıÖµ¾ÓÖĞ»æÖÆÔÚ (cx, cy), Ö§³Ö 0~999¡£
-* @param  cx    Êı×ÖÖĞĞÄ X
-* @param  cy    Êı×ÖÖĞĞÄ Y
-* @param  num   ÒªÏÔÊ¾µÄÊıÖµ(0~999)
-* @param  color Êı×ÖÑÕÉ«(RGB565)
-* @note   ÄÚ²¿ LCD_CS_CLR/SET, µ÷ÓÃÇ°Îğ¼ÙÉè CS ×´Ì¬¡£
+* @brief  ç”¨ 2048 å­—åº“æŠŠæ•°å€¼å±…ä¸­ç»˜åˆ¶åœ¨ (cx, cy), æ”¯æŒ 0~999ã€‚
+* @param  cx    æ•°å­—ä¸­å¿ƒ X
+* @param  cy    æ•°å­—ä¸­å¿ƒ Y
+* @param  num   è¦æ˜¾ç¤ºçš„æ•°å€¼(0~999)
+* @param  color æ•°å­—é¢œè‰²(RGB565)
+* @note   å†…éƒ¨ LCD_CS_CLR/SET, è°ƒç”¨å‰å‹¿å‡è®¾ CS çŠ¶æ€ã€‚
 */
 static void DrawDigitsCenter(uint16_t cx, uint16_t cy,
                               uint16_t num, uint16_t color)
@@ -156,10 +156,10 @@ static void DrawDigitsCenter(uint16_t cx, uint16_t cy,
 }
 
 /**
-* @brief  Çå³ıÊı×ÖÏÔÊ¾ÇøÓò(ÒÔ cx ÎªÖĞĞÄ, ¿í¡À50, ¸ß=Êı×Ö¸ß+4)ÎªºÚ¡£
-* @param  cx Êı×ÖÖĞĞÄ X
-* @param  cy Êı×ÖÖĞĞÄ Y
-* @note   Ö»ÇåÊı×Ö¸½½ü, ²»Ó°ÏìÕû¿ò/ÎÄ×Ö¡£
+* @brief  æ¸…é™¤æ•°å­—æ˜¾ç¤ºåŒºåŸŸ(ä»¥ cx ä¸ºä¸­å¿ƒ, å®½Â±50, é«˜=æ•°å­—é«˜+4)ä¸ºé»‘ã€‚
+* @param  cx æ•°å­—ä¸­å¿ƒ X
+* @param  cy æ•°å­—ä¸­å¿ƒ Y
+* @note   åªæ¸…æ•°å­—é™„è¿‘, ä¸å½±å“æ•´æ¡†/æ–‡å­—ã€‚
 */
 static void ClearDigitArea(uint16_t cx, uint16_t cy)
 {
@@ -175,8 +175,8 @@ static void ClearDigitArea(uint16_t cx, uint16_t cy)
 }
 
 /**
-* @brief  »æÖÆ·µ»Ø°´Å¥: °×µ×ºÚÉ«·½¿ò(3px ÄÚËõ)¡£
-* @note   °´Å¥ºêÎª BACK_X/BACK_Y/BACK_W/BACK_H¡£
+* @brief  ç»˜åˆ¶è¿”å›æŒ‰é’®: ç™½åº•é»‘è‰²æ–¹æ¡†(3px å†…ç¼©)ã€‚
+* @note   æŒ‰é’®å®ä¸º BACK_X/BACK_Y/BACK_W/BACK_Hã€‚
 */
 static void DrawBack(void)
 {
@@ -185,8 +185,8 @@ static void DrawBack(void)
 }
 
 /**
-* @brief  Ó¦ÓÃÆÁÄ»·½Ïò(Ğ´ MADCTL 0x36 ¼Ä´æÆ÷)¡£
-* @param  index ·½ÏòË÷Òı 0~3(Ô½½çÇ¯Î»Îª 0)
+* @brief  åº”ç”¨å±å¹•æ–¹å‘(å†™ MADCTL 0x36 å¯„å­˜å™¨)ã€‚
+* @param  index æ–¹å‘ç´¢å¼• 0~3(è¶Šç•Œé’³ä½ä¸º 0)
 */
 void Settings_ApplyOrientation(uint8_t index)
 {
@@ -198,9 +198,9 @@ void Settings_ApplyOrientation(uint8_t index)
 }
 
 /**
-* @brief  ½øÈëÖ¸¶¨ÉèÖÃÒ³²¢Á¢¼´ÖØ»æ¡£
-* @param  mode ÉèÖÃÒ³Ã¶¾Ù(SETTINGS_BRIGHTNESS/SLEEP_TIME/ORIENTATION)
-* @note   ÖØÖÃ¸÷Ò³´¥Ãş×´Ì¬, ²¢°ÑÁÁ¶È»¬¿é s_br_pos ³õÊ¼µ½µ±Ç°ÁÁ¶ÈÎ»ÖÃ¡£
+* @brief  è¿›å…¥æŒ‡å®šè®¾ç½®é¡µå¹¶ç«‹å³é‡ç»˜ã€‚
+* @param  mode è®¾ç½®é¡µæšä¸¾(SETTINGS_BRIGHTNESS/SLEEP_TIME/ORIENTATION)
+* @note   é‡ç½®å„é¡µè§¦æ‘¸çŠ¶æ€, å¹¶æŠŠäº®åº¦æ»‘å— s_br_pos åˆå§‹åˆ°å½“å‰äº®åº¦ä½ç½®ã€‚
 */
 void Settings_Enter(SettingsMode mode)
 {
@@ -222,26 +222,26 @@ void Settings_Enter(SettingsMode mode)
 }
 
 /**
-* @brief  »æÖÆÁÁ¶ÈÒ³ÄÚÈİ(¹ìµÀ/¼¤»îÌî³ä/»¬¿é/ÉÏ·½Êı×Ö), ÓÃÓÚ¾Ö²¿Ë¢ĞÂ¡£
-* @note   ²»¶¯Õû¿ò/·µ»Ø¼ü, ±ÜÃâÕûÒ³ÖØ»­ÉÁË¸; ¹©ÍÏ×§»ò²ÎÊı±ä»¯Ê±µ÷ÓÃ¡£
+* @brief  ç»˜åˆ¶äº®åº¦é¡µå†…å®¹(è½¨é“/æ¿€æ´»å¡«å……/æ»‘å—/ä¸Šæ–¹æ•°å­—), ç”¨äºå±€éƒ¨åˆ·æ–°ã€‚
+* @note   ä¸åŠ¨æ•´æ¡†/è¿”å›é”®, é¿å…æ•´é¡µé‡ç”»é—ªçƒ; ä¾›æ‹–æ‹½æˆ–å‚æ•°å˜åŒ–æ—¶è°ƒç”¨ã€‚
 */
 static void Brightness_DrawSlider(void)
 {
-    /* ¹ìµÀ±³¾° */
+    /* è½¨é“èƒŒæ™¯ */
     LCD_Fill(BR_X - BR_KNOB_W/2, BR_Y - 3,
              BR_X + BR_W + BR_KNOB_W/2, BR_Y + BR_H + 3, 0x4208);
-    /* ¼¤»îÌî³ä */
+    /* æ¿€æ´»å¡«å…… */
     LCD_Fill(BR_X, BR_Y, s_br_pos, BR_Y + BR_H, 0x07FF);
-    /* »¬¿é */
+    /* æ»‘å— */
     LCD_Fill(s_br_pos - BR_KNOB_W/2, BR_Y - 3,
              s_br_pos + BR_KNOB_W/2, BR_Y + BR_H + 3, 0xFFE0);
-    /* ÉÏ·½Êı×Ö */
+    /* ä¸Šæ–¹æ•°å­— */
     ClearDigitArea(BR_NUM_CX, BR_NUM_Y);
     DrawDigitsCenter(BR_NUM_CX, BR_NUM_Y, g_brightness, LCD_GBLUE);
 }
 
 /**
-* @brief  »æÖÆÁÁ¶ÈÉèÖÃÕûÒ³: ÇåºÚ + ·µ»Ø¼ü + »¬¿éÄÚÈİ¡£
+* @brief  ç»˜åˆ¶äº®åº¦è®¾ç½®æ•´é¡µ: æ¸…é»‘ + è¿”å›é”® + æ»‘å—å†…å®¹ã€‚
 */
 static void Brightness_Draw(void)
 {
@@ -251,9 +251,9 @@ static void Brightness_Draw(void)
 }
 
 /**
-* @brief  ´¦ÀíÁÁ¶ÈÒ³´¥Ãş: µã/ÍÏ»¬¿éµ÷½ÚÁÁ¶È, ËÉÊÖ±£´æ¡£
-* @return ºã·µ»Ø 1(Ò³Ãæ»îÔ¾)¡£
-* @note   Ö»ÏìÓ¦ÆğµãÔÚ»¬¿éÇøÓòµÄ´¥Ãş; ÍÏ¶¯ÖĞÈÎÒâ Y ¿É×óÓÒµ÷; ËÉÊÖÊ± Settings_SaveAll¡£
+* @brief  å¤„ç†äº®åº¦é¡µè§¦æ‘¸: ç‚¹/æ‹–æ»‘å—è°ƒèŠ‚äº®åº¦, æ¾æ‰‹ä¿å­˜ã€‚
+* @return æ’è¿”å› 1(é¡µé¢æ´»è·ƒ)ã€‚
+* @note   åªå“åº”èµ·ç‚¹åœ¨æ»‘å—åŒºåŸŸçš„è§¦æ‘¸; æ‹–åŠ¨ä¸­ä»»æ„ Y å¯å·¦å³è°ƒ; æ¾æ‰‹æ—¶ Settings_SaveAllã€‚
 */
 static uint8_t Brightness_Update(void)
 {
@@ -261,56 +261,56 @@ static uint8_t Brightness_Update(void)
     TouchState ts;
     Touch_Scan(&ts);
     if (ts.pressed) {
-        /* Ö»ÏìÓ¦ÆğµãÔÚ»¬¿éÇøÓòµÄ´¥Ãş, ´Óµ×²¿ÉÏ»®²Ëµ¥É¨¹ıµÄºöÂÔ */
+        /* åªå“åº”èµ·ç‚¹åœ¨æ»‘å—åŒºåŸŸçš„è§¦æ‘¸, ä»åº•éƒ¨ä¸Šåˆ’èœå•æ‰«è¿‡çš„å¿½ç•¥ */
         if (!s_br_drag) {
-            if (!s_br_start_y) s_br_start_y = ts.y;  /* ¼ÇÂ¼ÆğµãY */
+            if (!s_br_start_y) s_br_start_y = ts.y;  /* è®°å½•èµ·ç‚¹Y */
             if (s_br_start_y >= BR_Y - 18 && s_br_start_y <= BR_Y + BR_H + 18
                 && ts.x >= BR_X && ts.x <= BR_X + BR_W) {
                 s_br_drag = 1;
-                s_br_pos = (int16_t)ts.x;  /* Ö±½ÓÌøµ½µã»÷Î»ÖÃ */
+                s_br_pos = (int16_t)ts.x;  /* ç›´æ¥è·³åˆ°ç‚¹å‡»ä½ç½® */
                 g_brightness = (uint8_t)((uint32_t)(s_br_pos - BR_X) * 99 / BR_W + 1);
                 LCD_Backlight_PWM_SetDuty(g_brightness);
                 Brightness_DrawSlider();
             }
         }
-        /* ÍÏ×§ÖĞ: ÈÎÒâYÎ»ÖÃ, ×óÓÒ»¬¶¯¾ù¿Éµ÷½Ú */
+        /* æ‹–æ‹½ä¸­: ä»»æ„Yä½ç½®, å·¦å³æ»‘åŠ¨å‡å¯è°ƒèŠ‚ */
         if (s_br_drag) {
-            GameAutoSleep_KeepAlive();  /* ÍÏ¶¯ÖĞ³ÖĞøÖØÖÃĞİÃß¼ÆÊ±Æ÷ */
+            GameAutoSleep_KeepAlive();  /* æ‹–åŠ¨ä¸­æŒç»­é‡ç½®ä¼‘çœ è®¡æ—¶å™¨ */
             int16_t nx = (int16_t)ts.x;
             if (nx < BR_X) nx = BR_X;
             if (nx > BR_X + BR_W) nx = BR_X + BR_W;
             if (nx != s_br_pos) {
                 s_br_pos = nx;
-                g_brightness = (uint8_t)((uint32_t)(nx - BR_X) * 99 / BR_W + 1);  /* ×îµÍÁÁ¶È1% */
+                g_brightness = (uint8_t)((uint32_t)(nx - BR_X) * 99 / BR_W + 1);  /* æœ€ä½äº®åº¦1% */
                 LCD_Backlight_PWM_SetDuty(g_brightness);
                 Brightness_DrawSlider();
             }
         }
     } else {
-        s_br_start_y = 0;                           /* ËÉÊÖÊ±ÖØÖÃÆğµã */
-        if (s_br_drag) Settings_SaveAll();          /* ËÉÊÖÊ±±£´æ */
+        s_br_start_y = 0;                           /* æ¾æ‰‹æ—¶é‡ç½®èµ·ç‚¹ */
+        if (s_br_drag) Settings_SaveAll();          /* æ¾æ‰‹æ—¶ä¿å­˜ */
         s_br_drag = 0;
     }
     return 1;
 }
 
 /**
-* @brief  »æÖÆÏ¢ÆÁÊ±¼äÒ³ÄÚÈİ("-" °´Å¥/Êı×Ö/"S" Í¼±ê), ÓÃÓÚ¾Ö²¿Ë¢ĞÂ¡£
-* @note   ²»º¬Õû¿òÇåºÚ/·µ»Ø¼ü, ¹©µÍµçÃğ¶Î»Ö¸´»òÔöÁ¿Ë¢ĞÂµ÷ÓÃ¡£
+* @brief  ç»˜åˆ¶æ¯å±æ—¶é—´é¡µå†…å®¹("-" æŒ‰é’®/æ•°å­—/"S" å›¾æ ‡), ç”¨äºå±€éƒ¨åˆ·æ–°ã€‚
+* @note   ä¸å«æ•´æ¡†æ¸…é»‘/è¿”å›é”®, ä¾›ä½ç”µç­æ®µæ¢å¤æˆ–å¢é‡åˆ·æ–°è°ƒç”¨ã€‚
 */
 static void Sleep_DrawBody(void)
 {
-    /* "-" °´Å¥ */
+    /* "-" æŒ‰é’® */
     LCD_Fill(ST_LX, ST_Y, ST_LX + ST_W, ST_Y + ST_H, 0x07FF);
     LCD_Fill(ST_LX + 12, ST_Y + ST_H/2 - 2, ST_LX + ST_W - 12, ST_Y + ST_H/2 + 2, 0x0000);
-    /* "+" °´Å¥ */
+    /* "+" æŒ‰é’® */
     LCD_Fill(ST_RX, ST_Y, ST_RX + ST_W, ST_Y + ST_H, 0x07FF);
     LCD_Fill(ST_RX + 12, ST_Y + ST_H/2 - 2, ST_RX + ST_W - 12, ST_Y + ST_H/2 + 2, 0x0000);
     LCD_Fill(ST_RX + ST_W/2 - 2, ST_Y + 11, ST_RX + ST_W/2 + 2, ST_Y + ST_H - 11, 0x0000);
-    /* Êı×Ö(×óÒÆ¸øSÁô¿Õ) */
+    /* æ•°å­—(å·¦ç§»ç»™Sç•™ç©º) */
     DrawDigitsCenter(ST_NUM_CX - DIGIT_W/2, ST_NUM_Y,
                      g_sleep_times[g_sleep_time_index], LCD_GBLUE);
-    /* S ÊÖ»­ (Ëõµ½20x14, Æ¥ÅäÊı×Ö) */
+    /* S æ‰‹ç”» (ç¼©åˆ°20x14, åŒ¹é…æ•°å­—) */
     {
         static const uint16_t s_src[30] = {
             0x0000,0x0000,0x0000,0x07E0,0x1FFC,0x3F7C,0x780E,0x700E,
@@ -320,12 +320,12 @@ static void Sleep_DrawBody(void)
         };
         uint16_t ds[22]; uint8_t dr;
         for (dr = 0; dr < 20; dr++) {
-            uint8_t sr = 3 + dr * 23 / 19;             /* 24ĞĞÔ´¡ú20ĞĞÊä³ö */
-            ds[dr] = s_src[sr] >> 1;                    /* ²ÃµôµÚ1ÁĞ */
+            uint8_t sr = 3 + dr * 23 / 19;             /* 24è¡Œæºâ†’20è¡Œè¾“å‡º */
+            ds[dr] = s_src[sr] >> 1;                    /* è£æ‰ç¬¬1åˆ— */
         }
         ds[20] = 0; ds[21] = 0;
         uint16_t xs = ST_NUM_CX + DIGIT_W/2 + 1;
-        uint16_t ys = ST_NUM_Y - 10;                    /* 20¸ß, ¾ÓÖĞ */
+        uint16_t ys = ST_NUM_Y - 10;                    /* 20é«˜, å±…ä¸­ */
         for (dr = 0; dr < 20; dr++) {
             uint16_t b = ds[dr]; uint8_t c = 0, st;
             while (c < 14) {
@@ -340,7 +340,7 @@ static void Sleep_DrawBody(void)
 }
 
 /**
-* @brief  »æÖÆÏ¢ÆÁÊ±¼äÉèÖÃÕûÒ³: ÇåºÚ + ·µ»Ø¼ü + ÄÚÈİ¡£
+* @brief  ç»˜åˆ¶æ¯å±æ—¶é—´è®¾ç½®æ•´é¡µ: æ¸…é»‘ + è¿”å›é”® + å†…å®¹ã€‚
 */
 static void SleepTime_Draw(void)
 {
@@ -350,9 +350,9 @@ static void SleepTime_Draw(void)
 }
 
 /**
-* @brief  ´¦ÀíÏ¢ÆÁÊ±¼äÒ³´¥Ãş: µã "-"/"+" Ôö¼õ, ËÉÊÖ±£´æ¡£
-* @return ºã·µ»Ø 1(Ò³Ãæ»îÔ¾)¡£
-* @note   ½ö Y<200 µÄµã»÷ÏìÓ¦, ÆÁ±ÎÏÂ·½ 200~240 ·À»®²Ëµ¥Îó´¥¡£
+* @brief  å¤„ç†æ¯å±æ—¶é—´é¡µè§¦æ‘¸: ç‚¹ "-"/"+" å¢å‡, æ¾æ‰‹ä¿å­˜ã€‚
+* @return æ’è¿”å› 1(é¡µé¢æ´»è·ƒ)ã€‚
+* @note   ä»… Y<200 çš„ç‚¹å‡»å“åº”, å±è”½ä¸‹æ–¹ 200~240 é˜²åˆ’èœå•è¯¯è§¦ã€‚
 */
 static uint8_t SleepTime_Update(void)
 {
@@ -370,7 +370,7 @@ static uint8_t SleepTime_Update(void)
         int16_t dy = (int16_t)ts.y - (int16_t)s_st_start_y;
         if (dx < 0) dx = -dx;
         if (dy < 0) dy = -dy;
-        /* ½öY<200µÄÇøÓòÏìÓ¦µã»÷, ÆÁ±ÎÏÂ·½200~240(·ÀÖ¹»®²Ëµ¥Ê±Îó´¥) */
+        /* ä»…Y<200çš„åŒºåŸŸå“åº”ç‚¹å‡», å±è”½ä¸‹æ–¹200~240(é˜²æ­¢åˆ’èœå•æ—¶è¯¯è§¦) */
         if (dx <= TAP_THRESHOLD && dy <= TAP_THRESHOLD
             && s_st_start_y < 200) {
             if (s_st_start_x < 120) {
@@ -392,15 +392,15 @@ static uint8_t SleepTime_Update(void)
 }
 
 /**
-* @brief  »æÖÆÆÁÄ»·½ÏòÒ³ÄÚÈİ(ÉÏ¼ıÍ·+ÓÒ±ê¼Ç), ÓÃÓÚ¾Ö²¿Ë¢ĞÂ¡£
-* @note   ÆÁÄ»·½ÏòÓÉ MADCTL ¼Ä´æÆ÷Ğı×ª, ´Ë´¦½ö»­Ê¾Òâ¼ıÍ·¡£
+* @brief  ç»˜åˆ¶å±å¹•æ–¹å‘é¡µå†…å®¹(ä¸Šç®­å¤´+å³æ ‡è®°), ç”¨äºå±€éƒ¨åˆ·æ–°ã€‚
+* @note   å±å¹•æ–¹å‘ç”± MADCTL å¯„å­˜å™¨æ—‹è½¬, æ­¤å¤„ä»…ç”»ç¤ºæ„ç®­å¤´ã€‚
 */
 static void Orientation_DrawBody(void)
 {
     int16_t cx = OR_X, cy = OR_Y, s = OR_SZ;
-    /* ÉÏ¼ıÍ·+ÓÒ±ê¼Ç(ÆÁÄ»·½ÏòÓÉMADCTL¼Ä´æÆ÷Ğı×ª) */
-    LCD_Fill(cx - 4,  cy,         cx + 4,  cy + s,    0xFFE0);   /* ¸Ë */
-    LCD_Fill(cx + 20, cy - 34,    cx + 26, cy - 28,   0xFFE0);   /* ÓÒ±ê¼Ç */
+    /* ä¸Šç®­å¤´+å³æ ‡è®°(å±å¹•æ–¹å‘ç”±MADCTLå¯„å­˜å™¨æ—‹è½¬) */
+    LCD_Fill(cx - 4,  cy,         cx + 4,  cy + s,    0xFFE0);   /* æ† */
+    LCD_Fill(cx + 20, cy - 34,    cx + 26, cy - 28,   0xFFE0);   /* å³æ ‡è®° */
     for (uint8_t i = 0; i < 5; i++) {
         LCD_Fill(cx - 4 - i * 6, cy - 40 + i * 8, cx - i * 6,     cy - 32 + i * 8, 0xFFE0);
         LCD_Fill(cx + i * 6,     cy - 40 + i * 8, cx + 4 + i * 6, cy - 32 + i * 8, 0xFFE0);
@@ -408,7 +408,7 @@ static void Orientation_DrawBody(void)
 }
 
 /**
-* @brief  »æÖÆÆÁÄ»·½ÏòÉèÖÃÕûÒ³: ÇåºÚ + ·µ»Ø¼ü + ÄÚÈİ¡£
+* @brief  ç»˜åˆ¶å±å¹•æ–¹å‘è®¾ç½®æ•´é¡µ: æ¸…é»‘ + è¿”å›é”® + å†…å®¹ã€‚
 */
 static void Orientation_Draw(void)
 {
@@ -418,9 +418,9 @@ static void Orientation_Draw(void)
 }
 
 /**
-* @brief  ´¦ÀíÆÁÄ»·½ÏòÒ³´¥Ãş: µã»÷¼´Ñ­»·ÇĞ»»·½Ïò(0~3)²¢±£´æ¡£
-* @return ºã·µ»Ø 1(Ò³Ãæ»îÔ¾)¡£
-* @note   µ¥»÷ÇĞ»»·½Ïò²¢Ğ´ MADCTL Ğı×ª, ËÉÊÖÊ±±£´æ¡£
+* @brief  å¤„ç†å±å¹•æ–¹å‘é¡µè§¦æ‘¸: ç‚¹å‡»å³å¾ªç¯åˆ‡æ¢æ–¹å‘(0~3)å¹¶ä¿å­˜ã€‚
+* @return æ’è¿”å› 1(é¡µé¢æ´»è·ƒ)ã€‚
+* @note   å•å‡»åˆ‡æ¢æ–¹å‘å¹¶å†™ MADCTL æ—‹è½¬, æ¾æ‰‹æ—¶ä¿å­˜ã€‚
 */
 static uint8_t Orientation_Update(void)
 {
@@ -449,8 +449,8 @@ static uint8_t Orientation_Update(void)
 }
 
 /**
-* @brief  ÍË³öÉèÖÃ: ¸´Î» s_mode Óë¸÷Ò³´¥Ãş×´Ì¬¡£
-* @note   ²»ÖØ»æ»­Ãæ, ÓÉµ÷ÓÃ·½(main.c)»Ö¸´³¡¾°¡£
+* @brief  é€€å‡ºè®¾ç½®: å¤ä½ s_mode ä¸å„é¡µè§¦æ‘¸çŠ¶æ€ã€‚
+* @note   ä¸é‡ç»˜ç”»é¢, ç”±è°ƒç”¨æ–¹(main.c)æ¢å¤åœºæ™¯ã€‚
 */
 void Settings_Exit(void)
 {
@@ -465,8 +465,8 @@ void Settings_Exit(void)
 }
 
 /**
-* @brief  Í³Ò»ÉèÖÃÈë¿Ú: °´ s_mode ·ÖÅÉµ½¶ÔÓ¦Ò³ Update¡£
-* @return 1=ÉèÖÃÒ³»îÔ¾; 0=²»ÔÚÉèÖÃ×´Ì¬(s_mode==NONE)¡£
+* @brief  ç»Ÿä¸€è®¾ç½®å…¥å£: æŒ‰ s_mode åˆ†æ´¾åˆ°å¯¹åº”é¡µ Updateã€‚
+* @return 1=è®¾ç½®é¡µæ´»è·ƒ; 0=ä¸åœ¨è®¾ç½®çŠ¶æ€(s_mode==NONE)ã€‚
 */
 uint8_t Settings_Update(void)
 {

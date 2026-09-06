@@ -3,7 +3,7 @@
 
 #include "ch32v20x.h"
 
-/* ÓÎÏ··µ»ØÖµ (ÓÃÓÚ²Ëµ¥ÇĞ»») */
+/* æ¸¸æˆè¿”å›å€¼ (ç”¨äºèœå•åˆ‡æ¢) */
 #define GAME_RET_NONE     0
 #define GAME_RET_INTERACT 1
 #define GAME_RET_VIDEO    2
@@ -13,7 +13,7 @@
 #define GAME_RET_KLOTSKI  6
 
 /**
- * @brief  ¶íÂŞË¹·½¿éÓÎÏ·×´Ì¬Ã¶¾Ù
+ * @brief  ä¿„ç½—æ–¯æ–¹å—æ¸¸æˆçŠ¶æ€æšä¸¾
  */
 typedef enum {
     TETRIS_STATE_PLAYING = 0,
@@ -29,7 +29,7 @@ void    tetris_reset_touch(void);
 void    tetris_full_redraw(void);
 uint8_t tetris_is_menu_visible(void);
 void    tetris_lowbatt_restore(void);
-/* ²Ëµ¥×´Ì¬»ú hook (¹©¶ş¼¶ÉèÖÃ²Ëµ¥·µ»Ø¸´ÓÃ, ÓëÒ»¼¶²Ëµ¥Ò»ÖÂ) */
+/* èœå•çŠ¶æ€æœº hook (ä¾›äºŒçº§è®¾ç½®èœå•è¿”å›å¤ç”¨, ä¸ä¸€çº§èœå•ä¸€è‡´) */
 void tetris_menu_mark_dirty(void);
 uint8_t tetris_menu_bg_redraw(void);
 uint8_t tetris_save_state(uint8_t *buf, uint8_t max_len);

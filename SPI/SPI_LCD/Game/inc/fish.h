@@ -3,26 +3,26 @@
 
 #include "ch32v20x.h"
 
-/* ÓÎÏ··µ»ØÂë¸´ÓÃ tetris.h ÖĞ GAME_RET_* */
+/* æ¸¸æˆè¿”å›ç å¤ç”¨ tetris.h ä¸­ GAME_RET_* */
 
 /**
- * @brief  ´óÓã³ÔĞ¡ÓãÓÎÏ·×´Ì¬
+ * @brief  å¤§é±¼åƒå°é±¼æ¸¸æˆçŠ¶æ€
  */
 typedef enum {
-    FISH_STATE_PLAYING = 0,   /* ÓÎÏ·½øĞĞÖĞ */
-    FISH_STATE_OVER,          /* ÓÎÏ·½áÊø */
-    FISH_STATE_EXIT_MENU,     /* ÍË³ö²Ëµ¥ÖĞ */
-    FISH_STATE_RESTART_MENU,  /* ÖØĞÂ¿ªÊ¼²Ëµ¥ */
+    FISH_STATE_PLAYING = 0,   /* æ¸¸æˆè¿›è¡Œä¸­ */
+    FISH_STATE_OVER,          /* æ¸¸æˆç»“æŸ */
+    FISH_STATE_EXIT_MENU,     /* é€€å‡ºèœå•ä¸­ */
+    FISH_STATE_RESTART_MENU,  /* é‡æ–°å¼€å§‹èœå• */
 } FishState;
 
 /**
- * @brief ³õÊ¼»¯ / ¸üĞÂ / ÖØÆô / ´¥Ãş¸´Î»
+ * @brief åˆå§‹åŒ– / æ›´æ–° / é‡å¯ / è§¦æ‘¸å¤ä½
  */
 void    fish_init(void);
-uint8_t fish_update(void);    /* ·µ»Ø: GAME_RET_* */
+uint8_t fish_update(void);    /* è¿”å›: GAME_RET_* */
 void    fish_reset_touch(void);
 void    fish_full_redraw(void);
-void    fish_clear_lowbattery(void);    /* ¾Ö²¿Çå³ıµÍµçÍ¼±ê¸²¸ÇÇø(²»ÕûÆÁÖØ»æ) */
+void    fish_clear_lowbattery(void);    /* å±€éƒ¨æ¸…é™¤ä½ç”µå›¾æ ‡è¦†ç›–åŒº(ä¸æ•´å±é‡ç»˜) */
 uint8_t fish_is_menu_visible(void);
 uint8_t fish_save_state(uint8_t *buf, uint8_t max_len);
 uint8_t fish_restore_state(const uint8_t *buf, uint8_t len);

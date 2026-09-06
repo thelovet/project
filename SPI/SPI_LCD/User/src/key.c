@@ -1,22 +1,23 @@
 #include "key.h"
 #include "timer.h"
 
-volatile uint8_t key_status = 0;        // °´¼ü×´Ì¬±êÖ¾
-volatile uint32_t key_press_start = 0;   // °´ÏÂ¿ªÊ¼Ê±¼ä
-volatile uint32_t key_cooldown = 0;      // ÉÏ´Î´¥·¢Ê±¼ä£¨ÀäÈ´ÆÚÆğµã£©
-volatile uint8_t key_holding = 0;        // °´¼üÕıÔÚ°´×¡
-volatile uint8_t long_press_triggered = 0; // ³¤°´ÒÑ´¥·¢£¨·ÀÖ¹ÖØ¸´£©
+volatile uint8_t key_status = 0;        // æŒ‰é”®çŠ¶æ€æ ‡å¿—
+volatile uint32_t key_press_start = 0;   // æŒ‰ä¸‹å¼€å§‹æ—¶é—´
+volatile uint32_t key_cooldown = 0;      // ä¸Šæ¬¡è§¦å‘æ—¶é—´ï¼ˆå†·å´æœŸèµ·ç‚¹ï¼‰
+volatile uint8_t key_holding = 0;        // æŒ‰é”®æ­£åœ¨æŒ‰ä½
+volatile uint8_t long_press_triggered = 0; // é•¿æŒ‰å·²è§¦å‘ï¼ˆé˜²æ­¢é‡å¤ï¼‰
 
 
-#define KEY_COOLDOWN_MS      50            // ÀäÈ´Ê±¼ä£¨ms£©£¬¸ÄÕâÒ»¸öÖµ¼´¿É
-#define KEY_MIN_PRESS_MS     5              // ×î¶Ì°´ÏÂÊ±¼ä£¨0.1ms£©£¬µÍÓÚ´ËÊÓÎª¶¶¶¯
-#define KEY_LONG_PRESS_MS    500            // ³¤°´Ê±¼äãĞÖµ£¨ms£©
-#define KEY_COOLDOWN_TIME   (KEY_COOLDOWN_MS * 1000)  // ×Ô¶¯¼ÆËã£¨¦Ìs£©
-#define KEY_MIN_PRESS_TIME   (KEY_MIN_PRESS_MS * 100)  // ×Ô¶¯¼ÆËã£¨¦Ìs£©
-#define KEY_LONG_PRESS_TIME  (KEY_LONG_PRESS_MS * 1000) // ×Ô¶¯¼ÆËã£¨¦Ìs£©
-/***********************************************************************
- * @brief  PA0Íâ²¿ÖĞ¶Ï³õÊ¼»¯£¬ÓÃÓÚ°´¼ü¼ì²â£¨Ö§³Ö¶Ì°´ºÍ³¤°´£©
- **********************************************************************/
+#define KEY_COOLDOWN_MS      50            // å†·å´æ—¶é—´ï¼ˆmsï¼‰ï¼Œæ”¹è¿™ä¸€ä¸ªå€¼å³å¯
+#define KEY_MIN_PRESS_MS     5              // æœ€çŸ­æŒ‰ä¸‹æ—¶é—´ï¼ˆ0.1msï¼‰ï¼Œä½äºæ­¤è§†ä¸ºæŠ–åŠ¨
+#define KEY_LONG_PRESS_MS    500            // é•¿æŒ‰æ—¶é—´é˜ˆå€¼ï¼ˆmsï¼‰
+#define KEY_COOLDOWN_TIME   (KEY_COOLDOWN_MS * 1000)  // è‡ªåŠ¨è®¡ç®—ï¼ˆÎ¼sï¼‰
+#define KEY_MIN_PRESS_TIME   (KEY_MIN_PRESS_MS * 100)  // è‡ªåŠ¨è®¡ç®—ï¼ˆÎ¼sï¼‰
+#define KEY_LONG_PRESS_TIME  (KEY_LONG_PRESS_MS * 1000) // è‡ªåŠ¨è®¡ç®—ï¼ˆÎ¼sï¼‰
+/**
+ * @brief  åˆå§‹åŒ–PA0å¤–éƒ¨ä¸­æ–­ï¼Œç”¨äºæŒ‰é”®æ£€æµ‹(æ”¯æŒçŸ­æŒ‰/é•¿æŒ‰)
+ * @return æ— 
+ */
 void KEY_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure;
@@ -43,28 +44,30 @@ void KEY_Init(void)
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
 }
-/**
- * @brief  »ñÈ¡°´¼ü×´Ì¬¡£
- * @return °´¼ü×´Ì¬
- */
 
-uint8_t Get_Key_Status(void)//»ñÈ¡°´¼ü×´Ì¬
+/**
+ * @brief  è·å–æŒ‰é”®çŠ¶æ€ã€‚
+ * @return æŒ‰é”®çŠ¶æ€
+ */
+uint8_t Get_Key_Status(void)
 {
     return key_status;
 }
-/**
- * @brief  Çå³ı°´¼ü×´Ì¬¡£
- */
 
-void Clear_Key_Status(void)//Çå³ı°´¼ü×´Ì¬
+/**
+ * @brief  æ¸…é™¤æŒ‰é”®çŠ¶æ€ã€‚
+ * @return æ— 
+ */
+void Clear_Key_Status(void)
 {
     key_status = 0;
 }
-/**
- * @brief  ÖØÖÃ°´¼ü×´Ì¬(ÖØĞÂ¿ªÊ¼/Ä£Ê½ÇĞ»»Ê±µ÷ÓÃ)¡£
- */
 
-void KEY_Reset(void)//ÖØÖÃ°´¼ü×´Ì¬
+/**
+ * @brief  é‡ç½®æŒ‰é”®çŠ¶æ€(é‡æ–°å¼€å§‹/æ¨¡å¼åˆ‡æ¢æ—¶è°ƒç”¨)ã€‚
+ * @return æ— 
+ */
+void KEY_Reset(void)
 {
     key_status = 0;
     key_press_start = 0;
@@ -73,17 +76,11 @@ void KEY_Reset(void)//ÖØÖÃ°´¼ü×´Ì¬
     long_press_triggered = 0;
 }
 
-/*********************************************************************
- * @fn      EXTI0_IRQHandler
- *
- * @brief   °´ÏÂ¼ÇÂ¼Ê±¼ä ¡ú Ö÷Ñ­»·ÂÖÑ¯³¤°´ ¡ú ÊÍ·ÅÊ±¶Ì°´ÅĞ¶¨
- *          ³¤°´£º°´×¡³¬Ê±¼´´¥·¢£¬²»µÈ´ıÊÍ·Å
- *          ¶Ì°´£ºÊÍ·ÅÊ±ÅĞ¶¨£¨ÇÒÎ´Ôø´¥·¢³¤°´£©
- **********************************************************************/
 void EXTI0_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 /**
- * @brief  °´¼üÍâ²¿ÖĞ¶Ï(EXTI0)´¦Àí¡£
- * @note   ±ê×¼ ISR, ¼ÇÂ¼°´¼ü´¥·¢²¢Çå³ıÖĞ¶Ï±êÖ¾¡£
+ * @brief  æŒ‰é”®å¤–éƒ¨ä¸­æ–­(EXTI0)å¤„ç†ã€‚
+ *         æŒ‰ä¸‹è®°å½•æ—¶é—´ â†’ ä¸»å¾ªç¯è½®è¯¢é•¿æŒ‰ â†’ é‡Šæ”¾æ—¶åˆ¤å®šçŸ­æŒ‰
+ * @note   æ ‡å‡† ISR, è®°å½•æŒ‰é”®è§¦å‘å¹¶æ¸…é™¤ä¸­æ–­æ ‡å¿—
  */
 void EXTI0_IRQHandler(void)
 {
@@ -92,7 +89,7 @@ void EXTI0_IRQHandler(void)
         uint32_t now = GetTimerCount();
         uint8_t pin = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_0);
 
-        // ÀäÈ´¼ì²é
+        // å†·å´æ£€æŸ¥
         if((now - key_cooldown) < KEY_COOLDOWN_TIME)
         {
             EXTI_ClearITPendingBit(EXTI_Line0);
@@ -101,14 +98,14 @@ void EXTI0_IRQHandler(void)
 
         if(pin == Bit_SET)
         {
-            // °´ÏÂ£º¼ÇÂ¼Ê±¼ä£¬¿ªÊ¼¼ÆÊ±
+            // æŒ‰ä¸‹ï¼šè®°å½•æ—¶é—´ï¼Œå¼€å§‹è®¡æ—¶
             key_press_start = now;
             key_holding = 1;
             long_press_triggered = 0;
         }
         else
         {
-            // ÊÍ·Å£ºÈô³¤°´Î´´¥·¢£¬ÅĞ¶¨¶Ì°´
+            // é‡Šæ”¾ï¼šè‹¥é•¿æŒ‰æœªè§¦å‘ï¼Œåˆ¤å®šçŸ­æŒ‰
             if(key_holding && !long_press_triggered)
             {
                 uint32_t press_duration = now - key_press_start;
@@ -125,11 +122,10 @@ void EXTI0_IRQHandler(void)
     }
 }
 
-/*********************************************************************
- * @fn      KEY_Poll
- *
- * @brief   Ö÷Ñ­»·ÂÖÑ¯£º°´×¡³¬Ê±´¥·¢³¤°´
- **********************************************************************/
+/**
+ * @brief  ä¸»å¾ªç¯è½®è¯¢ï¼šæŒ‰ä½è¶…æ—¶è§¦å‘é•¿æŒ‰ã€‚
+ * @return æ— 
+ */
 void KEY_Poll(void)
 {
 #if KEY_LONG_PRESS_ENABLE

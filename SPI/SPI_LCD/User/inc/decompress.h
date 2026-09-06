@@ -8,22 +8,22 @@ u16 flash_decompress_and_show(u8 *location4, u16 *location3, u16 *location2, u16
 void Set_display_range();
 void Set_display_range_DMA();
 
-extern uint8_t first_frame;//ÊÇ·ñÊÇµÚÒ»Ö¡
-extern uint8_t end_flag;//ÊÇ·ñ½áÊø
-extern uint8_t lcd_blink_flag;//lCDÉÁË¸±êÖ¾Î»
-extern uint8_t key_response;//´¥Ãş²Ëµ¥ÊäÈëÏìÓ¦±êÖ¾
-extern uint8_t blink_touched; //ÉÁË¸ÆÚ¼ä´¥Ãş±êÖ¾£¬main.cÓÃºóÇåÁã
+extern uint8_t first_frame;//æ˜¯å¦æ˜¯ç¬¬ä¸€å¸§
+extern uint8_t end_flag;//æ˜¯å¦ç»“æŸ
+extern uint8_t lcd_blink_flag;//lCDé—ªçƒæ ‡å¿—ä½
+extern uint8_t key_response;//è§¦æ‘¸èœå•è¾“å…¥å“åº”æ ‡å¿—
+extern uint8_t blink_touched; //é—ªçƒæœŸé—´è§¦æ‘¸æ ‡å¿—ï¼Œmain.cç”¨åæ¸…é›¶
 
-//µ±Ç°ÊÓÆµĞòºÅ
+//å½“å‰è§†é¢‘åºå·
 extern uint8_t current_video_index;
-//×î´óÊÓÆµÊıÁ¿
+//æœ€å¤§è§†é¢‘æ•°é‡
 extern uint8_t max_video_count;
-// ÊÓÆµ¶ÎÊıÁ¿(Êı×éµÚÒ»Î¬, Óëdecompress.c¶¨ÒåÒ»ÖÂ, ĞŞ¸ÄÊ±Ö»Ğè¸Ä´Ëºê)
+// è§†é¢‘æ®µæ•°é‡(æ•°ç»„ç¬¬ä¸€ç»´, ä¸decompress.cå®šä¹‰ä¸€è‡´, ä¿®æ”¹æ—¶åªéœ€æ”¹æ­¤å®)
 #define VIDEO_SEGMENT_COUNT  1
-// ÊÓÆµ¶ÎµØÖ··¶Î§±í£ºÃ¿¶Î{ÆğÊ¼µØÖ·4×Ö½Ú, ½áÊøµØÖ·4×Ö½Ú}
+// è§†é¢‘æ®µåœ°å€èŒƒå›´è¡¨ï¼šæ¯æ®µ{èµ·å§‹åœ°å€4å­—èŠ‚, ç»“æŸåœ°å€4å­—èŠ‚}
 extern const uint8_t video_ranges[VIDEO_SEGMENT_COUNT][8];
 
-/* ¼ÓÔØµ±Ç°ÊÓÆµµØÖ·µ½ next_bank/higvh/high/low */
+/* åŠ è½½å½“å‰è§†é¢‘åœ°å€åˆ° next_bank/higvh/high/low */
 void LoadVideoAddress(void);
 
 #endif

@@ -1,15 +1,3 @@
-/*********************************************************************
- * File Name          : lcd.h
- * Author             : WCH
- * Version            : V1.0.0
- * Date               : 2023/8/15
- * Description        : file for lcd screen.
- *********************************************************************************
-* Copyright (c) 2023 Nanjing Qinheng Microelectronics Co., Ltd.
-* Attention: This software (modified or not) and binary are used for 
-* microcontroller manufactured by Nanjing Qinheng Microelectronics.
-*******************************************************************************/
-
 #ifndef __LCD_H
 #define __LCD_H
 #include "spi.h"

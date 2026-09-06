@@ -35,11 +35,13 @@ function Show-MemUsage {
     # 芯片容量: Flash=65280B(0xFF00, 末尾留存档区), RAM=20480B(20K)
     $flashPct = [math]::Round($flash / 65280.0 * 100, 2)
     $ramPct   = [math]::Round($ram / 20480.0 * 100, 2)
-    Write-Host ("  Flash 已用: {0} B ({1}% / 65280 B)" -f $flash, $flashPct) -ForegroundColor Yellow
-    Write-Host ("  RAM 已用:   {0} B ({1}% / 20480 B)" -f $ram, $ramPct) -ForegroundColor Yellow
+    Write-Host ("  Flash 已用: {0} B ({1}% / 65280 B)  剩余: {2} B" -f $flash, $flashPct, (65280 - $flash)) -ForegroundColor Yellow
+    Write-Host ("  RAM 已用:   {0} B ({1}% / 20480 B)  剩余: {2} B" -f $ram, $ramPct, (20480 - $ram)) -ForegroundColor Yellow
 }
 
 function Do-Build {
+    # 每次编译前清理过期目标文件(.o/.d/.map/.lst)，避免源码编码变更后调试信息失配
+    Get-ChildItem -Path $obj -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in ".o",".d",".map",".lst" } | Remove-Item -Force
     Write-Host "==> make all" -ForegroundColor Cyan
     make all
     if ($LASTEXITCODE -ne 0) { Write-Host "编译失败" -ForegroundColor Red; exit 1 }

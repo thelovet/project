@@ -1,97 +1,67 @@
-/*********************************************************************
- * File Name          : flash.c
- * Author             : WCH
- * Version            : V1.0.0
- * Date               : 2023/8/15
- * Description        : file for spi flash.
- *********************************************************************************
-* Copyright (c) 2023 Nanjing Qinheng Microelectronics Co., Ltd.
-* Attention: This software (modified or not) and binary are used for 
-* microcontroller manufactured by Nanjing Qinheng Microelectronics.
-*******************************************************************************/
 #include "flash.h"
 #include "spi.h"
 
-/*********************************************************************
- * @fn      FLASH_Write
- *
- * @brief   Í¨¹ıSPI1Ö»Ğ´ÈëÊı¾İ£¨²»½ÓÊÕ£©
- *
- * @param   TxData - ÒªĞ´ÈëµÄÊı¾İ
- *
- * @return  ÎŞ
+/**
+ * @brief  é€šè¿‡SPI1åªå†™å…¥æ•°æ®ï¼ˆä¸æ¥æ”¶ï¼‰
+ * @param  TxData  è¦å†™å…¥çš„æ•°æ®
+ * @return æ— 
  */
 void FLASH_Write(u8 TxData)
 {
-    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET)//µÈ´ı·¢ËÍ»º³åÇøÎª¿Õ
+    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET)//ç­‰å¾…å‘é€ç¼“å†²åŒºä¸ºç©º
         ;
-    SPI_I2S_SendData(SPI1, TxData);// ·¢ËÍÊı¾İ
-    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET)//µÈ´ı·¢ËÍÍê³É
+    SPI_I2S_SendData(SPI1, TxData);// å‘é€æ•°æ®
+    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET)//ç­‰å¾…å‘é€å®Œæˆ
         ;
-    // Èç¹û·¢ËÍ¹ı³ÌÖĞ²úÉúÁË½ÓÊÕÊı¾İ£¨Í¨³£¶¼ÓĞ£©£¬¶Á×ß¶ªÆú
+    // å¦‚æœå‘é€è¿‡ç¨‹ä¸­äº§ç”Ÿäº†æ¥æ”¶æ•°æ®ï¼ˆé€šå¸¸éƒ½æœ‰ï¼‰ï¼Œè¯»èµ°ä¸¢å¼ƒ
     if (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) != RESET) {
         SPI_I2S_ReceiveData(SPI1);
     }
 }
 
-/*********************************************************************
- * @fn      FLASH_Read
- *
- * @brief   Í¨¹ıSPI1Ö»¶ÁÈ¡Êı¾İ£¨·¢ËÍdummy£©
- *
- * @param   ÎŞ
- *
- * @return  ´ÓSPI1½ÓÊÕµÄÊı¾İ
+/**
+ * @brief  é€šè¿‡SPI1åªè¯»å–æ•°æ®ï¼ˆå‘é€dummyï¼‰
+ * @param  æ— 
+ * @return ä»SPI1æ¥æ”¶çš„æ•°æ®
  */
 u8 FLASH_Read(void)
 {
-    // Çå¿Õ¿ÉÄÜ²ĞÁôµÄ½ÓÊÕÊı¾İ
+    // æ¸…ç©ºå¯èƒ½æ®‹ç•™çš„æ¥æ”¶æ•°æ®
     if (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) != RESET) {
         SPI_I2S_ReceiveData(SPI1);
     }
-    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET);//µÈ´ı·¢ËÍ»º³åÇøÎª¿Õ
-    SPI_I2S_SendData(SPI1, 0xFF);// ·¢ËÍdummyÊı¾İ
-    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET);//µÈ´ı½ÓÊÕ»º³åÇø²»Îª¿Õ
+    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET);//ç­‰å¾…å‘é€ç¼“å†²åŒºä¸ºç©º
+    SPI_I2S_SendData(SPI1, 0xFF);// å‘é€dummyæ•°æ®
+    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET);//ç­‰å¾…æ¥æ”¶ç¼“å†²åŒºä¸ä¸ºç©º
     return SPI_I2S_ReceiveData(SPI1);
 }
 
-//ÎŞµÈ´ı¶ÁÈ¡
-/*********************************************************************
- * @fn      FLASH_Read
- *
- * @brief   Í¨¹ıSPI1Ö»¶ÁÈ¡Êı¾İ£¨·¢ËÍdummy£©
- *
- * @param   ÎŞ
- *
- * @return  ´ÓSPI1½ÓÊÕµÄÊı¾İ
+/**
+ * @brief  é€šè¿‡SPI1åªè¯»å–æ•°æ®ï¼ˆå‘é€dummyï¼‰
+ * @param  æ— 
+ * @return ä»SPI1æ¥æ”¶çš„æ•°æ®
  */
 u8 FLASH_NoWaiting_Read(void)
 {
-    // Çå¿Õ¿ÉÄÜ²ĞÁôµÄ½ÓÊÕÊı¾İ
+    // æ¸…ç©ºå¯èƒ½æ®‹ç•™çš„æ¥æ”¶æ•°æ®
     // if (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) != RESET) {
     //     SPI_I2S_ReceiveData(SPI1);
     // }
 
-    // while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET)//µÈ´ı·¢ËÍ»º³åÇøÎª¿Õ
+    // while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET)//ç­‰å¾…å‘é€ç¼“å†²åŒºä¸ºç©º
     //     ;
-    SPI_I2S_SendData(SPI1, 0xFF);  // ·¢ËÍdummyÊı¾İ
-    // while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET)//µÈ´ı·¢ËÍÍê³É
+    SPI_I2S_SendData(SPI1, 0xFF);  // å‘é€dummyæ•°æ®
+    // while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET)//ç­‰å¾…å‘é€å®Œæˆ
     //     ;
-    // while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET)//µÈ´ı½ÓÊÕ»º³åÇø²»Îª¿Õ
+    // while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET)//ç­‰å¾…æ¥æ”¶ç¼“å†²åŒºä¸ä¸ºç©º
     //     ;
     return SPI_I2S_ReceiveData(SPI1);
 }
 
-
-
-/*********************************************************************
- * @fn      FLASH_readWrite
- *
- * @brief   Í¨¹ıSPI1¶ÁÈ¡»òĞ´ÈëÊı¾İ
- *
- * @param   TxData - ÒªĞ´ÈëµÄÊı¾İ
- *
- * @return  ´ÓSPI1½ÓÊÕµÄÊı¾İ
+/**
+ * @brief  é€šè¿‡SPI1è¯»å–æˆ–å†™å…¥æ•°æ®
+ * @param  TxData  è¦å†™å…¥çš„æ•°æ®
+ * @return ä»SPI1æ¥æ”¶çš„æ•°æ®
  */
 static uint8_t FLASH_readWrite(uint8_t TxData)
 {
@@ -105,31 +75,23 @@ static uint8_t FLASH_readWrite(uint8_t TxData)
     return SPI_I2S_ReceiveData(SPI1);
 }
 
-/*********************************************************************
- * @fn      cs_pin_init
- *
- * @brief   gpio cs pin init.
- * @brief   ³õÊ¼»¯FLASH CSÒı½Å
- *
- * @return  none
+/**
+ * @brief  åˆå§‹åŒ–FLASH CSå¼•è„š
+ * @return æ— 
  */
 static void cs_pin_init()
 {
     GPIO_InitTypeDef GPIO_InitStructure;
-    RCC_APB2PeriphClockCmd(FLASH_CS_RCC, ENABLE);//Ê¹ÄÜFLASH CSÒı½ÅÊ±ÖÓ
-    GPIO_InitStructure.GPIO_Pin   = FLASH_CS_PIN;//FLASH CSÒı½Å
+    RCC_APB2PeriphClockCmd(FLASH_CS_RCC, ENABLE);//ä½¿èƒ½FLASH CSå¼•è„šæ—¶é’Ÿ
+    GPIO_InitStructure.GPIO_Pin   = FLASH_CS_PIN;//FLASH CSå¼•è„š
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;//50MHz
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;//Êä³öÍÆÍìÄ£Ê½
-    GPIO_Init(FLASH_CS_PORT, &GPIO_InitStructure);//³õÊ¼»¯FLASH CSÒı½Å
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;//è¾“å‡ºæ¨æŒ½æ¨¡å¼
+    GPIO_Init(FLASH_CS_PORT, &GPIO_InitStructure);//åˆå§‹åŒ–FLASH CSå¼•è„š
 }
 
-/*********************************************************************
- * @fn      SPI_FLASH_Init
- *
- * @brief   SPI FLASH Init.
- * @brief   ³õÊ¼»¯SPI FLASH½Ó¿Ú
- *
- * @return  none
+/**
+ * @brief  åˆå§‹åŒ–SPI FLASHæ¥å£
+ * @return æ— 
  */
 void SPI_FLASH_Init(void)
 {
@@ -139,16 +101,12 @@ void SPI_FLASH_Init(void)
     FLASH_CS_SET;
 }
 
-/*********************************************************************
- * @fn      SPI_Flash_ReadSR
- *
- * @brief   Read W25Qxx status register. 
- *        £¡£¡BIT7  6   5   4   3   2   1   0
- *        £¡£¡SPR   RV  TB  BP2 BP1 BP0 WEL BUSY
- *
- * @return  byte - status register value.
- * @brief   ¶ÁÈ¡W25Qxx×´Ì¬¼Ä´æÆ÷
- *          ·µ»ØÖµÎª8Î»Êı¾İ£¬°üº¬W25QxxµÄ×´Ì¬ĞÅÏ¢
+/**
+ * @brief  è¯»å–W25QxxçŠ¶æ€å¯„å­˜å™¨
+ *      BIT7  6   5   4   3   2   1   0
+ *      SPR   RV  TB  BP2 BP1 BP0 WEL BUSY
+ *     è¿”å›å€¼ä¸º8ä½æ•°æ®ï¼ŒåŒ…å«W25Qxxçš„çŠ¶æ€ä¿¡æ¯
+ * @return byte  çŠ¶æ€å¯„å­˜å™¨å€¼
  */
 uint8_t SPI_Flash_ReadSR(void)
 {
@@ -162,15 +120,10 @@ uint8_t SPI_Flash_ReadSR(void)
     return byte;
 }
 
-/*********************************************************************
- * @fn      SPI_FLASH_Write_SR
- *
- * @brief   Write W25Qxx status register.
- * @brief   Ğ´ÈëW25Qxx×´Ì¬¼Ä´æÆ÷
- *
- * @param   sr - status register value.
- *
- * @return  none
+/**
+ * @brief  å†™å…¥W25QxxçŠ¶æ€å¯„å­˜å™¨
+ * @param  sr  çŠ¶æ€å¯„å­˜å™¨å€¼
+ * @return æ— 
  */
 void SPI_FLASH_Write_SR(uint8_t sr)
 {
@@ -180,13 +133,9 @@ void SPI_FLASH_Write_SR(uint8_t sr)
     FLASH_CS_SET;
 }
 
-/*********************************************************************
- * @fn      SPI_Flash_Wait_Busy
- *
- * @brief   Wait flash free.
- * @brief   µÈ´ıFLASH¿ÕÏĞ
- *
- * @return  none
+/**
+ * @brief  ç­‰å¾…FLASHç©ºé—²
+ * @return æ— 
  */
 void SPI_Flash_Wait_Busy(void)
 {
@@ -194,13 +143,9 @@ void SPI_Flash_Wait_Busy(void)
         ;
 }
 
-/*********************************************************************
- * @fn      SPI_FLASH_Write_Enable
- *
- * @brief   Enable flash write.
- * @brief   Ê¹ÄÜFLASHĞ´Èë
- *
- * @return  none
+/**
+ * @brief  ä½¿èƒ½FLASHå†™å…¥
+ * @return æ— 
  */
 void SPI_FLASH_Write_Enable(void)
 {
@@ -209,13 +154,9 @@ void SPI_FLASH_Write_Enable(void)
     FLASH_CS_SET;
 }
 
-/*********************************************************************
- * @fn      SPI_FLASH_Write_Disable
- *
- * @brief   Disable flash write.
- * @brief   ½ûÓÃFLASHĞ´Èë
- *
- * @return  none
+/**
+ * @brief  ç¦ç”¨FLASHå†™å…¥
+ * @return æ— 
  */
 void SPI_FLASH_Write_Disable(void)
 {
@@ -224,13 +165,9 @@ void SPI_FLASH_Write_Disable(void)
     FLASH_CS_SET;
 }
 
-/*********************************************************************
- * @fn      SPI_Flash_ReadID
- *
- * @brief   Read flash ID.
- * @brief   ¶ÁÈ¡FLASH ID
- *
- * @return  Temp - FLASH ID.
+/**
+ * @brief  è¯»å–FLASH ID
+ * @return Temp  FLASH_ID
  */
 uint16_t SPI_Flash_ReadID(void)
 {
@@ -248,13 +185,9 @@ uint16_t SPI_Flash_ReadID(void)
     return Temp;
 }
 
-/*********************************************************************
- * @fn      SPI_Flash_ReadJedecDeviceID
- *
- * @brief   Read JedecDevice ID.
- * @brief   ¶ÁÈ¡JedecÉè±¸ID
- *
- * @return  JedecDevice ID.
+/**
+ * @brief  è¯»å–Jedecè®¾å¤‡ID
+ * @return JEDEC è®¾å¤‡ID
  */
 uint32_t SPI_Flash_ReadJedecDeviceID(void)
 {
@@ -268,15 +201,10 @@ uint32_t SPI_Flash_ReadJedecDeviceID(void)
     return Temp;
 }
 
-/*********************************************************************
- * @fn      SPI_Flash_Erase_Sector
- *
- * @brief   Erase one sector(4Kbyte).
- * @brief   ²Á³ıÒ»¸öÉÈÇø(4K×Ö½Ú)
- *
- * @param   Dst_Addr - 0 £¡£¡ 2047
- *
- * @return  none
+/**
+ * @brief  æ“¦é™¤ä¸€ä¸ªæ‰‡åŒº(4Kå­—èŠ‚)
+ * @param  Dst_Addr  æ‰‡åŒºå·(0~2047)
+ * @return æ— 
  */
 void SPI_Flash_Erase_Sector(uint32_t Dst_Addr)
 {
@@ -292,17 +220,12 @@ void SPI_Flash_Erase_Sector(uint32_t Dst_Addr)
     SPI_Flash_Wait_Busy();
 }
 
-/*********************************************************************
- * @fn      SPI_Flash_Read
- *
- * @brief   Read data from flash.
- * @brief   ´ÓFLASH¶ÁÈ¡Êı¾İ
- *
- * @param   pBuffer -
- *          ReadAddr -Initial address(24bit).
- *          size - Data length.
- *
- * @return  none
+/**
+ * @brief  ä»FLASHè¯»å–æ•°æ®
+ * @param  pBuffer   è¯»å–æ•°æ®ç¼“å†²åŒº
+ * @param  ReadAddr  èµ·å§‹åœ°å€(24bit)
+ * @param  size      æ•°æ®é•¿åº¦
+ * @return æ— 
  */
 void SPI_Flash_Read(uint8_t *pBuffer, uint32_t ReadAddr, uint16_t size)
 {
@@ -322,17 +245,12 @@ void SPI_Flash_Read(uint8_t *pBuffer, uint32_t ReadAddr, uint16_t size)
     FLASH_CS_SET;
 }
 
-/*********************************************************************
- * @fn      SPI_Flash_Write_Page
- *
- * @brief   Write data by one page.
- * @brief   Í¨¹ıFLASHĞ´ÈëÒ»Ò³Êı¾İ
- * *
- * @param   pBuffer -
- *          WriteAddr - Initial address(24bit).
- *          size - Data length.
- *
- * @return  none
+/**
+ * @brief  é€šè¿‡FLASHå†™å…¥ä¸€é¡µæ•°æ®
+ * @param  pBuffer    å†™å…¥æ•°æ®ç¼“å†²
+ * @param  WriteAddr  èµ·å§‹åœ°å€(24bit)
+ * @param  size       æ•°æ®é•¿åº¦
+ * @return æ— 
  */
 void SPI_Flash_Write_Page(uint8_t *pBuffer, uint32_t WriteAddr, uint16_t size)
 {
@@ -354,18 +272,13 @@ void SPI_Flash_Write_Page(uint8_t *pBuffer, uint32_t WriteAddr, uint16_t size)
     SPI_Flash_Wait_Busy();
 }
 
-/*********************************************************************
- * @fn      SPI_Flash_Write_NoCheck
- *
- * @brief   Write data to flash.(need Erase)
- * @brief   Í¨¹ıFLASHĞ´ÈëÊı¾İ(ĞèÒª²Á³ı)
- *          All data in address rang is 0xFF.
- *
- * @param   pBuffer -
- *          WriteAddr - Initial address(24bit).
- *          size - Data length.
- *
- * @return  none
+/**
+ * @brief  é€šè¿‡FLASHå†™å…¥æ•°æ®(éœ€è¦å…ˆæ“¦é™¤)
+ * @note   åœ°å€èŒƒå›´å†…æ•°æ®éœ€ä¸º 0xFF
+ * @param  pBuffer    å†™å…¥æ•°æ®ç¼“å†²
+ * @param  WriteAddr  èµ·å§‹åœ°å€(24bit)
+ * @param  size       æ•°æ®é•¿åº¦
+ * @return æ— 
  */
 void SPI_Flash_Write_NoCheck(uint8_t *pBuffer, uint32_t WriteAddr, uint16_t size)
 {
@@ -399,17 +312,12 @@ void SPI_Flash_Write_NoCheck(uint8_t *pBuffer, uint32_t WriteAddr, uint16_t size
 }
 
 static uint8_t W25QXX_BUFFER[4096];
-/*********************************************************************
- * @fn      SPI_Flash_Write
- *
- * @brief   Write data to flash.(no need Erase)
- * @brief   Í¨¹ıFLASHĞ´ÈëÊı¾İ(²»ĞèÒª²Á³ı)
- *
- * @param   pBuffer -
- *          WriteAddr - Initial address(24bit).
- *          size - Data length.
- *
- * @return  none
+/**
+ * @brief  é€šè¿‡FLASHå†™å…¥æ•°æ®(ä¸éœ€å…ˆæ“¦é™¤)
+ * @param  pBuffer    å†™å…¥æ•°æ®ç¼“å†²
+ * @param  WriteAddr  èµ·å§‹åœ°å€(24bit)
+ * @param  size       æ•°æ®é•¿åº¦
+ * @return æ— 
  */
 void SPI_Flash_Write(uint8_t *pBuffer, uint32_t WriteAddr, uint16_t size)
 {
@@ -476,14 +384,9 @@ void SPI_Flash_Write(uint8_t *pBuffer, uint32_t WriteAddr, uint16_t size)
     }
 }
 
-/*********************************************************************
- * @fn      SPI_Flash_Erase_Chip
- *
- * @brief   Erase all FLASH pages.
- * @brief   ²Á³ıËùÓĞFLASHÒ³Ãæ
- * *
- *
- * @return  none
+/**
+ * @brief  æ“¦é™¤æ‰€æœ‰FLASHé¡µé¢
+ * @return æ— 
  */
 void SPI_Flash_Erase_Chip(void)
 {
@@ -495,13 +398,9 @@ void SPI_Flash_Erase_Chip(void)
     SPI_Flash_Wait_Busy();
 }
 
-/*********************************************************************
- * @fn      SPI_Flash_PowerDown
- *
- * @brief   Enter power down mode.
- * @brief   ½øÈëµÍ¹¦ºÄÄ£Ê½
- * *
- * @return  none
+/**
+ * @brief  è¿›å…¥ä½åŠŸè€—æ¨¡å¼
+ * @return æ— 
  */
 void SPI_Flash_PowerDown(void)
 {
@@ -511,14 +410,9 @@ void SPI_Flash_PowerDown(void)
     Delay_Us(10);
 }
 
-/*********************************************************************
- * @fn      SPI_Flash_WAKEUP
- *
- * @brief   Power down wake up.
- * @brief   ´ÓµÍ¹¦ºÄÄ£Ê½»½ĞÑ
- * *
- *
- * @return  none
+/**
+ * @brief  ä»ä½åŠŸè€—æ¨¡å¼å”¤é†’
+ * @return æ— 
  */
 void SPI_Flash_WAKEUP(void)
 {
@@ -528,16 +422,11 @@ void SPI_Flash_WAKEUP(void)
     Delay_Us(10);
 }
 
-/*********************************************************************
- * @fn      SPI_Flash_Read_dma_start
- *
- * @brief   enable spi dma and set read address.
- * @brief   Ê¹SPI DMA²¢ÉèÖÃ¶ÁÈ¡µØÖ·
- *          ¶ÁÈ¡Êı¾İÊ±£¬SPI DMA»á×Ô¶¯½«Êı¾İ´ÓFLASH¶ÁÈ¡µ½DMA»º³åÇøÖĞ
- *   
- * @param    ReadAddr - the address in spi flash
- *
- * @return  none
+/**
+ * @brief  ä½¿SPI DMAå¹¶è®¾ç½®è¯»å–åœ°å€
+ *     è¯»å–æ•°æ®æ—¶ï¼ŒSPI DMAä¼šè‡ªåŠ¨å°†æ•°æ®ä»FLASHè¯»å–åˆ°DMAç¼“å†²åŒºä¸­
+ * @param  ReadAddr  SPI Flash è¯»å–åœ°å€
+ * @return æ— 
  */
 void SPI_Flash_Read_dma_start(uint32_t ReadAddr)
 {
@@ -550,14 +439,10 @@ void SPI_Flash_Read_dma_start(uint32_t ReadAddr)
     SPI_I2S_DMACmd(SPI1, SPI_I2S_DMAReq_Tx | SPI_I2S_DMAReq_Rx, ENABLE);
 }
 
-/*********************************************************************
- * @fn      SPI_Flash_Read_dma_end
- *
- * @brief   disable spi dma.
- * @brief   ½ûÓÃSPI DMA
- *          ½ûÓÃSPI DMAºó£¬SPI DMA»áÍ£Ö¹½«Êı¾İ´ÓFLASH¶ÁÈ¡µ½DMA»º³åÇøÖĞ
- *
- * @return  none
+/**
+ * @brief  ç¦ç”¨SPI DMA
+ *     ç¦ç”¨SPI DMAåï¼ŒSPI DMAä¼šåœæ­¢å°†æ•°æ®ä»FLASHè¯»å–åˆ°DMAç¼“å†²åŒºä¸­
+ * @return æ— 
  */
 void SPI_Flash_Read_dma_end(void)
 {

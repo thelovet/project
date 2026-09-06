@@ -3,70 +3,70 @@
 
 #include <stdint.h>
 
-/* ÖĞÎÄ×Ö¿â£º32x32µãÕó±àÂë, Ã¿×Ö·Ö4ĞĞÃ¿ĞĞ16×Ö½Ú, ¹²128×Ö½Ú/×Ö */
+/* ä¸­æ–‡å­—åº“ï¼š32x32ç‚¹é˜µç¼–ç , æ¯å­—åˆ†4è¡Œæ¯è¡Œ16å­—èŠ‚, å…±128å­—èŠ‚/å­— */
 #define FONT_CHAR_W   16
 #define FONT_CHAR_L   8
 #define FONT_CHAR_SIZE (FONT_CHAR_L * FONT_CHAR_W)  /* 128 */
 
 /**
- * @brief  »æÖÆ32x32ÖĞÎÄ×Ö·û (Ã¿ĞĞ16×Ö½ÚMSBÓÅÏÈ)
- * @param  x     ×Ö·û×óÉÏ½ÇX×ø±ê
- * @param  y     ×Ö·û×óÉÏ½ÇY×ø±ê
- * @param  font  ×ÖÄ£Êı¾İ (128×Ö½Ú)
- * @param  color ÏÔÊ¾ÑÕÉ« (RGB565)
+ * @brief  ç»˜åˆ¶32x32ä¸­æ–‡å­—ç¬¦ (æ¯è¡Œ16å­—èŠ‚MSBä¼˜å…ˆ)
+ * @param  x     å­—ç¬¦å·¦ä¸Šè§’Xåæ ‡
+ * @param  y     å­—ç¬¦å·¦ä¸Šè§’Yåæ ‡
+ * @param  font  å­—æ¨¡æ•°æ® (128å­—èŠ‚)
+ * @param  color æ˜¾ç¤ºé¢œè‰² (RGB565)
  */
 void sok_draw_char_32(uint16_t x, uint16_t y, const uint8_t *font, uint16_t color);
 void sok_draw_char_24(uint16_t x, uint16_t y, const uint8_t *font, uint16_t color);
 
 /**
- * @brief  »æÖÆÍÆÏä×ÓÊ¤Àû»­Ãæ"¹§Ï²Í¨¹Ø", Ê¹ÓÃ32x32ÖĞÎÄ×Ö¿â
- * @param  x  »­Ãæ×óÉÏ½ÇX×ø±ê
- * @param  y  »­Ãæ×óÉÏ½ÇY×ø±ê
+ * @brief  ç»˜åˆ¶æ¨ç®±å­èƒœåˆ©ç”»é¢"æ­å–œé€šå…³", ä½¿ç”¨32x32ä¸­æ–‡å­—åº“
+ * @param  x  ç”»é¢å·¦ä¸Šè§’Xåæ ‡
+ * @param  y  ç”»é¢å·¦ä¸Šè§’Yåæ ‡
  */
 void sok_win_draw(uint16_t x, uint16_t y);
 
-/* ÖĞÎÄ×ÖÄ£Êı¾İ (32x32) */
-extern const uint8_t font_ka[FONT_CHAR_SIZE];      /* ¿¨ */
-extern const uint8_t font_gong[FONT_CHAR_SIZE];    /* ¹§ */
-extern const uint8_t font_xi[FONT_CHAR_SIZE];      /* Ï² */
-extern const uint8_t font_tong[FONT_CHAR_SIZE];    /* Í¨ */
-extern const uint8_t font_guan[FONT_CHAR_SIZE];    /* ¹Ø */
-extern const uint8_t font_you[FONT_CHAR_SIZE];     /* ÓÎ */
-extern const uint8_t font_xi3[FONT_CHAR_SIZE];     /* Ï· */
-extern const uint8_t font_jie[FONT_CHAR_SIZE];     /* ½á */
-extern const uint8_t font_shu[FONT_CHAR_SIZE];     /* Êø */
+/* ä¸­æ–‡å­—æ¨¡æ•°æ® (32x32) */
+extern const uint8_t font_ka[FONT_CHAR_SIZE];      /* å¡ */
+extern const uint8_t font_gong[FONT_CHAR_SIZE];    /* æ­ */
+extern const uint8_t font_xi[FONT_CHAR_SIZE];      /* å–œ */
+extern const uint8_t font_tong[FONT_CHAR_SIZE];    /* é€š */
+extern const uint8_t font_guan[FONT_CHAR_SIZE];    /* å…³ */
+extern const uint8_t font_you[FONT_CHAR_SIZE];     /* æ¸¸ */
+extern const uint8_t font_xi3[FONT_CHAR_SIZE];     /* æˆ */
+extern const uint8_t font_jie[FONT_CHAR_SIZE];     /* ç»“ */
+extern const uint8_t font_shu[FONT_CHAR_SIZE];     /* æŸ */
 
-/* 16x32 Êı×Ö×Ö¿â */
+/* 16x32 æ•°å­—å­—åº“ */
 #define FONT_DIGIT_W   16
 #define FONT_DIGIT_H   32
 extern const uint8_t font_digits[640];
 #define FONT_DIGIT_BYTES  64
 
 /**
- * @brief  »æÖÆ16x32Êı×Ö×Ö·û
- * @param  x     ×Ö·û×óÉÏ½ÇX×ø±ê
- * @param  y     ×Ö·û×óÉÏ½ÇY×ø±ê
- * @param  digit Êı×Ö (0-9)
- * @param  color ÏÔÊ¾ÑÕÉ« (RGB565)
+ * @brief  ç»˜åˆ¶16x32æ•°å­—å­—ç¬¦
+ * @param  x     å­—ç¬¦å·¦ä¸Šè§’Xåæ ‡
+ * @param  y     å­—ç¬¦å·¦ä¸Šè§’Yåæ ‡
+ * @param  digit æ•°å­— (0-9)
+ * @param  color æ˜¾ç¤ºé¢œè‰² (RGB565)
  */
 void sok_draw_digit_16x32(uint16_t x, uint16_t y, uint8_t digit, uint16_t color);
 
 /**
- * @brief  »æÖÆ¿ÉËõ·Å16x32Êı×Ö (µÈ±ÈËõ·Å)
- * @param  x     ×Ö·û×óÉÏ½ÇX
- * @param  y     ×Ö·û×óÉÏ½ÇY
- * @param  digit Êı×Ö (0-9)
- * @param  color ÏÔÊ¾ÑÕÉ«
- * @param  tw    Ä¿±ê¿í¶È (px)
- * @param  th    Ä¿±ê¸ß¶È (px)
+ * @brief  ç»˜åˆ¶å¯ç¼©æ”¾16x32æ•°å­— (ç­‰æ¯”ç¼©æ”¾)
+ * @param  x     å­—ç¬¦å·¦ä¸Šè§’X
+ * @param  y     å­—ç¬¦å·¦ä¸Šè§’Y
+ * @param  digit æ•°å­— (0-9)
+ * @param  color æ˜¾ç¤ºé¢œè‰²
+ * @param  tw    ç›®æ ‡å®½åº¦ (px)
+ * @param  th    ç›®æ ‡é«˜åº¦ (px)
  */
 void sok_draw_digit_scaled(uint16_t x, uint16_t y, uint8_t digit,
                            uint16_t color, uint8_t tw, uint8_t th);
 
 /**
- * @brief  »æÖÆ¹Ø¿¨ºÅ "¹Ø¿¨X" (32x32ÖĞÎÄ×Ö + 16x32Êı×ÖËõ·Å, ºìÉ«ÏÔÊ¾)
- * @param  level ¹Ø¿¨±àºÅ (1-99)
- * @param  color ÎÄ×ÖÑÕÉ«
+ * @brief  ç»˜åˆ¶å…³å¡å· "å…³å¡X" (32x32ä¸­æ–‡å­— + 16x32æ•°å­—ç¼©æ”¾, çº¢è‰²æ˜¾ç¤º)
+ * @param  level å…³å¡ç¼–å· (1-99)
+ * @param  color æ–‡å­—é¢œè‰²
  */
 void sok_level_draw(uint8_t level, uint16_t color);
 

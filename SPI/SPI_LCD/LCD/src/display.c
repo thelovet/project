@@ -5,8 +5,8 @@
 #include "game_save.h"
 
 #define BKP_LOWBATT_SAVE_FLAG  BKP_DR5
-#define BKP_LOWBATT_SAVE_MAGIC 0xA5A5  /* µÍµçÒÑ±£´æ±êÖ¾ */
-static uint8_t g_lowbatt_game_dirty = 0;  /* ÓÎÏ·×´Ì¬ÒÑ±ä»¯±ê¼Ç£¬½öRAM£¬¹Ø»úÊ±Í¬²½µ½BKP */
+#define BKP_LOWBATT_SAVE_MAGIC 0xA5A5  /* ä½ç”µå·²ä¿å­˜æ ‡å¿— */
+static uint8_t g_lowbatt_game_dirty = 0;  /* æ¸¸æˆçŠ¶æ€å·²å˜åŒ–æ ‡è®°ï¼Œä»…RAMï¼Œå…³æœºæ—¶åŒæ­¥åˆ°BKP */
 
 extern MainMode s_main_mode;
 #define LCD_WIDTH   240
@@ -17,42 +17,42 @@ extern MainMode s_main_mode;
 #define START_X     ((LCD_WIDTH - SEG_WIDTH * 3 * 3) / 2)
 static const uint8_t seg_digits[10] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F};
 
-/** µÍµçÍ¼±ê¼¸ºÎ²ÎÊı£¬ÓÉ LowBattery_ComputeGeo Í³Ò»¼ÆËã£¬Ïû³ıÁ½´¦»æÖÆº¯ÊıµÄÖØ¸´ */
+/** ä½ç”µå›¾æ ‡å‡ ä½•å‚æ•°ï¼Œç”± LowBattery_ComputeGeo ç»Ÿä¸€è®¡ç®—ï¼Œæ¶ˆé™¤ä¸¤å¤„ç»˜åˆ¶å‡½æ•°çš„é‡å¤ */
 typedef struct {
-    uint16_t bw, bh, bx, by;               /* µç³ØÖ÷Ìå: ¿í/¸ß/×óÉÏ½Ç×ø±ê */
-    uint16_t nub_w, nub_h, nub_x, nub_y;   /* µç³ØÍ¹Æğ: ¿í/¸ß/×óÉÏ½Ç×ø±ê */
-    uint16_t ex_w, ex_h, dot_h, gap;       /* ¸ĞÌ¾ºÅ: ÊúÌõ¿í/¸ß¡¢µã¸ß¡¢¼ä¾à */
-    uint16_t ex_x, ex_y;                   /* ¸ĞÌ¾ºÅ: ×óÉÏ½Ç×ø±ê */
+    uint16_t bw, bh, bx, by;               /* ç”µæ± ä¸»ä½“: å®½/é«˜/å·¦ä¸Šè§’åæ ‡ */
+    uint16_t nub_w, nub_h, nub_x, nub_y;   /* ç”µæ± å‡¸èµ·: å®½/é«˜/å·¦ä¸Šè§’åæ ‡ */
+    uint16_t ex_w, ex_h, dot_h, gap;       /* æ„Ÿå¹å·: ç«–æ¡å®½/é«˜ã€ç‚¹é«˜ã€é—´è· */
+    uint16_t ex_x, ex_y;                   /* æ„Ÿå¹å·: å·¦ä¸Šè§’åæ ‡ */
 } LowBatteryGeo;
 
 /**
- * @brief  ¸ù¾İÆÁÄ»³ß´ç¼ÆËãµÍµçÍ¼±êËùÓĞ¼¸ºÎ²ÎÊı
- * @param  geo  Êä³ö¼¸ºÎ²ÎÊı
+ * @brief  æ ¹æ®å±å¹•å°ºå¯¸è®¡ç®—ä½ç”µå›¾æ ‡æ‰€æœ‰å‡ ä½•å‚æ•°
+ * @param  geo  è¾“å‡ºå‡ ä½•å‚æ•°
  */
 static void LowBattery_ComputeGeo(LowBatteryGeo *geo)
 {
-    geo->bw = LCD_WIDTH * 5 / 8;                  /* µç³Ø¿í = 5/8 ÆÁ¿í */
-    geo->bh = geo->bw * 11 / 20;                  /* µç³Ø¸ß ¡Ö 0.55 * ¿í */
-    geo->bx = (LCD_WIDTH - geo->bw) / 2;           /* ¾ÓÖĞ */
+    geo->bw = LCD_WIDTH * 5 / 8;                  /* ç”µæ± å®½ = 5/8 å±å®½ */
+    geo->bh = geo->bw * 11 / 20;                  /* ç”µæ± é«˜ â‰ˆ 0.55 * å®½ */
+    geo->bx = (LCD_WIDTH - geo->bw) / 2;           /* å±…ä¸­ */
     geo->by = (LCD_HEIGHT - geo->bh) / 2;
 
-    geo->nub_w = geo->bw / 10;                     /* Í¹Æğ¿í */
-    geo->nub_h = geo->bh * 2 / 5;                  /* Í¹Æğ¸ß */
+    geo->nub_w = geo->bw / 10;                     /* å‡¸èµ·å®½ */
+    geo->nub_h = geo->bh * 2 / 5;                  /* å‡¸èµ·é«˜ */
     geo->nub_x = geo->bx + geo->bw;
     geo->nub_y = geo->by + (geo->bh - geo->nub_h) / 2;
 
-    geo->ex_w = geo->bw / 8;                       /* Ì¾ºÅÊúÌõ¿í */
-    geo->ex_h = geo->bh * 4 / 9;                   /* Ì¾ºÅÊúÌõ¸ß */
-    geo->dot_h = geo->ex_w;                        /* Ì¾ºÅµã¸ß = ÊúÌõ¿í */
-    geo->gap = geo->ex_w / 2;                      /* ÊúÌõÓëµã¼ä¾à */
+    geo->ex_w = geo->bw / 8;                       /* å¹å·ç«–æ¡å®½ */
+    geo->ex_h = geo->bh * 4 / 9;                   /* å¹å·ç«–æ¡é«˜ */
+    geo->dot_h = geo->ex_w;                        /* å¹å·ç‚¹é«˜ = ç«–æ¡å®½ */
+    geo->gap = geo->ex_w / 2;                      /* ç«–æ¡ä¸ç‚¹é—´è· */
     geo->ex_x = geo->bx + (geo->bw - geo->ex_w) / 2;
     geo->ex_y = geo->by + geo->bh / 6;
 }
 
-/*********************************************************************
+/*
  * @fn      LCD_ShowLowBattery
  *
- * @brief   ³ÌĞò»¯»æÖÆµÍµçÁ¿¾¯¸æÍ¼±ê£¨µç³Ø¿ò+¸ĞÌ¾ºÅ£©£¬Í¬²½ÇåÆÁºó»æÖÆ
+ * @brief   ç¨‹åºåŒ–ç»˜åˆ¶ä½ç”µé‡è­¦å‘Šå›¾æ ‡ï¼ˆç”µæ± æ¡†+æ„Ÿå¹å·ï¼‰ï¼ŒåŒæ­¥æ¸…å±åç»˜åˆ¶
  *
  * @return  none
  */
@@ -61,50 +61,50 @@ void LCD_ShowLowBattery(void)
     LowBatteryGeo g;
     LowBattery_ComputeGeo(&g);
 
-    LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);       /* Í¬²½ÇåÆÁ£¬·ÀÖ¹²ĞÁôÉÏÒ»»­Ãæ */
+    LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);       /* åŒæ­¥æ¸…å±ï¼Œé˜²æ­¢æ®‹ç•™ä¸Šä¸€ç”»é¢ */
 
-    /* µç³ØÍâ¿ò£¨ºìÉ«£¬1ÏñËØ±ß¿ò£© */
-    LCD_Fill(g.bx, g.by, g.bx + g.bw, g.by + 1, LCD_RED);                       /* ÉÏ±ß */
-    LCD_Fill(g.bx, g.by + g.bh - 1, g.bx + g.bw, g.by + g.bh, LCD_RED);          /* ÏÂ±ß */
-    LCD_Fill(g.bx, g.by, g.bx + 1, g.by + g.bh, LCD_RED);                        /* ×ó±ß */
-    LCD_Fill(g.bx + g.bw - 1, g.by, g.bx + g.bw, g.by + g.bh, LCD_RED);          /* ÓÒ±ß */
+    /* ç”µæ± å¤–æ¡†ï¼ˆçº¢è‰²ï¼Œ1åƒç´ è¾¹æ¡†ï¼‰ */
+    LCD_Fill(g.bx, g.by, g.bx + g.bw, g.by + 1, LCD_RED);                       /* ä¸Šè¾¹ */
+    LCD_Fill(g.bx, g.by + g.bh - 1, g.bx + g.bw, g.by + g.bh, LCD_RED);          /* ä¸‹è¾¹ */
+    LCD_Fill(g.bx, g.by, g.bx + 1, g.by + g.bh, LCD_RED);                        /* å·¦è¾¹ */
+    LCD_Fill(g.bx + g.bw - 1, g.by, g.bx + g.bw, g.by + g.bh, LCD_RED);          /* å³è¾¹ */
 
-    /* µç³ØÍ¹Æğ£¨ºìÉ«Íâ¿ò+ºÚÉ«Ìî³ä£© */
+    /* ç”µæ± å‡¸èµ·ï¼ˆçº¢è‰²å¤–æ¡†+é»‘è‰²å¡«å……ï¼‰ */
     LCD_Fill(g.nub_x, g.nub_y, g.nub_x + g.nub_w, g.nub_y + g.nub_h, LCD_RED);
     LCD_Fill(g.nub_x + 1, g.nub_y + 1, g.nub_x + g.nub_w - 1, g.nub_y + g.nub_h - 1, LCD_BLACK);
 
-    /* ¸ĞÌ¾ºÅ */
+    /* æ„Ÿå¹å· */
     LCD_Fill(g.ex_x, g.ex_y, g.ex_x + g.ex_w, g.ex_y + g.ex_h, LCD_RED);
     LCD_Fill(g.ex_x, g.ex_y + g.ex_h + g.gap, g.ex_x + g.ex_w, g.ex_y + g.ex_h + g.gap + g.dot_h, LCD_RED);
 }
 
 /**
- * @brief  »æÖÆµÍµçÍ¼±ê£¨µç³Ø¿ò+¸ĞÌ¾ºÅ£©£¬µş¼ÓÔÚÓÎÏ·»­ÃæÉÏ²»Ë¢ºÚÆÁ
- * @param  color  ÏÔÊ¾ÑÕÉ«£¨LCD_RED=»æÖÆ, LCD_BLACK=Çå³ı£©
+ * @brief  ç»˜åˆ¶ä½ç”µå›¾æ ‡ï¼ˆç”µæ± æ¡†+æ„Ÿå¹å·ï¼‰ï¼Œå åŠ åœ¨æ¸¸æˆç”»é¢ä¸Šä¸åˆ·é»‘å±
+ * @param  color  æ˜¾ç¤ºé¢œè‰²ï¼ˆLCD_RED=ç»˜åˆ¶, LCD_BLACK=æ¸…é™¤ï¼‰
  */
 static void LCD_DrawLowBatteryOverlay(uint16_t color)
 {
     LowBatteryGeo g;
     LowBattery_ComputeGeo(&g);
 
-    /* µç³ØÍâ¿ò£¬±ß¿ò¼Ó´Öµ½2ÏñËØ */
-    LCD_Fill(g.bx, g.by, g.bx + g.bw, g.by + 2, color);                          /* ÉÏ±ß */
-    LCD_Fill(g.bx, g.by + g.bh - 2, g.bx + g.bw, g.by + g.bh, color);             /* ÏÂ±ß */
-    LCD_Fill(g.bx, g.by, g.bx + 2, g.by + g.bh, color);                          /* ×ó±ß */
-    LCD_Fill(g.bx + g.bw - 2, g.by, g.bx + g.bw, g.by + g.bh, color);             /* ÓÒ±ß */
+    /* ç”µæ± å¤–æ¡†ï¼Œè¾¹æ¡†åŠ ç²—åˆ°2åƒç´  */
+    LCD_Fill(g.bx, g.by, g.bx + g.bw, g.by + 2, color);                          /* ä¸Šè¾¹ */
+    LCD_Fill(g.bx, g.by + g.bh - 2, g.bx + g.bw, g.by + g.bh, color);             /* ä¸‹è¾¹ */
+    LCD_Fill(g.bx, g.by, g.bx + 2, g.by + g.bh, color);                          /* å·¦è¾¹ */
+    LCD_Fill(g.bx + g.bw - 2, g.by, g.bx + g.bw, g.by + g.bh, color);             /* å³è¾¹ */
 
-    /* µç³ØÍ¹ÆğÌî³ä */
+    /* ç”µæ± å‡¸èµ·å¡«å…… */
     LCD_Fill(g.nub_x, g.nub_y, g.nub_x + g.nub_w, g.nub_y + g.nub_h, color);
 
-    /* ¸ĞÌ¾ºÅ */
+    /* æ„Ÿå¹å· */
     LCD_Fill(g.ex_x, g.ex_y, g.ex_x + g.ex_w, g.ex_y + g.ex_h, color);
     LCD_Fill(g.ex_x, g.ex_y + g.ex_h + g.gap, g.ex_x + g.ex_w,
              g.ex_y + g.ex_h + g.gap + g.dot_h, color);
 }
 
 /**
- * @brief  ÏÔÊ¾µÍµçÍ¼±ê£¬ºìÉ«µç³Ø¿ò+¸ĞÌ¾ºÅ¸²¸ÇÔÚÓÎÏ·»­ÃæÉÏ
- * @note   Ã¿3ÃëÉÁË¸1Ãë£¬ÓÎÏ·ÆôÓÃÊ±²»Ë¢ºÚÆÁÖ±½Ó¸²¸Ç»æÖÆ
+ * @brief  æ˜¾ç¤ºä½ç”µå›¾æ ‡ï¼Œçº¢è‰²ç”µæ± æ¡†+æ„Ÿå¹å·è¦†ç›–åœ¨æ¸¸æˆç”»é¢ä¸Š
+ * @note   æ¯3ç§’é—ªçƒ1ç§’ï¼Œæ¸¸æˆå¯ç”¨æ—¶ä¸åˆ·é»‘å±ç›´æ¥è¦†ç›–ç»˜åˆ¶
  */
 void LCD_ShowLowBatteryOverlay(void)
 {
@@ -112,8 +112,8 @@ void LCD_ShowLowBatteryOverlay(void)
 }
 
 /**
- * @brief  Çå³ıµÍµçÍ¼±ê£¬½öË¢ºÚÍ¼±êÏßÌõ£¬²»Ë¢Õû¸ö¾ØĞÎÇøÓò
- * @note   ÓëÏÔÊ¾Ê¹ÓÃÍ¬Ò»»æÖÆº¯Êı´«ÈëLCD_BLACK£¬½ö¸²¸ÇºìÉ«ÏñËØ
+ * @brief  æ¸…é™¤ä½ç”µå›¾æ ‡ï¼Œä»…åˆ·é»‘å›¾æ ‡çº¿æ¡ï¼Œä¸åˆ·æ•´ä¸ªçŸ©å½¢åŒºåŸŸ
+ * @note   ä¸æ˜¾ç¤ºä½¿ç”¨åŒä¸€ç»˜åˆ¶å‡½æ•°ä¼ å…¥LCD_BLACKï¼Œä»…è¦†ç›–çº¢è‰²åƒç´ 
  */
 void LCD_ClearLowBatteryOverlay(void)
 {
@@ -121,9 +121,9 @@ void LCD_ClearLowBatteryOverlay(void)
 }
 
 /**
- * @brief ÏÔÊ¾3Î»Êı×Ö£¨×î´ó999£©
- * @param num ÒªÏÔÊ¾µÄÊı×Ö£¨×î´ó999£©
- * @param y Êı×ÖÏÔÊ¾µÄy×ø±ê
+ * @brief æ˜¾ç¤º3ä½æ•°å­—ï¼ˆæœ€å¤§999ï¼‰
+ * @param num è¦æ˜¾ç¤ºçš„æ•°å­—ï¼ˆæœ€å¤§999ï¼‰
+ * @param y æ•°å­—æ˜¾ç¤ºçš„yåæ ‡
  */
 void LCD_ShowNum(uint16_t num, uint16_t y)
 {
@@ -148,64 +148,64 @@ void LCD_ShowNum(uint16_t num, uint16_t y)
 }
 
 /**
- * @brief Í³Ò»×¼±¸Flash¡¢´¥ÃşºÍLCD½øÈë´ı»ú
+ * @brief ç»Ÿä¸€å‡†å¤‡Flashã€è§¦æ‘¸å’ŒLCDè¿›å…¥å¾…æœº
  */
 void System_PrepareForStandby(void)
 {
-    SPI_Flash_PowerDown();// Flash½øÈëPowerDownÄ£Ê½
-    CST816S_SleepEnable();// CST816S½øÈë´ı»úÄ£Ê½
-    LCD_Enter_Sleep();// LCD½øÈë´ı»úÄ£Ê½
-    LCD_PWR_OFF;// ¹Ø±ÕLCDµçÔ´
-    Touch_WaitWakeInputsReleased();// µÈ´ı´¥ÃşÊäÈëÊÍ·Å
+    SPI_Flash_PowerDown();// Flashè¿›å…¥PowerDownæ¨¡å¼
+    CST816S_SleepEnable();// CST816Sè¿›å…¥å¾…æœºæ¨¡å¼
+    LCD_Enter_Sleep();// LCDè¿›å…¥å¾…æœºæ¨¡å¼
+    LCD_PWR_OFF;// å…³é—­LCDç”µæº
+    Touch_WaitWakeInputsReleased();// ç­‰å¾…è§¦æ‘¸è¾“å…¥é‡Šæ”¾
 }
 
 
 
 /*
- * @brief ¼ì²éµç³ØµçÑ¹²¢ÏÔÊ¾µÍµçÁ¿¾¯¸æÍ¼±ê
- *          ¼ì²âµç³ØµçÑ¹ÊÇ·ñµÍÓÚ2.5V£¬ÈôµÍÓÚÔòÏÔÊ¾µÍµçÁ¿¾¯¸æÍ¼±ê
- *          ³äµçÖĞ»ò³äÂúÊ±²»ÏÔÊ¾µÍµç¾¯¸æ£¬ÈÃÖ÷Ñ­»·ÏÔÊ¾³äµçÍ¼±ê
+ * @brief æ£€æŸ¥ç”µæ± ç”µå‹å¹¶æ˜¾ç¤ºä½ç”µé‡è­¦å‘Šå›¾æ ‡
+ *          æ£€æµ‹ç”µæ± ç”µå‹æ˜¯å¦ä½äº2.5Vï¼Œè‹¥ä½äºåˆ™æ˜¾ç¤ºä½ç”µé‡è­¦å‘Šå›¾æ ‡
+ *          å……ç”µä¸­æˆ–å……æ»¡æ—¶ä¸æ˜¾ç¤ºä½ç”µè­¦å‘Šï¼Œè®©ä¸»å¾ªç¯æ˜¾ç¤ºå……ç”µå›¾æ ‡
  */
 void CheckAndShowLowBattery(void)
 {
-    // µÚ¶şµÀ£º2.5V <= VDD < 2.6V£¬ÏÔÊ¾µÍµç¾¯¸æ
-    // ³äµçÖĞ»ò³äÂúÊ±²»ÏÔÊ¾µÍµç¾¯¸æ£¬ÈÃÖ÷Ñ­»·ÏÔÊ¾³äµçÍ¼±ê
+    // ç¬¬äºŒé“ï¼š2.5V <= VDD < 2.6Vï¼Œæ˜¾ç¤ºä½ç”µè­¦å‘Š
+    // å……ç”µä¸­æˆ–å……æ»¡æ—¶ä¸æ˜¾ç¤ºä½ç”µè­¦å‘Šï¼Œè®©ä¸»å¾ªç¯æ˜¾ç¤ºå……ç”µå›¾æ ‡
     
     if (Battery_IsCharging() || Battery_GetStatus() == BAT_FULL) {
-        return;  // ÓĞÍâ²¿¹©µç£¬Ìø¹ıµÍµç¼ì²â
+        return;  // æœ‰å¤–éƒ¨ä¾›ç”µï¼Œè·³è¿‡ä½ç”µæ£€æµ‹
     }
     
-    PWR_PVDLevelConfig(PWR_PVDLevel_2V6);  // ãĞÖµ2.6V
+    PWR_PVDLevelConfig(PWR_PVDLevel_2V6);  // é˜ˆå€¼2.6V
     PWR_PVDCmd(ENABLE);
     Delay_Ms(1);
-    // ¶à´Î¼ì²âÈ¥¶¶£¬·ÀÖ¹PVDÎó´¥·¢
+    // å¤šæ¬¡æ£€æµ‹å»æŠ–ï¼Œé˜²æ­¢PVDè¯¯è§¦å‘
     // uint8_t pvd_count = 0;
     // for (uint8_t i = 0; i < 50; i++) {
     //     Delay_Ms(2);
     //     if (PWR_GetFlagStatus(PWR_FLAG_PVDO) == SET) pvd_count++;
     // }
-    if (PWR_GetFlagStatus(PWR_FLAG_PVDO) == SET)  // VDD < 2.6V£¨¶àÊı²É¼¯ÖĞ£©
+    if (PWR_GetFlagStatus(PWR_FLAG_PVDO) == SET)  // VDD < 2.6Vï¼ˆå¤šæ•°é‡‡é›†ä¸­ï¼‰
     {
-        /* PWM³õÊ¼»¯ºóPB9ÊÇ¸´ÓÃÊä³ö£¬±ØĞëÏÈ»Ö¸´ÎªGPIO²ÅÄÜÖ±½Ó¿ØÖÆ¡£ */
-        LCD_Backlight_PWM_Stop();  // »Ö¸´PB9ÎªGPIO²¢¹Ø±³¹â
-        Delay_Ms(10);              // Ïû³ı»¨ÆÁ
-        LCD_ShowLowBattery();       // ÏÔÊ¾"µç³ØµçÑ¹µÍ"
-        LCD_LED_CLR;                // ¿ª±³¹â
+        /* PWMåˆå§‹åŒ–åPB9æ˜¯å¤ç”¨è¾“å‡ºï¼Œå¿…é¡»å…ˆæ¢å¤ä¸ºGPIOæ‰èƒ½ç›´æ¥æ§åˆ¶ã€‚ */
+        LCD_Backlight_PWM_Stop();  // æ¢å¤PB9ä¸ºGPIOå¹¶å…³èƒŒå…‰
+        Delay_Ms(10);              // æ¶ˆé™¤èŠ±å±
+        LCD_ShowLowBattery();       // æ˜¾ç¤º"ç”µæ± ç”µå‹ä½"
+        LCD_LED_CLR;                // å¼€èƒŒå…‰
         for (uint8_t i = 0; i < 5; i++) {
-            IWDG_ReloadCounter();    // ¿´ÃÅ¹·Ô¼1Ãë£¬·ÀÖ¹ÌáÊ¾ÆÚ¼äÌáÇ°¸´Î»
+            IWDG_ReloadCounter();    // çœ‹é—¨ç‹—çº¦1ç§’ï¼Œé˜²æ­¢æç¤ºæœŸé—´æå‰å¤ä½
             Delay_Ms(100);
         }
-        LCD_LED_SET;                // ¹Ø±³¹â
+        LCD_LED_SET;                // å…³èƒŒå…‰
 
-        /* µÍµç¹Ø»úÇ°±£´æÓÎÏ·×´Ì¬ */
+        /* ä½ç”µå…³æœºå‰ä¿å­˜æ¸¸æˆçŠ¶æ€ */
         RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);
         PWR_BackupAccessCmd(ENABLE);
-        /* ÈôÓÎÏ·×´Ì¬ÓĞ±ä»¯£¬Çå³ıBKP±ê¼ÇÒÔ´¥·¢ÖØĞÂ±£´æ */
+        /* è‹¥æ¸¸æˆçŠ¶æ€æœ‰å˜åŒ–ï¼Œæ¸…é™¤BKPæ ‡è®°ä»¥è§¦å‘é‡æ–°ä¿å­˜ */
         if (g_lowbatt_game_dirty) {
             BKP_WriteBackupRegister(BKP_LOWBATT_SAVE_FLAG, 0x0000);
             g_lowbatt_game_dirty = 0;
         }
-        /* ÒÑ±£´æ(DR5=0xA5A5)ÔòÌø¹ı£¬·ÀÖ¹Æµ·±²ÁĞ´Flash */
+        /* å·²ä¿å­˜(DR5=0xA5A5)åˆ™è·³è¿‡ï¼Œé˜²æ­¢é¢‘ç¹æ“¦å†™Flash */
         if (BKP_ReadBackupRegister(BKP_LOWBATT_SAVE_FLAG)
             != BKP_LOWBATT_SAVE_MAGIC
             && GameSave_IsSupportedMode(s_main_mode)) {
@@ -217,15 +217,15 @@ void CheckAndShowLowBattery(void)
         }
 
         System_PrepareForStandby();
-        NVIC_SystemReset();    // Èí¸´Î» ¡ú main¿ªÍ·¼ì²âSFTRST ¡ú Ö±½ÓStandby
+        NVIC_SystemReset();    // è½¯å¤ä½ â†’ mainå¼€å¤´æ£€æµ‹SFTRST â†’ ç›´æ¥Standby
     }
 }
 
 /**
- * @brief  Çå³ıµÍµç±£´æ±ê¼Ç£¬±íÊ¾ÓÎÏ·×´Ì¬ÒÑ±ä»¯£¬ÏÂ´ÎµÍµçĞèÖØĞÂ±£´æ
- * @note   ÓÉ¸÷ÓÎÏ·ÔÚ×´Ì¬±ä»¯Ê±µ÷ÓÃ£¬½öÖÃRAM±äÁ¿£¬¹Ø»úÊ±Í³Ò»Ğ´BKP
+ * @brief  æ¸…é™¤ä½ç”µä¿å­˜æ ‡è®°ï¼Œè¡¨ç¤ºæ¸¸æˆçŠ¶æ€å·²å˜åŒ–ï¼Œä¸‹æ¬¡ä½ç”µéœ€é‡æ–°ä¿å­˜
+ * @note   ç”±å„æ¸¸æˆåœ¨çŠ¶æ€å˜åŒ–æ—¶è°ƒç”¨ï¼Œä»…ç½®RAMå˜é‡ï¼Œå…³æœºæ—¶ç»Ÿä¸€å†™BKP
  */
 void Main_ClearLowBattSaveFlag(void)
 {
-    g_lowbatt_game_dirty = 1;  /* ½öÖÃRAM±ê¼Ç£¬±ÜÃâÃ¿Ö¡Ğ´BKP */
+    g_lowbatt_game_dirty = 1;  /* ä»…ç½®RAMæ ‡è®°ï¼Œé¿å…æ¯å¸§å†™BKP */
 }
