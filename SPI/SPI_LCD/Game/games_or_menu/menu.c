@@ -14,12 +14,12 @@
 #include "fish.h"          /* fish_reset_touch (大鱼吃小鱼) */
 
 /* 游戏共用的退出菜单变量 (在 menu.c 中定义, menu.h 中 extern 声明) */
-uint8_t  g_touch_down;
-uint16_t g_touch_start_y;
-uint8_t  g_menu_cooldown;
-uint8_t  g_exit_menu_visible;
-uint8_t  g_exit_sliding;
-uint8_t  g_exit_dragging;
+uint8_t  g_touch_down;                  /* 触摸按下标志(当前是否按住) */
+uint16_t g_touch_start_y;               /* 触摸按下起点 Y */
+uint8_t  g_menu_cooldown;               /* 菜单操作冷却计数(防立即重触发) */
+uint8_t  g_exit_menu_visible;           /* 退出菜单是否可见 */
+uint8_t  g_exit_sliding;                /* 退出菜单滑动动画中 */
+uint8_t  g_exit_dragging;               /* 退出菜单拖拽跟手中 */
 uint8_t  g_state_before_menu = 0;     /* 进入菜单前的游戏状态 */
 int16_t  g_exit_drag_y = -MENU_H;     /* 退出菜单拖拽Y偏移 */
 uint16_t g_exit_drag_start_y = 0;     /* 退出菜单拖拽起始触摸Y */
