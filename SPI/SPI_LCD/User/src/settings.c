@@ -13,13 +13,72 @@
 #include "sok_img_win.h"
 #include "ch32v20x_bkp.h"
 
+/* ================= 常量与全局设置定义(统一置顶) ================= */
+
+/* ---- 设置持久化(BKP 后备寄存器) ---- */
 #define BKP_SLEEP_MAGIC  0xB071
 #define BKP_SLEEP_DR_MAGIC  BKP_DR6
 #define BKP_SLEEP_DR_INDEX  BKP_DR7
 #define BKP_BRIGHT_DR       BKP_DR8
 #define BKP_ORIENT_DR       BKP_DR10
 
-/* 统一保存: 确保DR6/DR7/DR8/DR10同时有效, 避免只保存一项时另一项为0导致唤醒后不亮 */
+/* ---- 数字绘制尺寸 ---- */
+#define DIGIT_W 14
+#define DIGIT_H 28
+
+/* ---- 亮度设置页 ---- */
+#define BR_X    44   /* (240-152)/2 居中 */
+#define BR_W    152
+#define BR_Y    108
+#define BR_H    12
+#define BR_KNOB_W 10
+#define BR_KNOB_H 20
+#define BR_NUM_CX  120                       /* 数字居中X */
+#define BR_NUM_Y   (BR_Y - 30)               /* 数字Y中心 (78) */
+#define TAP_THRESHOLD 15
+static uint8_t  s_br_drag = 0;              /* 亮度拖动中标志 */
+static int16_t  s_br_pos = BR_X + BR_W;     /* 当前滑块位置 */
+
+/* ---- 息屏时间设置页 ---- */
+#define ST_Y   100
+#define ST_H   34
+#define ST_W   38
+#define ST_LX  46
+#define ST_RX  156
+#define ST_NUM_CX 120                       /* 数字居中X */
+#define ST_NUM_Y  122                       /* 数字中心Y */
+static uint8_t s_st_prev = 0;               /* 上次按下状态 */
+static uint16_t s_st_start_x = 0;           /* 按下起点X */
+static uint16_t s_st_start_y = 0;           /* 按下起点Y */
+
+/* ---- 屏幕方向设置页 ---- */
+#define OR_X  120
+#define OR_Y  120
+#define OR_SZ 60                            /* 箭头更大 */
+static uint8_t s_or_prev = 0;               /* 上次按下状态 */
+static uint16_t s_or_start_x = 0;           /* 按下起点X */
+static uint16_t s_or_start_y = 0;           /* 按下起点Y */
+
+/* ---- 全局设置变量 ---- */
+uint8_t g_brightness = 100;                 /* 亮度 1~100 */
+uint8_t g_sleep_time_index = 2;             /* 息屏时间索引(0=2s ... 5=60s) */
+uint8_t g_orientation_index = 0;            /* 屏幕方向索引 0~3 */
+const uint16_t g_sleep_times[6] = {2, 5, 10, 20, 30, 60};   /* 可选息屏秒数 */
+static const uint8_t madctl_rotations[4] = {0x08, 0x68, 0xC8, 0xA8};  /* MADCTL 方向 */
+static SettingsMode s_mode = SETTINGS_NONE;  /* 当前设置页 */
+
+/* ---- 各设置页函数前置声明 ---- */
+static void Brightness_Draw(void);
+static void Brightness_DrawSlider(void);
+static void SleepTime_Draw(void);
+static void Orientation_Draw(void);
+static void Sleep_DrawBody(void);
+static void Orientation_DrawBody(void);
+
+/**
+* @brief  统一保存所有设置到 BKP 后备寄存器(魔数/息屏时间/亮度/方向)。
+* @note   确保 DR6/DR7/DR8/DR10 同时有效, 避免只存一项时另一项为 0 导致唤醒后不亮。
+*/
 static void Settings_SaveAll(void)
 {
     BKP_WriteBackupRegister(BKP_SLEEP_DR_MAGIC, BKP_SLEEP_MAGIC);
@@ -28,23 +87,10 @@ static void Settings_SaveAll(void)
     BKP_WriteBackupRegister(BKP_ORIENT_DR, g_orientation_index);
 }
 
-/* ---- 全局设置变量 ---- */
-uint8_t g_brightness = 100;
-uint8_t g_sleep_time_index = 2;
-uint8_t g_orientation_index = 0;
-const uint16_t g_sleep_times[6] = {2, 5, 10, 20, 30, 60};
-
-static const uint8_t madctl_rotations[4] = {0x08, 0x68, 0xC8, 0xA8};
-static SettingsMode s_mode = SETTINGS_NONE;
-
-/* 前置声明 */
-static void Brightness_Draw(void);
-/* 重绘当前设置页(只重绘、不处理触摸), 供低电图标灭段恢复时调用 */
-static void Brightness_DrawSlider(void);
-static void SleepTime_Draw(void);
-static void Orientation_Draw(void);
-static void Sleep_DrawBody(void);          /* 设置页内容局部重绘(低电区域刷新用) */
-static void Orientation_DrawBody(void);
+/**
+* @brief  重绘当前设置页(整页: 清黑+返回键+内容)。
+* @note   只重绘、不处理触摸, 供设置页刷新/进入时调用。
+*/
 void Settings_Redraw(void)
 {
     switch (s_mode) {
@@ -55,7 +101,10 @@ void Settings_Redraw(void)
     }
 }
 
-/* 低电灭段恢复: 只重绘电池图标覆盖区的当前设置页内容(不整屏清黑, 避免电池消失后整屏闪一下) */
+/**
+* @brief  低电灭段恢复: 只重绘电池图标覆盖区内的当前设置页内容。
+* @note   先清红色低电图标(红→黑), 再按 s_mode 局部重绘, 不整屏清黑, 避免消失后整屏闪一下。
+*/
 void Settings_RedrawRegion(void)
 {
     LCD_ClearLowBatteryOverlay();   /* 清红色图标(红→黑) */
@@ -68,48 +117,14 @@ void Settings_RedrawRegion(void)
 }
 
 
-
-#define DIGIT_W 14
-#define DIGIT_H 28
-
-/* 亮度 */
-#define BR_X    44   /* (240-152)/2 居中 */
-#define BR_W    152
-#define BR_Y    108
-#define BR_H    12
-#define BR_KNOB_W 10
-#define BR_KNOB_H 20
-#define BR_NUM_CX  120                       /* 数字居中X */
-#define BR_NUM_Y   (BR_Y - 30)               /* 数字Y中心 (78) */
-
-#define TAP_THRESHOLD 15
-
-static uint8_t  s_br_drag = 0;
-static int16_t  s_br_pos = BR_X + BR_W;
-
-/* 息屏 */
-#define ST_Y   100
-#define ST_H   34
-#define ST_W   38
-#define ST_LX  46
-#define ST_RX  156
-#define ST_NUM_CX 120                       /* 数字居中X */
-#define ST_NUM_Y  122                       /* 数字中心Y */
-
-static uint8_t s_st_prev = 0;
-static uint16_t s_st_start_x = 0;
-static uint16_t s_st_start_y = 0;
-
-/* 方向 */
-#define OR_X  120
-#define OR_Y  120
-#define OR_SZ 60                            /* 箭头更大 */
-
-static uint8_t s_or_prev = 0;
-static uint16_t s_or_start_x = 0;
-static uint16_t s_or_start_y = 0;
-
-/* ---- 辅助: 用2048字库画居中数字 ---- */
+/**
+* @brief  用 2048 字库把数值居中绘制在 (cx, cy), 支持 0~999。
+* @param  cx    数字中心 X
+* @param  cy    数字中心 Y
+* @param  num   要显示的数值(0~999)
+* @param  color 数字颜色(RGB565)
+* @note   内部 LCD_CS_CLR/SET, 调用前勿假设 CS 状态。
+*/
 static void DrawDigitsCenter(uint16_t cx, uint16_t cy,
                               uint16_t num, uint16_t color)
 {
@@ -140,7 +155,12 @@ static void DrawDigitsCenter(uint16_t cx, uint16_t cy,
     LCD_CS_SET;
 }
 
-/* ---- 辅助: 清除数字区域 ---- */
+/**
+* @brief  清除数字显示区域(以 cx 为中心, 宽±50, 高=数字高+4)为黑。
+* @param  cx 数字中心 X
+* @param  cy 数字中心 Y
+* @note   只清数字附近, 不影响整框/文字。
+*/
 static void ClearDigitArea(uint16_t cx, uint16_t cy)
 {
     int16_t x0 = (int16_t)cx - 50;
@@ -154,14 +174,20 @@ static void ClearDigitArea(uint16_t cx, uint16_t cy)
     LCD_Fill((uint16_t)x0, (uint16_t)y0, (uint16_t)x1, (uint16_t)y1, LCD_BLACK);
 }
 
-/* ---- 辅助: 返回按钮绘制 ---- */
+/**
+* @brief  绘制返回按钮: 白底黑色方框(3px 内缩)。
+* @note   按钮宏为 BACK_X/BACK_Y/BACK_W/BACK_H。
+*/
 static void DrawBack(void)
 {
     LCD_Fill(BACK_X, BACK_Y, BACK_X + BACK_W, BACK_Y + BACK_H, 0xFFFF);
     LCD_Fill(BACK_X + 3, BACK_Y + 3, BACK_X + BACK_W - 3, BACK_Y + BACK_H - 3, 0x0000);
 }
 
-/* ---- 屏幕方向应用 ---- */
+/**
+* @brief  应用屏幕方向(写 MADCTL 0x36 寄存器)。
+* @param  index 方向索引 0~3(越界钳位为 0)
+*/
 void Settings_ApplyOrientation(uint8_t index)
 {
     if (index > 3) index = 0;
@@ -171,7 +197,11 @@ void Settings_ApplyOrientation(uint8_t index)
     LCD_CS_SET;
 }
 
-/* ---- 进入设置 ---- */
+/**
+* @brief  进入指定设置页并立即重绘。
+* @param  mode 设置页枚举(SETTINGS_BRIGHTNESS/SLEEP_TIME/ORIENTATION)
+* @note   重置各页触摸状态, 并把亮度滑块 s_br_pos 初始到当前亮度位置。
+*/
 void Settings_Enter(SettingsMode mode)
 {
     s_mode = mode;
@@ -191,9 +221,10 @@ void Settings_Enter(SettingsMode mode)
     }
 }
 
-/* ================================================================
- *  亮度设置
- * ================================================================ */
+/**
+* @brief  绘制亮度页内容(轨道/激活填充/滑块/上方数字), 用于局部刷新。
+* @note   不动整框/返回键, 避免整页重画闪烁; 供拖拽或参数变化时调用。
+*/
 static void Brightness_DrawSlider(void)
 {
     /* 轨道背景 */
@@ -209,6 +240,9 @@ static void Brightness_DrawSlider(void)
     DrawDigitsCenter(BR_NUM_CX, BR_NUM_Y, g_brightness, LCD_GBLUE);
 }
 
+/**
+* @brief  绘制亮度设置整页: 清黑 + 返回键 + 滑块内容。
+*/
 static void Brightness_Draw(void)
 {
     LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
@@ -216,6 +250,11 @@ static void Brightness_Draw(void)
     Brightness_DrawSlider();
 }
 
+/**
+* @brief  处理亮度页触摸: 点/拖滑块调节亮度, 松手保存。
+* @return 恒返回 1(页面活跃)。
+* @note   只响应起点在滑块区域的触摸; 拖动中任意 Y 可左右调; 松手时 Settings_SaveAll。
+*/
 static uint8_t Brightness_Update(void)
 {
     static uint16_t s_br_start_y = 0;
@@ -255,9 +294,10 @@ static uint8_t Brightness_Update(void)
     return 1;
 }
 
-/* ================================================================
- *  息屏时间设置
- * ================================================================ */
+/**
+* @brief  绘制息屏时间页内容("-" 按钮/数字/"S" 图标), 用于局部刷新。
+* @note   不含整框清黑/返回键, 供低电灭段恢复或增量刷新调用。
+*/
 static void Sleep_DrawBody(void)
 {
     /* "-" 按钮 */
@@ -299,6 +339,9 @@ static void Sleep_DrawBody(void)
     }
 }
 
+/**
+* @brief  绘制息屏时间设置整页: 清黑 + 返回键 + 内容。
+*/
 static void SleepTime_Draw(void)
 {
     LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
@@ -306,6 +349,11 @@ static void SleepTime_Draw(void)
     Sleep_DrawBody();
 }
 
+/**
+* @brief  处理息屏时间页触摸: 点 "-"/"+" 增减, 松手保存。
+* @return 恒返回 1(页面活跃)。
+* @note   仅 Y<200 的点击响应, 屏蔽下方 200~240 防划菜单误触。
+*/
 static uint8_t SleepTime_Update(void)
 {
     TouchState ts;
@@ -343,9 +391,10 @@ static uint8_t SleepTime_Update(void)
     return 1;
 }
 
-/* ================================================================
- *  屏幕方向设置
- * ================================================================ */
+/**
+* @brief  绘制屏幕方向页内容(上箭头+右标记), 用于局部刷新。
+* @note   屏幕方向由 MADCTL 寄存器旋转, 此处仅画示意箭头。
+*/
 static void Orientation_DrawBody(void)
 {
     int16_t cx = OR_X, cy = OR_Y, s = OR_SZ;
@@ -358,6 +407,9 @@ static void Orientation_DrawBody(void)
     }
 }
 
+/**
+* @brief  绘制屏幕方向设置整页: 清黑 + 返回键 + 内容。
+*/
 static void Orientation_Draw(void)
 {
     LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
@@ -365,6 +417,11 @@ static void Orientation_Draw(void)
     Orientation_DrawBody();
 }
 
+/**
+* @brief  处理屏幕方向页触摸: 点击即循环切换方向(0~3)并保存。
+* @return 恒返回 1(页面活跃)。
+* @note   单击切换方向并写 MADCTL 旋转, 松手时保存。
+*/
 static uint8_t Orientation_Update(void)
 {
     TouchState ts;
@@ -391,9 +448,10 @@ static uint8_t Orientation_Update(void)
     return 1;
 }
 
-/* ================================================================
- *  退出设置
- * ================================================================ */
+/**
+* @brief  退出设置: 复位 s_mode 与各页触摸状态。
+* @note   不重绘画面, 由调用方(main.c)恢复场景。
+*/
 void Settings_Exit(void)
 {
     s_mode = SETTINGS_NONE;
@@ -406,9 +464,10 @@ void Settings_Exit(void)
     s_or_start_y = 0;
 }
 
-/* ================================================================
- *  统一入口
- * ================================================================ */
+/**
+* @brief  统一设置入口: 按 s_mode 分派到对应页 Update。
+* @return 1=设置页活跃; 0=不在设置状态(s_mode==NONE)。
+*/
 uint8_t Settings_Update(void)
 {
     if (s_mode == SETTINGS_NONE) return 0;
