@@ -890,8 +890,10 @@ uint8_t tetris_restore_state(const uint8_t *buf, uint8_t len)
     }
     return 1;
 }
-/* 绘制退出/重开菜单的背景(棋盘/结束画面)。
-   若进菜单前游戏已结束(OVER), 显示结束画面而非重绘棋盘(重绘棋盘会擦掉结束文字)。 */
+/**
+ * @brief  绘制退出/重开菜单的背景(棋盘/结束画面)。
+ * @note   进菜单前若游戏已结束(OVER), 显示结束画面而非重绘棋盘(重绘棋盘会擦掉结束文字)。
+ */
 static void tetris_draw_menu_scene(void)
 {
     if (g_state_before_menu == TETRIS_STATE_OVER) {
@@ -947,14 +949,13 @@ static void tetris_draw_menu_scene(void)
 }
 
 
-/**
- * @brief  俄罗斯方块每帧更新: 处理触摸手势、菜单交互、自动下落、消行动画和渲染
- * @retval GAME_RET_NONE=无交互, GAME_RET_INTERACT=有交互, 其他=退出到指定游戏/视频
- */
 /* ================================================================
  *  配置驱动菜单状态机的 hook (mark_dirty / bg_redraw / on_to_exit)
  * ================================================================ */
-void tetris_menu_mark_dirty(void)   /* 关闭/取消菜单后需重绘场景 */
+/**
+ * @brief  关闭/取消菜单后置脏, 以便下一帧重绘游戏场景。
+ */
+void tetris_menu_mark_dirty(void)
 {
     g_board_dirty = 2;
     g_sidebar_dirty = 1;
@@ -962,14 +963,19 @@ void tetris_menu_mark_dirty(void)   /* 关闭/取消菜单后需重绘场景 */
     g_gameover_drawn = 0;
 }
 
-/* 依据脏标记重绘菜单背景(棋盘/结束画面): 返回1=本帧已重绘 */
+/**
+ * @brief  依据脏标记重绘菜单背景(棋盘/结束画面)。
+ * @return 1=本帧已重绘; 0=无脏未重绘。
+ */
 uint8_t tetris_menu_bg_redraw(void)
 {
     if (g_board_dirty >= 2) { tetris_draw_menu_scene(); return 1; }
     return 0;
 }
 
-/* 重菜下滑打断进退出菜单后的补充处理: 置脏以便重绘 */
+/**
+ * @brief  重开菜单下滑打断进退出菜单后的补充处理: 置脏以便重绘场景。
+ */
 static void tetris_menu_on_to_exit(void)
 {
     g_board_dirty = 2;
@@ -977,9 +983,12 @@ static void tetris_menu_on_to_exit(void)
     g_preview_dirty = 1;
 }
 
-/* 只重绘电池覆盖的棋盘区(row5~14)中未被菜单框 y 覆盖(框外/拖拽中露出)的行, 框内
-   (完全被菜单框 y 覆盖)的行由菜单框盖住, 不重绘(否则先棋盘后菜单闪一帧).
-   电池主体/感叹号在棋盘上, 凸点/预览区由调用方 draw_preview 恢复. */
+/**
+ * @brief  只重绘电池覆盖的棋盘区(row5~14)中未被菜单框覆盖(框外/拖拽中露出)的行。
+ * @param  menu_top 菜单框顶 Y
+ * @param  menu_h   菜单框高
+ * @note   框内(完全被菜单框 y 覆盖)的行由菜单框盖住不重绘, 否则先棋盘后菜单会闪一帧; 凸点/预览区由调用方 draw_preview 恢复。
+ */
 static void tetris_restore_board_above_menu(int16_t menu_top, int16_t menu_h)
 {
     int16_t menu_bot = menu_top + menu_h;
@@ -1014,6 +1023,10 @@ static void tetris_restore_board_above_menu(int16_t menu_top, int16_t menu_h)
     }
 }
 
+/**
+ * @brief  低电图标灭段恢复: 按菜单覆盖范围恢复电池覆盖的棋盘/预览区。
+ * @note   退出菜单覆盖整屏(框内棋盘由菜单框盖住不重绘); 重开菜单只盖 y>=110; 纯游戏用全量重绘。
+ */
 void tetris_lowbatt_restore(void)
 {
     LCD_ClearLowBatteryOverlay();   /* 图标边框+凸点+感叹号 红→黑 */
@@ -1043,6 +1056,10 @@ static const GameMenuCfg g_tetris_menu_cfg = {
     tetris_menu_mark_dirty, tetris_menu_bg_redraw, tetris_menu_on_to_exit
 };
 
+/**
+ * @brief  俄罗斯方块每帧更新: 处理触摸手势、菜单交互、自动下落、消行动画和渲染
+ * @return GAME_RET_NONE=无交互, GAME_RET_INTERACT=有交互, 其他=退出到指定游戏/视频。
+ */
 uint8_t tetris_update(void)
 {
     uint8_t interacted = 0;
