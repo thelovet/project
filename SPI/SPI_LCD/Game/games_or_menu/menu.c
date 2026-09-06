@@ -233,9 +233,9 @@ uint32_t game_rand(void)
     return state;
 }
 
-/*********************************************************************
+/**
  * @brief  绘制华容道图标 (4x4网格, 右下角留空表示空格)
- **********************************************************************/
+ */
 void menu_draw_klotski_icon(uint16_t y)
 {
     uint8_t cell = 6, gap = 1;
@@ -254,9 +254,9 @@ void menu_draw_klotski_icon(uint16_t y)
     }
 }
 
-/*********************************************************************
+/**
  * @brief  绘制俄罗斯方块 T 形图标
- **********************************************************************/
+ */
 void menu_draw_tetris_icon(uint16_t y)
 {
     uint16_t cell = 14, g2 = 2;
@@ -271,10 +271,10 @@ void menu_draw_tetris_icon(uint16_t y)
     LCD_Fill(x2 + g2, y1 + g2, x2 + cell - g2, y1 + cell - g2, MENU_TEXT_COLOR);
 }
 
-/*********************************************************************
+/**
  * @brief  绘制大鱼吃小鱼图标 (中文"鱼"字, 24x24)
  * @note   直接使用固件内字模 font_yu 绘制, 不经外部Flash(免重新烧录)
- **********************************************************************/
+ */
 void menu_draw_fish_icon(uint16_t y)
 {
     uint16_t iw = 24;  /* 字宽 */
@@ -286,9 +286,9 @@ void menu_draw_fish_icon(uint16_t y)
 
 
 
-/*********************************************************************
+/**
  * @brief  绘制菜单外框 (边框 + 纯色背景)
- **********************************************************************/
+ */
 void menu_draw_frame(void)
 {
     LCD_Fill(MENU_X, MENU_Y, MENU_X + MENU_W - 1, MENU_Y + MENU_BDR - 1, MENU_BORDER_COLOR);
@@ -299,12 +299,12 @@ void menu_draw_frame(void)
              MENU_X + MENU_W - MENU_BDR - 1, MENU_Y + MENU_H - MENU_BDR - 1, MENU_BG_COLOR);
 }
 
-/*********************************************************************
+/**
  * @brief  菜单选项碰撞检测
  * @param  x, y        触摸坐标
  * @param  item_count  菜单项数量 (2 或 3)
  * @return 被点击的菜单项索引 (0-based), -1 表示未命中
- **********************************************************************/
+ */
 int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count)
 {
     if (x < MENU_X || x >= MENU_X + MENU_W) return -1;
@@ -358,10 +358,10 @@ static void menu_font_cache_load(void)
     }
 }
 
-/*********************************************************************
+/**
  * @brief  绘制主菜单 (5行: 推箱子/2048/俄罗斯方块/华容道/大鱼吃小鱼)
  * @note   去掉原"返回(视频)"行, 回视频靠点菜单外 (menu_hit_test 返回 -1)
- **********************************************************************/
+ */
 /* 主菜单行类型 (供 main_menu_draw / main_menu_draw_frame_only 共用, 布局一致) */
 static const uint8_t g_main_menu_row_types[5] = {
     MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH
@@ -376,9 +376,9 @@ void main_menu_draw(void)
     menu_draw_nrow_frame_only(MENU_Y, g_main_menu_row_types, 5);
 }
 
-/*********************************************************************
+/**
  * @brief  主菜单动画 (5行: 推箱子/2048/俄罗斯方块/华容道/大鱼吃小鱼)
- **********************************************************************/
+ */
 void main_menu_draw_frame_only(int16_t y_top)
 {
     menu_draw_nrow_frame_only(y_top, g_main_menu_row_types, 5);
@@ -417,13 +417,13 @@ static void draw_2048_strip(uint8_t *row, uint8_t cr, uint16_t menu_w)
     }
 }
 
-/*********************************************************************
+/**
  * @brief  通用n行动画菜单流式条带渲染 (主菜单/游戏退出/重新开始共用)
  *         设一次LCD窗口 → 逐条带填框架+文字/图标 → DMA连续推送
  * @param  y_top      菜单顶部Y坐标
  * @param  row_types  行内容类型数组 (MENU_ROW_*)
  * @param  n_rows     行数 (2=重新开始, 5=主菜单/退出菜单)
- **********************************************************************/
+ */
 /* 把低电电池图标(框2px边+感叹号)该行的红色像素写进菜单条带 buf(菜单内坐标),
    使菜单跟手重绘时电池区内容即为图标(而非被遮蔽再补画), 菜单+图标一次 DMA 一起绘制,
    消除"菜单每帧清青+图标每帧补红"来回闪. 凸点(x=195~210)在菜单右缘外, 由
@@ -770,9 +770,9 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t *row_types,
     #undef TX_H
     #undef TX_L
 }
-/*********************************************************************
+/**
  * @brief  游戏菜单中点击"设置"按钮, 打开视频设置菜单
- **********************************************************************/
+ */
 void menu_enter_game_settings(void)
 {
     g_settings_from_game = 1;
@@ -800,11 +800,11 @@ void game_menu_drag_reset(void)
     gdp_max_ty = 0;
 }
 
-/*********************************************************************
+/**
  * @brief  游戏退出菜单跟手拖拽轮询 (4个游戏共用)
  *         单向: 只跟手下拉, 不跟手上移; 松手上划>10px返回2取消
  * @return 0=拖拽中, 1=已释放-提交, 2=已释放-取消
- **********************************************************************/
+ */
 uint8_t game_menu_drag_poll(int16_t *drag_y, uint16_t *drag_touch_y,
                              uint8_t *dragging, const TouchState *ts,
                              const uint8_t row_types[5])
@@ -844,13 +844,13 @@ uint8_t game_menu_drag_poll(int16_t *drag_y, uint16_t *drag_touch_y,
     return 0;
 }
 
-/*********************************************************************
+/**
  * @brief  重新开始菜单跟手上划轮询
  *         单向: 只跟手上划, 不跟手下移
  *         松手时根据回退距离判断: max_dy - cur_dy > 5 → 取消, 否则提交
  *         (与视频菜单 video_menu_drag_poll 逻辑一致)
  * @return 0=拖拽中, 1=已释放-提交, 2=已释放-取消
- **********************************************************************/
+ */
 uint8_t game_restart_menu_drag_poll(int16_t *slide_y, uint16_t drag_start_y,
                                      uint8_t *dragging, const TouchState *ts)
 {
@@ -885,10 +885,10 @@ uint8_t game_restart_menu_drag_poll(int16_t *slide_y, uint16_t drag_start_y,
     return 0;
 }
 
-/*********************************************************************
+/**
  * @brief  检测重新开始菜单中的顶部下滑手势
  * @return 1 表示检测到有效下滑，0 表示尚未触发
- **********************************************************************/
+ */
 uint8_t game_restart_menu_down_poll(const TouchState *ts, uint8_t *touch_down,
                                     uint16_t *start_x, uint16_t *start_y)
 {
@@ -904,10 +904,10 @@ uint8_t game_restart_menu_down_poll(const TouchState *ts, uint8_t *touch_down,
     return *start_y < MENU_SWIPE_START_Y && (int16_t)ts->y - (int16_t)*start_y > 5;
 }
 
-/*********************************************************************
+/**
  * @brief  视频上划设置菜单跟手轮询 (底部上划)
  * @return 0=拖拽中(已绘制), 1=已释放(调用者应启动滑动动画)
- **********************************************************************/
+ */
 #define VIDEO_MENU_SLIDE_SPEED   1  /* 上划移动速度 */
 #define VIDEO_MENU_DRAG_MAX_STEP 4
 /**
@@ -950,10 +950,10 @@ uint8_t video_menu_drag_poll(int16_t *slide_y, uint16_t drag_start_y,
     return 0;
 }
 
-/*********************************************************************
+/**
  * @brief  检测视频模式下的底部上划手势
  * @return 1 表示检测到有效上划，0 表示尚未触发
- **********************************************************************/
+ */
 #define VIDEO_SWIPE_START_Y  210  /* 上划起点最小Y (接近底部) */
 #define VIDEO_SWIPE_TRIGGER   5
 /**
@@ -984,7 +984,7 @@ uint8_t video_menu_swipe_up_poll(const TouchState *ts, uint8_t *touch_down,
 #undef VIDEO_SWIPE_START_Y
 #undef VIDEO_SWIPE_TRIGGER
 
-/*********************************************************************
+/**
  * @brief  主菜单触摸处理 + 模式切换
  *         封装 hit检测 + LCD清屏 + 模式切换 + 返回视频
  * @param  x, y        触摸坐标
@@ -994,7 +994,7 @@ uint8_t video_menu_swipe_up_poll(const TouchState *ts, uint8_t *touch_down,
  * @param  touch_down  s_touch_down 指针
  * @param  key_resp    key_response 指针
  * @return 1 = 已处理, 0 = 未处理
- **********************************************************************/
+ */
 static uint8_t main_menu_hit_test(uint16_t x, uint16_t y);  /* 前向声明 */
 /**
  * @brief  主菜单命中检测与点击处理(返回值切换模式)。
@@ -1059,12 +1059,12 @@ uint8_t main_menu_handle(uint16_t x, uint16_t y,
     return 1;
 }
 
-/*********************************************************************
+/**
  * @brief  主菜单触摸检测 (5行菜单: 推箱子/2048/俄罗斯方块/华容道/返回)
  *         封装 menu_hit_test + hit→动作码映射
  * @param  x, y  触摸坐标
  * @return MAIN_MENU_ACT_* 动作码
- **********************************************************************/
+ */
 uint8_t main_menu_hit_test(uint16_t x, uint16_t y)
 {
     int8_t hit = menu_hit_test(x, y, 5);
@@ -1107,7 +1107,7 @@ static void game_reset_touch(uint8_t ret)
     }
 }
 
-/*********************************************************************
+/**
  * @brief  统一游戏返回值处理 (4个游戏共用)
  *         根据 ret 码执行模式切换或返回视频
  * @param  ret        游戏 update 返回值 (GAME_RET_*)
@@ -1116,7 +1116,7 @@ static void game_reset_touch(uint8_t ret)
  * @param  touch_down s_touch_down 指针
  * @param  key_resp   key_response 指针
  * @return ret 原值 (便于调用方判断)
- **********************************************************************/
+ */
 uint8_t game_handle_ret(uint8_t ret, MainMode *mode, uint8_t *game_inited,
                          uint8_t *touch_down, uint8_t *key_resp)
 {
@@ -1144,14 +1144,14 @@ uint8_t game_handle_ret(uint8_t ret, MainMode *mode, uint8_t *game_inited,
     return ret;
 }
 
-/*********************************************************************
+/**
  * @brief  退出菜单触摸轮询 (4个游戏共用)
  *         按下时记录菜单行，松手仍在同一行才触发
  * @param  ret_map       hit索引(0-3)到返回码的映射表
  * @param  prev_pressed  上一帧触摸状态指针
  * @param  out_ts        输出触摸坐标
  * @return EXIT_RET_NONE(0) / EXIT_RET_BACK(0xFF) / EXIT_RET_*
- **********************************************************************/
+ */
 uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t *prev_pressed,
                             TouchState *out_ts)
 {
@@ -1183,7 +1183,7 @@ uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t *prev_pressed,
     return EXIT_RET_NONE;
 }
 
-/*********************************************************************
+/**
  * @brief  检测底部上划打断退出菜单 (d2048/tetris/klotski 共用)
  *         维护 g_touch_down/g_touch_start_y，在拖拽/释放时检测上划
  *         检测到时自动清理退出菜单(g_exit_*清零+LCD_Fill清屏)
@@ -1191,7 +1191,7 @@ uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t *prev_pressed,
  * @param  dy_out       释放路径的输出滑动距离
  * @return 0=无动作, 1=拖拽中断(已清屏, 调用方切换状态+设置拖动脏位)
  *              2=释放中断(已清屏, 调用方切换状态+设置滑动脏位)
- **********************************************************************/
+ */
 uint8_t game_menu_swipe_up_poll(uint16_t y_threshold, uint8_t release_thresh,
                                 int16_t *dy_out)
 {
@@ -1228,14 +1228,14 @@ uint8_t game_menu_swipe_up_poll(uint16_t y_threshold, uint8_t release_thresh,
     return 0;
 }
 
-/*********************************************************************
+/**
  * @brief  退出菜单已显示(静止)时, 检测中间区域上划手势 关闭菜单返回游戏
  *         按起点分流: 底部(y>y_threshold)上划由 game_menu_swipe_up_poll 保留给切重菜,
  *         中间区域(起点 y 在 [10, y_threshold))上划才由本函数关闭菜单。推箱子不用本函数。
  * @param  y_threshold   底部切重菜起点阈值(起点<此值才属中间区域)
  * @param  release_thresh 释放上划距离阈值
  * @return 1=已检测到中间区域上划(调用方执行关闭菜单), 0=未触发
- **********************************************************************/
+ */
 uint8_t game_menu_swipe_mid_up_close(uint16_t y_threshold, uint8_t release_thresh)
 {
     static uint8_t  mu_dn = 0;      /* 中间区域上划追踪 */
@@ -1264,7 +1264,7 @@ uint8_t game_menu_swipe_mid_up_close(uint16_t y_threshold, uint8_t release_thres
     return 0;
 }
 
-/*********************************************************************
+/**
  * @brief  检测中间区域下滑关闭上划菜单 (视频上滑菜单/游戏二级设置菜单共用)
  *         按起点分流: 顶部(起点<MENU_SWIPE_START_Y)下滑由调用方保留给"切换退出菜单",
  *         中间/底部区域(起点在[MENU_SWIPE_START_Y, 240))下滑才由本函数关闭菜单。
@@ -1272,7 +1272,7 @@ uint8_t game_menu_swipe_mid_up_close(uint16_t y_threshold, uint8_t release_thres
  * @param  release_thresh 下滑距离阈值
  * @return 1=已检测到中间区域下滑(调用方执行关闭菜单), 0=未触发
  * @note   与 game_menu_swipe_mid_up_close 对称, 独立 static 状态不复用, 防互抢。
- **********************************************************************/
+ */
 uint8_t game_menu_swipe_mid_down_close(uint16_t start_min, uint8_t release_thresh)
 {
     static uint8_t  md_dn = 0;      /* 中间区域下滑追踪 */
@@ -1318,10 +1318,10 @@ void game_menu_fix_release_after_close(void)
     g_game_consume_release = t.pressed ? 1 : 0;  /* 仅手指按住(反向滑)才标记吸收本次松手, 点击关闭不标记 */
 }
 
-/*********************************************************************
+/**
  * @brief  顶部下滑拖拽中触发退出菜单 (3个游戏共用)
  * @return 1=已进入退出菜单拖拽模式, 0=未触发
- **********************************************************************/
+ */
 uint8_t game_menu_enter_exit_drag(const TouchState *ts, uint8_t *state,
                                    uint8_t playing_state, uint8_t exit_state)
 {
@@ -1345,10 +1345,10 @@ uint8_t game_menu_enter_exit_drag(const TouchState *ts, uint8_t *state,
     return 1;
 }
 
-/*********************************************************************
+/**
  * @brief  底部上划拖拽中触发重新开始菜单 (3个游戏共用)
  * @return 1=已进入重新开始菜单拖拽模式, 0=未触发
- **********************************************************************/
+ */
 uint8_t game_menu_enter_restart_drag(const TouchState *ts, uint8_t *state,
                                       uint8_t playing_state, uint8_t restart_state,
                                       uint16_t y_threshold)
@@ -1377,10 +1377,10 @@ uint8_t game_menu_enter_restart_drag(const TouchState *ts, uint8_t *state,
     return 1;
 }
 
-/*********************************************************************
+/**
  * @brief  松手时提交退出菜单 (3个游戏共用)
  * @return 1=已提交退出菜单滑动, 0=未触发
- **********************************************************************/
+ */
 uint8_t game_menu_commit_exit(int16_t dy, uint8_t *state, uint8_t exit_state)
 {
     if (g_touch_start_y >= MENU_SWIPE_START_Y
@@ -1396,10 +1396,10 @@ uint8_t game_menu_commit_exit(int16_t dy, uint8_t *state, uint8_t exit_state)
     return 1;
 }
 
-/*********************************************************************
+/**
  * @brief  松手时提交重新开始菜单 (3个游戏共用)
  * @return 1=已提交重新开始菜单滑动, 0=未触发
- **********************************************************************/
+ */
 uint8_t game_menu_commit_restart(int16_t dy, uint8_t *state, uint8_t restart_state,
                                   uint16_t y_threshold, uint8_t swipe_dist)
 {
@@ -1503,10 +1503,10 @@ void menu_exit_back_cleanup(void)
     g_touch_down = 0;
 }
 
-/*********************************************************************
+/**
  * @brief  退出菜单取消时按拖拽实际位置清除可见区域
  * @param  y  取消瞬间退出菜单的顶部Y坐标 (可能为负)
- **********************************************************************/
+ */
 void menu_clear_exit_area_to(int16_t y)
 {
     int16_t bottom = y + MENU_H;
@@ -1514,12 +1514,12 @@ void menu_clear_exit_area_to(int16_t y)
     LCD_Fill(MENU_X, (uint16_t)y, MENU_X + MENU_W, (uint16_t)bottom, g_menu_clear_color);
 }
 
-/*********************************************************************
+/**
  * @brief  配置驱动游戏退出/重新开始菜单统一状态机 (d2048/klotski/tetris/fish 共用)
  *         把各游戏 update() 里重复的 EXIT_MENU/RESTART_MENU 状态处理收敛到一处:
  *         仅通过 GameMenuCfg 传入状态枚举/行类型/映射/阈值/背景重绘回调等差异点.
  * @return GAME_MENU_CMD_*; 调用方按命令执行 init/设置/切换等游戏侧动作
- **********************************************************************/
+ */
 uint8_t game_menu_command(const GameMenuCfg *cfg, uint8_t *state, uint8_t *out_ret)
 {
     *out_ret = 0;
