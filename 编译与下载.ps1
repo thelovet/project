@@ -40,11 +40,15 @@ function Show-MemUsage {
 }
 
 function Do-Build {
-    # 每次编译前清理过期目标文件(.o/.d/.map/.lst)，避免源码编码变更后调试信息失配
-    Get-ChildItem -Path $obj -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in ".o",".d",".map",".lst" } | Remove-Item -Force
+    # 先增量编译(快); 若失败(如源码转码后旧.o调试信息失配导致链接错), 再清理过期目标文件重编一次
     Write-Host "==> make all" -ForegroundColor Cyan
     make all
-    if ($LASTEXITCODE -ne 0) { Write-Host "编译失败" -ForegroundColor Red; exit 1 }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "增量编译失败, 清理过期目标文件后重编..." -ForegroundColor Yellow
+        Get-ChildItem -Path $obj -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in ".o",".d",".map",".lst" } | Remove-Item -Force
+        make all
+        if ($LASTEXITCODE -ne 0) { Write-Host "编译失败" -ForegroundColor Red; exit 1 }
+    }
     $script:buildOk = $true
 }
 

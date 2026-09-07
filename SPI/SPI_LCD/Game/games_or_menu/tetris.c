@@ -583,14 +583,11 @@ static void draw_preview(void)
 }
 
 /**
- * @brief  绘制游戏结束画面: 居中显示"游戏结束" 32x32文字 + 16x32数字得分
+ * @brief  只绘制游戏结束画面文字("游戏结束"+分数), 不刷黑底. 用于菜单/低电恢复时叠回结束文字,
+ *         避免重复刷黑底导致闪.
  */
-static void draw_game_over(void)
+static void draw_game_over_text(void)
 {
-    /* 全黑背景: 覆盖棋盘区域 */
-    LCD_Fill(BOARD_X, BOARD_Y,
-             BOARD_X + BOARD_W - 1, BOARD_Y + BOARD_H - 1, LCD_BLACK);
-
     /* 居中显示 "游戏结束" (4字, 32x32) */
     {
         uint16_t gw = 4 * 32;
@@ -619,6 +616,17 @@ static void draw_game_over(void)
         }
         LCD_CS_SET;
     }
+}
+
+/**
+ * @brief  绘制游戏结束画面: 刷黑底 + 调用 draw_game_over_text().
+ */
+static void draw_game_over(void)
+{
+    /* 全黑背景: 覆盖棋盘区域 */
+    LCD_Fill(BOARD_X, BOARD_Y,
+             BOARD_X + BOARD_W - 1, BOARD_Y + BOARD_H - 1, LCD_BLACK);
+    draw_game_over_text();
 }
 
 /**
@@ -1026,14 +1034,17 @@ void tetris_lowbatt_restore(void)
 
     if (g_exit_menu_visible) {
         /* 退出菜单覆盖整屏(x=45~195): 框内棋盘由菜单框直接盖住, 不重绘(避免先棋盘后菜单闪);
-           只 draw_preview(跨菜单右边框的凸点/预览), 再画退出菜单框; 拖拽中框外露出由下方恢复 */
+           只 draw_preview(跨菜单右边框的凸点/预览), 再画退出菜单框; 拖拽中框外露出由下方恢复.
+           游戏已结束(OVER)时叠回结束文字而非重绘棋盘(重绘棋盘会擦掉结束文字) */
         draw_preview();
-        tetris_restore_board_above_menu(g_exit_drag_y, MENU_H);
+        if (g_state_before_menu == TETRIS_STATE_OVER) draw_game_over_text();
+        else tetris_restore_board_above_menu(g_exit_drag_y, MENU_H);
         menu_draw_nrow_frame_only(g_exit_drag_y, tetris_row_types, 5);
     } else if (g_restart_menu_visible) {
         /* 重开菜单只盖 y>=110: 只重绘菜单上方(row<110)棋盘行+预览, 框内由菜单框盖, 不闪 */
         draw_preview();
-        tetris_restore_board_above_menu(g_restart_slide_y, RESTART_MENU_H);
+        if (g_state_before_menu == TETRIS_STATE_OVER) draw_game_over_text();
+        else tetris_restore_board_above_menu(g_restart_slide_y, RESTART_MENU_H);
         menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
     } else {
         draw_preview();
@@ -1404,9 +1415,18 @@ uint8_t tetris_update(void)
         g_preview_dirty = 0;
     }
 render_only:
-    if (g_state == TETRIS_STATE_OVER && !g_gameover_drawn) {
-        draw_game_over();
-        g_gameover_drawn = 1;
+    if (g_state == TETRIS_STATE_OVER) {
+        /* 若棋盘/结束画面被标记重绘: 只叠回结束文字(不重复刷黑底, 避免闪);
+           首次进入结束态(未画过)才刷黑底+文字 */
+        if (g_board_dirty) {
+            g_board_dirty = 0;
+            draw_game_over_text();
+            g_gameover_drawn = 1;
+        }
+        else if (!g_gameover_drawn) {
+            draw_game_over();
+            g_gameover_drawn = 1;
+        }
     }
 
     game_battery_icon_update(184, 40, 0);

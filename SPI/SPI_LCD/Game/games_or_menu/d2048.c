@@ -34,6 +34,7 @@ static const uint16_t tile_colors[] = {
 };
 
 #define D2048_DEBUG  0        /* 调试开关: 1=新块始终生成最高值, 0=正常 */
+#define D2048_DEBUG_STATE  0     /* 调试开关: 0=正常, 1=任意移动一次即通关(测"恭喜通关"), 2=任意移动一次即游戏结束 */
 #define D2048_SAVE_LEN  37    /* 存档缓冲长度: 网格32 + 分数4 + 状态1 = 37 */
 
 /* 游戏状态 */
@@ -57,6 +58,9 @@ static const uint8_t d2048_exit_map[5] = {
 static const uint8_t d2048_row_types[5] = {
     MENU_ROW_SHIPIN, MENU_ROW_TUI, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH
 };
+
+/* d2048_redraw_battery_rows 定义在本文件下方, 此处前向声明 */
+static void d2048_redraw_battery_rows(void);
 
 /**
  * @brief  根据数值获取颜色索引 (2→1, 4→2, 8→3, ...)
@@ -335,6 +339,7 @@ static uint8_t do_move(uint8_t dir) {
  * @brief  检查是否还有可用移动
  * @return 1=仍有可用移动, 0=无法再移动
  */
+#if D2048_DEBUG_STATE == 0
 static uint8_t can_move(void) {
     uint8_t r, c;
     for (r = 0; r < 4; r++) {
@@ -346,6 +351,7 @@ static uint8_t can_move(void) {
     }
     return 0;
 }
+#endif /* D2048_DEBUG_STATE == 0 */
 
 /**
  * @brief  滑动方向检测
@@ -414,36 +420,6 @@ uint8_t d2048_is_menu_visible(void) {
 }
 
 /**
- * @brief  恢复重开菜单上方的细条带(菜单覆盖 y>=110 之外的网格底色)。
- * @note   不画延伸到菜单后的整格(否则游戏图先于菜单显示一帧会闪); 仅在菜单框外恢复
- *         电池主体边框/感叹号/凸点所压的行, 不重绘整格。凸点压在菜单右侧(x=195..209)。
- */
-static void d2048_restore_above_menu_slivers(void) {
-    uint16_t b1[4], b23;
-    uint8_t c;
-    for (c = 0; c < D2048_COLS; c++) {
-        uint16_t v = g_grid[1 * D2048_COLS + c];
-        b1[c] = (v == 0) ? 0xCE59 : tile_colors[get_color_idx(v)];
-    }
-    b23 = (g_grid[2 * D2048_COLS + 3] == 0)
-        ? 0xCE59 : tile_colors[get_color_idx(g_grid[2 * D2048_COLS + 3])];
-
-    /* 电池主体左边框压在 row1 col0 (x=45..46, y=81..109) */
-    LCD_Fill(45, 81, 47, RESTART_MENU_Y, b1[0]);
-    /* 电池主体右边框压在 row1 col3 (x=193..194, y=81..109) */
-    LCD_Fill(193, 81, 195, RESTART_MENU_Y, b1[3]);
-    /* 感叹号竖条(x=111..128, y=92..109)压在 row1 col1/col2 */
-    LCD_Fill(111, 92, 118, RESTART_MENU_Y, b1[1]);
-    LCD_Fill(118, 92, 122, RESTART_MENU_Y, LCD_BLACK);
-    LCD_Fill(122, 92, 129, RESTART_MENU_Y, b1[2]);
-    /* 电池凸点(x=195..209)在菜单外 */
-    LCD_Fill(195, 104, 207, 121, b1[3]);   /* (1,3) */
-    LCD_Fill(195, 121, 207, 126, LCD_BLACK);   /* row1/row2 缝隙 */
-    LCD_Fill(195, 126, 207, 136, b23);     /* (2,3) */
-    LCD_Fill(207, 104, 210, 136, LCD_BLACK);   /* col3 右缝 */
-}
-
-/**
  * @brief  恢复电池覆盖的网格行(框外露出部分, 框内由菜单框盖住)。
  * @param  menu_top 菜单框顶 Y
  * @param  menu_h   菜单框高
@@ -479,6 +455,37 @@ static void d2048_restore_battery_rows(int16_t menu_top, int16_t menu_h) {
 }
 
 /**
+ * @brief  重绘"游戏结束"/"恭喜通关"通关提示文字(居中, 红色)。
+ * @note   供 d2048_update 正常绘制与低电灭段恢复复用; 只画字不刷底。
+ */
+static void d2048_draw_win_lose_text(void) {
+    /* 菜单态时 g_state 已是 EXIT/RESTART, 用进入菜单前的 g_state_before_menu 判定胜负;
+       纯游戏态 g_state 即 WON/LOST. */
+    uint8_t rstate = (g_state == D2048_STATE_EXIT_MENU || g_state == D2048_STATE_RESTART_MENU)
+        ? g_state_before_menu : g_state;
+    if (rstate == D2048_STATE_LOST) {
+        uint16_t cx = (240 - 128) / 2;
+        uint16_t cy = 108;
+        LCD_CS_CLR;
+        sok_draw_char_32(cx, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_YOU, 0, FONT_CHAR_SIZE), LCD_RED);
+        sok_draw_char_32(cx + 32, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI3, 0, FONT_CHAR_SIZE), LCD_RED);
+        sok_draw_char_32(cx + 64, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_JIE, 0, FONT_CHAR_SIZE), LCD_RED);
+        sok_draw_char_32(cx + 96, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_SHU, 0, FONT_CHAR_SIZE), LCD_RED);
+        LCD_CS_SET;
+    }
+    if (rstate == D2048_STATE_WON) {
+        uint16_t cx = (240 - 128) / 2;
+        uint16_t cy = 108;
+        LCD_CS_CLR;
+        sok_draw_char_32(cx, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_GONG, 0, FONT_CHAR_SIZE), LCD_RED);
+        sok_draw_char_32(cx + 32, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI, 0, FONT_CHAR_SIZE), LCD_RED);
+        sok_draw_char_32(cx + 64, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_TONG, 0, FONT_CHAR_SIZE), LCD_RED);
+        sok_draw_char_32(cx + 96, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), LCD_RED);
+        LCD_CS_SET;
+    }
+}
+
+/**
  * @brief  低电图标灭段后恢复被其覆盖的底层内容
  * @note   参照推箱子的做法: LCD_ClearLowBatteryOverlay 把红色图标(边框+凸点+感叹号)
  *         刷黑, 然后同帧重画其下方内容.
@@ -494,19 +501,43 @@ void d2048_lowbatt_restore(void) {
 
     if (g_exit_menu_visible) {
         /* 退出菜单覆盖整屏(x=45~195): 框内电池主体由菜单框直接盖住, 不重绘(避免先棋盘后菜单闪);
-           只重绘拖拽中(菜单未盖住)框外露出的行 + 恒框外的凸点列(1,3)/(2,3)(横跨菜单右边框) */
+           只重绘拖拽中(菜单未盖住)框外露出的行 + 恒框外的凸点列(1,3)/(2,3)(横跨菜单右边框).
+           网格重绘会盖掉"恭喜通关/游戏结束"文字, 先叠回再画菜单框. */
         d2048_restore_battery_rows(g_exit_drag_y, MENU_H);
+        d2048_draw_win_lose_text();
         menu_draw_nrow_frame_only(g_exit_drag_y, d2048_row_types, 5);
     }
     else if (g_restart_menu_visible) {
-        /* 重开菜单: 只恢复菜单上方/外侧的电池残像素细条带, 再画菜单框(不重绘延伸到
-          菜单后的整格, 否则游戏图先于菜单闪一帧) */
-        d2048_restore_above_menu_slivers();
+        /* 重开菜单: 重绘 rows1-2 盖掉图标灭段留下的红/黑残留(菜单上方电池区),
+           网格重绘会盖掉"恭喜通关/游戏结束"文字, 先叠回再画菜单框;
+           菜单框盖住压在菜单内的格子部分, 先格子后菜单同一帧无闪 */
+        d2048_redraw_battery_rows();
+        d2048_draw_win_lose_text();
         menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
     }
+    else if (g_settings_from_game) {
+        /* 设置模式(二级菜单条带 x=45..195 已盖住电池主体/感叹号): 只重绘凸点格子(1,3)/(2,3),
+           不重绘 rows1-2(--否则先画游戏再画菜单条带会闪一帧, 同坑).
+           凸点在条带外(x=195..210), 须由游戏网格格恢复; 条带内部分由条带覆盖. */
+        uint8_t r;
+        for (r = 1; r <= 2; r++) {
+            uint16_t val = g_grid[r * D2048_COLS + 3];
+            uint8_t ci = (val == 0) ? 0 : get_color_idx(val);
+            draw_tile_bg(r, 3, (val == 0) ? 0xCE59 : tile_colors[ci]);
+            draw_tile_number(r, 3, val);
+            g_prev_grid[r * D2048_COLS + 3] = val;
+        }
+    }
     else {
-        /* 纯游戏: 下一帧全网格重绘盖住图标边框/感叹号 */
-        d2048_full_redraw();
+        /* 纯游戏: 通关(WON)/结束(LOST)画面是叠在网格上的红色文字,
+           若整屏重绘网格会盖掉并重画、闪一帧; 改为只重绘电池区(rows1-2)清图标残留
+           + 重叠加通关/结束文字. 其余正常态保持下一帧全网格重绘. */
+        if (g_state == D2048_STATE_WON || g_state == D2048_STATE_LOST) {
+            d2048_redraw_battery_rows();
+            d2048_draw_win_lose_text();
+        } else {
+            d2048_full_redraw();
+        }
     }
 }
 
@@ -566,6 +597,25 @@ void d2048_menu_mark_dirty(void) {
 }
 
 /**
+ * @brief  重绘电池覆盖的网格行(rows1-2)。
+ * @note   供菜单背景重绘(g_grid_dirty==2)与重开菜单拖拽/滑动(防电池区网格黑)共用。
+ */
+static void d2048_redraw_battery_rows(void) {
+    uint8_t r, c;
+    for (r = 1; r <= 2; r++) {
+        for (c = 0; c < D2048_COLS; c++) {
+            uint8_t idx = r * D2048_COLS + c;
+            uint16_t val = g_grid[idx];
+            uint8_t ci = (val == 0) ? 0 : get_color_idx(val);
+            uint16_t bg = (val == 0) ? 0xCE59 : tile_colors[ci];
+            draw_tile_bg(r, c, bg);
+            draw_tile_number(r, c, val);
+            g_prev_grid[idx] = val;
+        }
+    }
+}
+
+/**
  * @brief  依据脏标记重绘菜单背景(网格/分数)。
  * @return 1=已重绘, 0=无脏
  */
@@ -573,22 +623,15 @@ uint8_t d2048_menu_bg_redraw(void) {
     if (!g_grid_dirty) return 0;
     if (g_grid_dirty == 2) {
         /* 电池闪灭: 仅重绘第2、3行(电池下方), 避免大面积LCD_Fill闪烁 */
-        uint8_t r, c;
-        for (r = 1; r <= 2; r++) {
-            for (c = 0; c < D2048_COLS; c++) {
-                uint8_t idx = r * D2048_COLS + c;
-                uint16_t val = g_grid[idx];
-                uint8_t ci = (val == 0) ? 0 : get_color_idx(val);
-                uint16_t bg = (val == 0) ? 0xCE59 : tile_colors[ci];
-                draw_tile_bg(r, c, bg);
-                draw_tile_number(r, c, val);
-                g_prev_grid[idx] = val;
-            }
-        }
+        d2048_redraw_battery_rows();
+        d2048_draw_win_lose_text();   /* 网格重绘会盖掉"恭喜通关"文字, 叠回 */
     }
     else {
         draw_grid();
         draw_score();
+        /* 菜单返回/关闭后状态恢复为 WON/LOST, 此处须叠回通关/结束文字, 否则文字消失
+           (低电灭段才靠 d2048_lowbatt_restore 补画) */
+        d2048_draw_win_lose_text();
         /* draw_score 会整条清黑顶部区域(含电池图标), 此处须立即重绘电池,
           否则菜单返回/切换时电池消失又回闪(如重菜下滑返回游戏那一下闪) */
         game_battery_icon_update(164, 22, 1);
@@ -656,13 +699,14 @@ uint8_t d2048_update(void) {
             g_menu_cooldown = 0;  /* 触摸上半区时解除菜单冷却, 允许立刻上划 */
     }
 
-    /* 游戏进行中: 下滑触发退出菜单拖拽 */
+    /* 游戏进行中/通关/结束: 下滑触发退出菜单拖拽.
+       用当前 g_state 作为"可入菜单"状态, 让通关(WON)/结束(LOST)态也能跟手弹菜单(否则松手才动画弹出). */
     if (game_menu_enter_exit_drag(&ts, (uint8_t*)&g_state,
-        D2048_STATE_PLAYING, D2048_STATE_EXIT_MENU))
+        g_state, D2048_STATE_EXIT_MENU))
         return 0;
-    /* 游戏进行中: 上划触发重新开始菜单 */
+    /* 游戏进行中/通关/结束: 上划触发重新开始菜单 */
     if (game_menu_enter_restart_drag(&ts, (uint8_t*)&g_state,
-        D2048_STATE_PLAYING, D2048_STATE_RESTART_MENU, 210))
+        g_state, D2048_STATE_RESTART_MENU, 210))
         return 0;
 
     /* 松手防抖: 连续丢2帧才确认释放, 防止触摸IC抖动误触发 */
@@ -709,9 +753,15 @@ uint8_t d2048_update(void) {
                         }
                     }
                 }
+#if D2048_DEBUG_STATE == 1
+                g_state = D2048_STATE_WON;   /* 调试: 任意移动一次即通关, 测"恭喜通关"显示/低电 */
+#elif D2048_DEBUG_STATE == 2
+                g_state = D2048_STATE_LOST;  /* 调试: 任意移动一次即游戏结束, 测结束画面/低电 */
+#else
                 if (!can_move()) {
                     g_state = D2048_STATE_LOST;
                 }
+#endif
             }
         }
     }
@@ -722,29 +772,8 @@ uint8_t d2048_update(void) {
         draw_score();
         g_grid_dirty = 0;
 
-        /* 游戏结束 显示中文提示 */
-        if (g_state == D2048_STATE_LOST) {
-            uint16_t cx = (240 - 128) / 2;
-            uint16_t cy = 108;
-            LCD_CS_CLR;
-            sok_draw_char_32(cx, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_YOU, 0, FONT_CHAR_SIZE), LCD_RED);
-            sok_draw_char_32(cx + 32, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI3, 0, FONT_CHAR_SIZE), LCD_RED);
-            sok_draw_char_32(cx + 64, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_JIE, 0, FONT_CHAR_SIZE), LCD_RED);
-            sok_draw_char_32(cx + 96, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_SHU, 0, FONT_CHAR_SIZE), LCD_RED);
-            LCD_CS_SET;
-        }
-
-        /* 通关 显示"恭喜通关" (4个32x32汉字) */
-        if (g_state == D2048_STATE_WON) {
-            uint16_t cx = (240 - 128) / 2;   /* 4个字x32=128, 居中 */
-            uint16_t cy = 108;
-            LCD_CS_CLR;
-            sok_draw_char_32(cx, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_GONG, 0, FONT_CHAR_SIZE), LCD_RED);
-            sok_draw_char_32(cx + 32, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI, 0, FONT_CHAR_SIZE), LCD_RED);
-            sok_draw_char_32(cx + 64, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_TONG, 0, FONT_CHAR_SIZE), LCD_RED);
-            sok_draw_char_32(cx + 96, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), LCD_RED);
-            LCD_CS_SET;
-        }
+        /* 游戏结束/通关 显示中文提示 */
+        d2048_draw_win_lose_text();
     }
 
     game_battery_icon_update(164, 22, battery_redraw);
