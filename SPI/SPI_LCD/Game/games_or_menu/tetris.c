@@ -1048,7 +1048,20 @@ void tetris_lowbatt_restore(void)
         menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
     } else {
         draw_preview();
-        g_board_dirty = 3;
+        if (g_state == TETRIS_STATE_OVER) {
+            /* 结束画面是纯黑棋盘+文字, 整块被电池图标盖住: 直接刷黑棋盘区并叠回文字,
+               不能走 draw_board(会画出棋盘格子盖掉结束文字) */
+            g_board_dirty = 0;
+            draw_game_over();
+            g_gameover_drawn = 1;
+        } else {
+            /* 立即重绘电池覆盖区: 若只置 g_board_dirty=3 留给下一帧, 玩家这一帧的
+               移动/旋转会把脏标记覆盖为 1(增量分支不重绘电池区), 留下黑框残留 */
+            g_board_dirty = 3;
+            draw_board();
+            draw_score_area();
+            g_board_dirty = 0;
+        }
     }
 }
 

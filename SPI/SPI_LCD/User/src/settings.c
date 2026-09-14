@@ -36,8 +36,10 @@
 #define BR_NUM_CX  120                       /* 数字居中X */
 #define BR_NUM_Y   (BR_Y - 30)               /* 数字Y中心 (78) */
 #define TAP_THRESHOLD 15
+#define BR_SMOOTH_DIV 3                      /* 滑块位置平滑强度: 每帧向手指位置靠近 1/该值(防手抖带得数字乱跳) */
 static uint8_t  s_br_drag = 0;              /* 亮度拖动中标志 */
 static int16_t  s_br_pos = BR_X + BR_W;     /* 当前滑块位置 */
+static int16_t  s_br_smooth_x = 0;          /* 平滑后的触摸X(防手抖) */
 
 /* ---- 息屏时间设置页 ---- */
 #define ST_Y   100
@@ -268,6 +270,7 @@ static uint8_t Brightness_Update(void)
                 && ts.x >= BR_X && ts.x <= BR_X + BR_W) {
                 s_br_drag = 1;
                 s_br_pos = (int16_t)ts.x;  /* 直接跳到点击位置 */
+                s_br_smooth_x = s_br_pos;  /* 平滑值从点击位置起算 */
                 g_brightness = (uint8_t)((uint32_t)(s_br_pos - BR_X) * 99 / BR_W + 1);
                 LCD_Backlight_PWM_SetDuty(g_brightness);
                 Brightness_DrawSlider();
@@ -277,6 +280,10 @@ static uint8_t Brightness_Update(void)
         if (s_br_drag) {
             GameAutoSleep_KeepAlive();  /* 拖动中持续重置休眠计时器 */
             int16_t nx = (int16_t)ts.x;
+            /* 指数平滑(与 fish 拖动同一手法): 触摸坐标有 ±1~2px 抖动, 直接把坐标映射成亮度
+               会让滑块和数字一起抖; 平滑后静止时基本不动, 拖动时只有轻微滞后(进度条可接受) */
+            s_br_smooth_x = (int16_t)(s_br_smooth_x + (int16_t)(nx - s_br_smooth_x) / BR_SMOOTH_DIV);
+            nx = s_br_smooth_x;
             if (nx < BR_X) nx = BR_X;
             if (nx > BR_X + BR_W) nx = BR_X + BR_W;
             if (nx != s_br_pos) {

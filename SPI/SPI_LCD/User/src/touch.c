@@ -1,6 +1,8 @@
 #include "touch.h"
 #include "debug.h"
 #include "settings.h"
+#include "lcd.h"
+#include "sok_img_win.h"
 
 /**
  * @brief 软件I2C引脚控制宏
@@ -18,6 +20,7 @@
 #define TOUCH_MAP_MAX  240
 #define TOUCH_JUMP_LIMIT_RAW          80
 #define TOUCH_JUMP_CONFIRM_LIMIT_RAW  40
+#define TOUCH_IT7259_DEAD_ZONE        1    /* IT7259静止死区(原始像素): 只滤±1噪声; 设3会造成拖动时"每3像素动一下" */
 
 /**
  * @brief 全局状态变量
@@ -27,6 +30,16 @@ static uint16_t g_touch_x = 0;
 static uint16_t g_touch_y = 0;
 uint8_t  g_touch_pressed = 0;  /* 触摸状态, 1=有触摸, 0=无触摸 */
 volatile uint8_t g_touch_int_flag = 0;
+
+#if TOUCH_DEBUG_SHOW
+static uint8_t g_dbg_point_buf[8];   /* 调试: 最近一次点报告原始字节(Byte0~) */
+static uint8_t g_dbg_cmd_stat = 0xFF; /* 调试: 初始化下发命令后 Query Buffer 的命令状态位 bit1-0 (0=Done,1=Busy,2=Error) */
+#endif
+#if TOUCH_IC_IT7259
+static uint16_t g_med_raw_x[3] = {0, 0, 0};   /* IT7259: 3点中值滤波缓存(最新在[2]) */
+static uint16_t g_med_raw_y[3] = {0, 0, 0};
+static uint8_t  g_med_inited = 0;             /* 中值缓存是否已用首个采样填满 */
+#endif
 static uint16_t g_touch_last_raw_x = 0;
 static uint16_t g_touch_last_raw_y = 0;
 static uint16_t g_touch_pending_raw_x = 0;
@@ -69,6 +82,17 @@ void Touch_WakeResumeInit(void)
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
     GPIO_InitStructure.GPIO_Pin  = TOUCH_INT_PIN;
     GPIO_Init(TOUCH_INT_PORT, &GPIO_InitStructure);
+
+#if TOUCH_IC_IT7259
+    /* IT7259: 待机时 PB8 高阻 → RST 被拉低, 芯片实际一直处于复位态; 唤醒后 RST 刚被拉高,
+       芯片需要启动时间。这里补一次复位时序(脉宽须<1ms, 否则会进sleep)并等它启动完成,
+       否则紧接着的"触摸唤醒确认"(Main_ConfirmTouchWake, 仅30ms窗口)会读不到点 →
+       判为无效触摸 → 直接复位回Standby(现象: 屏幕不亮、像没唤醒)。 */
+    GPIO_ResetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
+    Delay_Us(100);
+    GPIO_SetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
+    Delay_Ms(100);
+#endif
 
     g_touch_int_flag = 0;
     g_touch_pressed = 0;
@@ -245,6 +269,7 @@ static uint8_t I2C_ReadByte(uint8_t ack)
     return dat;
 }
 
+#if !TOUCH_IC_IT7259 || CST816S_IT7259_WRITE_TH
 /**
  * @brief CST816S 写寄存器
  * @param  reg  寄存器地址
@@ -266,6 +291,39 @@ err:
     I2C_Stop();
     return 0;
 }
+#endif
+
+#if TOUCH_IC_IT7259
+/**
+ * @brief  向 IT7259 命令缓冲区写入 3 字节命令(命令+子命令+参数)。
+ * @param  cmd   命令号 (如 0x15=Set Algorithm Parameter, 0x04=Set Power Mode)
+ * @param  sub   子命令号 (如 0x1D=Point Threshold, 0x18=Engine Scan Period)
+ * @param  param 参数值
+ * @retval 1=写入成功, 0=I2C 失败
+ * @note   手册3.1.6.1 示例 "Write 0x01 0x00 to Command Buffer" = S 0x8C(W) 0x20 0x01 0x00 P,
+ *         即把 [命令, 子命令, 参数] 依次写入 0x20(Command Buffer); 命令执行状态见 Query Buffer
+ *         的 bit1-0 (00b=Done, 01b=Busy, 10b=Error)。
+ */
+static uint8_t IT7259_WriteCmd3(uint8_t cmd, uint8_t sub, uint8_t param)
+{
+    I2C_Start();
+    I2C_SendByte(CST816S_ADDR << 1);
+    if (I2C_WaitAck()) goto err;
+    I2C_SendByte(CST816S_REG_CMD_BUF);
+    if (I2C_WaitAck()) goto err;
+    I2C_SendByte(cmd);
+    if (I2C_WaitAck()) goto err;
+    I2C_SendByte(sub);
+    if (I2C_WaitAck()) goto err;
+    I2C_SendByte(param);
+    if (I2C_WaitAck()) goto err;
+    I2C_Stop();
+    return 1;
+err:
+    I2C_Stop();
+    return 0;
+}
+#endif
 
 /**
  * @brief CST816S 读寄存器
@@ -296,6 +354,72 @@ err:
     return 0;
 }
 
+#if TOUCH_IC_IT7259
+/**
+ * @brief  读取 IT7259 触摸数据并解析 Point0 原始坐标。
+ * @param  raw_x 输出原始X坐标 (12位)
+ * @param  raw_y 输出原始Y坐标 (12位)
+ * @return 1=读到有效点, 0=无点(抬手), -1=非点报告/读失败(状态未知)
+ * @note   两种数据源, 用 CST816S_IT7259_USE_POINT_REPORT 切换:
+ *         - 0(默认): FT6x36 风格 —— 读 0x02 手指数 + 0x03~0x06 坐标, 与厂家例程
+ *           `esp_lcd_touch_touch_read_data` 一致, 属连续坐标;
+ *         - 1: 读 0xE0 点数据报告(厂家例程做手势演示那套)。实测其坐标只在事件(位移够大/
+ *           手势)时才更新, 表现为"移动很长才跳"; 长按时还会变成 0x80 手势报告(不含坐标),
+ *           不能当抬手, 否则断触。
+ */
+static int8_t IT7259_ReadPoint(uint16_t *raw_x, uint16_t *raw_y)
+{
+    uint8_t buf[CST816S_POINT_LEN];
+    uint8_t rd;
+    uint8_t q = 0;
+
+#if CST816S_IT7259_USE_POINT_REPORT
+    /* 手册4.1: 必须先读 Query Buffer(0x80) 的状态, 才知道该不该/能不能取数据包。
+       bit7-6: 1xb=有新数据包; 01b=无新包但手指仍按着; 00b=无手指。
+       直接读点缓冲区(不查 Query)会一直取到旧包 → 坐标要移动很长才更新。 */
+    if (!CST816S_ReadReg(CST816S_REG_QUERY_BUF, &q, 1))
+        return -1;                      /* 读失败: 保持原状态 */
+    if ((q & 0xC0) == 0x00)
+        return 0;                       /* 00b: 无手指, 真抬手 */
+    if ((q & 0x80) == 0)
+        return -1;                      /* 01b: 手指仍按着但无新包 → 保持上次坐标, 不可判抬起 */
+    rd = CST816S_ReadReg(CST816S_REG_POINT, buf, CST816S_POINT_LEN);
+#else
+    /* 0x02 手指数, 0x03~0x06 为第1点 XH/XL/YH/YL */
+    (void)q;
+    rd = CST816S_ReadReg(CST816S_REG_FINGERNUM, buf, 5);
+#endif
+    if (!rd)
+        return -1;
+
+#if TOUCH_DEBUG_SHOW
+    {
+        uint8_t k;
+        for (k = 0; k < 5; k++) g_dbg_point_buf[k] = buf[k];
+    }
+#endif
+
+#if CST816S_IT7259_USE_POINT_REPORT
+    /* 非"点数据报告"(如 0x80 手势报告)不含坐标: 保持状态, 不可判抬手 */
+    if ((buf[0] >> 4) != 0x00)
+        return -1;
+    /* Byte0[2:0] = Point Information (Point0~2 是否有效), 0 即无点(真抬手) */
+    if ((buf[0] & 0x07) == 0)
+        return 0;
+    /* Byte2=X[7:0], Byte3[3:0]=X[11:8], Byte3[7:4]=Y[11:8], Byte4=Y[7:0] */
+    *raw_x = ((uint16_t)(buf[3] & 0x0F) << 8) | buf[2];
+    *raw_y = ((uint16_t)(buf[3] >> 4)   << 8) | buf[4];
+#else
+    /* buf[0]=手指数(低4位), buf[1]=XH, buf[2]=XL, buf[3]=YH, buf[4]=YL */
+    if ((buf[0] & 0x0F) == 0)
+        return 0;
+    *raw_x = ((uint16_t)(buf[1] & 0x0F) << 8) | buf[2];
+    *raw_y = ((uint16_t)(buf[3] & 0x0F) << 8) | buf[4];
+#endif
+    return 1;
+}
+#endif
+
 
 /**
  * @brief 等待触摸输入释放
@@ -325,9 +449,21 @@ void Touch_WaitWakeInputsReleased(void)
      * 持续读取手指数和坐标，消费未处理事件，直到稳定释放100ms。
      */
     while (stable_count < 20) {
-        uint8_t fingers = 0;
         uint8_t touch_released;
 
+#if TOUCH_IC_IT7259
+        /* IT7259: 读点数据报告, 无点=已释放; 读失败则退回INT电平判断 */
+        {
+            uint16_t rx, ry;
+            int8_t ret = IT7259_ReadPoint(&rx, &ry);
+            if (ret < 0)
+                touch_released =
+                    (GPIO_ReadInputDataBit(TOUCH_INT_PORT, TOUCH_INT_PIN) == Bit_SET);
+            else
+                touch_released = (ret == 0);
+        }
+#else
+        uint8_t fingers = 0;
         if (CST816S_ReadReg(CST816S_REG_FINGERNUM, &fingers, 1)) {
             touch_released = (fingers == 0);
             if (fingers != 0) {
@@ -339,6 +475,7 @@ void Touch_WaitWakeInputsReleased(void)
             touch_released =
                 (GPIO_ReadInputDataBit(TOUCH_INT_PORT, TOUCH_INT_PIN) == Bit_SET);
         }
+#endif
 
         if (touch_released
             && GPIO_ReadInputDataBit(TOUCH_INT_PORT, TOUCH_INT_PIN) == Bit_SET) {
@@ -378,6 +515,22 @@ static uint16_t Touch_AbsDiff(uint16_t a, uint16_t b)
 {
     return (a >= b) ? (a - b) : (b - a);
 }
+
+#if TOUCH_IC_IT7259
+/**
+ * @brief  取 3 个数中的中值(IT7259 坐标中值滤波用)。
+ * @param  a 值1
+ * @param  b 值2
+ * @param  c 值3
+ * @return 三者的中值
+ */
+static uint16_t Touch_Mid3(uint16_t a, uint16_t b, uint16_t c)
+{
+    if (a > b) { uint16_t t = a; a = b; b = t; }
+    if (b > c) { b = c; }
+    return (a > b) ? a : b;
+}
+#endif
 /**
  * @brief  重置触摸坐标滤波/去抖状态。
  */
@@ -386,6 +539,9 @@ static void Touch_ResetCoordFilter(void)
 {
     g_touch_have_valid_sample = 0;
     g_touch_have_pending_sample = 0;
+#if TOUCH_IC_IT7259
+    g_med_inited = 0;
+#endif
 }
 /**
  * @brief  应用一次原始坐标(滤波/去抖, 判定是否有效)。
@@ -398,6 +554,13 @@ static uint8_t Touch_TryApplyCoords(uint16_t raw_x, uint16_t raw_y)
 {
     uint16_t dx;
     uint16_t dy;
+#if TOUCH_IC_IT7259
+    /* IT7259: 实测原始坐标偶发大跳变, 原80阈值会把连续采样成片丢弃 → 表现为"移动很长才更新";
+       放宽到远超屏宽(近似不做跳变过滤) */
+    const uint16_t jump_limit = 300;
+#else
+    const uint16_t jump_limit = TOUCH_JUMP_LIMIT_RAW;
+#endif
 
     if (raw_x > TOUCH_MAX_RAW || raw_y > TOUCH_MAX_RAW) {
         g_touch_have_pending_sample = 0;
@@ -407,7 +570,7 @@ static uint8_t Touch_TryApplyCoords(uint16_t raw_x, uint16_t raw_y)
     if (g_touch_have_valid_sample) {
         dx = Touch_AbsDiff(raw_x, g_touch_last_raw_x);
         dy = Touch_AbsDiff(raw_y, g_touch_last_raw_y);
-        if (dx > TOUCH_JUMP_LIMIT_RAW || dy > TOUCH_JUMP_LIMIT_RAW) {
+        if (dx > jump_limit || dy > jump_limit) {
             if (!g_touch_have_pending_sample
                 || Touch_AbsDiff(raw_x, g_touch_pending_raw_x)
                        > TOUCH_JUMP_CONFIRM_LIMIT_RAW
@@ -420,6 +583,35 @@ static uint8_t Touch_TryApplyCoords(uint16_t raw_x, uint16_t raw_y)
             }
         }
     }
+
+#if TOUCH_IC_IT7259
+    /* 3点中值滤波: 芯片阈值调小后, 静止时会有孤立的大幅跳动, 取3点中值可直接把它丢掉;
+       慢速滑动只延迟1帧(约16ms), 且输出的是真实采样值而不是量化值, 不产生台阶。 */
+    if (!g_med_inited) {
+        g_med_raw_x[0] = g_med_raw_x[1] = g_med_raw_x[2] = raw_x;
+        g_med_raw_y[0] = g_med_raw_y[1] = g_med_raw_y[2] = raw_y;
+        g_med_inited = 1;
+    } else {
+        g_med_raw_x[0] = g_med_raw_x[1];
+        g_med_raw_x[1] = g_med_raw_x[2];
+        g_med_raw_x[2] = raw_x;
+        g_med_raw_y[0] = g_med_raw_y[1];
+        g_med_raw_y[1] = g_med_raw_y[2];
+        g_med_raw_y[2] = raw_y;
+    }
+    raw_x = Touch_Mid3(g_med_raw_x[0], g_med_raw_x[1], g_med_raw_x[2]);
+    raw_y = Touch_Mid3(g_med_raw_y[0], g_med_raw_y[1], g_med_raw_y[2]);
+
+    /* 静止死区滤波: IT7259 点阈值调小后静止时会有轻微抖动, 若相邻采样在 X/Y 上的变化
+       都小于死区, 就沿用上次坐标(把抖动吃掉); 一旦任一轴超过死区即视为真实移动,
+       立即跟随 —— 属滞回/死区滤波, 不像一阶滤波那样引入跟手延迟。 */
+    if (g_touch_have_valid_sample
+        && Touch_AbsDiff(raw_x, g_touch_last_raw_x) < TOUCH_IT7259_DEAD_ZONE
+        && Touch_AbsDiff(raw_y, g_touch_last_raw_y) < TOUCH_IT7259_DEAD_ZONE) {
+        raw_x = g_touch_last_raw_x;
+        raw_y = g_touch_last_raw_y;
+    }
+#endif
 
     {
         uint16_t mx = MapCoord(raw_x, 0);
@@ -475,13 +667,23 @@ void Touch_Init(void)
     GPIO_Init(TOUCH_RST_PORT, &GPIO_InitStructure);
     GPIO_SetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
 
-    /* 2. 硬件复位时序 (拉低再拉高) */
+    /* 2. 硬件复位时序 (拉低再拉高)
+       - CST816S: 低电平>50ms 后拉高, 等100~200ms
+       - IT7259 : 复位脉宽须 <1ms (手册7章: 低电平脉宽>1ms 会使芯片进sleep模式),
+                  故低电平只保持100us, 拉高后再等100ms */
+#if TOUCH_IC_IT7259
+    GPIO_ResetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
+    Delay_Us(100);
+    GPIO_SetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
+    Delay_Ms(100);
+#else
     GPIO_ResetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
     Delay_Ms(10);
     GPIO_SetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
     Delay_Ms(100);   /* CST816S 复位要求: 低电平>50ms, 等待100~200ms */
+#endif
 
-    /* 3. 验证I2C通信: 读芯片ID (0xA7, 预期0xB4或0xB5), 失败重试 */
+    /* 3. 验证I2C通信: 读芯片ID, 失败重试 */
     {
         uint8_t chip_id, retry = 0;
         do {
@@ -489,9 +691,53 @@ void Touch_Init(void)
         } while (!CST816S_ReadReg(CST816S_REG_CHIPID, &chip_id, 1) && ++retry < 5);
     }
 
-    /* 4. 配置中断控制寄存器: 0xFA = 0x40 (启用INT触发) */
+#if TOUCH_IC_IT7259
+#if CST816S_IT7259_WRITE_TH
+    /* 3.1 阈值写入: 厂家例程那套 FT6x36 寄存器(0x80~0x89); 实测无效且可能改坏配置, 默认关闭 */
+    CST816S_WriteReg(CST816S_REG_THGROUP,        70);
+    CST816S_WriteReg(CST816S_REG_THPEAK,         60);
+    CST816S_WriteReg(CST816S_REG_THCAL,          16);
+    CST816S_WriteReg(CST816S_REG_THWATER,        60);
+    CST816S_WriteReg(CST816S_REG_THTEMP,         10);
+    CST816S_WriteReg(CST816S_REG_THDIFF,         20);
+    CST816S_WriteReg(CST816S_REG_TIME_MONITOR,    2);
+    CST816S_WriteReg(CST816S_REG_PERIODACTIVE,   12);
+    CST816S_WriteReg(CST816S_REG_PERIODMONITOR,  40);
+    Delay_Ms(10);
+#endif
+
+    /* 3.2 算法参数(手册5.3.17 命令0x15): 决定坐标上报密度。
+       手册原文(5.3.17.4): "Point Threshold —— 若移动距离 > threshold*resolution/1000
+       才上报该点", 默认值下要移动十几像素才更新一次 → 滑动时坐标一格一格跳(如118→129)。 */
+#if CST816S_IT7259_TH_ENABLE
+    IT7259_WriteCmd3(0x15, 0x1D, CST816S_IT7259_POINT_TH);    /* 子命令0x1D: Point Threshold */
+    Delay_Ms(5);
+    IT7259_WriteCmd3(0x15, 0x18, CST816S_IT7259_SCAN_PERIOD); /* 子命令0x18: 引擎扫描周期(ms) */
+    Delay_Ms(5);
+    IT7259_WriteCmd3(0x15, 0x06, CST816S_IT7259_LAST_POINT);  /* 子命令0x06: 输出最后一点 */
+    Delay_Ms(5);
+#endif
+
+    /* 3.3 置为 Active 模式(手册5.3.4: Command 0x04/子命令0x00, 参数0x01=Idle, 0x00=Active)。
+       Idle 是省电态(25uA), 不上报任何数据包、也不接受命令, 直到用户触摸才唤醒。 */
+    IT7259_WriteCmd3(CST816S_REG_POWER_MODE, 0x00, 0x00);
+    Delay_Ms(10);
+
+#if TOUCH_DEBUG_SHOW
+    /* 调试: 回读 Query Buffer 的命令状态位(bit1-0): 0=Done(命令已被接受), 1=Busy, 2=Error */
+    {
+        uint8_t qs = 0;
+        if (CST816S_ReadReg(CST816S_REG_QUERY_BUF, &qs, 1))
+            g_dbg_cmd_stat = (uint8_t)(qs & 0x03);
+    }
+#endif
+#endif
+
+#if !TOUCH_IC_IT7259
+    /* 4. 配置中断控制寄存器: 0xFA=0x40 周期产生中断 (IT7259 走纯I2C轮询, 不配置中断) */
     CST816S_WriteReg(CST816S_REG_IRQCTL, CST816S_IRQ_ENABLE);
     Delay_Ms(10);
+#endif
 
     /* 5. 禁用自动休眠 (保证运行期间触摸响应即时) */
     CST816S_SleepDisable();
@@ -554,9 +800,15 @@ void EXTI9_5_IRQHandler(void)
  **********************************************************************/
 void CST816S_SleepEnable(void)
 {
+#if TOUCH_IC_IT7259
+    /* IT7259: 待机前不能让它进 sleep —— 手册7章的"RST 低脉冲>1ms 进 sleep"是深睡眠(0.1uA),
+       芯片会完全停止响应触摸、INT 不再输出 → 待机后点屏幕唤不醒(实测)。故这里保持芯片工作,
+       只靠 INT 在触摸时唤醒 MCU(功耗换可用性); 若以后要低功耗, 需改用 Idle 模式命令。 */
+#else
     CST816S_WriteReg(CST816S_REG_LP_SCAN_TH,
                      CST816S_LP_SCAN_THRESHOLD);
     CST816S_WriteReg(CST816S_REG_AUTOSLEEP, CST816S_SLEEP_ENABLE);
+#endif
 }
 
 /*********************************************************************
@@ -566,7 +818,11 @@ void CST816S_SleepEnable(void)
  **********************************************************************/
 void CST816S_SleepDisable(void)
 {
+#if TOUCH_IC_IT7259
+    /* IT7259: 复位(脉宽<1ms)后即为Active态, 无需额外命令 */
+#else
     CST816S_WriteReg(CST816S_REG_AUTOSLEEP, CST816S_SLEEP_DISABLE);
+#endif
 }
 
 /**
@@ -593,6 +849,52 @@ uint8_t Touch_IsPressed(void)
 {
     static uint8_t g_triggered = 0;  /* 触发状态, 用于防止重复上报 */
 
+#if TOUCH_IC_IT7259
+    /* IT7259: 纯I2C轮询(不依赖INT), 每帧读点数据报告 */
+    g_touch_int_flag = 0;
+    {
+        static uint8_t s_no_point_cnt = 0;   /* 连续无点计数(释放去抖) */
+        uint16_t raw_x = 0, raw_y = 0;
+        int8_t got = 0;                      /* 1=读到点, 0=全是无点, -1=读失败 */
+        uint8_t i;
+
+        /* 连读多次取最新: 点报告若是队列, 每帧只取一包会持续滞后(滑动一跳一跳) */
+        for (i = 0; i < CST816S_POINT_POLL_TIMES; i++)
+        {
+            uint16_t tx, ty;
+            int8_t r = IT7259_ReadPoint(&tx, &ty);
+            if (r < 0) { got = -1; break; }
+            if (r == 1) { got = 1; raw_x = tx; raw_y = ty; }
+        }
+
+        if (got < 0)
+        {
+            /* I2C读失败: 状态未知, 保持原状态(否则误判抬手, 拖动一卡一卡) */
+            return 0;
+        }
+        if (got == 0)
+        {
+            /* 无点: 连续2次才判抬手(报点间隙/空包会误判断触) */
+            if (++s_no_point_cnt >= 2)
+            {
+                Touch_ResetCoordFilter();
+                g_triggered = 0;
+                g_touch_pressed = 0;
+            }
+            return 0;
+        }
+        s_no_point_cnt = 0;
+        if (!Touch_TryApplyCoords(raw_x, raw_y))
+            return 0;
+        g_touch_pressed = 1;
+        if (!g_triggered)
+        {
+            g_triggered = 1;
+            return 1;
+        }
+        return 0;
+    }
+#else
     if (g_touch_int_flag)
     {
         g_touch_int_flag = 0;
@@ -650,6 +952,7 @@ uint8_t Touch_IsPressed(void)
             g_touch_pressed = 0;
         }
     }
+#endif
     return 0;
 }
 
@@ -662,6 +965,20 @@ uint8_t Touch_IsPressed(void)
  */
 void Touch_UpdateCoords(void)
 {
+#if TOUCH_IC_IT7259
+    /* IT7259: 轮询点数据报告刷新长按期间的实时坐标 */
+    {
+        uint16_t raw_x, raw_y;
+        int8_t ret = IT7259_ReadPoint(&raw_x, &raw_y);
+        if (ret < 0)
+            return;              /* 读失败: 保持原状态 */
+        if (ret == 0)
+            return;              /* 无点: 抬手统一由 Touch_IsPressed 去抖后处理 */
+        if (!Touch_TryApplyCoords(raw_x, raw_y))
+            return;
+        g_touch_pressed = 1;
+    }
+#else
     uint8_t fingers;
     if (!CST816S_ReadReg(CST816S_REG_FINGERNUM, &fingers, 1)) {
         return;
@@ -683,6 +1000,7 @@ void Touch_UpdateCoords(void)
     if (!Touch_TryApplyCoords(raw_x, raw_y))
         return;
     g_touch_pressed = 1;
+#endif
 }
 
 /**
@@ -712,3 +1030,39 @@ void Touch_StandbyWakeupConfig(void)
 
     EXTI_ClearFlag(EXTI_Line8);
 }
+
+#if TOUCH_DEBUG_SHOW
+/**
+ * @brief  绘制 3 位数字(000~999, 前导0补位), 供坐标调试显示用。
+ * @param  x     左上角X
+ * @param  y     左上角Y
+ * @param  v     数值
+ * @param  color 颜色
+ */
+static void Touch_DebugNum3(uint16_t x, uint16_t y, uint16_t v, uint16_t color)
+{
+    sok_draw_digit_scaled(x,      y, (uint8_t)((v / 100) % 10), color, 8, 14);
+    sok_draw_digit_scaled(x + 8,  y, (uint8_t)((v / 10) % 10),  color, 8, 14);
+    sok_draw_digit_scaled(x + 16, y, (uint8_t)(v % 10),         color, 8, 14);
+}
+
+/**
+ * @brief  调试: 屏幕上显示触摸状态、点报告原始字节与解析后的坐标。
+ * @note   行1=按下标志(红) 行2=Byte0标志(白) 行3=Byte2(黄) 行4=Byte3(浅蓝) 行5=解析X(绿);
+ *         圆形屏四角在圆外不可见, 故放在左中部(距圆心<120);
+ *         sok_draw_digit_scaled 不带CS控制, LCD_Fill 之后须先 LCD_CS_CLR(见§8)。
+ */
+void Touch_DebugShow(void)
+{
+    LCD_Fill(56, 76, 87, 187, LCD_BLACK);
+    LCD_CS_CLR;
+    Touch_DebugNum3(56,  76, (uint16_t)(g_touch_pressed ? 1U : 0U), LCD_RED);   /* 行1 按下标志 */
+    Touch_DebugNum3(56,  92, g_dbg_point_buf[0], LCD_WHITE);                    /* 行2 Byte0(格式标志) */
+    Touch_DebugNum3(56, 108, g_dbg_point_buf[2], LCD_YELLOW);                   /* 行3 Byte2 = 原始X低8位 */
+    Touch_DebugNum3(56, 124, g_dbg_point_buf[3], LCD_GBLUE);                    /* 行4 Byte3 = X/Y高位 */
+    Touch_DebugNum3(56, 140, g_dbg_point_buf[4], LCD_WHITE);                    /* 行5 Byte4 = 原始Y低8位 */
+    Touch_DebugNum3(56, 156, g_touch_x, LCD_GREEN);                             /* 行6 映射后X */
+    Touch_DebugNum3(56, 172, g_touch_y, LCD_RED);                               /* 行7 映射后Y */
+    LCD_CS_SET;
+}
+#endif

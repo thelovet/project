@@ -543,9 +543,12 @@ static void Main_DisableTouchInput(void)
     s_touch_started_top = 0;
 }
 
+#if !TOUCH_IC_IT7259
 /**
  * @brief  通过I2C触摸IC确认CST816S有效触摸唤醒
  * @return 1 确认有效触摸, 0 误触发
+ * @note   仅 CST816S 使用。IT7259 不能走这里: 唤醒时 IC 刚复位、用户往往只点一下就松手,
+ *         这种"连续2次读到按下"的确认必然错过 → 会误判无效并复位回待机(见开发注意事项§22.4)。
  */
 static uint8_t Main_ConfirmTouchWake(void)
 {
@@ -567,6 +570,7 @@ static uint8_t Main_ConfirmTouchWake(void)
     }
     return 0;
 }
+#endif
 
 /**
  * @brief  PVD低电压检测
@@ -1209,6 +1213,10 @@ static void main_run_game(void (*init_fn)(void), uint8_t (*update_fn)(void))
         LCD_Backlight_PWM_SetDuty(g_brightness);
         init_fn();
         s_game_inited = 1;
+        /* 从菜单点进游戏时, 手指往往还按在屏上(菜单项多在中下部, 正好落在"上划重开菜单"
+           的判定区)。若不冷却, 这同一次触摸会被当成游戏内的起手 → 一进游戏就弹出上划菜单。
+           这里给菜单手势一点冷却时间, 等这一次触摸结束。 */
+        g_menu_cooldown = 30;
     }
     if (!g_settings_from_game)
         game_handle_ret(update_fn(), &s_main_mode, &s_game_inited,
@@ -1552,7 +1560,14 @@ int main(void) {
          * 通过拉低PB8复位CST816S
          */
         Touch_WakeResumeInit();
+#if TOUCH_IC_IT7259
+        /* IT7259: 唤醒信号本身来自触摸IC的INT(芯片内部有滤波, 可信), 且唤醒后 IC 需启动、
+           用户通常只点一下就松手(实测 INT 低仅7.7ms), 用"连续2次读到按下"的严格确认必然
+           错过 → 判无效触摸 → 复位回待机(现象: 点屏幕不亮)。故直接认定有效。 */
+        wake_touch_confirmed = 1;
+#else
         wake_touch_confirmed = Main_ConfirmTouchWake();
+#endif
     }
 
     Delay_Ms(20);            // 等待LCD复位完成和SPI稳定
@@ -1654,6 +1669,7 @@ int main(void) {
                 || s_settings_mode != SETTINGS_NONE
                 || g_settings_from_game)
             && Main_HandleTouchInput()) {
+            TOUCH_DEBUG_FRAME();   /* 调试: 触摸坐标显示在最上层 */
             continue;
         }
 
@@ -1661,6 +1677,7 @@ int main(void) {
         if (current_state == 1 && end_flag == 0) {
             Main_UpdateActiveMode(&charging_game_saved);//活动模式更新: 菜单/游戏/视频主循环处理
             Main_FlashLowBattery();  /* 电量0级时低频闪烁低电图标 */
+            TOUCH_DEBUG_FRAME();   /* 调试: 触摸坐标显示在最上层 */
         }
         else {
             // 待机/充电模式

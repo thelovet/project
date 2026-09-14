@@ -324,17 +324,27 @@ void menu_draw_frame(void) {
  * @brief  菜单选项碰撞检测
  * @param  x, y        触摸坐标
  * @param  item_count  菜单项数量 (2 或 3)
- * @return 被点击的菜单项索引 (0-based), -1 表示未命中
+ * @return 被点击的菜单项索引 (0-based), -1 表示点在菜单框外
  */
 int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count) {
+    uint16_t item_y0;
+    uint16_t item_end;
+    uint16_t item_h;
+
     if (x < MENU_X || x >= MENU_X + MENU_W) return -1;
+    if (y < MENU_Y || y >= MENU_Y + MENU_H) return -1;   /* 菜单框外才算未命中 */
 
-    uint16_t item_y0 = MENU_Y + MENU_BDR;
-    uint16_t item_end = MENU_Y + MENU_H - MENU_BDR;
+    item_y0 = MENU_Y + MENU_BDR;
+    item_end = MENU_Y + MENU_H - MENU_BDR;
 
-    if (y < item_y0 || y >= item_end) return -1;
+    /* 框内上下各有 MENU_BDR(5px) 边框带, 不属于任何一行。若这里直接返回 -1,
+       点到最后一行时会被当成"菜单外"(主菜单→返回视频, 游戏退出菜单→关闭菜单),
+       表现为"点最下面那个选项没反应, 要偏上点才行" —— 圆屏最下方可点到 y≈237,
+       而最后一行判定区只到 y=229。故把边框带内的点夹到最近的行。 */
+    if (y < item_y0) y = item_y0;
+    if (y >= item_end) y = item_end - 1;
 
-    uint16_t item_h = (item_end - item_y0) / item_count;
+    item_h = (uint16_t)((item_end - item_y0) / item_count);
     return (int8_t)((y - item_y0) / item_h);
 }
 
@@ -814,6 +824,10 @@ uint8_t game_menu_drag_poll(int16_t* drag_y, uint16_t* drag_touch_y,
         /* 根据手指总位移算目标，逐帧追过去 */
         int16_t total_dy = (int16_t)ts->y - (int16_t)gdp_start_ty;
         int16_t target_y = gdp_start_y + total_dy;
+        /* 拖动上限要留出 MENU_RELEASE_GAP, 不能改成 MENU_Y(试过, 已回退):
+           ① 留一段余量, 松手后由自动滑动补完, 用于区分"拖到一半松手取消";
+           ② 更关键: 若真拖到底, 手指会跟到屏幕下方(>220), 而"上划重新开始菜单"的
+              起手判定区就在那里 → 会意外弹出上划菜单。 */
         if (target_y > MENU_Y - MENU_RELEASE_GAP)
             target_y = MENU_Y - MENU_RELEASE_GAP;
         if (target_y > *drag_y) {
@@ -1040,6 +1054,7 @@ uint8_t main_menu_handle(uint16_t x, uint16_t y,
  * @return MAIN_MENU_ACT_* 动作码
  */
 uint8_t main_menu_hit_test(uint16_t x, uint16_t y) {
+    /* 菜单框内(含上下边框带)由 menu_hit_test 夹到最近的行, 只有框外才返回 -1 → 返回视频 */
     int8_t hit = menu_hit_test(x, y, 5);
     if (hit < 0 || hit > 4) return MAIN_MENU_ACT_VIDEO;  /* 菜单外→返回视频 */
     /* 行0=推箱子, 1=2048, 2=俄罗斯方块, 3=华容道, 4=大鱼吃小鱼 (无返回行) */
@@ -1490,8 +1505,14 @@ uint8_t game_menu_command(const GameMenuCfg* cfg, uint8_t* state, uint8_t* out_r
         if (cfg->bg_redraw() && !g_exit_dragging && !g_exit_sliding)
             menu_draw_nrow_frame_only(g_exit_drag_y, cfg->exit_row_types, 5);
 
-        /* 底部上划打断 → 切换到重新开始菜单 */
-        {
+        /* 底部上划打断 → 切换到重新开始菜单
+           仅在退出菜单已静止时判定: 拖拽/滑入期间不判。
+           否则"下滑打开退出菜单"这个动作本身就会撞上它 —— 手指拖到屏幕下方(y>y_threshold)
+           后松开, 菜单还在慢慢滑入时手指再按下, 上划检测会把起点重录在那片底部区域,
+           随后任何几像素的上漂(抬手/噪声)都会满足"上划"→ 上划菜单被抢出来,
+           同时退出菜单仍按原动画下滑, 表现为"下滑菜单时上划菜单也弹出来"。
+           与下方 game_menu_swipe_mid_up_close 的门控保持一致。 */
+        if (!g_exit_dragging && !g_exit_sliding) {
             uint8_t r = menu_swipe_to_restart_handler(cfg->y_threshold, cfg->release_thresh);
             if (r) {
                 cfg->mark_dirty();
@@ -1541,6 +1562,14 @@ uint8_t game_menu_command(const GameMenuCfg* cfg, uint8_t* state, uint8_t* out_r
                 g_exit_sliding = 0;
                 g_touch_down = 0;
                 g_prev_pressed = 0;  /* 滑入结束重置按下态, 防拖拽松手被误判为点菜单外关闭 */
+                /* 菜单刚落定: 若此时手指已重新按住(通常就停在屏幕下方的菜单行上),
+                   上划检测会把起点重录在那片底部区域 → 之后几像素上漂就会弹出上划菜单。
+                   补一小段冷却把这次刚落下的触摸吸收掉。 */
+                {
+                    TouchState ts_now;
+                    Touch_Scan(&ts_now);
+                    if (ts_now.pressed) g_menu_cooldown = 15;
+                }
             }
             menu_draw_nrow_frame_only(g_exit_drag_y, cfg->exit_row_types, 5);
             return GAME_MENU_CMD_NONE;

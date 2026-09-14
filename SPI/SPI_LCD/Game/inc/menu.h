@@ -362,9 +362,11 @@ void game_menu_fix_release_after_close(void);
 /* ---- 菜单碰撞/处理 ---- */
 /**
  * @brief  菜单碰撞检测
+ * @note   点在菜单框内上下边框带(不属于任何一行)时会夹到最近的行, 避免点最后一行
+ *         被误判为"菜单外"; 只有点在菜单框外才返回 -1
  * @param  x, y        触摸坐标
  * @param  item_count  菜单项数量 (2 或 3)
- * @return 命中的菜单项索引 (0-based), -1 表示未命中任何项
+ * @return 命中的菜单项索引 (0-based), -1 表示点在菜单框外
  */
 int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count);
 
