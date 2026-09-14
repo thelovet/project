@@ -21,6 +21,20 @@
 #define TOUCH_JUMP_LIMIT_RAW          80
 #define TOUCH_JUMP_CONFIRM_LIMIT_RAW  40
 #define TOUCH_IT7259_DEAD_ZONE        1    /* IT7259静止死区(原始像素): 只滤±1噪声; 设3会造成拖动时"每3像素动一下" */
+/* IT7259 坐标归一化窗口: 圆屏实测滑到最左/最右时原始 X 只到 23~230、原始 Y 只到 8~239 ——
+   两端各有十几到二十像素够不到。若按原始值直接用, 翻转 90°/270° 后 UI 的 Y 是由原始 X 推出来的
+   (case1: 239-mx, case3: mx), 那一端就永远够不到 "屏幕最下", 表现为"翻转后上/下划菜单都很难
+   滑出来, 要很下面滑才行"(上划菜单要求起点 y>210/220)。
+   故按 [TOUCH_NORM_MIN, TOUCH_NORM_MAX] 线性拉满到 0~239, 倍率由 MapCoord 按窗口自动算
+   (必须跟着窗口走: 曾只把 MAX 改小、倍率不动, 输出范围被一起压缩 —— 例如 MAX=210 配
+    239 档倍率时 UI 最大只到 208, 而底部上划要求 y>210 → 那条带子永远够不到)。
+   两个宏就是"标定手指实际能到的两端":
+   MAX 太大 → 右端判定带/右侧点击落在够不到或信号弱的外圈(右侧难划、右侧不灵敏);
+   MAX 太小 → 倍率变大(位置失真变大), 且超过 MAX 的最外圈变成"位置不再变化"的粘区。
+   左侧同理由 MIN 决定。调参口诀: 右边难划/点不到 → MAX 减小; 左边变难 → MAX 加回。
+   当前 10~229(倍率≈1.09) 为实测确认值: 翻转 90°/270° 后上/下划菜单与四方向点击均正常。 */
+#define TOUCH_NORM_MIN   10
+#define TOUCH_NORM_MAX  229
 
 /**
  * @brief 全局状态变量
@@ -500,7 +514,17 @@ static uint16_t MapCoord(uint16_t raw, uint8_t mirror)
     uint16_t mapped;
     if (mirror)
         raw = TOUCH_MAX_RAW - raw;
+#if TOUCH_IC_IT7259
+    /* 把 [TOUCH_NORM_MIN, TOUCH_NORM_MAX] 线性拉满到 0~239。
+       倍率必须跟着窗口算(不能用固定移位近似): 否则单独改 MAX 会把输出范围一起压缩,
+       例如 MAX=210 配 239 档倍率时 UI 最大只到 208 → 底部上划要求 y>210 永远够不到。 */
+    if (raw < TOUCH_NORM_MIN) raw = TOUCH_NORM_MIN;
+    if (raw > TOUCH_NORM_MAX) raw = TOUCH_NORM_MAX;
+    mapped = (uint16_t)((uint32_t)(raw - TOUCH_NORM_MIN) * 239 /
+                        (TOUCH_NORM_MAX - TOUCH_NORM_MIN));
+#else
     mapped = (uint32_t)raw * TOUCH_MAP_MAX / TOUCH_MAX_RAW;
+#endif
     if (mapped >= TOUCH_MAP_MAX) mapped = TOUCH_MAP_MAX - 1;
     return mapped;
 }
@@ -616,7 +640,7 @@ static uint8_t Touch_TryApplyCoords(uint16_t raw_x, uint16_t raw_y)
     {
         uint16_t mx = MapCoord(raw_x, 0);
         uint16_t my = MapCoord(raw_y, 0);
-        /* 根据屏幕方向旋转触摸坐标 */
+        /* 根据屏幕方向旋转触摸坐标 (坐标已在 MapCoord 里按 19~219 归一化, 四方向一致) */
         switch (g_orientation_index) {
         case 0: g_touch_x = mx;        g_touch_y = my;        break;
         case 1: g_touch_x = my;        g_touch_y = 239 - mx;  break;
