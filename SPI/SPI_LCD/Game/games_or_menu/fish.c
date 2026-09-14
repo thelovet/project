@@ -827,8 +827,14 @@ uint8_t fish_update(void) {
     /* 设置页面下滑→退出菜单 */
     if (g_game_enter_exit_menu) {
         g_game_enter_exit_menu = 0;
+        /* 这条路没经过 game_menu_enter_exit_drag, 需自行记录"进菜单前的状态":
+           fish_restore_scene_behind 与关闭菜单时的 *state 恢复都读它 */
+        g_state_before_menu = g_state;
         g_state = FISH_STATE_EXIT_MENU;
-        g_full_redraw = 1;
+        /* 设置页是整屏画上去的(背景已不是游戏画面), 必须同帧整屏重绘鱼场景 ——
+           不能只置 g_full_redraw: fish_menu_bg_redraw 在菜单态只补凸起区(防菜单闪),
+           不重绘场景, 否则退出菜单下面是黑的(推箱子同处已直接 sokoban_draw_level)。 */
+        fish_restore_scene_behind();
     }
 
     /* ---- 退出菜单 / 重新开始菜单: 配置驱动统一状态机 ---- */
