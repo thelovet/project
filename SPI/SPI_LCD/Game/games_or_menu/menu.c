@@ -324,7 +324,7 @@ void menu_draw_frame(void) {
  * @brief  菜单选项碰撞检测
  * @param  x, y        触摸坐标
  * @param  item_count  菜单项数量 (2 或 3)
- * @return 被点击的菜单项索引 (0-based), -1 表示点在菜单框外
+ * @return 被点击的菜单项索引 (0-based), -1 表示点在菜单框上方或左右外侧
  */
 int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count) {
     uint16_t item_y0;
@@ -332,15 +332,16 @@ int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count) {
     uint16_t item_h;
 
     if (x < MENU_X || x >= MENU_X + MENU_W) return -1;
-    if (y < MENU_Y || y >= MENU_Y + MENU_H) return -1;   /* 菜单框外才算未命中 */
+    if (y < MENU_Y) return -1;   /* 菜单框上方才算未命中(点空白关闭) */
 
     item_y0 = MENU_Y + MENU_BDR;
     item_end = MENU_Y + MENU_H - MENU_BDR;
 
-    /* 框内上下各有 MENU_BDR(5px) 边框带, 不属于任何一行。若这里直接返回 -1,
-       点到最后一行时会被当成"菜单外"(主菜单→返回视频, 游戏退出菜单→关闭菜单),
-       表现为"点最下面那个选项没反应, 要偏上点才行" —— 圆屏最下方可点到 y≈237,
-       而最后一行判定区只到 y=229。故把边框带内的点夹到最近的行。 */
+    /* 框内上下各有 MENU_BDR(5px) 边框带不属于任何一行; 框下沿(235)到屏幕最下(239)
+       这一段在框外, 但用户仍认为它属于最后一行。都夹到最近的行, 否则点最后一行会被
+       当成"菜单外"(主菜单→返回视频, 游戏退出菜单→关闭菜单), 表现为"点最下面那个选项
+       没反应/点一下就返回"。圆屏最下方可点到 y≈239, 而最后一行判定区只到 y=229,
+       所以这里不再按菜单框下沿截断, 而是一路夹到最后一行。 */
     if (y < item_y0) y = item_y0;
     if (y >= item_end) y = item_end - 1;
 
@@ -1150,6 +1151,18 @@ uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t* prev_pressed,
     else if (*prev_pressed && !ts.pressed) {
         int8_t released_hit = menu_hit_test(ts.x, ts.y, 5);
         uint8_t ret = EXIT_RET_NONE;
+
+        /* 抬手坐标向下漂出菜单框外时, 以按下那一行为准。
+           最后一行(如各游戏退出菜单的"华容道/大鱼吃小鱼")紧贴屏幕下沿, 抬手瞬间接触面
+           向下滑出, 松手报的坐标常落到框外 → released_hit=-1, 与按下行不一致被判成
+           "没点中", 现象就是"最下面那个选项怎么点都没反应, 点它下面反而关掉菜单"
+           (点下面时按下即在框外, 才是走 EXIT_RET_BACK 关闭菜单)。
+           限定只吸收"X 仍在菜单宽度内、Y 只是向下漂出框外"这一种抬手漂移,
+           拖到菜单左/右侧外松手仍按原语义取消; 松手落在别的行也算滑走取消。 */
+        if (released_hit < 0 && pressed_hit >= 0 && pressed_hit < 5
+            && ts.x >= MENU_X && ts.x < MENU_X + MENU_W
+            && ts.y >= MENU_Y + MENU_H)
+            released_hit = pressed_hit;
 
         if (released_hit == pressed_hit) {
             if (released_hit >= 0 && released_hit < 5)
