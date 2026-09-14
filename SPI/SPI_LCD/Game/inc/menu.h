@@ -85,6 +85,7 @@ typedef struct {
 #define MENU_SWIPE_COMMIT_DIST  20 /* 松手确认展开所需滑动距离 */
 #define MENU_SLIDE_SPEED          3 /* 菜单自动滑动速度 (每帧像素) */
 #define MENU_DRAG_MAX_STEP        4 /* 下滑菜单拖拽时每帧最大位移 */
+#define MENU_DRAG_MAX_LAG        12 /* 下滑菜单拖拽最大滞后(px): 快速下滑时最多落后手指这么多, 超出部分直接补上 */
 #define MENU_RELEASE_GAP         36 /* 松手后菜单最小下滑距离 */
 #define RESTART_MENU_SLIDE_SPEED 2  /* 上滑菜单移动速度 (每帧像素, 与视频菜单一致) */
 

@@ -33,6 +33,7 @@ static const uint8_t fish_row_types[5] = {
 #define FISH_PLAYER_X   (LCD_W / 2)
 #define FISH_FACE_DEAD    2    /* 转向死区(px): 手指静止时 X 抖动在此范围内不换朝向(防鱼原地左右翻) */
 #define FISH_SMOOTH_DIV   3    /* 位置平滑强度: 每帧向目标靠近 1/该值(值大=更不抖但更滞后) */
+#define FISH_MAX_LAG      8    /* 位置最大滞后(px): 与手指距离超过它就直接跟上, 否则快滑时鱼只走一半 */
 #define FISH_PLAYER_Y   (LCD_H / 2)
 
 #define FISH_NUM_FOOD   6      /* 场上小鱼数量 */
@@ -763,15 +764,26 @@ static void fish_update_drag(const TouchState* ts, uint8_t just_pressed)
         int16_t target_x = (int16_t)(s_drag_start_fx + ((int16_t)ts->x - s_drag_start_tx));
         int16_t target_y = (int16_t)(s_drag_start_fy + ((int16_t)ts->y - s_drag_start_ty));
 
-        /* 位置: 指数平滑(每帧向目标靠近 1/FISH_SMOOTH_DIV)。
+        /* 位置: 指数平滑(每帧向目标靠近 1/FISH_SMOOTH_DIV) + "最大滞后"上限。
            - 静止: 手抖是"来回摆", 平滑后被平均掉, 鱼基本不动;
-           - 滑动: 无死区、无门槛, 不会"隔几像素才动"的台阶, 只有轻微滞后。
-           (位置直跟 → 手抖全传出来; 加死区 → 变台阶; 折中就是平滑) */
+           - 滑动: 无死区、无门槛, 不会"隔几像素才动"的台阶;
+           - 快速滑动: 只按 1/3 靠近时, 手一挥(一两帧走完)鱼只走到一半就停在半路
+             (实测"快速滑动很长距离, 鱼只移动大概一半"), 故加一条上限: 与目标的距离
+             超过 FISH_MAX_LAG 时, 超出部分直接走掉, 只保留 FISH_MAX_LAG 的滞后。
+             小幅抖动(距离 <= FISH_MAX_LAG)仍按 1/3 平滑, 去抖效果不变。 */
         {
             int16_t fx = (int16_t)(target_x - (int16_t)g_player.x);
             int16_t fy = (int16_t)(target_y - (int16_t)g_player.y);
-            g_player.x = (uint16_t)((int16_t)g_player.x + fx / FISH_SMOOTH_DIV);
-            g_player.y = (uint16_t)((int16_t)g_player.y + fy / FISH_SMOOTH_DIV);
+            int16_t sx = (int16_t)(fx / FISH_SMOOTH_DIV);
+            int16_t sy = (int16_t)(fy / FISH_SMOOTH_DIV);
+
+            if (fx > FISH_MAX_LAG)        sx = (int16_t)(fx - FISH_MAX_LAG);
+            else if (fx < -FISH_MAX_LAG)  sx = (int16_t)(fx + FISH_MAX_LAG);
+            if (fy > FISH_MAX_LAG)        sy = (int16_t)(fy - FISH_MAX_LAG);
+            else if (fy < -FISH_MAX_LAG)  sy = (int16_t)(fy + FISH_MAX_LAG);
+
+            g_player.x = (uint16_t)((int16_t)g_player.x + sx);
+            g_player.y = (uint16_t)((int16_t)g_player.y + sy);
         }
 
         /* 朝向: 累积"平滑后位置"的单向位移, 攒够 FISH_FACE_DEAD 才换向。

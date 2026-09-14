@@ -37,6 +37,7 @@
 #define BR_NUM_Y   (BR_Y - 30)               /* 数字Y中心 (78) */
 #define TAP_THRESHOLD 15
 #define BR_SMOOTH_DIV 3                      /* 滑块位置平滑强度: 每帧向手指位置靠近 1/该值(防手抖带得数字乱跳) */
+#define BR_MAX_LAG    8                      /* 滑块最大滞后(px): 快拖时最多落后手指这么多, 超出部分直接跟上 */
 static uint8_t  s_br_drag = 0;              /* 亮度拖动中标志 */
 static int16_t  s_br_pos = BR_X + BR_W;     /* 当前滑块位置 */
 static int16_t  s_br_smooth_x = 0;          /* 平滑后的触摸X(防手抖) */
@@ -280,9 +281,17 @@ static uint8_t Brightness_Update(void)
         if (s_br_drag) {
             GameAutoSleep_KeepAlive();  /* 拖动中持续重置休眠计时器 */
             int16_t nx = (int16_t)ts.x;
-            /* 指数平滑(与 fish 拖动同一手法): 触摸坐标有 ±1~2px 抖动, 直接把坐标映射成亮度
-               会让滑块和数字一起抖; 平滑后静止时基本不动, 拖动时只有轻微滞后(进度条可接受) */
-            s_br_smooth_x = (int16_t)(s_br_smooth_x + (int16_t)(nx - s_br_smooth_x) / BR_SMOOTH_DIV);
+            /* 指数平滑(与 fish 拖动同一手法) + 最大滞后上限: 触摸坐标有 ±1~2px 抖动, 直接把坐标
+               映射成亮度会让滑块和数字一起抖, 平滑后静止时基本不动。但固定 1/3 增益在快速拖动
+               (一两帧走完)时只能走到一半(与鱼"快滑只走一半"同因), 故与目标距离超过 BR_MAX_LAG
+               时把超出部分直接走掉; 小幅抖动(<= BR_MAX_LAG)仍按 1/3 平滑, 去抖效果不变。 */
+            {
+                int16_t dx = (int16_t)(nx - s_br_smooth_x);
+                int16_t step = (int16_t)(dx / BR_SMOOTH_DIV);
+                if (dx > BR_MAX_LAG)       step = (int16_t)(dx - BR_MAX_LAG);
+                else if (dx < -BR_MAX_LAG) step = (int16_t)(dx + BR_MAX_LAG);
+                s_br_smooth_x = (int16_t)(s_br_smooth_x + step);
+            }
             nx = s_br_smooth_x;
             if (nx < BR_X) nx = BR_X;
             if (nx > BR_X + BR_W) nx = BR_X + BR_W;
