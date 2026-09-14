@@ -73,6 +73,18 @@ void Touch_DebugShow(void);
 #define CST816S_IT7259_POINT_TH    0          // Point Threshold(0x1D): 移动> resolution*值/1000 才上报, 0=每个采样点都上报
 #define CST816S_IT7259_SCAN_PERIOD 0x05       // Engine Scan Period(0x18): 引擎扫描周期, 单位ms
 #define CST816S_IT7259_LAST_POINT  0x01       // Report the Last Point(0x06): bit0=1输出最后一点, bit7-1=跳过范围(0=不跳过, 否则要移动够远才补最后一点)
+/* Gain Setting(手册5.3.17.2 命令0x15/子命令0x07, 1字节): bit7-4=FW CDC Compensation,
+   bit3-2=AFE Gain @AC Shielding Mode(浮空/放桌上), bit1-0=AFE Gain @Ground Mode(接地/拿手里), 0~3越大越灵敏。
+   实测"拿着只能到200、不拿到239"且"轻触时按下标志会跳" → 两档都拉高试。
+   手册只给位定义、无默认值/量程, 只能台阶式试: 0x0F(两档最高) → 0x0A → 0x05, 找到够用又不误触的值。 */
+#define CST816S_IT7259_GAIN        0x0F
+#define CST816S_IT7259_GAIN_EN     1          // 必须为1: 实测关掉(0=不下发增益)后"触摸非常不灵敏", 说明芯片默认增益对本屏偏低
+/* 信号链前端(手册5.3.22.2 / 5.3.22.5): 针对"轻触判不到按下"且基线(CSEL)正常的现象。
+   0x1A/0x02 模拟前端滤波系数(平均长度): 0x00=默认 / 0x03=96pt / 0x05=160pt / 0x06=192pt
+                                         / 0x08=256pt / 0x0A=320pt, pt 越大越平滑(SNR 好, 响应略慢)
+   0x1A/0x04 引擎控制: 0x03=切到接地模式(拿在手里) / 0x04=切到屏蔽模式(放桌上) */
+#define CST816S_IT7259_AFE_FILTER  0x03       // 先温和(96pt); 不够再试 0x05 / 0x06
+#define CST816S_IT7259_ENGINE_MODE 0x03       // 03=接地模式(正常拿在手里用) / 04=屏蔽模式
 /* Command 0x04: 在 Active/Idle 间切换(资料写"切换", 疑为无参数命令) */
 #define CST816S_REG_POWER_MODE     0x04       // 无参数命令: 发一次切换一次模式
 #define CST816S_POWER_ACTIVE       0x01        // 若改用带参数写法, 用这个值

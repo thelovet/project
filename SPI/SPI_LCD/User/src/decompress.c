@@ -1,4 +1,5 @@
 #include "decompress.h"    // 解压缩算法头文件
+#include "config.h"        // 调试/模式宏 (DEBUG_BLACK_VIDEO 等)
 #include "lcd.h"           // LCD显示接口
 #include "SPI.h"     // SPI Flash读写接口
 #include "flash.h"
@@ -152,6 +153,12 @@ void Set_display_range_DMA() {//读取坐标后配置屏幕显示位置
  * 4. 使用24位全局地址指针(input_pos2/1/0)加速读取位置
  */
 u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16* location1) {
+#ifdef DEBUG_BLACK_VIDEO
+	/* 触摸/噪声调试(config.h 里打开): 视频模式不刷视频帧(保持黑屏), 菜单与触摸逻辑照常运行,
+	   用于隔离"显示屏/背光刷新与 SPI 活动"对触摸的影响 */
+	(void)location4; (void)location3; (void)location2; (void)location1;
+	return 0;
+#else
 	u16 length = 0;      // 当前数据块的实际长度	
 	uint32_t frame_start = GetTimerCount();  // 记录帧开始时间	
 	u8 header = 0;     // 数据块头字节标识
@@ -428,4 +435,5 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 			}
 		}
 	}
+#endif /* DEBUG_BLACK_VIDEO */
 }

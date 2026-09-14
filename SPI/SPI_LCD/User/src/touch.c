@@ -3,6 +3,7 @@
 #include "settings.h"
 #include "lcd.h"
 #include "sok_img_win.h"
+#include "timer.h"      /* 调试显示里的 GetTimerCount 限流用 */
 
 /**
  * @brief 软件I2C引脚控制宏
@@ -32,9 +33,16 @@
    MAX 太大 → 右端判定带/右侧点击落在够不到或信号弱的外圈(右侧难划、右侧不灵敏);
    MAX 太小 → 倍率变大(位置失真变大), 且超过 MAX 的最外圈变成"位置不再变化"的粘区。
    左侧同理由 MIN 决定。调参口诀: 右边难划/点不到 → MAX 减小; 左边变难 → MAX 加回。
-   当前 10~229(倍率≈1.09) 为实测确认值: 翻转 90°/270° 后上/下划菜单与四方向点击均正常。 */
-#define TOUCH_NORM_MIN   10
-#define TOUCH_NORM_MAX  229
+   当前 X=20~212 / Y=0~239 为实测确认值:
+   X: "拿在手里(正常用法)"原始X只能到约20~211、放桌上能到0~239, 故 X 单独收窄到 20~212
+      (保证拿在手里时两端都够得到); 代价是倍率 ×1.24 → 沿 X 的慢速拖动会有"1px、2px"交替的节奏。
+   Y: 原始 Y 在增益命令后已稳定到约 10~239(健康轴), 故直接用满量程 0~239 →
+      倍率正好 1.000(1:1 映射), 慢速拖动严格 1px 跟随, 没有任何步进感。
+   注: 等硬件把面板参考地做好(见开发注意事项 §27.4), X 也能回到 0~239, 那时两轴都无步进。 */
+#define TOUCH_NORM_MIN_X  20
+#define TOUCH_NORM_MAX_X  212
+#define TOUCH_NORM_MIN_Y  0
+#define TOUCH_NORM_MAX_Y  239
 
 /**
  * @brief 全局状态变量
@@ -504,25 +512,26 @@ void Touch_WaitWakeInputsReleased(void)
 }
 
 /**
- * @brief 坐标映射: raw 映射到 0~239
- * @param  raw    原始坐标 (0~240)
- * @param  mirror 是否镜像
+ * @brief 坐标映射: raw 按"该轴的窗口"[nmin,nmax] 线性拉满到 0~239
+ * @param  raw  该轴原始坐标 (0~240)
+ * @param  is_y 0=用X轴窗口, 1=用Y轴窗口
  * @retval 映射后坐标 (0~239)
+ * @note   X/Y 分开标定的原因见文件头 TOUCH_NORM_*_X/Y 的说明。
  */
-static uint16_t MapCoord(uint16_t raw, uint8_t mirror)
+static uint16_t MapCoord(uint16_t raw, uint8_t is_y)
 {
+    uint16_t nmin = is_y ? TOUCH_NORM_MIN_Y : TOUCH_NORM_MIN_X;
+    uint16_t nmax = is_y ? TOUCH_NORM_MAX_Y : TOUCH_NORM_MAX_X;
     uint16_t mapped;
-    if (mirror)
-        raw = TOUCH_MAX_RAW - raw;
 #if TOUCH_IC_IT7259
-    /* 把 [TOUCH_NORM_MIN, TOUCH_NORM_MAX] 线性拉满到 0~239。
+    /* 把 [nmin, nmax] 线性拉满到 0~239。
        倍率必须跟着窗口算(不能用固定移位近似): 否则单独改 MAX 会把输出范围一起压缩,
        例如 MAX=210 配 239 档倍率时 UI 最大只到 208 → 底部上划要求 y>210 永远够不到。 */
-    if (raw < TOUCH_NORM_MIN) raw = TOUCH_NORM_MIN;
-    if (raw > TOUCH_NORM_MAX) raw = TOUCH_NORM_MAX;
-    mapped = (uint16_t)((uint32_t)(raw - TOUCH_NORM_MIN) * 239 /
-                        (TOUCH_NORM_MAX - TOUCH_NORM_MIN));
+    if (raw < nmin) raw = nmin;
+    if (raw > nmax) raw = nmax;
+    mapped = (uint16_t)((uint32_t)(raw - nmin) * 239 / (nmax - nmin));
 #else
+    (void)nmin; (void)nmax;
     mapped = (uint32_t)raw * TOUCH_MAP_MAX / TOUCH_MAX_RAW;
 #endif
     if (mapped >= TOUCH_MAP_MAX) mapped = TOUCH_MAP_MAX - 1;
@@ -639,8 +648,8 @@ static uint8_t Touch_TryApplyCoords(uint16_t raw_x, uint16_t raw_y)
 
     {
         uint16_t mx = MapCoord(raw_x, 0);
-        uint16_t my = MapCoord(raw_y, 0);
-        /* 根据屏幕方向旋转触摸坐标 (坐标已在 MapCoord 里按 19~219 归一化, 四方向一致) */
+        uint16_t my = MapCoord(raw_y, 1);
+        /* 根据屏幕方向旋转触摸坐标 (坐标已在 MapCoord 里按各轴窗口归一化, 四方向一致) */
         switch (g_orientation_index) {
         case 0: g_touch_x = mx;        g_touch_y = my;        break;
         case 1: g_touch_x = my;        g_touch_y = 239 - mx;  break;
@@ -740,7 +749,27 @@ void Touch_Init(void)
     Delay_Ms(5);
     IT7259_WriteCmd3(0x15, 0x06, CST816S_IT7259_LAST_POINT);  /* 子命令0x06: 输出最后一点 */
     Delay_Ms(5);
+    /* 子命令0x07: AFE 增益(bit3-2=浮空/放桌上档, bit1-0=接地/拿手里档, 越大越灵敏)。
+       实测"轻触时按下标志会跳(判不到按下)"、"拿着只能到200/不拿到239", 故把两档都调高试,
+       让轻触也能稳定检出、两种握持状态下手感接近。
+       A/B 验证(可关): 加上它之后"Y 稳定到239、X 仍随手变" —— 关掉(GAIN_EN=0)可确认
+       Y 的稳定是不是靠这条命令来的。 */
+#if CST816S_IT7259_GAIN_EN
+    IT7259_WriteCmd3(0x15, 0x07, CST816S_IT7259_GAIN);
+    Delay_Ms(5);
 #endif
+#endif
+
+    /* 3.2b 信号链前端(手册5.3.22.2 / 5.3.22.5):
+       - 0x1A/0x02 模拟前端滤波系数(平均长度): 0x00=默认 / 0x03=96pt / 0x05=160pt / 0x06=192pt
+         / 0x08=256pt / 0x0A=320pt, pt 越大越平滑(SNR 更好, 响应略慢);
+       - 0x1A/0x04 引擎控制: 0x03=切到接地模式(拿在手里) / 0x04=切到屏蔽模式(放桌上)。
+       背景: 实测"轻触时按下标志会跳(判不到按下)"、而基线(CSEL)正常且不随握持变化,
+       说明问题在"手指→面板→地"的信号链前端, 故从这两条入手改善信噪比/一致性。 */
+    IT7259_WriteCmd3(0x1A, 0x02, CST816S_IT7259_AFE_FILTER);
+    Delay_Ms(5);
+    IT7259_WriteCmd3(0x1A, 0x04, CST816S_IT7259_ENGINE_MODE);
+    Delay_Ms(5);
 
     /* 3.3 置为 Active 模式(手册5.3.4: Command 0x04/子命令0x00, 参数0x01=Idle, 0x00=Active)。
        Idle 是省电态(25uA), 不上报任何数据包、也不接受命令, 直到用户触摸才唤醒。 */
@@ -1070,23 +1099,77 @@ static void Touch_DebugNum3(uint16_t x, uint16_t y, uint16_t v, uint16_t color)
     sok_draw_digit_scaled(x + 16, y, (uint8_t)(v % 10),         color, 8, 14);
 }
 
+#if TOUCH_IC_IT7259
+/* 基线(CSEL)诊断: 用于判断"轻触不灵敏/坐标随握持变化"是否与芯片基线补偿有关 */
+static uint16_t g_dbg_csel_min = 0;
+static uint16_t g_dbg_csel_max = 0;
+static uint8_t  g_dbg_csel_ok  = 0;
+static uint32_t g_dbg_csel_us  = 0;
+
 /**
- * @brief  调试: 屏幕上显示触摸状态、点报告原始字节与解析后的坐标。
- * @note   行1=按下标志(红) 行2=Byte0标志(白) 行3=Byte2(黄) 行4=Byte3(浅蓝) 行5=解析X(绿);
+ * @brief  调试: 读一次"当前模式 CSEL"(各通道基线补偿), 统计最小/最大值。
+ * @note   命令 0x1A/子命令0x05/参数0x00 = Get Current Mode CSEL(手册5.3.22.6),
+ *         返回 28 个 WORD, 小端: 低字节=CSEL, 高字节=CIN(通道号), 从 Command Response Buffer(0xA0) 读。
+ *         只在无触摸时读(手指按着时 CSEL 本身会变化), 并限流到约 0.5s 一次(一次要读 56 字节)。
+ */
+static void Touch_DebugReadBaseline(void)
+{
+    uint8_t buf[56];
+    uint8_t i, qs = 0;
+    uint16_t mn = 0xFFFF, mx = 0;
+
+    if (g_touch_pressed) { g_dbg_csel_ok = 0; return; }
+    if ((uint32_t)(GetTimerCount() - g_dbg_csel_us) < 500000UL) return;
+    g_dbg_csel_us = GetTimerCount();
+
+    if (!IT7259_WriteCmd3(0x1A, 0x05, 0x00)) { g_dbg_csel_ok = 0; return; }
+    for (i = 0; i < 20; i++) {                    /* 等命令完成: Query 的 bit1-0 == 00b(Done) */
+        if (!CST816S_ReadReg(CST816S_REG_QUERY_BUF, &qs, 1)) break;
+        if ((qs & 0x03) == 0x00) break;
+        Delay_Ms(1);
+    }
+    if (!CST816S_ReadReg(CST816S_REG_CMD_RSP, buf, 56)) { g_dbg_csel_ok = 0; return; }
+    for (i = 0; i < 56; i += 2) {                  /* 小端 WORD: 低字节=CSEL */
+        uint16_t v = (uint16_t)buf[i];
+        if (v < mn) mn = v;
+        if (v > mx) mx = v;
+    }
+    g_dbg_csel_min = mn;
+    g_dbg_csel_max = mx;
+    g_dbg_csel_ok = 1;
+}
+#endif
+
+/**
+ * @brief  调试: 屏幕上显示触摸状态、点报告原始字节与解析后的坐标/基线诊断值。
+ * @note   行1=按下标志(红) 行2=Byte0标志(白) 行3=Byte2(黄) 行4=Byte3(浅蓝) 行5=Byte4(白)
+ *         行6=映射后X(绿) 行7=映射后Y(红) 行8=CSEL最小(青) 行9=CSEL最大(蓝) 行10=基线读取成功(白);
  *         圆形屏四角在圆外不可见, 故放在左中部(距圆心<120);
  *         sok_draw_digit_scaled 不带CS控制, LCD_Fill 之后须先 LCD_CS_CLR(见§8)。
  */
 void Touch_DebugShow(void)
 {
-    LCD_Fill(56, 76, 87, 187, LCD_BLACK);
+#if TOUCH_IC_IT7259
+    Touch_DebugReadBaseline();   /* 刷新基线诊断值(内部已限流、且仅无触摸时读) */
+#endif
+    /* 位置在菜单框(x 45~195)左侧之外的那条竖带里: 菜单打开时不会被盖掉。
+       圆屏限制: x=11~35 处可见 y 约 35~205, 故从 y=60 起、行距 14、共 10 行到 y=186。 */
+    LCD_Fill(11, 58, 35, 200, LCD_BLACK);
     LCD_CS_CLR;
-    Touch_DebugNum3(56,  76, (uint16_t)(g_touch_pressed ? 1U : 0U), LCD_RED);   /* 行1 按下标志 */
-    Touch_DebugNum3(56,  92, g_dbg_point_buf[0], LCD_WHITE);                    /* 行2 Byte0(格式标志) */
-    Touch_DebugNum3(56, 108, g_dbg_point_buf[2], LCD_YELLOW);                   /* 行3 Byte2 = 原始X低8位 */
-    Touch_DebugNum3(56, 124, g_dbg_point_buf[3], LCD_GBLUE);                    /* 行4 Byte3 = X/Y高位 */
-    Touch_DebugNum3(56, 140, g_dbg_point_buf[4], LCD_WHITE);                    /* 行5 Byte4 = 原始Y低8位 */
-    Touch_DebugNum3(56, 156, g_touch_x, LCD_GREEN);                             /* 行6 映射后X */
-    Touch_DebugNum3(56, 172, g_touch_y, LCD_RED);                               /* 行7 映射后Y */
+    Touch_DebugNum3(11,  60, (uint16_t)(g_touch_pressed ? 1U : 0U), LCD_RED);   /* 行1 按下标志 */
+    Touch_DebugNum3(11,  74, g_dbg_point_buf[0], LCD_WHITE);                    /* 行2 Byte0(格式标志) */
+    Touch_DebugNum3(11,  88, g_dbg_point_buf[2], LCD_YELLOW);                   /* 行3 Byte2 = 原始X低8位 */
+    Touch_DebugNum3(11, 102, g_dbg_point_buf[3], LCD_GBLUE);                    /* 行4 Byte3 = X/Y高位 */
+    Touch_DebugNum3(11, 116, g_dbg_point_buf[4], LCD_WHITE);                    /* 行5 Byte4 = 原始Y低8位 */
+    Touch_DebugNum3(11, 130, g_touch_x, LCD_GREEN);                             /* 行6 映射后X */
+    Touch_DebugNum3(11, 144, g_touch_y, LCD_RED);                               /* 行7 映射后Y */
+#if TOUCH_IC_IT7259
+    /* 行8/9: 当前模式各通道 CSEL(基线补偿)的最小/最大值 —— 贴到 0 或 255 说明基线顶到边界,
+       正是"轻触判不到/坐标随握持变化"的典型特征; 行10: 1=本帧读取成功 */
+    Touch_DebugNum3(11, 158, g_dbg_csel_min, LCD_CYAN);
+    Touch_DebugNum3(11, 172, g_dbg_csel_max, LCD_BLUE);
+    Touch_DebugNum3(11, 186, (uint16_t)g_dbg_csel_ok, LCD_WHITE);
+#endif
     LCD_CS_SET;
 }
 #endif

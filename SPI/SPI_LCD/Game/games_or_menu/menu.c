@@ -833,13 +833,11 @@ uint8_t game_menu_drag_poll(int16_t* drag_y, uint16_t* drag_touch_y,
             target_y = MENU_Y - MENU_RELEASE_GAP;
         if (target_y > *drag_y) {
             int16_t diff = target_y - *drag_y;
-            /* 单帧位移上限 + 最大滞后: 快速下滑时若一直按 MENU_DRAG_MAX_STEP 逐帧追,
-               菜单会明显落在手指后面(与"鱼快滑只走一半"同因), 故超出 MENU_DRAG_MAX_LAG
-               的部分直接补上, 只保留这么点滞后; 小幅移动仍逐帧平滑。 */
-            if (diff > MENU_DRAG_MAX_STEP) {
-                int16_t fast = (int16_t)(diff - MENU_DRAG_MAX_LAG);
-                diff = (fast > MENU_DRAG_MAX_STEP) ? fast : MENU_DRAG_MAX_STEP;
-            }
+            /* 只做单帧位移上限: 菜单拖起来是"逐像素慢慢追上来"的从容感。
+               曾加过"最大滞后"(超出部分直接补上, 让快滑更跟手), 但菜单观感变差,
+               已按需回退(鱼拖动/亮度条仍保留该做法, 见 §24)。 */
+            if (diff > MENU_DRAG_MAX_STEP)
+                diff = MENU_DRAG_MAX_STEP;
             *drag_y += diff;
         }
         if (ts->y > gdp_max_ty) gdp_max_ty = ts->y;

@@ -734,12 +734,10 @@ static uint8_t Main_HandleTouchInput(void)
                 target_y = MENU_Y - MENU_RELEASE_GAP;
             if (target_y > s_menu_drag_y) {
                 int16_t diff = target_y - s_menu_drag_y;
-                /* 单帧位移上限 + 最大滞后(与 game_menu_drag_poll / 鱼拖动同一处理):
-                   快速下滑时若只按 MENU_DRAG_MAX_STEP 逐帧追, 菜单会明显落在手指后面 */
-                if (diff > MENU_DRAG_MAX_STEP) {
-                    int16_t fast = (int16_t)(diff - MENU_DRAG_MAX_LAG);
-                    diff = (fast > MENU_DRAG_MAX_STEP) ? fast : MENU_DRAG_MAX_STEP;
-                }
+                /* 只做单帧位移上限(同 game_menu_drag_poll): 保持"逐像素追上来"的从容感。
+                   曾加过"最大滞后"让快滑更跟手, 但菜单观感变差, 已回退。 */
+                if (diff > MENU_DRAG_MAX_STEP)
+                    diff = MENU_DRAG_MAX_STEP;
                 s_menu_drag_y += diff;
                 s_menu_dragging = 1;
                 /* 视频设置页顶部下滑拖主菜单即退出设置页, 背景重载视频第一帧(同视频菜单清背景) */
@@ -1409,7 +1407,7 @@ int main(void) {
     uint8_t  wake_touch_confirmed = 0;
     uint16_t standby_wake_magic = 0;
     // ====== 调试模式：绕过Standby，直接等待PA8触摸 ======
-//#define DEBUG_NO_STANDBY
+//#define DEBUG_NO_STANDBY   /* 调试用: 打开=不进待机/不熄屏; 正式版必须注释掉 */
 #ifdef DEBUG_NO_STANDBY
     // 调试模式：PA8触摸直接触发主循环，绕过Standby
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB |
