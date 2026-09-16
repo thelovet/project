@@ -37,7 +37,9 @@ typedef struct {
 } FlashStoreRes;
 
 #ifdef FLASH_DATA_STORE_MODE
-static const FlashStoreRes s_resources[] = {
+#include "sokoban.h"      /* 只为取 SOKOBAN_MAP_RES_LIST: 50 张推箱子关卡地图(见下表末尾) */
+
+static FlashStoreRes s_resources[] = {   /* 非 const: 关卡地图的长度在运行期补(见 FlashStore_BurnAll) */
     /* ---- 24x24中文点阵字库 (chinese_fonts.c, 72字节/字) ---- */
     { font_tui,     72 }, { font_xiang,   72 }, { font_zi,     72 },
     { font_shi,     72 }, { font_pin,     72 }, { font_fan,    72 },
@@ -90,6 +92,14 @@ static const FlashStoreRes s_resources[] = {
     { player_img_6, PLAYER_6_W * PLAYER_6_H * 2 },
     { player_img_7, PLAYER_7_W * PLAYER_7_H * 2 },
     { player_img_8, PLAYER_8_W * PLAYER_8_H * 2 },
+
+    /* ---- 50 张推箱子关卡地图 (sokoban_maps.c, Bcd 压缩每字节2格) ----
+       ★ 顺序必须与 flash_store.h 里 FLASH_STORE_ID_SOK_MAP_0 起的 50 个 ID 一致
+       ★ 游戏模式不引用这些数组(改用外部 Flash 读取) → 会被 --gc-sections 回收, 不占内部 Flash;
+         只有本烧录固件带着它们(约 3KB), 这就是"关卡搬到外部 Flash 省空间"的实现 */
+#define SOK_RES_ENTRY(n)  { sok_map##n, 0 },   /* 长度在运行期补: 见 FlashStore_BurnAll 开头的 0.2 步 */
+    SOKOBAN_MAP_RES_LIST(SOK_RES_ENTRY)
+#undef SOK_RES_ENTRY
 };
 #endif /* FLASH_DATA_STORE_MODE */
 
@@ -524,6 +534,15 @@ void FlashStore_BurnAll(void)
     g_res_prog.pct      = 0;
     g_res_prog.crc_fail = 0;
     g_res_prog.result   = 0;
+
+    /* 0.2 关卡地图的长度运行期补上: sokoban_maps.c 里 50 张地图是各自独立的数组,
+       头文件只能给"不完整类型"的声明(extern const uint8_t sok_mapN[]), 编译期 sizeof 不出来;
+       长度 = ceil(行*列/2)(Bcd 每字节 2 格), 由 sokoban_levels[i] 推出。
+       ★ 顺序前提: s_resources[] 末尾 50 项 == sok_map1..50 == sokoban_levels[0..49], 三处必须同序 */
+    for (i = 0; i < SOKOBAN_LEVEL_COUNT; i++) {
+        s_resources[FLASH_STORE_ID_SOK_MAP_0 + i].size =
+            ((uint16_t)sokoban_levels[i].rows * sokoban_levels[i].cols + 1) / 2;
+    }
 
     /* 1. 计算全部资源总大小 */
     uint32_t total = 0;

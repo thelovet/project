@@ -240,9 +240,11 @@ if ($needData -or $needGame) {
         Ok ("  已缓存: {0} ({1:N0} B)" -f (Split-Path $elfData -Leaf), (Get-Item $elfData).Length)
     }
     if ($needGame) {
+        Set-DataMacro $false | Out-Null       # ★ 必须在编译前关掉字库宏, 否则编出来的"游戏固件"其实是字库固件
         & powershell -ExecutionPolicy Bypass -File $switch game *> $null
         New-Build '游戏'
-        Assert-Sym $elf 'g_video_chunk' $false   # 自检: 游戏固件里视频块应被 --gc-sections 回收
+        Assert-Sym $elf 'g_res_prog' $false   # 自检: 游戏固件绝不能有 g_res_prog(那是字库固件的标志)
+        Assert-Sym $elf 'g_video_chunk' $false
         Copy-Item $elf $elfGame -Force
         Save-CacheStamp $elfGame
         Ok ("  已缓存: {0} ({1:N0} B)" -f (Split-Path $elfGame -Leaf), (Get-Item $elfGame).Length)

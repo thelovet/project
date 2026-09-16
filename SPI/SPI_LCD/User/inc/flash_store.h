@@ -118,6 +118,12 @@ typedef enum {
     FLASH_STORE_ID_PLAYER_7,
     FLASH_STORE_ID_PLAYER_8,
 
+    /* 65-114: 50 张推箱子关卡地图(Bcd 压缩, 每字节存 2 格; 顺序 = sokoban_maps.c 的 sok_map1..50)
+       ★ 与 s_resources[] 末尾 50 项一一对应; 游戏里用 FLASH_STORE_ID_SOK_MAP_0 + 关卡序号 读取
+       ★ 这张表一改, 外部 Flash 资源区布局就变 → 所有板子都得重烧"字库/图片"那一步(烧录脚本会做) */
+    FLASH_STORE_ID_SOK_MAP_0 = 65,
+    FLASH_STORE_ID_SOK_MAP_LAST = 114,
+
     FLASH_STORE_ID_COUNT
 } FlashStoreId;
 

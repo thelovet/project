@@ -30,12 +30,30 @@
 
 /**
  * @brief 关卡数据结构
+ * @note  地图本体已移到**外部 Flash 资源区**(见下面的 SOKOBAN_MAP_RES_LIST):
+ *        运行时由 sokoban.c 在选关时读进 RAM 缓冲再解压, 这里不再持有地图指针 ——
+ *        否则 50 张地图会被链接器一起带进内部 Flash(约 3KB, 而游戏固件只剩几百字节余量)。
  */
 typedef struct {
-    uint8_t       rows;       /* 行数 */
-    uint8_t       cols;       /* 列数 */
-    const uint8_t *map;       /* 关卡地图数据 [rows * cols], 存Flash */
+    uint8_t rows;       /* 行数 */
+    uint8_t cols;       /* 列数 */
 } SokobanLevel;
+
+/**
+ * @brief 关卡地图资源清单 (50 张, 定义在 sokoban_maps.c, 非 static)
+ *        flash_store.c 的 s_resources[] 用下面的 X 宏把它们登记成外部 Flash 资源;
+ *        游戏模式只按 FLASH_STORE_ID_SOK_MAP_0 + 序号 读取, 不直接引用数组本体。
+ */
+#define SOKOBAN_MAP_RES_LIST(X) \
+    X(1) X(2) X(3) X(4) X(5) X(6) X(7) X(8) X(9) X(10) \
+    X(11) X(12) X(13) X(14) X(15) X(16) X(17) X(18) X(19) X(20) \
+    X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(28) X(29) X(30) \
+    X(31) X(32) X(33) X(34) X(35) X(36) X(37) X(38) X(39) X(40) \
+    X(41) X(42) X(43) X(44) X(45) X(46) X(47) X(48) X(49) X(50)
+
+#define SOKOBAN_MAP_DECL(n)  extern const uint8_t sok_map##n[];
+SOKOBAN_MAP_RES_LIST(SOKOBAN_MAP_DECL)
+#undef SOKOBAN_MAP_DECL
 
 extern const uint16_t sok_img_bg_palette[];
 extern const uint16_t sok_img_wall_palette[];
