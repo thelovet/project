@@ -30,20 +30,38 @@ uint32_t last_seg_end = 0;//最后一个数据段结束地址
 uint8_t pre_data[PARALLEL_BUFFER_COUNT];//预读数据数组
 
 #define AVG_FRAME_COUNT       10    // 滑动窗10帧求平均值
-#define TARGET_FPS            40    // 目标帧率，改这一个值即可
+#define TARGET_FPS            60    // 目标帧率，改这一个值即可
 #define INIT_FRAME_TIME_US    (1000000 / TARGET_FPS)  // 自动计算每帧微秒数，60FPS=16666us
+
+/* 分段帧率: 前 VIDEO_SLOW_SEGMENTS 段按 SLOW_FPS 播, 其余按 TARGET_FPS。
+   两批视频数据是用不同帧率压的, 播快/播慢都不对, 所以按段号给不同的"目标帧间隔"。 */
+#define VIDEO_SLOW_SEGMENTS   4      // 前 4 段用慢速帧率
+#define SLOW_FPS              40
+#define SLOW_FRAME_TIME_US    (1000000 / SLOW_FPS)
+static uint32_t target_frame_us = INIT_FRAME_TIME_US;   // 当前生效的目标帧间隔(每帧按段号刷新)
 
 /* VIDEO_BLINK_WAKE_ENABLE: 1=启用(播放完一遍后允许背光闪烁+触摸切换/唤醒), 0=禁用(播完直接结束循环休眠) */
 #define VIDEO_BLINK_WAKE_ENABLE  1
 
 //当前视频段
 uint8_t current_video_index = 0;
-//最大视频段数
+/* 最大视频段数: 直接取自 VIDEO_SEGMENT_COUNT(decompress.h), 该宏同时决定下面 video_ranges 的行数!
+   ★ 必须等于 video_ranges 里"有值的行数"(当前 8 行, 对应 压缩数据1~8):
+     - 若为 1 -> 切换语句 `(idx+1) % max_video_count` 恒为 0 -> 点击只会"重播当前段", 切不了视频;
+     - 若比有值的行数多 -> 多出来的行是全 0 -> seg_end=0 -> 播到帧末立刻重播(看着像卡住)。 */
 uint8_t max_video_count = VIDEO_SEGMENT_COUNT;
 
 // 视频段地址范围定义（每组{起始地址4字节, 结束地址4字节}）
 const uint8_t video_ranges[VIDEO_SEGMENT_COUNT][8] = {
-	{0x00, 0x00, 0x00, 0x00, 0x00, 0x79, 0xC0, 0x1D},
+	//{0x00, 0x00, 0x00, 0x00, 0x00, 0x79, 0xC0, 0x1D},娜娜莉
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x6F, 0xC0,
+	0x00, 0x09, 0x6F, 0xC1, 0x00, 0x14, 0x75, 0x7A,
+	0x00, 0x14, 0x75, 0x7B, 0x00, 0x21, 0xF0, 0x88,
+	0x00, 0x21, 0xF0, 0x89, 0x00, 0x40, 0x09, 0xB6,
+	0x00, 0x40, 0x09, 0xB7, 0x00, 0x44, 0x40, 0x13,
+	0x00, 0x44, 0x40, 0x14, 0x00, 0x4C, 0x89, 0x4D,
+	0x00, 0x4C, 0x89, 0x4E, 0x00, 0x54, 0xF5, 0xD1,
+	0x00, 0x54, 0xF5, 0xD2, 0x00, 0x6D, 0xFD, 0x56,
 	// {0x00, 0x00, 0x00, 0x00, 0x00, 0x0A, 0xD1, 0xE2},
 	// {0x00, 0x0A, 0xD1, 0xE3, 0x00, 0x1D, 0x47, 0x93},
 	// {0x00, 0x1D, 0x47, 0x94, 0x00, 0x30, 0xFB, 0x35},
@@ -76,8 +94,8 @@ void UpdateAvgFrameTime(uint32_t frame_duration) {
 	}
 	avg_frame_time = sum / AVG_FRAME_COUNT;
 
-	if (avg_frame_time < INIT_FRAME_TIME_US) {
-		avg_frame_time = INIT_FRAME_TIME_US;
+	if (avg_frame_time < target_frame_us) {
+		avg_frame_time = target_frame_us;   /* 按当前段的目标帧间隔兜底(40/60fps 分段) */
 	}
 }
 
@@ -170,6 +188,9 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 	u8 datah = 0;   // 当前像素的高字节（默认值）
 	u8 datal = 0;   // 当前像素的低字节（默认值）			
 	uint8_t pre_count = 0;//预读像素数量
+
+	/* 按当前段号刷新目标帧间隔: 前 VIDEO_SLOW_SEGMENTS 段 40fps, 其余 TARGET_FPS */
+	target_frame_us = (current_video_index < VIDEO_SLOW_SEGMENTS) ? SLOW_FRAME_TIME_US : INIT_FRAME_TIME_US;
 
 	last_seg_end = ((uint32_t)video_ranges[max_video_count - 1][4] << 24) |
 		((uint32_t)video_ranges[max_video_count - 1][5] << 16) |
