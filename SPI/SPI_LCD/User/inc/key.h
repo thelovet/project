@@ -1,22 +1,17 @@
 #ifndef __KEY_H
 #define __KEY_H
 
+/* (已废弃) 旧版物理按键驱动头文件 —— 见 key.c 顶部说明, 2026-09 随 key.c 一起清空。
+ *
+ * 原内容(需要时从 git 历史取回: git log -- SPI/SPI_LCD/User/inc/key.h):
+ *   KEY_SHORT_PRESS / KEY_LONG_PRESS         按键事件标志
+ *   KEY_LONG_PRESS_ENABLE                    长按开关(旧版: 1=长按有效; 现在已无按键, 无意义)
+ *   KEY_Init / Get_Key_Status / Clear_Key_Status / KEY_Reset / KEY_Poll   旧按键驱动接口
+ *   这些函数现在全工程 0 调用点, 已从 key.c 删除; PA0 现为 LCD 的 DC 脚, 不要再启用按键代码。
+ */
+
 #include "ch32v20x.h"
 
-// 按键状态标志
-// 按键类型定义
-#define KEY_SHORT_PRESS        0x01    // 短按
-#define KEY_LONG_PRESS         0x02    // 长按
-
-#define KEY_LONG_PRESS_ENABLE  1  // 长按开关：1=长按有效，0=长按无效（松手触发短按）
-
-// 按键驱动接口函数
-void KEY_Init(void);
-uint8_t Get_Key_Status(void);
-void Clear_Key_Status(void);
-void KEY_Reset(void);
-void KEY_Poll(void);
-
-extern uint8_t key_response;       // 按键响应标志
+extern uint8_t key_response;       /* 触摸/菜单输入响应标志(真正定义在 decompress.c) */
 
 #endif

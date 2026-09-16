@@ -23,7 +23,7 @@ extern uint8_t max_video_count;
    填错的后果: ①填 1 时 `(idx+1) % max_video_count` 恒为 0 -> 点击变成"重播当前段"、切不了视频;
                ②填多了多出全 0 行 -> seg_end=0, 播到帧末立刻重播(看着像卡住)。
    以后启用 decompress.c 表里那些注释掉的段时, 记得把这个数字一起加。 */
-#define VIDEO_SEGMENT_COUNT  8
+#define VIDEO_SEGMENT_COUNT  4
 // 视频段地址范围表：每段{起始地址4字节, 结束地址4字节}
 extern const uint8_t video_ranges[VIDEO_SEGMENT_COUNT][8];
 

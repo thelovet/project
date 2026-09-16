@@ -19,3 +19,7 @@ obj/
 
 # 临时文件
 *.tmp
+
+# 脚本生成的文件(gen_video_chunk.py 每块都会重写; 新克隆仓库编译前需先跑一次生成器)
+SPI/SPI_LCD/User/src/video_chunk.c
+SPI/SPI_LCD/User/inc/video_chunk.h

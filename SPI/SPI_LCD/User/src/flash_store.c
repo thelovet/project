@@ -626,6 +626,54 @@ void FlashStore_BurnAll(void)
 #ifdef VIDEO_CHUNK_STORE_MODE
 #include "video_chunk.h"
 
+/* ---- SWD 回读握手/进度 (给 PC 端 burn_all.ps1 读, 替代"猜一个固定等待时间") ----
+   PC 端用 nm 从 SPI_LCD.elf 查这个符号的地址, 再用一次 mem2array 把 10 个字读回去;
+   用结构体是为了保证这些字连续, 一次读就能拿到 magic/块号/阶段/进度/两个CRC/结果/三段耗时。
+   ★ magic 必须在最前面且最先写: 合并会话后 PC 可能在 MCU 刚复位、.bss 还没清零时就读,
+     读到的是随机 RAM; PC 先校验 magic, 对不上就继续等, 免得把随机数当"烧完了"。 */
+#define BURN_PROG_MAGIC   0x4255524Eu   /* 'B','U','R','N' */
+
+typedef struct {
+    volatile uint32_t magic;    /* BURN_PROG_MAGIC: 结构有效标志(最先写) */
+    volatile uint32_t index;    /* 块号(VIDEO_CHUNK_INDEX) */
+    volatile uint32_t stage;    /* 0=擦除 1=写入 2=回读校验 3=结束(通过或失败) */
+    volatile uint32_t pct;      /* 0~100 当前进度(与屏幕进度条同源) */
+    volatile uint32_t crc_src;  /* 源数据 CRC16 */
+    volatile uint32_t crc_rd;   /* 回读数据 CRC16(失败时 PC 日志里可直接对比) */
+    volatile uint32_t result;   /* 0=未完成 1=校验通过 2=校验失败 */
+    volatile uint32_t ms_erase; /* 擦除阶段耗时(ms), 供评估"是否值得改用块擦除" */
+    volatile uint32_t ms_write; /* 写入阶段耗时(ms) */
+    volatile uint32_t ms_verify;/* 回读校验阶段耗时(ms) */
+} burn_prog_t;
+
+volatile burn_prog_t g_burn_prog = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+/* ---- 分阶段计时: 借 TIM1 当自由计数器(144MHz/14400 = 10kHz → 0.1ms/tick, 6.55s 回绕一次) ----
+   不使能中断 —— 免得把主程序 TIM1 更新中断里的电池检测拉进烧录模式。
+   背光 PWM 用的是 TIM4, 游戏模式的帧计时器在烧录模式里根本没初始化, 所以这里独占 TIM1 ✓ */
+static void burn_timer_init(void)
+{
+    TIM_TimeBaseInitTypeDef t = {0};
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
+    t.TIM_Period        = 65535;
+    t.TIM_Prescaler     = 14399;   /* 144MHz / (14399+1) = 10kHz */
+    t.TIM_ClockDivision = TIM_CKD_DIV1;
+    t.TIM_CounterMode   = TIM_CounterMode_Up;
+    TIM_TimeBaseInit(TIM1, &t);
+    TIM_Cmd(TIM1, ENABLE);
+}
+
+static uint16_t burn_tick(void)
+{
+    return (uint16_t)TIM1->CNT;
+}
+
+/* 距 t0 过了多少 ms(0.1ms/tick, 只适用 <6.5s 的间隔) */
+static uint32_t burn_ms_since(uint16_t t0)
+{
+    return (uint32_t)((uint16_t)(burn_tick() - t0)) / 10;
+}
+
 /**
  * @brief  视频数据块烧录主流程 (不返回)
  * @note   进入前需已初始化SPI Flash与LCD;
@@ -634,7 +682,11 @@ void FlashStore_BurnAll(void)
  */
 void VideoChunkStore_BurnAll(void)
 {
+    g_burn_prog.magic = BURN_PROG_MAGIC;     /* 回读握手: 先置有效标志, PC 才认后面的字段 */
     flash_store_detect_chip();   /* 识别芯片容量与地址模式 */
+    g_burn_prog.index = VIDEO_CHUNK_INDEX;   /* 回读握手: 告诉 PC 本块是第几块 */
+    burn_timer_init();                       /* 分段计时用(TIM1 自由计数) */
+    uint16_t t_phase = burn_tick();
 
     flash_store_ui_init();
     flash_store_ui_update(0);
@@ -647,6 +699,8 @@ void VideoChunkStore_BurnAll(void)
     uint32_t end   = start + VIDEO_CHUNK_SIZE;
     if (end > s_flash_size) {
         flash_store_ui_fail(0);
+        g_burn_prog.stage  = 3;
+        g_burn_prog.result = 2;   /* 握手: 本块越界, 直接报失败(不让 PC 白等超时) */
         while (1) { Delay_Ms(1000); }
     }
 
@@ -656,23 +710,33 @@ void VideoChunkStore_BurnAll(void)
                                (start & ~((uint32_t)4095));
         uint32_t done = 0;
         uint32_t addr;
+        t_phase = burn_tick();
+        g_burn_prog.stage = 0;
         for (addr = start & ~((uint32_t)4095); addr < end; addr += 4096) {
             flash_store_erase_sector(addr);
             done += 4096;
-            flash_store_ui_update((uint8_t)(10UL * done / erase_total));
+            uint8_t p = (uint8_t)(10UL * done / erase_total);
+            flash_store_ui_update(p);
+            g_burn_prog.pct = p;
         }
+        g_burn_prog.ms_erase = burn_ms_since(t_phase);
     }
 
     /* 3. 写入数据(每次1个扇区大小, 便于进度更新) */
     {
         uint32_t written = 0;
+        t_phase = burn_tick();
+        g_burn_prog.stage = 1;
         while (written < VIDEO_CHUNK_SIZE) {
             uint32_t n = VIDEO_CHUNK_SIZE - written;
             if (n > 4096) n = 4096;
             flash_store_write(g_video_chunk + written, start + written, n);
             written += n;
-            flash_store_ui_update((uint8_t)(10 + 80UL * written / VIDEO_CHUNK_SIZE));
+            uint8_t p = (uint8_t)(10 + 80UL * written / VIDEO_CHUNK_SIZE);
+            flash_store_ui_update(p);
+            g_burn_prog.pct = p;
         }
+        g_burn_prog.ms_write = burn_ms_since(t_phase);
     }
 
     /* 4. 回读校验: 与源数据CRC比对 */
@@ -681,6 +745,8 @@ void VideoChunkStore_BurnAll(void)
         uint32_t left = VIDEO_CHUNK_SIZE;
         uint32_t a    = start;
         uint16_t c    = 0xFFFF;
+        t_phase = burn_tick();
+        g_burn_prog.stage = 2;
         while (left) {
             uint16_t n = (left > sizeof(rbuf)) ? (uint16_t)sizeof(rbuf)
                                                : (uint16_t)left;
@@ -690,14 +756,22 @@ void VideoChunkStore_BurnAll(void)
             }
             a += n;
             left -= n;
-            flash_store_ui_update(
-                (uint8_t)(90 + 10UL * (VIDEO_CHUNK_SIZE - left) / VIDEO_CHUNK_SIZE));
+            uint8_t p = (uint8_t)(90 + 10UL * (VIDEO_CHUNK_SIZE - left) / VIDEO_CHUNK_SIZE);
+            flash_store_ui_update(p);
+            g_burn_prog.crc_rd = c;
+            g_burn_prog.pct    = p;
         }
-        if (c == flash_store_crc16(g_video_chunk, VIDEO_CHUNK_SIZE)) {
+        uint16_t c_src = flash_store_crc16(g_video_chunk, VIDEO_CHUNK_SIZE);
+        g_burn_prog.ms_verify = burn_ms_since(t_phase);
+        g_burn_prog.crc_src = c_src;
+        g_burn_prog.stage   = 3;
+        if (c == c_src) {
             flash_store_ui_update(100);
             flash_store_ui_done();     /* 绿色100% */
+            g_burn_prog.result = 1;    /* 握手: 烧完且校验通过 */
         } else {
             flash_store_ui_fail(s_ui_last_pct);  /* 红色 */
+            g_burn_prog.result = 2;    /* 握手: 校验失败 */
         }
     }
 

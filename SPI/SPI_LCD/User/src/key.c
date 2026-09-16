@@ -1,143 +1,20 @@
-#include "key.h"
-#include "timer.h"
-
-volatile uint8_t key_status = 0;        // 按键状态标志
-volatile uint32_t key_press_start = 0;   // 按下开始时间
-volatile uint32_t key_cooldown = 0;      // 上次触发时间（冷却期起点）
-volatile uint8_t key_holding = 0;        // 按键正在按住
-volatile uint8_t long_press_triggered = 0; // 长按已触发（防止重复）
-
-
-#define KEY_COOLDOWN_MS      50            // 冷却时间（ms），改这一个值即可
-#define KEY_MIN_PRESS_MS     5              // 最短按下时间（0.1ms），低于此视为抖动
-#define KEY_LONG_PRESS_MS    500            // 长按时间阈值（ms）
-#define KEY_COOLDOWN_TIME   (KEY_COOLDOWN_MS * 1000)  // 自动计算（μs）
-#define KEY_MIN_PRESS_TIME   (KEY_MIN_PRESS_MS * 100)  // 自动计算（μs）
-#define KEY_LONG_PRESS_TIME  (KEY_LONG_PRESS_MS * 1000) // 自动计算（μs）
 /**
- * @brief  初始化PA0外部中断，用于按键检测(支持短按/长按)
- * @return 无
+ * @file    key.c
+ * @brief   (已废弃) 旧版物理按键驱动 —— 硬件上早已没有按键, 本模块是死代码, 2026-09 清空以省 Flash。
+ *
+ * 原实现(需要时从 git 历史取回: git log -- SPI/SPI_LCD/User/src/key.c):
+ *   KEY_Init()  : PA0 下拉输入 + EXTI0 双边沿中断
+ *   EXTI0 中断  : 抖动过滤(KEY_MIN_PRESS_MS) / 50ms 冷却 / 松手判定短按
+ *   KEY_Poll()  : 主循环轮询, 按住 >= 500ms 判定长按(受 key.h 的 KEY_LONG_PRESS_ENABLE 控制)
+ *   事件取出    : Get_Key_Status() / Clear_Key_Status()
+ *
+ * 为什么删:
+ *   1) 全工程对 KEY_Init/KEY_Poll/Get_Key_Status/Clear_Key_Status/KEY_Reset 的调用点都是 0 处,
+ *      PA0 的 EXTI 从未使能, 长短按永远不会发生 —— 只白占 Flash(约 134 字节 .text)。
+ *   2) PA0 现在是 LCD 的 DC 脚(config.h 的 LCD_DC_PIN), 万一有人把 KEY_Init() 打开,
+ *      会把 PA0 从 LCD 手里抢走(下拉输入 + 中断), 属于必须避免的隐患。
+ *   3) 现在的输入来源是触摸: main.c / decompress.c 的触摸处理直接写 key_response(定义在 decompress.c)。
+ *
+ * 保留本文件的原因: 构建脚本的源文件列表(obj 目录里的 subdir.mk)还列着它, 删文件会报
+ *   "No rule to make target"; 内容清空即不产生任何代码。
  */
-void KEY_Init(void)
-{
-    GPIO_InitTypeDef GPIO_InitStructure;
-    EXTI_InitTypeDef EXTI_InitStructure;
-    NVIC_InitTypeDef NVIC_InitStructure;
-
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_AFIO, ENABLE);
-
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-    GPIO_EXTILineConfig(GPIO_PortSourceGPIOA, GPIO_PinSource0);
-
-    EXTI_InitStructure.EXTI_Line = EXTI_Line0;
-    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
-    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-    EXTI_Init(&EXTI_InitStructure);
-
-    NVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
-}
-
-/**
- * @brief  获取按键状态。
- * @return 按键状态
- */
-uint8_t Get_Key_Status(void)
-{
-    return key_status;
-}
-
-/**
- * @brief  清除按键状态。
- * @return 无
- */
-void Clear_Key_Status(void)
-{
-    key_status = 0;
-}
-
-/**
- * @brief  重置按键状态(重新开始/模式切换时调用)。
- * @return 无
- */
-void KEY_Reset(void)
-{
-    key_status = 0;
-    key_press_start = 0;
-    key_cooldown = 0;
-    key_holding = 0;
-    long_press_triggered = 0;
-}
-
-void EXTI0_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
-/**
- * @brief  按键外部中断(EXTI0)处理。
- *         按下记录时间 → 主循环轮询长按 → 释放时判定短按
- * @note   标准 ISR, 记录按键触发并清除中断标志
- */
-void EXTI0_IRQHandler(void)
-{
-    if(EXTI_GetITStatus(EXTI_Line0) != RESET)
-    {
-        uint32_t now = GetTimerCount();
-        uint8_t pin = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_0);
-
-        // 冷却检查
-        if((now - key_cooldown) < KEY_COOLDOWN_TIME)
-        {
-            EXTI_ClearITPendingBit(EXTI_Line0);
-            return;
-        }
-
-        if(pin == Bit_SET)
-        {
-            // 按下：记录时间，开始计时
-            key_press_start = now;
-            key_holding = 1;
-            long_press_triggered = 0;
-        }
-        else
-        {
-            // 释放：若长按未触发，判定短按
-            if(key_holding && !long_press_triggered)
-            {
-                uint32_t press_duration = now - key_press_start;
-                if(press_duration >= KEY_MIN_PRESS_TIME)
-                {
-                    key_status = KEY_SHORT_PRESS;
-                    key_cooldown = now;
-                }
-            }
-            key_holding = 0;
-        }
-
-        EXTI_ClearITPendingBit(EXTI_Line0);
-    }
-}
-
-/**
- * @brief  主循环轮询：按住超时触发长按。
- * @return 无
- */
-void KEY_Poll(void)
-{
-#if KEY_LONG_PRESS_ENABLE
-    if(key_holding && !long_press_triggered)
-    {
-        uint32_t now = GetTimerCount();
-        if((now - key_press_start) >= KEY_LONG_PRESS_TIME)
-        {
-            key_status = KEY_LONG_PRESS;
-            long_press_triggered = 1;
-            key_cooldown = now;
-        }
-    }
-#endif
-}
