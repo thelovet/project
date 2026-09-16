@@ -11,6 +11,7 @@
 #include "display.h"
 #include "touch.h"
 #include "sok_img_win.h"
+#include "flash_store.h"    /* 语言设置页的字模从外部Flash读 */
 #include "ch32v20x_bkp.h"
 
 /* ================= 常量与全局设置定义(统一置顶) ================= */
@@ -21,6 +22,7 @@
 #define BKP_SLEEP_DR_INDEX  BKP_DR7
 #define BKP_BRIGHT_DR       BKP_DR8
 #define BKP_ORIENT_DR       BKP_DR10
+#define BKP_LANG_DR         BKP_DR11   /* 语言索引 (DR1~DR10 已被其它模块占用) */
 
 /* ---- 数字绘制尺寸 ---- */
 #define DIGIT_W 14
@@ -62,10 +64,22 @@ static uint8_t s_or_prev = 0;               /* 上次按下状态 */
 static uint16_t s_or_start_x = 0;           /* 按下起点X */
 static uint16_t s_or_start_y = 0;           /* 按下起点Y */
 
+/* ---- 语言设置页 (中文 / English) ---- */
+#define LG_CN_Y     66                      /* "中文" 行顶部Y (2字 x 24 = 48宽, 居中) */
+#define LG_EN_Y    140                      /* "English" 行顶部Y (7字 x 16 = 112宽, 居中) */
+#define LG_MARK_X   28                      /* 选中标记方块X (左侧指示列) */
+#define LG_MARK_SZ  12
+#define LG_LAT_DY    2                      /* 半宽字母基线与24x24汉字差2行, 下移对齐 */
+#define LG_TAP_SPLIT 110                    /* 点击分界Y: 上半=中文, 下半=English */
+static uint8_t s_lg_prev = 0;               /* 上次按下状态 */
+static uint16_t s_lg_start_x = 0;           /* 按下起点X */
+static uint16_t s_lg_start_y = 0;           /* 按下起点Y */
+
 /* ---- 全局设置变量 ---- */
 uint8_t g_brightness = 100;                 /* 亮度 1~100 */
 uint8_t g_sleep_time_index = 2;             /* 息屏时间索引(0=2s ... 5=60s) */
 uint8_t g_orientation_index = 0;            /* 屏幕方向索引 0~3 */
+uint8_t g_language_index = 0;               /* 语言: 0=中文, 1=English */
 const uint16_t g_sleep_times[6] = {2, 5, 10, 20, 30, 60};   /* 可选息屏秒数 */
 static const uint8_t madctl_rotations[4] = {0x08, 0x68, 0xC8, 0xA8};  /* MADCTL 方向 */
 static SettingsMode s_mode = SETTINGS_NONE;  /* 当前设置页 */
@@ -75,11 +89,13 @@ static void Brightness_Draw(void);
 static void Brightness_DrawSlider(void);
 static void SleepTime_Draw(void);
 static void Orientation_Draw(void);
+static void Language_Draw(void);
 static void Sleep_DrawBody(void);
 static void Orientation_DrawBody(void);
+static void Language_DrawBody(void);
 
 /**
-* @brief  统一保存所有设置到 BKP 后备寄存器(魔数/息屏时间/亮度/方向)。
+* @brief  统一保存所有设置到 BKP 后备寄存器(魔数/息屏时间/亮度/方向/语言)。
 * @note   确保 DR6/DR7/DR8/DR10 同时有效, 避免只存一项时另一项为 0 导致唤醒后不亮。
 */
 static void Settings_SaveAll(void)
@@ -88,6 +104,7 @@ static void Settings_SaveAll(void)
     BKP_WriteBackupRegister(BKP_SLEEP_DR_INDEX, g_sleep_time_index);
     BKP_WriteBackupRegister(BKP_BRIGHT_DR, g_brightness);
     BKP_WriteBackupRegister(BKP_ORIENT_DR, g_orientation_index);
+    BKP_WriteBackupRegister(BKP_LANG_DR, g_language_index);
 }
 
 /**
@@ -100,6 +117,7 @@ void Settings_Redraw(void)
     case SETTINGS_BRIGHTNESS:  Brightness_Draw();  break;
     case SETTINGS_SLEEP_TIME:  SleepTime_Draw();   break;
     case SETTINGS_ORIENTATION: Orientation_Draw(); break;
+    case SETTINGS_LANGUAGE:    Language_Draw();    break;
     default: break;
     }
 }
@@ -115,6 +133,7 @@ void Settings_RedrawRegion(void)
     case SETTINGS_BRIGHTNESS:  Brightness_DrawSlider();  break;
     case SETTINGS_SLEEP_TIME:  Sleep_DrawBody();         break;
     case SETTINGS_ORIENTATION: Orientation_DrawBody();   break;
+    case SETTINGS_LANGUAGE:    Language_DrawBody();      break;
     default: break;
     }
 }
@@ -202,7 +221,7 @@ void Settings_ApplyOrientation(uint8_t index)
 
 /**
 * @brief  进入指定设置页并立即重绘。
-* @param  mode 设置页枚举(SETTINGS_BRIGHTNESS/SLEEP_TIME/ORIENTATION)
+* @param  mode 设置页枚举(SETTINGS_BRIGHTNESS/SLEEP_TIME/ORIENTATION/LANGUAGE)
 * @note   重置各页触摸状态, 并把亮度滑块 s_br_pos 初始到当前亮度位置。
 */
 void Settings_Enter(SettingsMode mode)
@@ -215,11 +234,15 @@ void Settings_Enter(SettingsMode mode)
     s_or_prev = 0;
     s_or_start_x = 0;
     s_or_start_y = 0;
+    s_lg_prev = 0;
+    s_lg_start_x = 0;
+    s_lg_start_y = 0;
     s_br_pos = BR_X + (int16_t)((uint32_t)g_brightness * BR_W / 100);
     switch (mode) {
     case SETTINGS_BRIGHTNESS:  Brightness_Draw();  break;
     case SETTINGS_SLEEP_TIME:  SleepTime_Draw();   break;
     case SETTINGS_ORIENTATION: Orientation_Draw(); break;
+    case SETTINGS_LANGUAGE:    Language_Draw();    break;
     default: break;
     }
 }
@@ -465,6 +488,122 @@ static uint8_t Orientation_Update(void)
 }
 
 /**
+* @brief  从外部Flash读一个 24x24 全宽汉字(72B)并绘制。
+* @note   字模在资源表末尾(115~118), 没重烧字库时读失败 -> 该字不显示(其它正常)。
+*         调用者负责 LCD_CS_CLR/SET (sok_draw_char_24 内部不管CS)。
+*/
+static void Lang_DrawCnChar(uint16_t x, uint16_t y, FlashStoreId id, uint16_t color)
+{
+    uint8_t buf[72];
+    if (FlashStore_ResRead(id, 0, buf, sizeof(buf)) != sizeof(buf)) return;
+    sok_draw_char_24(x, y, buf, color);
+}
+
+/**
+* @brief  从外部Flash读一个 16x24 半宽字母(48B = 24行 x 2字节, MSB在左)并绘制。
+* @note   y 用 LG_LAT_DY 下移, 使字母基线与 24x24 汉字视觉对齐。
+*/
+static void Lang_DrawLatChar(uint16_t x, uint16_t y, FlashStoreId id, uint16_t color)
+{
+    uint8_t buf[48];
+    uint8_t py, px, seg, in;
+    if (FlashStore_ResRead(id, 0, buf, sizeof(buf)) != sizeof(buf)) return;
+    for (py = 0; py < 24; py++) {
+        uint16_t bits = (uint16_t)(((uint16_t)buf[py * 2] << 8) | buf[py * 2 + 1]);
+        seg = 0; in = 0;
+        for (px = 0; px < 16; px++) {
+            uint8_t fg = (uint8_t)((bits >> (15 - px)) & 0x01);
+            if (fg && !in) { seg = px; in = 1; }
+            else if (!fg && in) {
+                LCD_Address_Set(x + seg, y + py + LG_LAT_DY, x + px - 1, y + py + LG_LAT_DY);
+                for (; seg < px; seg++) LCD_WR_DATA_16Bit(color);
+                in = 0;
+            }
+        }
+        if (in) {
+            LCD_Address_Set(x + seg, y + py + LG_LAT_DY, x + 15, y + py + LG_LAT_DY);
+            for (; seg < 16; seg++) LCD_WR_DATA_16Bit(color);
+        }
+    }
+}
+
+/**
+* @brief  绘制语言设置页内容("中文" / "English" 两行 + 选中标记), 用于局部刷新。
+* @note   选中项用绿色文字 + 左侧绿色方块; 未选中用白色文字(无方块)。
+*/
+static void Language_DrawBody(void)
+{
+    /* 中文 = 中 文 (2 x 24 = 48宽, 居中: x 96~144); English = 7 x 16 = 112宽, 居中: x 64~176 */
+    static const uint8_t cn_id[2] = { FLASH_STORE_ID_24_ZHONG, FLASH_STORE_ID_24_WEN };
+    static const uint8_t en_id[7] = { FLASH_STORE_ID_16_E, FLASH_STORE_ID_16_N,
+                                      FLASH_STORE_ID_16_G, FLASH_STORE_ID_16_L,
+                                      FLASH_STORE_ID_16_I, FLASH_STORE_ID_16_S,
+                                      FLASH_STORE_ID_16_H };
+    uint8_t i;
+    uint16_t cn_color = (g_language_index == 0) ? LCD_GREEN : LCD_WHITE;
+    uint16_t en_color = (g_language_index == 1) ? LCD_GREEN : LCD_WHITE;
+
+    LCD_CS_CLR;
+    for (i = 0; i < 2; i++) {
+        Lang_DrawCnChar((uint16_t)(96 + i * 24), LG_CN_Y, (FlashStoreId)cn_id[i], cn_color);
+    }
+    for (i = 0; i < 7; i++) {
+        Lang_DrawLatChar((uint16_t)(64 + i * 16), LG_EN_Y, (FlashStoreId)en_id[i], en_color);
+    }
+    LCD_CS_SET;
+
+    /* 选中标记方块(只画选中项) */
+    if (g_language_index == 0) {
+        LCD_Fill(LG_MARK_X, LG_CN_Y + 6, LG_MARK_X + LG_MARK_SZ, LG_CN_Y + 6 + LG_MARK_SZ, LCD_GREEN);
+    } else {
+        LCD_Fill(LG_MARK_X, LG_EN_Y + 6, LG_MARK_X + LG_MARK_SZ, LG_EN_Y + 6 + LG_MARK_SZ, LCD_GREEN);
+    }
+}
+
+/**
+* @brief  绘制语言设置整页: 清黑 + 返回键 + 内容。
+*/
+static void Language_Draw(void)
+{
+    LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
+    DrawBack();
+    Language_DrawBody();
+}
+
+/**
+* @brief  处理语言设置页触摸: 点上半=中文, 下半=English, 改动即保存并重绘。
+* @return 恒返回 1(页面活跃)。
+* @note   仅 Y<200 的点击响应, 屏蔽下方 200~240 防划菜单误触(同息屏时间页)。
+*/
+static uint8_t Language_Update(void)
+{
+    TouchState ts;
+    Touch_Scan(&ts);
+    if (ts.pressed) {
+        if (!s_lg_prev) {
+            s_lg_prev = 1;
+            s_lg_start_x = ts.x;
+            s_lg_start_y = ts.y;
+        }
+    } else if (s_lg_prev) {
+        s_lg_prev = 0;
+        int16_t dx = (int16_t)ts.x - (int16_t)s_lg_start_x;
+        int16_t dy = (int16_t)ts.y - (int16_t)s_lg_start_y;
+        if (dx < 0) dx = -dx;
+        if (dy < 0) dy = -dy;
+        if (dx <= TAP_THRESHOLD && dy <= TAP_THRESHOLD && s_lg_start_y < 200) {
+            uint8_t idx = (s_lg_start_y < LG_TAP_SPLIT) ? 0 : 1;
+            if (idx != g_language_index) {
+                g_language_index = idx;
+                Settings_SaveAll();
+            }
+            Language_Draw();
+        }
+    }
+    return 1;
+}
+
+/**
 * @brief  退出设置: 复位 s_mode 与各页触摸状态。
 * @note   不重绘画面, 由调用方(main.c)恢复场景。
 */
@@ -478,6 +617,9 @@ void Settings_Exit(void)
     s_or_prev = 0;
     s_or_start_x = 0;
     s_or_start_y = 0;
+    s_lg_prev = 0;
+    s_lg_start_x = 0;
+    s_lg_start_y = 0;
 }
 
 /**
@@ -491,6 +633,7 @@ uint8_t Settings_Update(void)
     case SETTINGS_BRIGHTNESS:  return Brightness_Update();
     case SETTINGS_SLEEP_TIME:  return SleepTime_Update();
     case SETTINGS_ORIENTATION: return Orientation_Update();
+    case SETTINGS_LANGUAGE:    return Language_Update();
     default: s_mode = SETTINGS_NONE; return 0;
     }
 }

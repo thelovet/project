@@ -59,9 +59,11 @@ typedef struct {
 #define VIDEO_MENU_W   150
 #define VIDEO_MENU_H   130  /* 3行: 2*5 + 3*32 + 4*6 = 130 */
 #define VIDEO_MENU_H4  188  /* 4行: 2*5 + 4*32 + 5*10 = 188 (同主菜单间距) */
+#define VIDEO_MENU_H5  230  /* 5行: 2*5 + 5*32 + 6*10 = 230 (= MENU_H, 与主菜单同尺寸) */
 #define VIDEO_MENU_BDR 5
 #define VIDEO_MENU_X   ((240 - VIDEO_MENU_W) / 2)
 #define VIDEO_MENU_Y   (240 - VIDEO_MENU_H4)  /* 底部对齐, 4行顶部Y=72 */
+#define VIDEO_MENU_Y5  (240 - VIDEO_MENU_H5)  /* 底部对齐, 5行顶部Y=10 */
 
 /* "重新开始"菜单行Y坐标 */
 #define RESTART_MENU_ROW0_Y (RESTART_MENU_Y + RESTART_MENU_BDR + RESTART_MENU_GAP)       /* 第1行Y ("重新开始") */
@@ -114,6 +116,7 @@ typedef struct {
 #define MENU_ROW_XPSJ      9  /* "息屏时间" 4字 */
 #define MENU_ROW_PMFX     10  /* "屏幕方向" 4字 */
 #define MENU_ROW_SHEZHI   11  /* "设置" 2字 */
+#define MENU_ROW_YYSH     12  /* "语言设置" 4字 */
 
 /* ================= 常量: 返回值/命令 ================= */
 
@@ -153,8 +156,8 @@ typedef struct {
 /* 重新开始菜单行类型数组 (3行: "重新开始" + "设置" + "返回") */
 extern const uint8_t g_restart_row_types[3];
 
-/* 视频上滑设置菜单行类型数组 (4行: 亮度设置/息屏时间/屏幕方向/返回) */
-extern const uint8_t g_video_menu_row_types[4];
+/* 视频上滑设置菜单行类型数组 (5行: 亮度设置/息屏时间/屏幕方向/语言设置/返回) */
+extern const uint8_t g_video_menu_row_types[5];
 
 /* 游戏退出/重新开始菜单共用变量 */
 extern uint8_t  g_touch_down;

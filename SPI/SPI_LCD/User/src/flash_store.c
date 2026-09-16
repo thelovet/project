@@ -100,6 +100,14 @@ static FlashStoreRes s_resources[] = {   /* 非 const: 关卡地图的长度在�
 #define SOK_RES_ENTRY(n)  { sok_map##n, 0 },   /* 长度在运行期补: 见 FlashStore_BurnAll 开头的 0.2 步 */
     SOKOBAN_MAP_RES_LIST(SOK_RES_ENTRY)
 #undef SOK_RES_ENTRY
+
+    /* ---- "语言设置"新增字形 (chinese_fonts.c, 语/言/中/文 + English 半宽字母) ----
+       ★ 顺序必须与 flash_store.h 里 FLASH_STORE_ID_24_YU2 起的 11 个 ID 一致 */
+    { font_yu2,     72 }, { font_yan,   72 },
+    { font_zhong,   72 }, { font_wen,   72 },
+    { font_lat_E,   48 }, { font_lat_n, 48 }, { font_lat_g, 48 },
+    { font_lat_l,   48 }, { font_lat_i, 48 }, { font_lat_s, 48 },
+    { font_lat_h,   48 },
 };
 #endif /* FLASH_DATA_STORE_MODE */
 

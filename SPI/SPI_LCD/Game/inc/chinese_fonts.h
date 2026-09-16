@@ -32,6 +32,27 @@ extern const uint8_t font_mu[72];
 extern const uint8_t font_fan2[72];
 extern const uint8_t font_xiang2[72];
 
-extern const uint8_t font_yu[72];
+extern const uint8_t font_yu[72];   /* 鱼(主菜单小鱼图标, 直接放内部Flash) */
+
+/**
+ * @brief 24x24 追加汉字 "语言设置"页用 (语 言) + 子页选项 (中 文)
+ * @note  资源 ID 排在外部Flash资源表末尾(115~118), 不改动前面已有的 ID ——
+ *        这样没重烧字库的旧板子只是这几个字显示空白, 其它功能照常
+ */
+extern const uint8_t font_yu2[72];    /* 语 */
+extern const uint8_t font_yan[72];    /* 言 */
+extern const uint8_t font_zhong[72];  /* 中 */
+extern const uint8_t font_wen[72];    /* 文 */
+
+/**
+ * @brief 16x24 半宽拉丁字母 "English" 选项用 (48字节/字: 24行 x 2字节, MSB在左)
+ */
+extern const uint8_t font_lat_E[48];
+extern const uint8_t font_lat_n[48];
+extern const uint8_t font_lat_g[48];
+extern const uint8_t font_lat_l[48];
+extern const uint8_t font_lat_i[48];
+extern const uint8_t font_lat_s[48];
+extern const uint8_t font_lat_h[48];
 
 #endif

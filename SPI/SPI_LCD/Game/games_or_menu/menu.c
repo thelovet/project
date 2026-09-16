@@ -24,11 +24,17 @@
 #define VIDEO_SWIPE_TRIGGER   5          /* 上划触发距离 */
 
 /* ---- 菜单字体缓存/行类型常量 (集中置顶) ---- */
-/* 菜单24x24字库: 从外部Flash整体读入RAM缓存(条带渲染需逐行随机访问) */
-static uint8_t s_menu_fonts[22 * 72];   /* 22个常用汉字 x 72字节 */
+/* 菜单24x24字库: 从外部Flash整体读入RAM缓存(条带渲染需逐行随机访问)
+   槽位 0~21 = 资源ID 0~21(常用汉字); 槽位 22/23 = "语/言"(资源ID 115/116, 见 MENU_FONT_SLOT) */
+#define MENU_FONT_SLOTS  24
+static uint8_t s_menu_fonts[MENU_FONT_SLOTS * 72];
 static uint8_t s_menu_fonts_ok = 0;
 static uint8_t s_menu_digits[4 * 64];   /* 2048行数字 2/0/4/8 的字模缓存 */
 static uint8_t s_menu_digits_ok = 0;
+
+/* 资源ID → 缓存槽位: 0~21 原样; 后加的 语(115)/言(116) 顺延到 22/23 */
+#define MENU_FONT_SLOT(id)  ((uint8_t)(((id) >= FLASH_STORE_ID_24_YU2) \
+                            ? (22u + ((id) - FLASH_STORE_ID_24_YU2)) : (id)))
 
 /* 菜单行用到的汉字ID表 (替代原字体指针数组, 数据存外部Flash) */
 static const uint8_t s_fonts_tui_id[3] = { FLASH_STORE_ID_24_TUI, FLASH_STORE_ID_24_XIANG, FLASH_STORE_ID_24_ZI };
@@ -38,6 +44,7 @@ static const uint8_t s_fonts_cx_id[4] = { FLASH_STORE_ID_24_CHONG, FLASH_STORE_I
 static const uint8_t s_fonts_ld_id[4] = { FLASH_STORE_ID_24_LIANG, FLASH_STORE_ID_24_DU, FLASH_STORE_ID_24_SHE, FLASH_STORE_ID_24_ZHI };
 static const uint8_t s_fonts_xp_id[4] = { FLASH_STORE_ID_24_XI2, FLASH_STORE_ID_24_PING, FLASH_STORE_ID_24_SHI2, FLASH_STORE_ID_24_JIAN };
 static const uint8_t s_fonts_pm_id[4] = { FLASH_STORE_ID_24_PING, FLASH_STORE_ID_24_MU, FLASH_STORE_ID_24_FAN2, FLASH_STORE_ID_24_XIANG2 };
+static const uint8_t s_fonts_yy_id[4] = { FLASH_STORE_ID_24_YU2, FLASH_STORE_ID_24_YAN, FLASH_STORE_ID_24_SHE, FLASH_STORE_ID_24_ZHI };
 static const uint8_t s_dig_2048[4] = { 2, 0, 4, 8 };
 
 /* 主菜单行类型 (供 main_menu_draw / main_menu_draw_frame_only 共用, 布局一致) */
@@ -70,8 +77,8 @@ uint8_t  g_game_consume_release;      /* 反向滑关闭后的松手吸收标志
 /* 重新开始菜单行类型 (2行: "重新开始" + "返回") */
 const uint8_t g_restart_row_types[3] = { MENU_ROW_CHONGXIN, MENU_ROW_SHEZHI, MENU_ROW_FANHUI };
 
-/* 视频上划设置菜单行类型 (4行) */
-const uint8_t g_video_menu_row_types[4] = { MENU_ROW_LDSZ, MENU_ROW_XPSJ, MENU_ROW_PMFX, MENU_ROW_FANHUI };
+/* 视频上划设置菜单行类型 (5行) */
+const uint8_t g_video_menu_row_types[5] = { MENU_ROW_LDSZ, MENU_ROW_XPSJ, MENU_ROW_PMFX, MENU_ROW_YYSH, MENU_ROW_FANHUI };
 
 #define GAME_BATTERY_SAMPLE_US   3000000UL  /* 3秒采样一次，休眠10秒前可完成3次降格确认 */
 #define GAME_BATTERY_REDRAW_US   1000000UL
@@ -360,7 +367,16 @@ static void menu_font_cache_load(void) {
             break;   /* 任一读取失败即放弃缓存(外部Flash未烧录) */
         }
     }
-    if (i == 22) s_menu_fonts_ok = 1;
+    if (i == 22) {
+        /* 后加的 语/言(资源ID 115/116) 存到槽位 22/23; 读不到(旧字库)只影响"语言设置"行显示 */
+        uint8_t k;
+        for (k = 0; k < 2; k++) {
+            uint8_t slot = (uint8_t)(22u + k);
+            FlashStore_ResRead((FlashStoreId)(FLASH_STORE_ID_24_YU2 + k), 0,
+                s_menu_fonts + (uint16_t)slot * 72, 72);
+        }
+        s_menu_fonts_ok = 1;
+    }
 
     if (!s_menu_digits_ok) {
         for (i = 0; i < 4; i++) {
@@ -698,6 +714,7 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
                 case MENU_ROW_LDSZ:
                 case MENU_ROW_XPSJ:
                 case MENU_ROW_PMFX:
+                case MENU_ROW_YYSH:
                 case MENU_ROW_TUI:
                 case MENU_ROW_SHIPIN:
                 case MENU_ROW_SHEZHI:
@@ -716,6 +733,9 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
                     else if (row_types[i] == MENU_ROW_PMFX) {
                         fnt = s_fonts_pm_id; cnt = 4;
                     }
+                    else if (row_types[i] == MENU_ROW_YYSH) {
+                        fnt = s_fonts_yy_id; cnt = 4;
+                    }
                     else if (row_types[i] == MENU_ROW_TUI) {
                         fnt = s_fonts_tui_id; cnt = 3;
                     }
@@ -733,7 +753,7 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
                     cx = (mw - cnt * 24) / 2;
                     cl = cr >> 2; co = (cr & 3) * 3;
                     for (ci = 0; ci < cnt; ci++) {
-                        const uint8_t* fp = &s_menu_fonts[(uint16_t)fnt[ci] * 72 + cl * 12 + co];
+                        const uint8_t* fp = &s_menu_fonts[(uint16_t)MENU_FONT_SLOT(fnt[ci]) * 72 + cl * 12 + co];
                         for (uint8_t b = 0; b < 3; b++) {
                             uint8_t bits = fp[b];
                             for (int8_t bt = 7; bt >= 0; bt--) {
@@ -790,7 +810,7 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
 void menu_enter_game_settings(void) {
     g_settings_from_game = 1;
     s_video_menu_visible = 1;
-    s_video_menu_slide_y = VIDEO_MENU_Y;
+    s_video_menu_slide_y = VIDEO_MENU_Y5;
     vm_touch_down = 0;
 }
 
@@ -931,12 +951,12 @@ uint8_t video_menu_drag_poll(int16_t* slide_y, uint16_t drag_start_y,
 
     if (ts->pressed) {
         int16_t dy = drag_start_y - ts->y;
-        int16_t new_y = (int16_t)(VIDEO_MENU_Y + VIDEO_MENU_H4) - dy;
+        int16_t new_y = (int16_t)(VIDEO_MENU_Y5 + VIDEO_MENU_H5) - dy;
         rel_cnt = 0;
         if (dy > max_dy) max_dy = dy;
-        if (new_y > VIDEO_MENU_Y + VIDEO_MENU_H4)
-            new_y = VIDEO_MENU_Y + VIDEO_MENU_H4;
-        if (new_y < VIDEO_MENU_Y) new_y = VIDEO_MENU_Y;
+        if (new_y > VIDEO_MENU_Y5 + VIDEO_MENU_H5)
+            new_y = VIDEO_MENU_Y5 + VIDEO_MENU_H5;
+        if (new_y < VIDEO_MENU_Y5) new_y = VIDEO_MENU_Y5;
         if (new_y < *slide_y - VIDEO_MENU_DRAG_MAX_STEP)
             new_y = *slide_y - VIDEO_MENU_DRAG_MAX_STEP;
         if (new_y <= *slide_y) *slide_y = new_y;
@@ -945,7 +965,7 @@ uint8_t video_menu_drag_poll(int16_t* slide_y, uint16_t drag_start_y,
         rel_cnt++;
     }
 
-    menu_draw_nrow_frame_only(*slide_y, g_video_menu_row_types, 4);
+    menu_draw_nrow_frame_only(*slide_y, g_video_menu_row_types, 5);
     if (!ts->pressed && rel_cnt >= 2) {
         *dragging = 0;
         rel_cnt = 0;

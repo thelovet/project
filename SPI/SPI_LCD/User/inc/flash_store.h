@@ -124,6 +124,24 @@ typedef enum {
     FLASH_STORE_ID_SOK_MAP_0 = 65,
     FLASH_STORE_ID_SOK_MAP_LAST = 114,
 
+    /* 115-118: "语言设置"用 24x24 汉字 (chinese_fonts.c)
+       ★ 追加在表尾而不是插进前面的 0~21, 以免把已有 ID 全部顶位:
+         没重烧字库的旧板子只会"语言设置"这几个字空白, 其它功能照常 */
+    FLASH_STORE_ID_24_YU2 = 115,   /* 语 */
+    FLASH_STORE_ID_24_YAN,         /* 言 */
+    FLASH_STORE_ID_24_ZHONG,       /* 中 */
+    FLASH_STORE_ID_24_WEN,         /* 文 */
+
+    /* 119-125: 16x24 半宽拉丁字母, 供"语言设置"子页的 "English" 选项
+       (24行 x 2字节 = 48字节/字, MSB在左; 与 24x24 汉字同一套取模方式) */
+    FLASH_STORE_ID_16_E = 119,
+    FLASH_STORE_ID_16_N,
+    FLASH_STORE_ID_16_G,   /* 小写 g (字模 font_lat_g) */
+    FLASH_STORE_ID_16_L,
+    FLASH_STORE_ID_16_I,
+    FLASH_STORE_ID_16_S,
+    FLASH_STORE_ID_16_H,
+
     FLASH_STORE_ID_COUNT
 } FlashStoreId;
 

@@ -855,18 +855,18 @@ static uint8_t Main_HandleTouchInput(void)
         if (!handled && s_video_menu_visible) {
             int8_t hit = -1;
             if (ts.x >= VIDEO_MENU_X && ts.x < VIDEO_MENU_X + VIDEO_MENU_W) {
-                uint16_t iy0 = VIDEO_MENU_Y + VIDEO_MENU_BDR;
-                uint16_t iye = VIDEO_MENU_Y + VIDEO_MENU_H4 - VIDEO_MENU_BDR;
+                uint16_t iy0 = VIDEO_MENU_Y5 + VIDEO_MENU_BDR;
+                uint16_t iye = VIDEO_MENU_Y5 + VIDEO_MENU_H5 - VIDEO_MENU_BDR;
                 if (ts.y >= iy0 && ts.y < iye) {
-                    hit = (int8_t)((ts.y - iy0) / ((iye - iy0) / 4));
+                    hit = (int8_t)((ts.y - iy0) / ((iye - iy0) / 5));
                 }
             }
             handled = 1;
             s_video_menu_visible = 0;
             vm_touch_down = 0;
-            if (hit == -1 || hit == 3) {
+            if (hit == -1 || hit == 4) {
                 if (s_settings_mode != SETTINGS_NONE) {
-                    if (hit == 3) s_settings_mode = SETTINGS_NONE;
+                    if (hit == 4) s_settings_mode = SETTINGS_NONE;
                     else Settings_Enter(s_settings_mode);
                 }
                 if (hit != -1 || s_settings_mode == SETTINGS_NONE) {
@@ -876,7 +876,7 @@ static uint8_t Main_HandleTouchInput(void)
                                                   &next_high, &next_low);
                     }
                 }
-            } else if (hit >= 0 && hit <= 2) {
+            } else if (hit >= 0 && hit <= 3) {
                 s_settings_mode = (SettingsMode)((uint8_t)hit + 1);
                 Settings_Enter(s_settings_mode);
             }
@@ -931,7 +931,7 @@ static void main_lowbatt_restore_under_icon(void)
             if (s_settings_mode != SETTINGS_NONE) Settings_RedrawRegion();
             else main_restore_game_under_icon();
             menu_draw_nrow_frame_only(s_video_menu_slide_y,
-                                      g_video_menu_row_types, 4);
+                                      g_video_menu_row_types, 5);
         } else if (s_settings_mode != SETTINGS_NONE) {
             Settings_RedrawRegion();
         } else {
@@ -1014,7 +1014,7 @@ static void VideoMenu_Update(const TouchState *ts, uint8_t is_video_mode)
         if (video_menu_swipe_up_poll(ts, &vm_touch_down,
                                       &vm_start_x, &vm_start_y)) {
             s_video_menu_dragging = 1;
-            s_video_menu_slide_y = VIDEO_MENU_Y + VIDEO_MENU_H4;
+            s_video_menu_slide_y = VIDEO_MENU_Y5 + VIDEO_MENU_H5;
             s_video_menu_drag_start_y = vm_start_y;
             vm_touch_down = 0;
             if (is_video_mode && (s_menu_dragging || s_menu_sliding)) {
@@ -1055,13 +1055,13 @@ static void VideoMenu_Update(const TouchState *ts, uint8_t is_video_mode)
     /* 松手后回弹到最终位置 */
     else if (vm_sliding) {
         s_video_menu_slide_y -= MENU_SLIDE_SPEED;
-        if (s_video_menu_slide_y <= VIDEO_MENU_Y) {
-            s_video_menu_slide_y = VIDEO_MENU_Y;
+        if (s_video_menu_slide_y <= VIDEO_MENU_Y5) {
+            s_video_menu_slide_y = VIDEO_MENU_Y5;
             vm_sliding = 0;
             s_video_menu_visible = 1;
         }
         menu_draw_nrow_frame_only(s_video_menu_slide_y,
-                                   g_video_menu_row_types, 4);
+                                   g_video_menu_row_types, 5);
     }
 }
 
@@ -1069,7 +1069,7 @@ static void VideoMenu_Update(const TouchState *ts, uint8_t is_video_mode)
  * @brief  从游戏"二次上划"进入设置菜单并跟手滑出 (推箱子用)
  * @param  start_y  触摸起点Y (上划手势的按下起始位置)
  * @note   复用 VideoMenu_Update 的跟手拖拽状态机: 置 s_video_menu_dragging=1,
- *         s_video_menu_slide_y 从底部(VIDEO_MENU_Y+VIDEO_MENU_H4)开始, 随后
+ *         s_video_menu_slide_y 从底部(VIDEO_MENU_Y5+VIDEO_MENU_H5)开始, 随后
  *         每帧由 video_menu_drag_poll 依据手指位移往上跟手滑出, 松手滑到顶部。
  *         与静止的 menu_enter_game_settings() 区别: 后者直接显示, 无跟手动画。
  */
@@ -1078,7 +1078,7 @@ void menu_enter_game_settings_swipe(uint16_t start_y)
     g_settings_from_game = 1;
     s_video_menu_visible = 0;
     s_video_menu_dragging = 1;
-    s_video_menu_slide_y = VIDEO_MENU_Y + VIDEO_MENU_H4;
+    s_video_menu_slide_y = VIDEO_MENU_Y5 + VIDEO_MENU_H5;
     s_video_menu_drag_start_y = start_y;
     vm_touch_down = 0;
 }
@@ -1131,7 +1131,7 @@ static void GameSettings_Update(void)
                     if (was_strip) {
                         /* 二级设置条带压在游戏上: 只清条带区(条带区外游戏场景保留),
                            参考一级菜单切换/返回游戏做法, 不整屏刷黑(否则游戏场景丢失→黑闪一帧) */
-                        LCD_Fill_DMA(VIDEO_MENU_X, VIDEO_MENU_Y,
+                        LCD_Fill_DMA(VIDEO_MENU_X, VIDEO_MENU_Y5,
                                      VIDEO_MENU_X + VIDEO_MENU_W, 240, g_menu_clear_color);
                     } else {
                         LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);  /* 设置页整屏: 需清屏 */
@@ -1168,7 +1168,7 @@ static void GameSettings_Update(void)
             && s_strip_prev_y != strip_now_y) {
             s_strip_prev_y = strip_now_y;
             menu_draw_nrow_frame_only(strip_now_y,
-                                       g_video_menu_row_types, 4);
+                                       g_video_menu_row_types, 5);
         }
         s_strip_prev_vis = 1;
     } else {
@@ -1187,7 +1187,7 @@ static void GameSettings_Update(void)
                并在同一帧重绘场景。二级菜单是底部覆盖条(与一级菜单一样),
                场景始终在它后面, 无需整屏刷黑(那会造成一帧黑闪)。
                返回键在此处松开(ts.pressed==0), 因此 update() 在手势层面是安全的无操作。 */
-            LCD_Fill_DMA(VIDEO_MENU_X, VIDEO_MENU_Y,
+            LCD_Fill_DMA(VIDEO_MENU_X, VIDEO_MENU_Y5,
                          VIDEO_MENU_X + VIDEO_MENU_W, 240, g_menu_clear_color);
             if (s_main_mode == MAIN_MODE_SOKOBAN) { sokoban_menu_settings_restore(); }
             else if (s_main_mode == MAIN_MODE_D2048) { d2048_full_redraw(); d2048_update(); }
@@ -1488,6 +1488,8 @@ int main(void) {
         if (br >= 1 && br <= 100) g_brightness = (uint8_t)br;  /* br=0表示未保存, 保持默认100% */
         uint16_t orient = BKP_ReadBackupRegister(BKP_DR10);
         if (orient <= 3) g_orientation_index = (uint8_t)orient;
+        uint16_t lang = BKP_ReadBackupRegister(BKP_DR11);
+        if (lang <= 1) g_language_index = (uint8_t)lang;
     }
 
     if (RCC_GetFlagStatus(RCC_FLAG_SFTRST) != RESET

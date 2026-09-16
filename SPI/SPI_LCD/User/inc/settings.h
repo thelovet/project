@@ -3,12 +3,13 @@
 
 #include "ch32v20x.h"
 
-/* 设置模式 */
+/* 设置模式 (★ 顺序与视频上滑菜单行号对应: 菜单 hit+1 = 下面的值) */
 typedef enum {
     SETTINGS_NONE        = 0,
     SETTINGS_BRIGHTNESS  = 1,
     SETTINGS_SLEEP_TIME  = 2,
     SETTINGS_ORIENTATION = 3,
+    SETTINGS_LANGUAGE    = 4,
 } SettingsMode;
 
 /* 返回按钮尺寸 (与settings.c中DrawBack一致) */
@@ -21,6 +22,7 @@ typedef enum {
 extern uint8_t g_brightness;          /* 亮度 0-100 */
 extern uint8_t g_sleep_time_index;    /* 息屏时间索引: 0=2S,1=5S,2=10S,3=20S,4=30S,5=60S */
 extern uint8_t g_orientation_index;   /* 屏幕方向索引: 0=0?,1=90?,2=180?,3=270? */
+extern uint8_t g_language_index;      /* 语言: 0=中文, 1=English (界面文字暂未随此切换) */
 
 /* 息屏时间值数组 (秒) */
 extern const uint16_t g_sleep_times[6];
