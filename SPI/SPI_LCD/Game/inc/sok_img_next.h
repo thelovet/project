@@ -18,4 +18,8 @@ extern const uint16_t sok_img_next[NEXT_IMG_W * NEXT_IMG_H];
 
 void sok_next_draw(uint16_t x, uint16_t y);
 
+/* 英文模式下的"下一关"按钮(内容不同, 尺寸与中文那套完全相同)
+   资源 ID: FLASH_STORE_ID_IMG_NEXT_EN */
+extern const uint16_t sok_img_next_en[NEXT_IMG_W * NEXT_IMG_H];
+
 #endif

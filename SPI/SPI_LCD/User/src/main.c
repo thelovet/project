@@ -1426,6 +1426,29 @@ int main(void) {
     while (1) {
         Delay_Ms(1000);
     }
+#elif defined(BTN_IMG_STORE_MODE)
+    /* ====== 英文版按钮图烧录模式 (BTN_IMG_STORE_MODE) ======
+     * 只把 g_btn_img_en[5580] 写到外部Flash的固定保留区 BTN_IMG_EN_ADDR
+     * (英文版"上一关/下一关/重新开始"三张), 不碰字库资源区与目录 → 字库不用重烧;
+     * 中文那套仍在字库资源里(ID 71~73), 运行时按语言选择读哪一套 */
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);//设置中断优先级分组1
+    SystemCoreClockUpdate();//更新系统时钟
+    Delay_Init();//初始化延时函数
+
+    LCD_PWR_Init();          // LCD电源+背光引脚初始化
+    LCD_PWR_ON;              // LCD 从OFF切ON
+    Delay_Ms(20);            // 等待LCD复位完成和SPI稳定
+    SPI_FLASH_Init();        // 初始化外部Flash SPI
+    SPI_Flash_WAKEUP();      // 从PowerDown中唤醒Flash
+    LCD_Init();              // 初始化LCD
+
+    LCD_Backlight_PWM_Stop();// PB9回GPIO模式, 停PWM
+    LCD_LED_CLR;             // 打开背光
+
+    BtnImgStore_BurnAll();   // 烧录+CRC校验, 完成后常驻显示100%
+    while (1) {
+        Delay_Ms(1000);
+    }
 #else
     // 主循环局部变量
     uint16_t peak_voltage = 0;

@@ -18,4 +18,8 @@ extern const uint16_t sok_img_restart[RESTART_IMG_W * RESTART_IMG_H];
 
 void sok_restart_draw(uint16_t x, uint16_t y);
 
+/* 英文模式下的"重新开始"按钮(内容不同, 尺寸与中文那套完全相同)
+   资源 ID: FLASH_STORE_ID_IMG_RESTART_EN */
+extern const uint16_t sok_img_restart_en[RESTART_IMG_W * RESTART_IMG_H];
+
 #endif

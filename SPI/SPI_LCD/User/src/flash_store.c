@@ -67,7 +67,8 @@ static FlashStoreRes s_resources[] = {   /* 非 const: 关卡地图的长度在�
     { sok_img_target_palette,          36 * 2 },
     { sok_img_target,                  SOK_TARGET_PIXELS },
     { sok_img_player,                  SOK_PLAYER_PIXELS * 2 },
-    /* ---- 导航图标 (30x31 RGB565) ---- */
+    /* ---- 导航图标 (30x31 RGB565, 中文那套: 上一关/下一关/重新开始; 英文那套见 flash_store.h
+       的 BTN_IMG_EN_ADDR 保留区, 用独立模式烧) ---- */
     { sok_img_prev,     PREV_IMG_W * PREV_IMG_H * 2 },
     { sok_img_next,     NEXT_IMG_W * NEXT_IMG_H * 2 },
     { sok_img_restart,  RESTART_IMG_W * RESTART_IMG_H * 2 },
@@ -136,7 +137,8 @@ static uint8_t s_scratch[FLASH_STORE_SCRATCH_SIZE];
  * CRC16 (MODBUS: 多项式0x8005反向0xA001, 初值0xFFFF)
  * 仅烧录模式使用(写入/校验), 游戏模式不编译以消除警告
  * ================================================================ */
-#if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
+#if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE) \
+    || defined(BTN_IMG_STORE_MODE)
 /**
  * @brief  CRC16 迭代更新(每字节)。
  * @param  crc  当前 CRC
@@ -164,13 +166,14 @@ static uint16_t flash_store_crc16(const uint8_t *data, uint32_t len)
     while (len--) crc = flash_store_crc16_update(crc, *data++);
     return crc;
 }
-#endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE */
+#endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE || BTN_IMG_STORE_MODE */
 
 /* ================================================================
  * 4字节地址SPI Flash访问 (兼容 >16MB 地址区域, 不改变芯片地址模式)
  * 擦除/写入仅烧录模式使用; 读取游戏模式也用, 不参与条件编译
  * ================================================================ */
-#if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
+#if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE) \
+    || defined(BTN_IMG_STORE_MODE)
 /**
  * @brief  用 4B 指令擦除外部 Flash 扇区。
  * @param  addr 扇区地址
@@ -226,7 +229,7 @@ static void flash_store_write_4b(const uint8_t *src, uint32_t addr, uint32_t len
         len  -= chunk;
     }
 }
-#endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE */
+#endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE || BTN_IMG_STORE_MODE */
 
 /**
  * @brief  用 4B 指令读取外部 Flash 数据。
@@ -272,7 +275,8 @@ static void flash_store_detect_chip(void)
 /* ================================================================
  * 统一扇区擦除/跨页写 (仅烧录模式使用)
  * ================================================================ */
-#if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
+#if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE) \
+    || defined(BTN_IMG_STORE_MODE)
 /**
  * @brief  擦除外部 Flash 扇区(普通指令)。
  * @param  addr 扇区地址
@@ -300,7 +304,7 @@ static void flash_store_write(const uint8_t *src, uint32_t addr, uint32_t len)
         SPI_Flash_Write_NoCheck((uint8_t *)src, addr, (uint16_t)len);
     }
 }
-#endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE */
+#endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE || BTN_IMG_STORE_MODE */
 
 /**
  * @brief  读取外部 Flash 数据(普通指令)。
@@ -393,6 +397,17 @@ const uint8_t *FlashStore_ResLoad(FlashStoreId id, uint32_t offset, uint16_t len
     return s_scratch;
 }
 
+/**
+ * @brief  按绝对地址读一段外部 Flash 数据(不走资源目录)
+ * @note   供固定保留区使用(如 BTN_IMG_EN_ADDR 的英文按钮图): 这些数据不在资源表/目录里,
+ *         字库不重烧也能重新烧它们(独立烧录模式 BTN_IMG_STORE_MODE 写入)
+ */
+uint16_t FlashStore_RawRead(uint32_t addr, uint8_t *buf, uint16_t len)
+{
+    flash_store_read(buf, addr, len);
+    return len;
+}
+
 uint8_t *FlashStore_Scratch(void)
 {
     return s_scratch;
@@ -401,7 +416,8 @@ uint8_t *FlashStore_Scratch(void)
 /* ================================================================
  * 进度条UI (240x240屏幕, 仅烧录模式使用)
  * ================================================================ */
-#if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE)
+#if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE) \
+    || defined(BTN_IMG_STORE_MODE)
 #define UI_BAR_X0      17   /* 进度条填充区左边界 */
 #define UI_BAR_X1      225  /* 进度条填充区右边界(不含) */
 #define UI_BAR_Y0      92   /* 进度条填充区上边界 */
@@ -505,7 +521,7 @@ static void flash_store_ui_fail(uint8_t pct)
     LCD_Fill(UI_BAR_X0, UI_BAR_Y0, UI_BAR_X1, UI_BAR_Y1, LCD_RED);
     flash_store_ui_draw_pct(pct, LCD_RED);
 }
-#endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE */
+#endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE || BTN_IMG_STORE_MODE */
 
 /* ================================================================
  * 烧录主流程 (FLASH_DATA_STORE_MODE: 字库/图片资源烧录)
@@ -846,3 +862,99 @@ void VideoChunkStore_BurnAll(void)
     }
 }
 #endif /* VIDEO_CHUNK_STORE_MODE */
+
+/* ================================================================
+ * 英文版推箱子按钮图烧录 (BTN_IMG_STORE_MODE)
+ * ----------------------------------------------------------------
+ * 只写外部 Flash 的固定保留区 BTN_IMG_EN_ADDR (5580 字节 = 3 张 30x31 RGB565),
+ * 不碰字库资源区、不碰目录 → 加/换这套图不需要重烧字库。
+ * 进度: 擦除 0~10%、写入 10~90%、回读校验 90~100%, 完成后常驻 100%。
+ * ================================================================ */
+#ifdef BTN_IMG_STORE_MODE
+#include "sok_img_prev.h"      /* g_btn_img_en[]: 三张英文按钮图连在一起 */
+
+#define BTN_PROG_MAGIC   0x42544E31u   /* 'B','T','N','1' */
+
+typedef struct {
+    volatile uint32_t magic;    /* BTN_PROG_MAGIC */
+    volatile uint32_t size;     /* 本区字节数(= BTN_IMG_EN_SIZE) */
+    volatile uint32_t pct;      /* 0~100 */
+    volatile uint32_t result;   /* 0=未完成 1=校验通过 2=校验失败 */
+} btn_prog_t;
+
+volatile btn_prog_t g_btn_prog = { 0, 0, 0, 0 };
+
+/**
+ * @brief  烧录英文版按钮图到外部 Flash 保留区 (不返回)
+ */
+void BtnImgStore_BurnAll(void)
+{
+    flash_store_detect_chip();
+
+    g_btn_prog.magic  = BTN_PROG_MAGIC;
+    g_btn_prog.size   = BTN_IMG_EN_SIZE;
+    g_btn_prog.pct    = 0;
+    g_btn_prog.result = 0;
+
+    flash_store_ui_init();
+    flash_store_ui_update(0);
+
+    /* 1. 擦除保留区覆盖的扇区(地址本身 4KB 对齐, 5580B 只占 2 个扇区) */
+    {
+        uint32_t start = BTN_IMG_EN_ADDR & ~(uint32_t)4095;
+        uint32_t end   = (BTN_IMG_EN_ADDR + BTN_IMG_EN_SIZE + 4095u) & ~(uint32_t)4095;
+        uint32_t addr;
+        for (addr = start; addr < end; addr += 4096) {
+            flash_store_erase_sector(addr);
+            g_btn_prog.pct = (uint8_t)(10UL * (addr + 4096 - start) / (end - start));
+            flash_store_ui_update((uint8_t)g_btn_prog.pct);
+        }
+    }
+
+    /* 2. 写入 3 张按钮图 */
+    {
+        uint32_t written = 0;
+        while (written < BTN_IMG_EN_SIZE) {
+            uint32_t n = BTN_IMG_EN_SIZE - written;
+            if (n > 4096) n = 4096;
+            flash_store_write(g_btn_img_en + written, BTN_IMG_EN_ADDR + written, n);
+            written += n;
+            g_btn_prog.pct = (uint8_t)(10 + 80UL * written / BTN_IMG_EN_SIZE);
+            flash_store_ui_update((uint8_t)g_btn_prog.pct);
+        }
+    }
+
+    /* 3. 回读校验: 与固件里的源数据比 CRC16 */
+    {
+        uint8_t  rbuf[64];
+        uint32_t left = BTN_IMG_EN_SIZE;
+        uint32_t a    = BTN_IMG_EN_ADDR;
+        uint16_t c    = 0xFFFF;
+        uint8_t  ok;
+
+        while (left) {
+            uint16_t n = (left > sizeof(rbuf)) ? (uint16_t)sizeof(rbuf) : (uint16_t)left;
+            uint16_t j;
+            flash_store_read(rbuf, a, n);
+            for (j = 0; j < n; j++) c = flash_store_crc16_update(c, rbuf[j]);
+            a += n;
+            left -= n;
+            g_btn_prog.pct = (uint8_t)(90 + 10UL * (BTN_IMG_EN_SIZE - left) / BTN_IMG_EN_SIZE);
+            flash_store_ui_update((uint8_t)g_btn_prog.pct);
+        }
+        ok = (c == flash_store_crc16(g_btn_img_en, BTN_IMG_EN_SIZE)) ? 1 : 0;
+        g_btn_prog.pct    = 100;
+        g_btn_prog.result = ok ? 1 : 2;
+        if (ok) {
+            flash_store_ui_update(100);
+            flash_store_ui_done();
+        } else {
+            flash_store_ui_fail(s_ui_last_pct);
+        }
+    }
+
+    while (1) {
+        Delay_Ms(1000);
+    }
+}
+#endif /* BTN_IMG_STORE_MODE */

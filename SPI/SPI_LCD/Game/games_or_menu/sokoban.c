@@ -17,6 +17,7 @@
 #include "sok_img_restart.h"
 #include "sok_img_next.h"
 #include "flash_store.h"   /* 图像资源从外部Flash读取 */
+#include "settings.h"    /* g_language_index: pick button set by language */
 
 #define SOK_BATTERY_X  108
 #define SOK_BATTERY_Y    2
@@ -241,6 +242,44 @@ static const void* sok_load_img_rows(FlashStoreId img_id, uint16_t src_w, int16_
     return (FlashStore_ResRead(img_id, 0, s, bytes) == bytes) ? s : 0;
 }
 
+/**
+ * @brief  按当前语言取一张导航按钮图的前 vis_rows 行 (整图绘制/裁剪绘制共用)
+ * @param  which    0=上一关 1=下一关 2=重新开始
+ * @param  vis_rows 需要的行数 (整图=31)
+ * @param  src_w    源图宽 (三种按钮都是 30)
+ * @return scratch 里的图像数据指针; 失败/没烧返回 0
+ * @note   中文那套在字库资源里(ID 71~73); 英文那套在外部 Flash 的固定保留区
+ *         BTN_IMG_EN_ADDR(见 flash_store.h), 由独立模式 BTN_IMG_STORE_MODE 烧进去 ——
+ *         内部 Flash 装不下两套按钮图, 所以英文这套不进资源表/目录, 单独占一块保留区
+ */
+static const void* sok_btn_img_rows(uint8_t which, int16_t vis_rows, uint16_t src_w)
+{
+    uint16_t bytes = (uint16_t)vis_rows * src_w * 2;
+    uint8_t* s = FlashStore_Scratch();
+
+    if (g_language_index == 1) {
+        uint32_t off = (which == 0) ? BTN_IMG_EN_PREV :
+                       (which == 1) ? BTN_IMG_EN_NEXT : BTN_IMG_EN_RESTART;
+        return (FlashStore_RawRead(BTN_IMG_EN_ADDR + off, s, bytes) == bytes) ? s : 0;
+    }
+
+    {
+        FlashStoreId id = (which == 0) ? FLASH_STORE_ID_IMG_PREV :
+                          (which == 1) ? FLASH_STORE_ID_IMG_NEXT : FLASH_STORE_ID_IMG_RESTART;
+        return sok_load_img_rows(id, src_w, vis_rows);
+    }
+}
+
+/**
+ * @brief  整图绘制一张导航按钮 (按当前语言选图)
+ */
+static void sok_draw_btn(uint16_t x, uint16_t y, uint8_t which, uint16_t src_w)
+{
+    const void* img = sok_btn_img_rows(which, PREV_IMG_H, src_w);
+    if (img) sok_nav_draw_rgb565(x, y, (const uint16_t*)img);
+}
+
+
 
 /* 分趟绘制用的格子类型位掩码 (bit = SOK_xxx 的值) */
 #define SOK_M_BG     ((1u << SOK_FLOOR) | (1u << SOK_TARGET) \
@@ -434,11 +473,11 @@ uint8_t sokoban_is_won(void) {
  */
 static void sok_draw_nav_buttons(void) {
     if (s_current_level > 0) {
-        sok_prev_draw(SOK_BTN1_X, SOK_BTN_Y);
+        sok_draw_btn(SOK_BTN1_X, SOK_BTN_Y, 0, PREV_IMG_W);
     }
-    sok_restart_draw(SOK_BTN2_X, SOK_BTN_Y);
+    sok_draw_btn(SOK_BTN2_X, SOK_BTN_Y, 2, RESTART_IMG_W);
     if (s_current_level < SOKOBAN_LEVEL_COUNT - 1) {
-        sok_next_draw(SOK_BTN3_X, SOK_BTN_Y);
+        sok_draw_btn(SOK_BTN3_X, SOK_BTN_Y, 1, NEXT_IMG_W);
     }
 }
 
@@ -793,9 +832,10 @@ static void sok_draw_nav_buttons_at(int16_t y) {
 
     /* 按钮完全在屏幕内(y<=180)复用已有绘制函数, 节省flash */
     if (y <= 180) {
-        if (s_current_level > 0) sok_prev_draw(SOK_BTN1_X, (uint16_t)y);
-        sok_restart_draw(SOK_BTN2_X, (uint16_t)y);
-        if (s_current_level < SOKOBAN_LEVEL_COUNT - 1) sok_next_draw(SOK_BTN3_X, (uint16_t)y);
+        if (s_current_level > 0) sok_draw_btn(SOK_BTN1_X, (uint16_t)y, 0, PREV_IMG_W);
+        sok_draw_btn(SOK_BTN2_X, (uint16_t)y, 2, RESTART_IMG_W);
+        if (s_current_level < SOKOBAN_LEVEL_COUNT - 1)
+            sok_draw_btn(SOK_BTN3_X, (uint16_t)y, 1, NEXT_IMG_W);
         LCD_CS_SET;
         return;
     }
@@ -807,15 +847,15 @@ static void sok_draw_nav_buttons_at(int16_t y) {
     if (vis_rows > 31) vis_rows = 31;
 
     if (s_current_level > 0) {
-        const void* img = sok_load_img_rows(FLASH_STORE_ID_IMG_PREV, PREV_IMG_W, vis_rows);
+        const void* img = sok_btn_img_rows(0, vis_rows, PREV_IMG_W);
         if (img) sok_draw_btn_clipped(SOK_BTN1_X, y, img, vis_rows);
     }
     {
-        const void* img = sok_load_img_rows(FLASH_STORE_ID_IMG_RESTART, RESTART_IMG_W, vis_rows);
+        const void* img = sok_btn_img_rows(2, vis_rows, RESTART_IMG_W);
         if (img) sok_draw_btn_clipped(SOK_BTN2_X, y, img, vis_rows);
     }
     if (s_current_level < SOKOBAN_LEVEL_COUNT - 1) {
-        const void* img = sok_load_img_rows(FLASH_STORE_ID_IMG_NEXT, NEXT_IMG_W, vis_rows);
+        const void* img = sok_btn_img_rows(1, vis_rows, NEXT_IMG_W);
         if (img) sok_draw_btn_clipped(SOK_BTN3_X, y, img, vis_rows);
     }
     LCD_CS_SET;

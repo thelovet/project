@@ -930,6 +930,18 @@ uint8_t Touch_IsPressed(void)
             /* 无点: 连续2次才判抬手(报点间隙/空包会误判断触) */
             if (++s_no_point_cnt >= 2)
             {
+                /* ★ 残留包只在"刚判抬手"那一帧清一次(s_no_point_cnt 到 2 那一刻)!
+                    这个计数在抬手后不会归零、会一直涨, 若放在 >=2 里, 空闲时就会**每帧**
+                    多读 32 字节软件 I2C(约3ms) → 帧时间凭空多两成, 所有动画/滚动都变慢。
+                    点缓冲是"读满 32 字节才推进"的单包缓冲: 抬手那一刻芯片还会生成本次触摸的
+                    最后一个包(含抬起位置), 而本函数在"无手指"分支直接返回、从不消费它;
+                    残留包会在下一次按下时被当成第一个采样 → 按压位置被记成"上一次触摸的坐标"
+                    (表现: 我明明点这里, 执行的却是上一次的位置)。读掉它即可。 */
+                if (s_no_point_cnt == 2)
+                {
+                    uint8_t flush[CST816S_POINT_LEN];
+                    (void)CST816S_ReadReg(CST816S_REG_POINT, flush, CST816S_POINT_LEN);
+                }
                 Touch_ResetCoordFilter();
                 g_triggered = 0;
                 g_touch_pressed = 0;

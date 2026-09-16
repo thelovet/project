@@ -1758,6 +1758,8 @@ uint8_t game_menu_command(const GameMenuCfg* cfg, uint8_t* state, uint8_t* out_r
 
         /* 滑入动画 */
         if (g_restart_sliding) {
+            /* 菜单加高(130→160)后滑入距离变长, 曾按高度比例补偿成"平均 2.5px/帧", 但用户
+               实测偏快 → 保持原速 2px/帧(宁可慢一点, 手感与别处一致) */
             g_restart_slide_y -= RESTART_MENU_SLIDE_SPEED;
             if (g_restart_slide_y <= RESTART_MENU_Y) {
                 g_restart_slide_y = RESTART_MENU_Y;
