@@ -29,6 +29,7 @@
 #define MENU_FONT_SLOTS  24
 static uint8_t s_menu_fonts[MENU_FONT_SLOTS * 72];
 static uint8_t s_menu_fonts_ok = 0;
+static uint8_t s_fonts_lang = 0xFF;   /* 缓存里装的是哪套字: 0=中文, 1=英文 */
 static uint8_t s_menu_digits[4 * 64];   /* 2048行数字 2/0/4/8 的字模缓存 */
 static uint8_t s_menu_digits_ok = 0;
 
@@ -45,6 +46,26 @@ static const uint8_t s_fonts_ld_id[4] = { FLASH_STORE_ID_24_LIANG, FLASH_STORE_I
 static const uint8_t s_fonts_xp_id[4] = { FLASH_STORE_ID_24_XI2, FLASH_STORE_ID_24_PING, FLASH_STORE_ID_24_SHI2, FLASH_STORE_ID_24_JIAN };
 static const uint8_t s_fonts_pm_id[4] = { FLASH_STORE_ID_24_PING, FLASH_STORE_ID_24_MU, FLASH_STORE_ID_24_FAN2, FLASH_STORE_ID_24_XIANG2 };
 static const uint8_t s_fonts_yy_id[4] = { FLASH_STORE_ID_24_YU2, FLASH_STORE_ID_24_YAN, FLASH_STORE_ID_24_SHE, FLASH_STORE_ID_24_ZHI };
+
+/* 双语行文字表: 中文=字模ID数组(24宽全宽字), 英文=ASCII串(16宽半宽字, 见 chinese_fonts.h)
+   英文为 0 的行表示语言无关(2048数字行/图标行), 不在此表里 */
+typedef struct {
+    const uint8_t* cn;      /* 中文字模ID数组 */
+    const char*    en;      /* 英文串 (可为0) */
+    uint8_t        cn_cnt;
+} MenuRowText;
+
+static const MenuRowText s_row_text[MENU_ROW_MAX + 1] = {
+    [MENU_ROW_TUI]      = { s_fonts_tui_id,      "Sokoban",  3 },
+    [MENU_ROW_SHIPIN]   = { s_fonts_sp_id,       "Video",    2 },
+    [MENU_ROW_CHONGXIN] = { s_fonts_cx_id,       "Restart",  4 },
+    [MENU_ROW_SHEZHI]   = { s_fonts_ld_id + 2,   "Settings", 2 },
+    [MENU_ROW_LDSZ]     = { s_fonts_ld_id,       "Bright",   4 },   /* 行内可用宽度只有 130px */
+    [MENU_ROW_XPSJ]     = { s_fonts_xp_id,       "Sleep",    4 },
+    [MENU_ROW_PMFX]     = { s_fonts_pm_id,       "Rotation", 4 },
+    [MENU_ROW_YYSH]     = { s_fonts_yy_id,       "Language", 4 },
+    [MENU_ROW_FANHUI]   = { s_fonts_fh_id,       "Back",     2 },
+};
 static const uint8_t s_dig_2048[4] = { 2, 0, 4, 8 };
 
 /* 主菜单行类型 (供 main_menu_draw / main_menu_draw_frame_only 共用, 布局一致) */
@@ -328,54 +349,93 @@ void menu_draw_frame(void) {
 }
 
 /**
+ * @brief  按"视觉行中线"把触摸 Y 归属到菜单某一行 (触摸区无缝隙, 显示保留行间距)
+ * @param  y_top   菜单框顶部Y
+ * @param  y       触摸Y
+ * @param  n_rows  行数 (2~6)
+ * @return 行索引 (0-based); -1 = 点在菜单框上方(视为点空白)
+ * @note   行几何与 menu_draw_nrow_frame_only 用同一公式: row_gap=(mh-2*mb-n*32)/(n+1),
+ *         第 i 行文字顶 = y_top + mb + gap + i*(32+gap)。触摸区分界取相邻两行文字之间
+ *         那段间隙的中线(即 base = mb + gap/2, 步距 = 32+gap), 所以:
+ *           1) 触摸区连续无缝隙, 点在两行之间一定归属最近的某一行, 不会掉空;
+ *           2) 分界线与"眼睛看到的行中心"对齐(旧写法按内高平均分, 5行时最后一条分界线
+ *              比视觉中线低 12px → 点"返回"上半截会被算成上一行/点倒数第二行下沿被算成
+ *              下一行, 这就是"点设置却跳到返回"的根因);
+ *           3) 框内上下边框带、以及框下沿到屏幕最下(y=239)都夹到最近行。
+ */
+int8_t menu_row_from_y(uint16_t y_top, uint16_t y, uint8_t n_rows) {
+    uint16_t mh, mb, gap, base, rel, idx;
+
+    if (n_rows < 2 || n_rows > 6) return -1;
+    if (n_rows == 3)      { mh = VIDEO_MENU_H;  mb = VIDEO_MENU_BDR; }  /* 游戏"重开/设置/返回" */
+    else if (n_rows == 4) { mh = VIDEO_MENU_H4; mb = VIDEO_MENU_BDR; }
+    else if (n_rows == 2) { mh = RESTART_MENU_H; mb = RESTART_MENU_BDR; }
+    else                  { mh = MENU_H;        mb = MENU_BDR; }        /* 5/6 行 */
+
+    if (y < y_top) return -1;   /* 菜单框上方才算未命中(点空白关闭) */
+
+    gap  = (uint16_t)((mh - 2 * mb - (uint16_t)n_rows * 32) / (n_rows + 1));
+    base = (uint16_t)(mb + gap / 2);
+    rel  = (uint16_t)(y - y_top);
+    if (rel <= base) return 0;
+    idx = (uint16_t)((rel - base - 1u) / (uint16_t)(32u + gap));
+    if (idx >= n_rows) return (int8_t)(n_rows - 1);
+    return (int8_t)idx;
+}
+
+/**
  * @brief  菜单选项碰撞检测
  * @param  x, y        触摸坐标
- * @param  item_count  菜单项数量 (2 或 3)
+ * @param  item_count  菜单项数量 (5行主菜单/退出菜单)
  * @return 被点击的菜单项索引 (0-based), -1 表示点在菜单框上方或左右外侧
  */
 int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count) {
-    uint16_t item_y0;
-    uint16_t item_end;
-    uint16_t item_h;
-
     if (x < MENU_X || x >= MENU_X + MENU_W) return -1;
-    if (y < MENU_Y) return -1;   /* 菜单框上方才算未命中(点空白关闭) */
-
-    item_y0 = MENU_Y + MENU_BDR;
-    item_end = MENU_Y + MENU_H - MENU_BDR;
-
-    /* 框内上下各有 MENU_BDR(5px) 边框带不属于任何一行; 框下沿(235)到屏幕最下(239)
-       这一段在框外, 但用户仍认为它属于最后一行。都夹到最近的行, 否则点最后一行会被
-       当成"菜单外"(主菜单→返回视频, 游戏退出菜单→关闭菜单), 表现为"点最下面那个选项
-       没反应/点一下就返回"。圆屏最下方可点到 y≈239, 而最后一行判定区只到 y=229,
-       所以这里不再按菜单框下沿截断, 而是一路夹到最后一行。 */
-    if (y < item_y0) y = item_y0;
-    if (y >= item_end) y = item_end - 1;
-
-    item_h = (uint16_t)((item_end - item_y0) / item_count);
-    return (int8_t)((y - item_y0) / item_h);
+    return menu_row_from_y(MENU_Y, y, item_count);
 }
 
 /**
  * @brief  加载菜单字体缓存(从外部 Flash 按需载入字库块)。
  */
+/**
+ * @brief  让菜单字体缓存失效: 下次绘制时按当前语言重新加载。
+ * @note   设置页切换语言后必须调用, 否则菜单还在用上一套字模(SW缓存是二选一的)。
+ */
+void Menu_FontCacheInvalidate(void) {
+    s_menu_fonts_ok = 0;
+    s_fonts_lang    = 0xFF;
+}
+
 static void menu_font_cache_load(void) {
     uint8_t i;
-    if (s_menu_fonts_ok) return;
-    for (i = 0; i < 22; i++) {
-        if (FlashStore_ResRead((FlashStoreId)i, 0, s_menu_fonts + (uint16_t)i * 72, 72) != 72) {
-            break;   /* 任一读取失败即放弃缓存(外部Flash未烧录) */
+    uint8_t want = (uint8_t)(g_language_index ? 1u : 0u);   /* 0=中文, 1=英文 */
+    if (s_menu_fonts_ok && s_fonts_lang == want) return;
+
+    if (want == 1) {
+        /* 英文: 一次读入整组 27 个 16x24 半宽字(27*48=1296B, 缓冲 1728B 够用) */
+        s_menu_fonts_ok = 0;
+        if (FlashStore_ResRead(FLASH_STORE_ID_LATIN24, 0, s_menu_fonts,
+                LATIN24_COUNT * LATIN24_CHAR) == LATIN24_COUNT * LATIN24_CHAR) {
+            s_menu_fonts_ok = 1;
+            s_fonts_lang    = 1;
         }
-    }
-    if (i == 22) {
-        /* 后加的 语/言(资源ID 115/116) 存到槽位 22/23; 读不到(旧字库)只影响"语言设置"行显示 */
-        uint8_t k;
-        for (k = 0; k < 2; k++) {
-            uint8_t slot = (uint8_t)(22u + k);
-            FlashStore_ResRead((FlashStoreId)(FLASH_STORE_ID_24_YU2 + k), 0,
-                s_menu_fonts + (uint16_t)slot * 72, 72);
+    } else {
+        for (i = 0; i < 22; i++) {
+            if (FlashStore_ResRead((FlashStoreId)i, 0, s_menu_fonts + (uint16_t)i * 72, 72) != 72) {
+                break;   /* 任一读取失败即放弃缓存(外部Flash未烧录) */
+            }
         }
-        s_menu_fonts_ok = 1;
+        if (i == 22) {
+            /* 后加的 语/言(资源ID 115/116) 存到槽位 22/23; 读不到(旧字库)只影响"语言设置"行显示 */
+            uint8_t k;
+            for (k = 0; k < 2; k++) {
+                uint8_t slot = (uint8_t)(22u + k);
+                FlashStore_ResRead((FlashStoreId)(FLASH_STORE_ID_24_YU2 + k), 0,
+                    s_menu_fonts + (uint16_t)slot * 72, 72);
+            }
+            s_menu_fonts_ok = 1;
+            s_fonts_lang    = 0;
+        }
     }
 
     if (!s_menu_digits_ok) {
@@ -471,6 +531,41 @@ static void lmbat_strip(uint8_t* row, int16_t ay, int16_t mx, uint16_t mw) {
 }
 
 /**
+ * @brief 画一行英文菜单文字(半宽字, 逐字从 RAM 缓存的整组拉丁字里取)
+ * @param row  条带缓冲(每像素2字节)
+ * @param mw   菜单宽度
+ * @param cr   行内像素行(0..23, 已去掉上下留白)
+ * @param str  ASCII 串
+ * @param hi/lo 文字颜色高低字节
+ * @note  供 menu_draw_nrow_frame_only 的文字行 与"鱼"那行(英文模式)复用
+ */
+static void menu_blit_en_row(uint8_t* row, uint16_t mw, uint16_t cr,
+                             const char* str, uint8_t hi, uint8_t lo)
+{
+    uint16_t cx, x;
+    uint8_t ci, slen = 0;
+    if (!str) return;
+    while (str[slen]) slen++;
+    cx = (uint16_t)((mw - (uint16_t)slen * LATIN24_W) / 2);
+    for (ci = 0; ci < slen; ci++) {
+        uint8_t gi = g_latin24_idx[(uint8_t)str[ci]];
+        if (gi != LATIN_INDEX_NONE) {
+            const uint8_t* fp = &s_menu_fonts[((uint16_t)gi * 24u + cr) * 2u];
+            for (uint8_t b = 0; b < 2; b++) {
+                uint8_t bits = fp[b];
+                for (int8_t bt = 7; bt >= 0; bt--) {
+                    if (bits & (1 << bt)) {
+                        x = cx + b * 8 + (7 - (uint8_t)bt);
+                        if (x < mw) { row[x * 2] = hi; row[x * 2 + 1] = lo; }
+                    }
+                }
+            }
+        }
+        cx += LATIN24_W;
+    }
+}
+
+/**
  * @brief  绘制 n 行菜单框架(逐条带乒乓双缓冲, 一次 DMA 发送)。
  * @param  y_top     菜单框顶 Y
  * @param  row_types 各行人类型数组
@@ -483,7 +578,8 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
        双缓冲分块(shared_buffer 5120 = 前置2400 + 后置2400), 0额外RAM恢复流水线并行 */
 #define STRIP_H   8
 
-#define TXT_SPAN  96  /* 文本边框内容区宽度: 4*24 = 3*32 = 96 */
+#define TXT_SPAN  96  /* 文本边框内容区宽度(中文): 4*24 = 3*32 = 96 */
+#define TXT_SPAN_EN 112 /* 英文: 最长单词 8 字 x 14(LATIN24_W) = 112, 框按语言放宽 */
 
        /* 根据行数选择菜单尺寸 */
     uint16_t mw, mh, mx, mb;
@@ -526,9 +622,10 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
     for (i = 0; i < nr; i++)
         row_y[i] = (uint16_t)(mb + row_gap + i * (32 + row_gap));
 
-    /* 文本边框水平范围 */
-    uint16_t txt_l = (mw - TXT_SPAN) / 2 - MENU_TEXT_BDR_PAD;
-    uint16_t txt_r = (uint16_t)(txt_l + TXT_SPAN + 2 * MENU_TEXT_BDR_PAD - 1);
+    /* 文本边框水平范围 (英文单词比中文宽: 8字x14=112, 所以英文时把框放宽) */
+    uint16_t txt_span = (uint16_t)((g_language_index == 1) ? TXT_SPAN_EN : TXT_SPAN);
+    uint16_t txt_l = (mw - txt_span) / 2 - MENU_TEXT_BDR_PAD;
+    uint16_t txt_r = (uint16_t)(txt_l + txt_span + 2 * MENU_TEXT_BDR_PAD - 1);
     uint16_t blu_l = (uint16_t)(txt_l + MENU_TEXT_BDR_W);
     uint16_t blu_r = (uint16_t)(txt_r - MENU_TEXT_BDR_W);
 
@@ -693,6 +790,12 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
                 } break;
 
                 case MENU_ROW_FISH: {
+                    if (g_language_index == 1) {
+                        /* 英文模式: 这行显示 "Fish" 文字(与 Sokoban/Video 一致), 不再画"鱼"字图标 */
+                        if (cr < 4 || cr >= 28) break;
+                        menu_blit_en_row(row, mw, (uint16_t)(cr - 4), "Fish", TX_H, TX_L);
+                        break;
+                    }
                     /* Chinese "yu" icon (24x24) via font_yu */
                     uint16_t iw = 24;
                     uint16_t ih = 24;
@@ -719,51 +822,36 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
                 case MENU_ROW_SHIPIN:
                 case MENU_ROW_SHEZHI:
                 case MENU_ROW_FANHUI: {
-                    const uint8_t* fnt;   /* 汉字ID数组 */
-                    uint8_t cnt;
-                    if (row_types[i] == MENU_ROW_CHONGXIN) {
-                        fnt = s_fonts_cx_id; cnt = 4;
-                    }
-                    else if (row_types[i] == MENU_ROW_LDSZ) {
-                        fnt = s_fonts_ld_id; cnt = 4;
-                    }
-                    else if (row_types[i] == MENU_ROW_XPSJ) {
-                        fnt = s_fonts_xp_id; cnt = 4;
-                    }
-                    else if (row_types[i] == MENU_ROW_PMFX) {
-                        fnt = s_fonts_pm_id; cnt = 4;
-                    }
-                    else if (row_types[i] == MENU_ROW_YYSH) {
-                        fnt = s_fonts_yy_id; cnt = 4;
-                    }
-                    else if (row_types[i] == MENU_ROW_TUI) {
-                        fnt = s_fonts_tui_id; cnt = 3;
-                    }
-                    else if (row_types[i] == MENU_ROW_SHIPIN) {
-                        fnt = s_fonts_sp_id; cnt = 2;
-                    }
-                    else if (row_types[i] == MENU_ROW_SHEZHI) {
-                        fnt = s_fonts_ld_id + 2; cnt = 2;
-                    }
-                    else {
-                        fnt = s_fonts_fh_id; cnt = 2;
-                    }
-                    if (cr < 4 || cr >= 28) break;
+                    const MenuRowText* rt = (row_types[i] <= MENU_ROW_MAX)
+                        ? &s_row_text[row_types[i]] : 0;
+                    if (!rt) break;
+                    if (cr < 4 || cr >= 28) break;   /* 24 高的字模画在 32 高行槽的中部 */
                     cr -= 4;
-                    cx = (mw - cnt * 24) / 2;
-                    cl = cr >> 2; co = (cr & 3) * 3;
-                    for (ci = 0; ci < cnt; ci++) {
-                        const uint8_t* fp = &s_menu_fonts[(uint16_t)MENU_FONT_SLOT(fnt[ci]) * 72 + cl * 12 + co];
-                        for (uint8_t b = 0; b < 3; b++) {
-                            uint8_t bits = fp[b];
-                            for (int8_t bt = 7; bt >= 0; bt--) {
-                                if (bits & (1 << bt)) {
-                                    x = cx + b * 8 + (7 - (uint8_t)bt);
-                                    if (x < mw) { row[x * 2] = TX_H; row[x * 2 + 1] = TX_L; }
+
+                    if (g_language_index == 1) {
+                        /* 英文行: 半宽字, 每字占 LATIN24_W 列 (空格字模全零, 自然留白) */
+                        if (!rt->en) break;
+                        menu_blit_en_row(row, mw, cr, rt->en, TX_H, TX_L);
+                    } else {
+                        /* 中文行: 24 宽全宽字 */
+                        const uint8_t* fnt = rt->cn;
+                        uint8_t cnt = rt->cn_cnt;
+                        if (!fnt) break;
+                        cx = (mw - cnt * 24) / 2;
+                        cl = cr >> 2; co = (cr & 3) * 3;
+                        for (ci = 0; ci < cnt; ci++) {
+                            const uint8_t* fp = &s_menu_fonts[(uint16_t)MENU_FONT_SLOT(fnt[ci]) * 72 + cl * 12 + co];
+                            for (uint8_t b = 0; b < 3; b++) {
+                                uint8_t bits = fp[b];
+                                for (int8_t bt = 7; bt >= 0; bt--) {
+                                    if (bits & (1 << bt)) {
+                                        x = cx + b * 8 + (7 - (uint8_t)bt);
+                                        if (x < mw) { row[x * 2] = TX_H; row[x * 2 + 1] = TX_L; }
+                                    }
                                 }
                             }
+                            cx += 24;
                         }
-                        cx += 24;
                     }
                 } break;
                 }
@@ -790,6 +878,7 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
 
 #undef STRIP_H
 #undef STRIP_BYTES
+#undef TXT_SPAN_EN
 #undef TXT_SPAN
 #undef ROW_BYTES
 #undef BK_H
@@ -1711,15 +1800,13 @@ uint8_t game_menu_command(const GameMenuCfg* cfg, uint8_t* state, uint8_t* out_r
             }
         }
 
-        /* 点选重菜 */
+        /* 点选重菜 (行归属与绘制用同一套行几何: 触摸区无缝隙, 点在两行之间的空隙按
+           视觉中线归属, 不会掉空, 也不会把"设置"下半截算成"返回") */
         {
             static int8_t ph = -1;
             int8_t ch = -1;
-            if (ts.x >= RESTART_MENU_X && ts.x < RESTART_MENU_X + RESTART_MENU_W) {
-                uint16_t yo = ts.y - (RESTART_MENU_Y + RESTART_MENU_BDR);
-                uint16_t ih = (RESTART_MENU_H - 2 * RESTART_MENU_BDR) / 3;
-                if (yo < ih * 3) ch = (int8_t)(yo / ih);
-            }
+            if (ts.x >= RESTART_MENU_X && ts.x < RESTART_MENU_X + RESTART_MENU_W)
+                ch = menu_row_from_y(RESTART_MENU_Y, ts.y, 3);
             if (!g_prev_pressed && ts.pressed) {
                 ph = ch;
             }

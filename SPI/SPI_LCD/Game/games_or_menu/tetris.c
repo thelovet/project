@@ -588,17 +588,9 @@ static void draw_preview(void)
  */
 static void draw_game_over_text(void)
 {
-    /* 居中显示 "游戏结束" (4字, 32x32) */
+    /* 居中显示 "游戏结束" / "Game Over" */
     {
-        uint16_t gw = 4 * 32;
-        uint16_t gx = BOARD_X + (BOARD_W - gw) / 2;
-        uint16_t gy = 75;  /* 上方, 给分数留出空间 */
-        LCD_CS_CLR;
-        sok_draw_char_32(gx,       gy, FlashStore_ResLoad(FLASH_STORE_ID_32_YOU,  0, FONT_CHAR_SIZE), LCD_WHITE);
-        sok_draw_char_32(gx + 32,  gy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI3,  0, FONT_CHAR_SIZE), LCD_WHITE);
-        sok_draw_char_32(gx + 64,  gy, FlashStore_ResLoad(FLASH_STORE_ID_32_JIE,  0, FONT_CHAR_SIZE), LCD_WHITE);
-        sok_draw_char_32(gx + 96,  gy, FlashStore_ResLoad(FLASH_STORE_ID_32_SHU,  0, FONT_CHAR_SIZE), LCD_WHITE);
-        LCD_CS_SET;
+        sok_draw_big_text(SOK_BIGTEXT_GAMEOVER, 75, LCD_WHITE);  /* 上方, 给分数留出空间 */
     }
 
     /* 下方显示得分数 (16x32 数字) */

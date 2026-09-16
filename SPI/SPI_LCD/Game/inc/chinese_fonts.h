@@ -55,4 +55,27 @@ extern const uint8_t font_lat_i[48];
 extern const uint8_t font_lat_s[48];
 extern const uint8_t font_lat_h[48];
 
+
+/**
+ * @brief English UI glyph sets (resources: FLASH_STORE_ID_LATIN24 / FLASH_STORE_ID_LATIN32)
+ *        LATIN24: 25 glyphs x 1200 B (16x24, menu rows, index 0 = space)
+ *        LATIN32: 18 glyphs x 1152 B (16x32, win / game-over / level text)
+ *        The index tables map an ASCII code to the glyph index (0xFF = not available).
+ */
+#define LATIN24_CHAR     48
+/* LATIN24_W: menu glyph cell width in px (14 -> tighter spacing) */
+#define LATIN24_W       14
+#define LATIN32_W       16
+#define LATIN32_CHAR     64
+#define LATIN24_COUNT    26
+#define LATIN32_COUNT    18
+#define LATIN_INDEX_NONE 0xFF
+
+extern const uint8_t font_latin24[1248];
+extern const uint8_t font_latin32[1152];
+
+extern const uint8_t g_latin24_idx[128];
+
+extern const uint8_t g_latin32_idx[128];
+
 #endif

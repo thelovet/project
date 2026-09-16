@@ -396,14 +396,8 @@ static void klotski_restore_battery_rows(int16_t menu_top, int16_t menu_h) {
  *         供 klotski_update 正常绘制 与 低电/菜单背景重绘复用; 含清中间区, 防叠字.
  */
 static void klotski_draw_win_title(void) {
-    uint16_t cx = (240 - 128) / 2;
-    LCD_CS_CLR;
-    /* "恭喜通关" (4个32x32汉字) */
-    sok_draw_char_32(cx, 90, FlashStore_ResLoad(FLASH_STORE_ID_32_GONG, 0, FONT_CHAR_SIZE), LCD_RED);
-    sok_draw_char_32(cx + 32, 90, FlashStore_ResLoad(FLASH_STORE_ID_32_XI, 0, FONT_CHAR_SIZE), LCD_RED);
-    sok_draw_char_32(cx + 64, 90, FlashStore_ResLoad(FLASH_STORE_ID_32_TONG, 0, FONT_CHAR_SIZE), LCD_RED);
-    sok_draw_char_32(cx + 96, 90, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), LCD_RED);
-    LCD_CS_SET;
+    /* "恭喜通关" / "You Win" —— 居中由 sok_draw_big_text 内部算(中英宽度不同) */
+    sok_draw_big_text(SOK_BIGTEXT_WIN, 90, LCD_RED);
 }
 
 static void klotski_draw_win_steps(void) {

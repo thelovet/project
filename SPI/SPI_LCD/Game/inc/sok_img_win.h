@@ -25,6 +25,21 @@ void sok_draw_char_24(uint16_t x, uint16_t y, const uint8_t *font, uint16_t colo
  */
 void sok_win_draw(uint16_t x, uint16_t y);
 
+/* ============ 通关/结束大字: 中英双语 (按 g_language_index 自动选) ============ */
+#define SOK_BIGTEXT_WIN      0   /* 恭喜通关 / You Win   */
+#define SOK_BIGTEXT_CLEARED  1   /* 通关     / Cleared   */
+#define SOK_BIGTEXT_GAMEOVER 2   /* 游戏结束 / Game Over */
+
+/**
+ * @brief  屏幕水平居中绘制"通关/结束"大字
+ * @param  id    文本ID (SOK_BIGTEXT_*)
+ * @param  y     顶部Y坐标
+ * @param  color 颜色 (RGB565)
+ * @note   中文用 32x32 全宽字(每字32列), 英文用外部Flash的 16x32 半宽字(每字16列);
+ *         两种语言的宽度不同, 所以由本函数内部居中, 调用者只给 Y。
+ */
+void sok_draw_big_text(uint8_t id, uint16_t y, uint16_t color);
+
 /* 中文字模数据 (32x32) */
 extern const uint8_t font_ka[FONT_CHAR_SIZE];      /* 卡 */
 extern const uint8_t font_gong[FONT_CHAR_SIZE];    /* 恭 */

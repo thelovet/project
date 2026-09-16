@@ -854,31 +854,41 @@ static uint8_t Main_HandleTouchInput(void)
         }
         if (!handled && s_video_menu_visible) {
             int8_t hit = -1;
-            if (ts.x >= VIDEO_MENU_X && ts.x < VIDEO_MENU_X + VIDEO_MENU_W) {
-                uint16_t iy0 = VIDEO_MENU_Y5 + VIDEO_MENU_BDR;
-                uint16_t iye = VIDEO_MENU_Y5 + VIDEO_MENU_H5 - VIDEO_MENU_BDR;
-                if (ts.y >= iy0 && ts.y < iye) {
-                    hit = (int8_t)((ts.y - iy0) / ((iye - iy0) / 5));
-                }
-            }
+            /* 行归属与绘制用同一套行几何(menu_row_from_y): 触摸区无缝隙、边界落在相邻
+               两行文字的视觉中线上 → 点两行之间的空隙不会掉空、也不会整段算给下一行。
+               行数=5, 框顶=VIDEO_MENU_Y5。 */
+            /* 只响应"点击"(同主菜单/游戏菜单): 按下行与松手行必须是同一行。
+               手指在条带上滑动(上下划, 松手换了行)一律不选中 —— 否则"滑一下再松开"
+               就会误进入设置页; 此时条带保持显示, 没被消费的手势也不会传给视频/游戏。
+               行取值用按下位置(滑动时松手坐标会漂, 起点更准)。 */
+            int8_t pr = menu_row_from_y(VIDEO_MENU_Y5, s_touch_start_y, 5);
+            int8_t rl = menu_row_from_y(VIDEO_MENU_Y5, ts.y, 5);
+            uint8_t is_tap = (pr == rl);
+
+            if (is_tap
+                && ts.x >= VIDEO_MENU_X && ts.x < VIDEO_MENU_X + VIDEO_MENU_W)
+                hit = pr;
+
             handled = 1;
-            s_video_menu_visible = 0;
-            vm_touch_down = 0;
-            if (hit == -1 || hit == 4) {
-                if (s_settings_mode != SETTINGS_NONE) {
-                    if (hit == 4) s_settings_mode = SETTINGS_NONE;
-                    else Settings_Enter(s_settings_mode);
-                }
-                if (hit != -1 || s_settings_mode == SETTINGS_NONE) {
-                    if (!g_settings_from_game) {
-                        LoadVideoAddress();
-                        flash_decompress_and_show(&next_bank, &next_higvh,
-                                                  &next_high, &next_low);
+            if (is_tap) {
+                s_video_menu_visible = 0;
+                vm_touch_down = 0;
+                if (hit == -1 || hit == 4) {
+                    if (s_settings_mode != SETTINGS_NONE) {
+                        if (hit == 4) s_settings_mode = SETTINGS_NONE;
+                        else Settings_Enter(s_settings_mode);
                     }
+                    if (hit != -1 || s_settings_mode == SETTINGS_NONE) {
+                        if (!g_settings_from_game) {
+                            LoadVideoAddress();
+                            flash_decompress_and_show(&next_bank, &next_higvh,
+                                                      &next_high, &next_low);
+                        }
+                    }
+                } else if (hit >= 0 && hit <= 3) {
+                    s_settings_mode = (SettingsMode)((uint8_t)hit + 1);
+                    Settings_Enter(s_settings_mode);
                 }
-            } else if (hit >= 0 && hit <= 3) {
-                s_settings_mode = (SettingsMode)((uint8_t)hit + 1);
-                Settings_Enter(s_settings_mode);
             }
         }
 
@@ -1094,9 +1104,14 @@ static void GameSettings_Update(void)
        低电图标才能正常几秒闪一次。离开设置时复位, 保证下次进入强制首个重绘。 */
     static int16_t s_strip_prev_y = -1;
     static uint8_t s_strip_prev_vis = 0;
+    /* 上一帧是否在显示"设置页"(整屏绘制; 二级菜单条带压在它上面时也算):
+       离开时用它在"整屏恢复"和"只清条带区"之间二选一 —— 本帧点"返回"时
+       s_settings_mode 已经被清成 NONE, 所以只能用上一帧的状态判断。 */
+    static uint8_t s_page_open = 0;
 
     if (!g_settings_from_game) {
         s_strip_prev_vis = 0;
+        s_page_open = 0;
         return;
     }
 
@@ -1170,6 +1185,7 @@ static void GameSettings_Update(void)
             menu_draw_nrow_frame_only(strip_now_y,
                                        g_video_menu_row_types, 5);
         }
+        if (s_settings_mode != SETTINGS_NONE) s_page_open = 1;  /* 设置页仍在条带下(整屏内容) */
         s_strip_prev_vis = 1;
     } else {
         s_strip_prev_vis = 0;
@@ -1179,17 +1195,30 @@ static void GameSettings_Update(void)
             return;
 
         if (s_settings_mode != SETTINGS_NONE) {
+            s_page_open = 1;
             IWDG_ReloadCounter();
             Settings_Update();
         } else {
+            uint8_t page_closed = s_page_open;   /* 1=刚从设置页返回(不只是退出二级菜单) */
+            s_page_open = 0;
             g_settings_from_game = 0;
-            /* 二级"设置选项"菜单返回游戏: 只用游戏背景色清除菜单条带区,
-               并在同一帧重绘场景。二级菜单是底部覆盖条(与一级菜单一样),
-               场景始终在它后面, 无需整屏刷黑(那会造成一帧黑闪)。
-               返回键在此处松开(ts.pressed==0), 因此 update() 在手势层面是安全的无操作。 */
-            LCD_Fill_DMA(VIDEO_MENU_X, VIDEO_MENU_Y5,
-                         VIDEO_MENU_X + VIDEO_MENU_W, 240, g_menu_clear_color);
-            if (s_main_mode == MAIN_MODE_SOKOBAN) { sokoban_menu_settings_restore(); }
+            if (page_closed) {
+                /* 从"设置页"返回游戏: 设置页是整屏绘制的, 页面上有些元素画在二级菜单条带区
+                   以外(如语言页左侧那个绿色选中方块 x=28~40, 还有返回键), 只清条带区会留下
+                   残影 → 整屏用游戏背景色清一次, 再由下方各游戏整幅恢复。
+                   返回键在此处松开(ts.pressed==0), 因此 update() 在手势层面是安全的无操作。 */
+                LCD_Fill(0, 0, LCD_W, LCD_H, g_menu_clear_color);
+            } else {
+                /* 只是二级"设置选项"菜单返回游戏: 场景就在条带后面, 只清条带区,
+                   不整屏刷黑(那会造成一帧黑闪)。 */
+                LCD_Fill_DMA(VIDEO_MENU_X, VIDEO_MENU_Y5,
+                             VIDEO_MENU_X + VIDEO_MENU_W, 240, g_menu_clear_color);
+            }
+            if (s_main_mode == MAIN_MODE_SOKOBAN) {
+                /* 推箱子的地图可能跨到条带区上方, 整屏清过之后必须整幅重画 */
+                if (page_closed) sokoban_menu_settings_restore_full();
+                else sokoban_menu_settings_restore();
+            }
             else if (s_main_mode == MAIN_MODE_D2048) { d2048_full_redraw(); d2048_update(); }
             else if (s_main_mode == MAIN_MODE_TETRIS) { tetris_menu_mark_dirty(); tetris_menu_bg_redraw(); }
             else if (s_main_mode == MAIN_MODE_FISH) { fish_full_redraw(); fish_update(); }
@@ -1487,9 +1516,8 @@ int main(void) {
         uint16_t br = BKP_ReadBackupRegister(BKP_DR8);
         if (br >= 1 && br <= 100) g_brightness = (uint8_t)br;  /* br=0表示未保存, 保持默认100% */
         uint16_t orient = BKP_ReadBackupRegister(BKP_DR10);
-        if (orient <= 3) g_orientation_index = (uint8_t)orient;
-        uint16_t lang = BKP_ReadBackupRegister(BKP_DR11);
-        if (lang <= 1) g_language_index = (uint8_t)lang;
+        g_orientation_index = (uint8_t)(orient & 0x0003u);   /* 低2位=方向 */
+        g_language_index = (uint8_t)((orient >> 2) & 0x0001u); /* bit2=语言(DR11 超出 BKP 范围, 不用) */
     }
 
     if (RCC_GetFlagStatus(RCC_FLAG_SFTRST) != RESET

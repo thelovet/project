@@ -108,6 +108,10 @@ static FlashStoreRes s_resources[] = {   /* 非 const: 关卡地图的长度在�
     { font_lat_E,   48 }, { font_lat_n, 48 }, { font_lat_g, 48 },
     { font_lat_l,   48 }, { font_lat_i, 48 }, { font_lat_s, 48 },
     { font_lat_h,   48 },
+
+    /* English UI glyph sets (one resource per set) */
+    { font_latin24, 1296 },
+    { font_latin32, 1152 },
 };
 #endif /* FLASH_DATA_STORE_MODE */
 

@@ -142,6 +142,12 @@ typedef enum {
     FLASH_STORE_ID_16_S,
     FLASH_STORE_ID_16_H,
 
+    /* 126-127: English UI glyph sets (one resource per set, read glyph by offset)
+       LATIN24 = 27 x 16x24 half-width glyphs (48 B each)
+       LATIN32 = 18 x 16x32 half-width glyphs (64 B each) */
+    FLASH_STORE_ID_LATIN24 = 126,
+    FLASH_STORE_ID_LATIN32,
+
     FLASH_STORE_ID_COUNT
 } FlashStoreId;
 

@@ -6,6 +6,8 @@
 #include "sok_img_win.h"
 #include "lcd.h"
 #include "flash_store.h"
+#include "chinese_fonts.h"   /* LATIN32_CHAR / g_latin32_idx: 英文大字字模 */
+#include "settings.h"        /* g_language_index: 当前语言 */
 
 /* 单色字库: 每个字32x32, 每数据行打包4个像素行(16字节), MSB=左, 共128字节/字 */
 #define FONT_CHAR_W   16   /* 数据行字节数 (4像素行×4字节) */
@@ -242,18 +244,88 @@ void sok_draw_char_24(uint16_t x, uint16_t y, const uint8_t *font, uint16_t colo
 }
 
 /**
- * @brief  绘制通关文字"恭喜通关"（红色, 每字32x32紧密排列, 总宽128）
- * @param  x  左上角X坐标
- * @param  y  左上角Y坐标
+ * @brief  绘制一个 16x32 半宽字(外部Flash, 按索引偏移取字)
+ * @note   调用者负责 LCD_CS_CLR/SET
+ */
+static void sok_draw_latin32(uint16_t x, uint16_t y, uint8_t gi, uint16_t color)
+{
+    const uint8_t* fp = FlashStore_ResLoad(FLASH_STORE_ID_LATIN32,
+                                           (uint32_t)gi * LATIN32_CHAR, LATIN32_CHAR);
+    uint8_t py, px, seg, in;
+    if (!fp) return;
+    for (py = 0; py < 32; py++) {
+        uint16_t bits = (uint16_t)(((uint16_t)fp[py * 2] << 8) | fp[py * 2 + 1]);
+        seg = 0; in = 0;
+        for (px = 0; px < 16; px++) {
+            uint8_t fg = (uint8_t)((bits >> (15 - px)) & 0x01);
+            if (fg && !in) { seg = px; in = 1; }
+            else if (!fg && in) {
+                LCD_Address_Set(x + seg, y + py, x + px - 1, y + py);
+                for (; seg < px; seg++) LCD_WR_DATA_16Bit(color);
+                in = 0;
+            }
+        }
+        if (in) {
+            LCD_Address_Set(x + seg, y + py, x + 15, y + py);
+            for (; seg < 16; seg++) LCD_WR_DATA_16Bit(color);
+        }
+    }
+}
+
+/* 通关/结束大字的中英文表 (中文=32x32字模ID, 英文=ASCII串) */
+typedef struct {
+    const uint8_t* cn;
+    uint8_t        cn_cnt;
+    const char*    en;
+} SokBigText;
+
+static const uint8_t s_bt_win_cn[4]  = { FLASH_STORE_ID_32_GONG, FLASH_STORE_ID_32_XI, FLASH_STORE_ID_32_TONG, FLASH_STORE_ID_32_GUAN };
+static const uint8_t s_bt_clr_cn[2]  = { FLASH_STORE_ID_32_TONG, FLASH_STORE_ID_32_GUAN };
+static const uint8_t s_bt_over_cn[4] = { FLASH_STORE_ID_32_YOU, FLASH_STORE_ID_32_XI3, FLASH_STORE_ID_32_JIE, FLASH_STORE_ID_32_SHU };
+
+static const SokBigText s_big_text[3] = {
+    { s_bt_win_cn,  4, "You Win"   },
+    { s_bt_clr_cn,  2, "Cleared"   },
+    { s_bt_over_cn, 4, "Game Over" },
+};
+
+/**
+ * @brief  屏幕水平居中绘制"通关/结束/关卡前两字"大字 (中英双语)
+ */
+void sok_draw_big_text(uint8_t id, uint16_t y, uint16_t color)
+{
+    uint16_t x;
+    uint8_t i, n;
+    if (id > 2) return;
+    LCD_CS_CLR;
+    if (g_language_index == 1) {
+        const char* s = s_big_text[id].en;
+        n = 0;
+        while (s[n]) n++;
+        x = (uint16_t)((LCD_W - (uint16_t)n * 16) / 2);
+        for (i = 0; i < n; i++) {
+            uint8_t gi = g_latin32_idx[(uint8_t)s[i]];
+            if (gi != LATIN_INDEX_NONE) sok_draw_latin32(x, y, gi, color);
+            x += 16;
+        }
+    } else {
+        n = s_big_text[id].cn_cnt;
+        x = (uint16_t)((LCD_W - (uint16_t)n * 32) / 2);
+        for (i = 0; i < n; i++) {
+            sok_draw_char_32(x + (uint16_t)i * 32, y,
+                FlashStore_ResLoad((FlashStoreId)s_big_text[id].cn[i], 0, FONT_CHAR_SIZE), color);
+        }
+    }
+    LCD_CS_SET;
+}
+
+/**
+ * @brief  绘制通关文字"恭喜通关"（红色, 居中）
  */
 void sok_win_draw(uint16_t x, uint16_t y)
 {
-    LCD_CS_CLR;
-    sok_draw_char_32(x,      y, FlashStore_ResLoad(FLASH_STORE_ID_32_GONG, 0, FONT_CHAR_SIZE), LCD_RED);
-    sok_draw_char_32(x + 32, y, FlashStore_ResLoad(FLASH_STORE_ID_32_XI,   0, FONT_CHAR_SIZE), LCD_RED);
-    sok_draw_char_32(x + 64, y, FlashStore_ResLoad(FLASH_STORE_ID_32_TONG, 0, FONT_CHAR_SIZE), LCD_RED);
-    sok_draw_char_32(x + 96, y, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), LCD_RED);
-    LCD_CS_SET;
+    (void)x;   /* 居中由 sok_draw_big_text 内部算(中英宽度不同) */
+    sok_draw_big_text(SOK_BIGTEXT_WIN, y, LCD_RED);
 }
 
 /**
@@ -317,30 +389,40 @@ void sok_draw_digit_16x32(uint16_t x, uint16_t y, uint8_t digit, uint16_t color)
  */
 void sok_level_draw(uint8_t level, uint16_t color)
 {
-    LCD_CS_CLR;
-
     uint8_t tens = level / 10;
     uint8_t ones = level % 10;
     uint8_t digit_count = (tens > 0) ? 2 : 1;
     uint8_t digit_w = digit_count * 16 + (digit_count - 1) * 2;
-
-    /* "关卡" 两个32x32 + 数字(16x32, 与中文同高) */
-    uint16_t total_w = 64 + 4 + digit_w;
-    uint16_t x = (240 - total_w) / 2;
     uint16_t y = (240 - 32) / 2 - 20;
+    uint16_t x;
 
-    /* 绘制 "关" */
-    sok_draw_char_32(x, y, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), color);
-    /* 绘制 "卡" */
-    sok_draw_char_32(x + 32, y, FlashStore_ResLoad(FLASH_STORE_ID_32_KA, 0, FONT_CHAR_SIZE), color);
-
-    /* 绘制数字 (16x32, 与中文顶部对齐) */
-    uint16_t dx = x + 64 + 4;
-    if (tens > 0) {
-        sok_draw_digit_16x32(dx, y, tens, color);
-        dx += 16 + 2;
+    LCD_CS_CLR;
+    if (g_language_index == 1) {
+        /* 英文: "Level" + 数字 */
+        static const char s_level[] = "Level";
+        uint8_t i;
+        uint16_t total_w = (uint16_t)(sizeof(s_level) - 1) * 16 + 6 + digit_w;
+        x = (240 - total_w) / 2;
+        for (i = 0; i < sizeof(s_level) - 1; i++) {
+            uint8_t gi = g_latin32_idx[(uint8_t)s_level[i]];
+            if (gi != LATIN_INDEX_NONE) sok_draw_latin32(x + (uint16_t)i * 16, y, gi, color);
+        }
+        x += (uint16_t)(sizeof(s_level) - 1) * 16 + 6;
+    } else {
+        /* 中文: "关卡" 两个32x32全宽字 + 数字 */
+        uint16_t total_w = 64 + 4 + digit_w;
+        x = (240 - total_w) / 2;
+        sok_draw_char_32(x, y, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), color);
+        sok_draw_char_32(x + 32, y, FlashStore_ResLoad(FLASH_STORE_ID_32_KA, 0, FONT_CHAR_SIZE), color);
+        x += 64 + 4;
     }
-    sok_draw_digit_16x32(dx, y, ones, color);
+
+    /* 数字 (16x32, 与文字顶部对齐) */
+    if (tens > 0) {
+        sok_draw_digit_16x32(x, y, tens, color);
+        x += 16 + 2;
+    }
+    sok_draw_digit_16x32(x, y, ones, color);
 
     LCD_CS_SET;
 }

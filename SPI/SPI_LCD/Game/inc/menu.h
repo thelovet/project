@@ -47,7 +47,9 @@ typedef struct {
 
 /* "重新开始"菜单尺寸 (3行: "重新开始" + "设置" + "返回") */
 #define RESTART_MENU_W  150  /* 菜单宽度 */
-#define RESTART_MENU_H  130  /* 菜单高度 (与3行视频菜单相同) */
+#define RESTART_MENU_H  160  /* 菜单高度 (3行, 与 VIDEO_MENU_H 必须一致)
+                                ★ 130 时行距只有38px/命中区40px, 拿在手里点"设置"常被
+                                  判成"返回"(触摸屏低位坐标会漂) → 加大到160: 行距45/命中区50 */
 #define RESTART_MENU_BDR 5   /* 边框宽度 */
 #define RESTART_MENU_X  ((240 - RESTART_MENU_W) / 2)  /* 菜单左上角X (居中) */
 #define RESTART_MENU_Y  (240 - RESTART_MENU_H)        /* 菜单贴底, 上划弹出, =110 */
@@ -57,7 +59,7 @@ typedef struct {
 
 /* 视频上滑菜单尺寸 */
 #define VIDEO_MENU_W   150
-#define VIDEO_MENU_H   130  /* 3行: 2*5 + 3*32 + 4*6 = 130 */
+#define VIDEO_MENU_H   160  /* 3行: 与 RESTART_MENU_H 一致(游戏的"重新开始/设置/返回"框) */
 #define VIDEO_MENU_H4  188  /* 4行: 2*5 + 4*32 + 5*10 = 188 (同主菜单间距) */
 #define VIDEO_MENU_H5  230  /* 5行: 2*5 + 5*32 + 6*10 = 230 (= MENU_H, 与主菜单同尺寸) */
 #define VIDEO_MENU_BDR 5
@@ -117,6 +119,7 @@ typedef struct {
 #define MENU_ROW_PMFX     10  /* "屏幕方向" 4字 */
 #define MENU_ROW_SHEZHI   11  /* "设置" 2字 */
 #define MENU_ROW_YYSH     12  /* "语言设置" 4字 */
+#define MENU_ROW_MAX      12  /* 行类型最大值(双语文字表用) */
 
 /* ================= 常量: 返回值/命令 ================= */
 
@@ -158,6 +161,11 @@ extern const uint8_t g_restart_row_types[3];
 
 /* 视频上滑设置菜单行类型数组 (5行: 亮度设置/息屏时间/屏幕方向/语言设置/返回) */
 extern const uint8_t g_video_menu_row_types[5];
+
+/**
+ * @brief 语言切换后让菜单字体缓存失效(下次绘制按当前语言重载, 见 menu.c)
+ */
+void Menu_FontCacheInvalidate(void);
 
 /* 游戏退出/重新开始菜单共用变量 */
 extern uint8_t  g_touch_down;
@@ -366,11 +374,23 @@ void game_menu_fix_release_after_close(void);
 
 /* ---- 菜单碰撞/处理 ---- */
 /**
- * @brief  菜单碰撞检测
- * @note   菜单框内上下边框带、以及菜单框下沿到屏幕最下(y=239)这一段都夹到最近的行,
- *         避免点最后一行被误判为"菜单外"; 只有点在菜单框上方或左右外侧才返回 -1
+ * @brief  按"视觉行中线"把触摸 Y 归属到菜单某一行 (触摸区无缝隙, 显示保留行间距)
+ * @param  y_top   菜单框顶部Y (静止态: 3行=RESTART_MENU_Y, 5行=MENU_Y/VIDEO_MENU_Y5)
+ * @param  y       触摸Y
+ * @param  n_rows  行数 (2~6)
+ * @return 行索引 (0-based); -1 表示点在菜单框上方(点空白关闭)
+ * @note   行几何与 menu_draw_nrow_frame_only 完全一致(row_gap=(mh-2*mb-n*32)/(n+1)),
+ *         行与行之间那半个行距的空隙按"最近行"各分一半 → 触摸区连续、没有无归属的缝隙,
+ *         行边界正好落在相邻两行文字的视觉中线上(与眼睛看到的行中心对齐);
+ *         框内上下边框带及菜单框下沿到屏幕最下(y=239)都夹到最近行。
+ */
+int8_t menu_row_from_y(uint16_t y_top, uint16_t y, uint8_t n_rows);
+
+/**
+ * @brief  菜单碰撞检测 (主菜单/退出菜单, 5行, 用 MENU_X/MENU_W/MENU_Y 几何)
+ * @note   行归属见 menu_row_from_y; 只有点在菜单框上方或左右外侧才返回 -1
  * @param  x, y        触摸坐标
- * @param  item_count  菜单项数量 (2 或 3)
+ * @param  item_count  菜单项数量 (行数)
  * @return 命中的菜单项索引 (0-based), -1 表示点在菜单框上方或左右外侧
  */
 int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count);

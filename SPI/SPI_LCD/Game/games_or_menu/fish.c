@@ -436,59 +436,72 @@ static void draw_background(void) {
 /**
  * @brief  绘制顶部信息栏: 左=当前分数, 右=升级进度条(10格, 按分数在当前级的占比)
  */
+/**
+ * @brief  顶部信息栏第1行: 当前分数(居中, 黄色 8x14)
+ * @note   拆成小函数是为了让分支距离变短: 合成一个大函数时 GCC 会报
+ *         "R_RISCV_BRANCH truncated to fit", 链接失败(见备忘录的同类坑)
+ */
+static void draw_hud_score(void) {
+    uint8_t digits[8];
+    uint8_t dc = fish_score_digits(g_score, digits);   /* 低位在前 */
+    uint16_t score_w = (uint16_t)dc * 8;
+    uint16_t sx = (uint16_t)((240 - score_w) / 2);
+    uint8_t i;
+    for (i = 0; i < dc; i++) {
+        uint8_t d = digits[dc - 1 - i];
+        sok_draw_digit_scaled((uint16_t)(sx + i * 8), 4, d, LCD_YELLOW, 8, 14);
+    }
+}
+
+/**
+ * @brief  顶部信息栏第2行: 升级进度条(10格) + 当前等级数字(紧贴进度条右侧)
+ */
+static void draw_hud_progress(void) {
+    uint16_t prog_w = 10 * 4 + 9 * 1;         /* 进度条总宽49 */
+    uint16_t pl_total = prog_w + 2 + 16;      /* 进度+间隔+等级(最多2位) */
+    uint16_t px = (uint16_t)((240 - pl_total) / 2);
+    uint16_t py = 18;
+    uint8_t j;
+    uint32_t lo = (g_player.level > 0) ? fish_thresh(g_player.level) : 0;
+    uint32_t hi = fish_thresh((uint8_t)(g_player.level + 1));
+    uint32_t seg = hi - lo;
+    uint8_t fill = 0;
+    if (seg > 0) {
+        uint32_t cur = (g_score >= lo) ? (g_score - lo) : 0;
+        fill = (uint8_t)((cur * 10) / seg);
+        if (fill > 10) fill = 10;
+    }
+    for (j = 0; j < 10; j++) {
+        uint16_t col = (j < fill) ? 0xFFE0 : 0x1E69;
+        LCD_Fill(px, py, (uint16_t)(px + 4), (uint16_t)(py + 13), col);
+        px += 4 + 1;
+    }
+    px += 2;
+    LCD_CS_CLR;   /* 进度条 LCD_Fill 内部会切 CS, 画等级前须重新拉低片选, 否则写不进 */
+    {
+        uint8_t lv = (uint8_t)(g_player.level + 1);
+        if (lv >= 10) {
+            sok_draw_digit_scaled(px, py, 1, LCD_WHITE, 8, 14);
+            sok_draw_digit_scaled((uint16_t)(px + 8), py, (uint8_t)(lv - 10), LCD_WHITE, 8, 14);
+        }
+        else {
+            sok_draw_digit_scaled(px, py, lv, LCD_WHITE, 8, 14);
+        }
+    }
+}
+
+/**
+ * @brief  绘制顶部信息栏: 第1行分数, 第2行升级进度条+等级
+ */
 static void draw_hud(void) {
     if (!g_hud_dirty) return;
     g_hud_dirty = 0;
     /* 清空顶部信息区 */
     LCD_Fill(0, SCORE_TOP, LCD_W, PLAY_TOP, COLOR_BG);
     {
-        uint8_t digits[8];
-        uint8_t dc = fish_score_digits(g_score, digits);   /* 低位在前 */
-        uint16_t score_w = (uint16_t)dc * 8;
-        uint16_t prog_w = 10 * 4 + 9 * 1;         /* 进度条总宽49 */
-        uint16_t pl_total = prog_w + 2 + 16;      /* 进度+间隔+等级(最多2位) */
         LCD_CS_CLR;
-        /* 行1: 当前分数(居中, 黄色 7x11) */
-        {
-            uint16_t sx = (240 - score_w) / 2;
-            uint8_t i;
-            for (i = 0; i < dc; i++) {
-                uint8_t d = digits[dc - 1 - i];
-                sok_draw_digit_scaled(sx + i * 8, 4, d, LCD_YELLOW, 8, 14);
-            }
-        }
-        /* 行2: 升级进度条 + 当前等级(居中, 等级紧贴进度条右侧) */
-        {
-            uint16_t px = (240 - pl_total) / 2;
-            uint16_t py = 18;
-            uint8_t j;
-            uint32_t lo = (g_player.level > 0) ? fish_thresh(g_player.level) : 0;
-            uint32_t hi = fish_thresh((uint8_t)(g_player.level + 1));
-            uint32_t seg = hi - lo;
-            uint8_t fill = 0;
-            if (seg > 0) {
-                uint32_t cur = (g_score >= lo) ? (g_score - lo) : 0;
-                fill = (uint8_t)((cur * 10) / seg);
-                if (fill > 10) fill = 10;
-            }
-            for (j = 0; j < 10; j++) {
-                uint16_t col = (j < fill) ? 0xFFE0 : 0x1E69;
-                LCD_Fill(px, py, (uint16_t)(px + 4), (uint16_t)(py + 13), col);
-                px += 4 + 1;
-            }
-            px += 2;
-            LCD_CS_CLR;   /* 进度条 LCD_Fill 内部会切 CS, 画等级前须重新拉低片选, 否则写不进 */
-            {
-                uint8_t lv = (uint8_t)(g_player.level + 1);
-                if (lv >= 10) {
-                    sok_draw_digit_scaled(px, py, 1, LCD_WHITE, 8, 14);
-                    sok_draw_digit_scaled((uint16_t)(px + 8), py, (uint8_t)(lv - 10), LCD_WHITE, 8, 14);
-                }
-                else {
-                    sok_draw_digit_scaled(px, py, lv, LCD_WHITE, 8, 14);
-                }
-            }
-        }
+        draw_hud_score();
+        draw_hud_progress();
         LCD_CS_SET;
     }
 }
@@ -498,25 +511,14 @@ static void draw_hud(void) {
  * @note   供低电图标灭段在图标区背景上复用重绘, 避免整屏清黑闪一下.
  */
 static void draw_game_over_text(void) {
+    uint16_t y = (240 - 32) / 2 - 14;
     if (g_won) {
-        /* "通关" 32x32 两字, 居中 (绿色) */
-        uint16_t x = (240 - 2 * 32) / 2;
-        uint16_t y = (240 - 32) / 2 - 14;
-        LCD_CS_CLR;
-        sok_draw_char_32(x, y, FlashStore_ResLoad(FLASH_STORE_ID_32_TONG, 0, 128), LCD_GREEN);
-        sok_draw_char_32(x + 32, y, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, 128), LCD_GREEN);
-        LCD_CS_SET;
+        /* "通关" / "Cleared" (绿色, 居中) */
+        sok_draw_big_text(SOK_BIGTEXT_CLEARED, y, LCD_GREEN);
     }
     else {
-        /* "游戏结束" 32x32 四字, 居中 (红色) */
-        uint16_t x = (240 - 4 * 32) / 2;
-        uint16_t y = (240 - 32) / 2 - 14;
-        LCD_CS_CLR;
-        sok_draw_char_32(x, y, FlashStore_ResLoad(FLASH_STORE_ID_32_YOU, 0, 128), LCD_RED);
-        sok_draw_char_32(x + 32, y, FlashStore_ResLoad(FLASH_STORE_ID_32_XI3, 0, 128), LCD_RED);
-        sok_draw_char_32(x + 64, y, FlashStore_ResLoad(FLASH_STORE_ID_32_JIE, 0, 128), LCD_RED);
-        sok_draw_char_32(x + 96, y, FlashStore_ResLoad(FLASH_STORE_ID_32_SHU, 0, 128), LCD_RED);
-        LCD_CS_SET;
+        /* "游戏结束" / "Game Over" (红色, 居中) */
+        sok_draw_big_text(SOK_BIGTEXT_GAMEOVER, y, LCD_RED);
     }
     /* 通关/结束文字下方显示当前分数 (黄色 16x26, 居中) */
     {

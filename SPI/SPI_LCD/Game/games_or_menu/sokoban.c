@@ -581,6 +581,19 @@ void sokoban_menu_settings_restore(void) {
     sok_level_draw(s_level_num, LCD_RED);
 }
 
+/**
+ * @brief  从"设置页"(整屏绘制)返回游戏: 整幅恢复地图 + 按钮面板 + 关卡编号
+ * @note   设置页是整屏绘制的, 页面上有些元素落在二级菜单条带区以外(如语言页左侧的绿色
+ *         选中方块), 只清条带区会留下残影。这里整屏清黑重画整张地图(与"设置页下滑进
+ *         退出菜单"同一做法), 再补按钮面板与关卡编号。
+ */
+void sokoban_menu_settings_restore_full(void) {
+    s_menu_visible = 1;
+    sokoban_draw_level(s_current_level);
+    sok_draw_nav_buttons();
+    sok_level_draw(s_level_num, LCD_RED);
+}
+
 
 /**
  * @brief  移动玩家 (含推箱子逻辑)

@@ -464,24 +464,12 @@ static void d2048_draw_win_lose_text(void) {
     uint8_t rstate = (g_state == D2048_STATE_EXIT_MENU || g_state == D2048_STATE_RESTART_MENU)
         ? g_state_before_menu : g_state;
     if (rstate == D2048_STATE_LOST) {
-        uint16_t cx = (240 - 128) / 2;
-        uint16_t cy = 108;
-        LCD_CS_CLR;
-        sok_draw_char_32(cx, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_YOU, 0, FONT_CHAR_SIZE), LCD_RED);
-        sok_draw_char_32(cx + 32, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI3, 0, FONT_CHAR_SIZE), LCD_RED);
-        sok_draw_char_32(cx + 64, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_JIE, 0, FONT_CHAR_SIZE), LCD_RED);
-        sok_draw_char_32(cx + 96, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_SHU, 0, FONT_CHAR_SIZE), LCD_RED);
-        LCD_CS_SET;
+        /* "游戏结束" / "Game Over" (居中) */
+        sok_draw_big_text(SOK_BIGTEXT_GAMEOVER, 108, LCD_RED);
     }
     if (rstate == D2048_STATE_WON) {
-        uint16_t cx = (240 - 128) / 2;
-        uint16_t cy = 108;
-        LCD_CS_CLR;
-        sok_draw_char_32(cx, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_GONG, 0, FONT_CHAR_SIZE), LCD_RED);
-        sok_draw_char_32(cx + 32, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_XI, 0, FONT_CHAR_SIZE), LCD_RED);
-        sok_draw_char_32(cx + 64, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_TONG, 0, FONT_CHAR_SIZE), LCD_RED);
-        sok_draw_char_32(cx + 96, cy, FlashStore_ResLoad(FLASH_STORE_ID_32_GUAN, 0, FONT_CHAR_SIZE), LCD_RED);
-        LCD_CS_SET;
+        /* "恭喜通关" / "You Win" (居中) */
+        sok_draw_big_text(SOK_BIGTEXT_WIN, 108, LCD_RED);
     }
 }
 

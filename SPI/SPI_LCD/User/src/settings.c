@@ -12,6 +12,7 @@
 #include "touch.h"
 #include "sok_img_win.h"
 #include "flash_store.h"    /* 语言设置页的字模从外部Flash读 */
+#include "menu.h"           /* Menu_FontCacheInvalidate: 切语言后菜单要换字模 */
 #include "ch32v20x_bkp.h"
 
 /* ================= 常量与全局设置定义(统一置顶) ================= */
@@ -21,8 +22,13 @@
 #define BKP_SLEEP_DR_MAGIC  BKP_DR6
 #define BKP_SLEEP_DR_INDEX  BKP_DR7
 #define BKP_BRIGHT_DR       BKP_DR8
+/* ★ 方向与语言合用一个寄存器: CH32V203 的 BKP 只实现 DR1~DR10
+   (DR11 的头文件地址是 0x0040, 属于另一段/未实现 → 写进去读回来永远是 0,
+   曾导致"休眠唤醒后语言变回中文"), 所以语言位打包进方向的空闲位。
+   低2位=方向(0~3), 第3位(bit2)=语言(0=中文,1=English) */
 #define BKP_ORIENT_DR       BKP_DR10
-#define BKP_LANG_DR         BKP_DR11   /* 语言索引 (DR1~DR10 已被其它模块占用) */
+#define BKP_ORIENT_MASK     0x0003u
+#define BKP_LANG_SHIFT      2
 
 /* ---- 数字绘制尺寸 ---- */
 #define DIGIT_W 14
@@ -95,16 +101,18 @@ static void Orientation_DrawBody(void);
 static void Language_DrawBody(void);
 
 /**
-* @brief  统一保存所有设置到 BKP 后备寄存器(魔数/息屏时间/亮度/方向/语言)。
+* @brief  统一保存所有设置到 BKP 后备寄存器(魔数/息屏时间/亮度/方向+语言)。
 * @note   确保 DR6/DR7/DR8/DR10 同时有效, 避免只存一项时另一项为 0 导致唤醒后不亮。
+*         语言与方向合用 DR10(见上面 BKP_ORIENT_DR 的说明: BKP 只有 DR1~DR10)。
 */
 static void Settings_SaveAll(void)
 {
     BKP_WriteBackupRegister(BKP_SLEEP_DR_MAGIC, BKP_SLEEP_MAGIC);
     BKP_WriteBackupRegister(BKP_SLEEP_DR_INDEX, g_sleep_time_index);
     BKP_WriteBackupRegister(BKP_BRIGHT_DR, g_brightness);
-    BKP_WriteBackupRegister(BKP_ORIENT_DR, g_orientation_index);
-    BKP_WriteBackupRegister(BKP_LANG_DR, g_language_index);
+    BKP_WriteBackupRegister(BKP_ORIENT_DR,
+        (uint16_t)((uint16_t)(g_orientation_index & BKP_ORIENT_MASK)
+                   | (uint16_t)((uint16_t)g_language_index << BKP_LANG_SHIFT)));
 }
 
 /**
@@ -596,6 +604,7 @@ static uint8_t Language_Update(void)
             if (idx != g_language_index) {
                 g_language_index = idx;
                 Settings_SaveAll();
+                Menu_FontCacheInvalidate();   /* 菜单文字要整套换字模 */
             }
             Language_Draw();
         }
