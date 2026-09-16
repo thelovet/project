@@ -489,6 +489,24 @@ static void flash_store_ui_fail(uint8_t pct)
  * 烧录主流程 (FLASH_DATA_STORE_MODE: 字库/图片资源烧录)
  * ================================================================ */
 #ifdef FLASH_DATA_STORE_MODE
+/* ---- SWD 回读握手/进度 (给 PC 端读, 替代"人眼看屏幕是否 100%") ----
+   PC 端用 nm 从 SPI_LCD.elf 查 g_res_prog 的地址, 再用一次 mem2array 把 6 个字读回去。
+   ★ magic 必须在最前面且最先写: MCU 刚复位时 .bss 还没清零, PC 可能读到随机 RAM,
+     先校验 magic, 对不上就继续等。
+   ★ 字库模式烧完是 while(1) 常驻、背光不灭、不进待机 → SWD 一直活着, PC 直接轮询即可。 */
+#define RES_PROG_MAGIC   0x52455331u   /* 'R','E','S','1' */
+
+typedef struct {
+    volatile uint32_t magic;    /* RES_PROG_MAGIC: 结构有效标志(最先写) */
+    volatile uint32_t total;    /* 资源总项数(= FLASH_STORE_RES_COUNT) */
+    volatile uint32_t index;    /* 正在烧第几项(1 起), 0=还没开始写 */
+    volatile uint32_t pct;      /* 0~100 进度(与屏幕进度条同源) */
+    volatile uint32_t crc_fail; /* 回读校验失败的项数 */
+    volatile uint32_t result;   /* 0=未完成 1=全部通过 2=有失败 */
+} res_prog_t;
+
+volatile res_prog_t g_res_prog = { 0, 0, 0, 0, 0, 0 };
+
 /**
  * @brief  烧录全部资源到外部 Flash(带进度 UI)。
  */
@@ -498,6 +516,14 @@ void FlashStore_BurnAll(void)
 
     /* 0. 识别芯片容量与地址模式(8MB芯片用3字节地址, >16MB用4字节) */
     flash_store_detect_chip();
+
+    /* 0.5 回读握手: magic 最先写, PC 才不会把随机 RAM 当有效数据 */
+    g_res_prog.magic    = RES_PROG_MAGIC;
+    g_res_prog.total    = FLASH_STORE_RES_COUNT;
+    g_res_prog.index    = 0;
+    g_res_prog.pct      = 0;
+    g_res_prog.crc_fail = 0;
+    g_res_prog.result   = 0;
 
     /* 1. 计算全部资源总大小 */
     uint32_t total = 0;
@@ -521,8 +547,9 @@ void FlashStore_BurnAll(void)
         uint32_t addr;
         for (addr = erase_start; addr < s_flash_size; addr += 4096) {
             flash_store_erase_sector(addr);
-            flash_store_ui_update(
-                (uint8_t)(10UL * (addr - erase_start + 4096) / erase_total));
+            uint8_t p = (uint8_t)(10UL * (addr - erase_start + 4096) / erase_total);
+            flash_store_ui_update(p);
+            g_res_prog.pct = p;              /* 回读握手: 擦除阶段 0~10 */
         }
     }
 
@@ -566,7 +593,10 @@ void FlashStore_BurnAll(void)
 
             cur     += size;
             written += size;
-            flash_store_ui_update((uint8_t)(10 + 80UL * written / total));
+            uint8_t p = (uint8_t)(10 + 80UL * written / total);
+            flash_store_ui_update(p);
+            g_res_prog.index = i + 1;    /* 回读握手: 正在烧第几项(1 起) */
+            g_res_prog.pct   = p;        /* 回读握手: 写入阶段 10~90 */
         }
 
         /* 6. 写入目录区 */
@@ -596,10 +626,14 @@ void FlashStore_BurnAll(void)
             }
             if (crc != flash_store_crc16((const uint8_t *)s_resources[i].data, size)) {
                 ok = 0;
+                g_res_prog.crc_fail++;   /* 回读握手: 失败项计数 */
             }
             addr += size;
             flash_store_ui_update((uint8_t)(90 + 10UL * (i + 1) / FLASH_STORE_RES_COUNT));
+            g_res_prog.pct = (uint8_t)(90 + 10UL * (i + 1) / FLASH_STORE_RES_COUNT);
         }
+        g_res_prog.pct    = 100;
+        g_res_prog.result = ok ? 1 : 2;  /* 回读握手: 1=全部通过 2=有失败 */
 
         /* 8. 完成显示 */
         if (ok) {
@@ -650,7 +684,7 @@ volatile burn_prog_t g_burn_prog = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 /* ---- 分阶段计时: 借 TIM1 当自由计数器(144MHz/14400 = 10kHz → 0.1ms/tick, 6.55s 回绕一次) ----
    不使能中断 —— 免得把主程序 TIM1 更新中断里的电池检测拉进烧录模式。
-   背光 PWM 用的是 TIM4, 游戏模式的帧计时器在烧录模式里根本没初始化, 所以这里独占 TIM1 ✓ */
+   背光 PWM 用的是 TIM4, 游戏模式的帧计时器在烧录模式里根本没初始化, 所以这里独占 TIM1 ? */
 static void burn_timer_init(void)
 {
     TIM_TimeBaseInitTypeDef t = {0};
