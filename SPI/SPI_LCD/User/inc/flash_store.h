@@ -170,6 +170,16 @@ typedef enum {
 #define BTN_IMG_EN_NEXT     BTN_IMG_EN_ONE
 #define BTN_IMG_EN_RESTART  (BTN_IMG_EN_ONE * 2UL)
 
+/* 菜单"游戏名"用的汉字字模 (见 chinese_fonts.h 的 MENU_EXT_ID_*):
+   放在**字库数据区紧前面**(与字库同一个区), 地址 = (data_start 向下取整到 4KB) - MENU_GLYPH_SIZE。
+   这样它落在"全量烧字库"的擦除范围(从 data_start 所在扇区起到芯片末尾)之外,
+   所以烧字库不会把它擦掉; 它由 BTN_IMG_STORE_MODE 单独烧一次(和英文按钮图一起)。
+   ★ 字库资源总量变化(data_start 移动)后, 必须重烧这一块。
+   读取接口 FlashStore_MenuGlyphRead() 内部按目录头里的 data_start 现算地址。 */
+#define MENU_GLYPH_ONE    72UL                                  /* 单字 24x24 1bpp */
+#define MENU_GLYPH_CNT    12UL                                  /* 方块消行/华容道/大鱼小鱼/合并 */
+#define MENU_GLYPH_SIZE   (MENU_GLYPH_ONE * MENU_GLYPH_CNT)     /* 864 字节 */
+
 /* ================================================================
  * 接口
  * ================================================================ */
@@ -181,12 +191,21 @@ typedef enum {
 void FlashStore_BurnAll(void);
 
 /**
- * @brief  英文版按钮图烧录 (BTN_IMG_STORE_MODE)
- * @note   把固件里的 g_btn_img_en[BTN_IMG_EN_SIZE] 写到外部 Flash 的固定保留区
- *         BTN_IMG_EN_ADDR(擦除+写入+CRC回读校验), 完成常驻显示100%; 本函数不返回。
- *         只动这块保留区, 不碰字库资源区和目录 → 字库不用重烧。
+ * @brief  英文版按钮图 + 菜单游戏名汉字 烧录 (BTN_IMG_STORE_MODE)
+ * @note   写两小块, 都不碰字库资源区/目录, 所以不用重烧字库:
+ *         1) 英文按钮图 5580B → 固定保留区 BTN_IMG_EN_ADDR
+ *         2) 菜单游戏名 10 个汉字 720B → 字库数据区紧前面(见 MENU_GLYPH_SIZE 注释)
+ *         擦除+写入+CRC回读校验, 完成常驻显示100%; 本函数不返回。
  */
 void BtnImgStore_BurnAll(void);
+
+/**
+ * @brief  读取"菜单游戏名"追加字模 (10 个 24x24 汉字, 共 MENU_GLYPH_SIZE 字节)
+ * @param  buf 目标缓冲(至少 MENU_GLYPH_SIZE 字节)
+ * @return 1=读取完成(没烧过时内容是 0xFF, 字不显示, 其它功能不受影响)
+ * @note   地址按目录头里的 data_start 现算: (data_start 向下取整 4KB) - MENU_GLYPH_SIZE
+ */
+uint8_t FlashStore_MenuGlyphRead(uint8_t *buf);
 
 /* ================================================================
  * 运行期资源读取接口 (游戏模式使用)

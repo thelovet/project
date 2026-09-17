@@ -111,8 +111,8 @@ static FlashStoreRes s_resources[] = {   /* 非 const: 关卡地图的长度在�
     { font_lat_h,   48 },
 
     /* English UI glyph sets (one resource per set) */
-    { font_latin24, 1296 },
-    { font_latin32, 1152 },
+    { font_latin24, LATIN24_COUNT * LATIN24_CHAR },
+    { font_latin32, LATIN32_COUNT * LATIN32_CHAR },
 };
 #endif /* FLASH_DATA_STORE_MODE */
 
@@ -408,6 +408,27 @@ uint16_t FlashStore_RawRead(uint32_t addr, uint8_t *buf, uint16_t len)
     return len;
 }
 
+/**
+ * @brief  菜单"游戏名"追加字模的存放地址 (字库数据区紧前面的那一小块)
+ * @note   地址 = (data_start 向下取整到 4KB) - MENU_GLYPH_SIZE。
+ *         data_start 来自目录头(FlashStore 已缓存到 s_data_start), 所以游戏和烧录固件
+ *         两边算出来的地址完全一致; 放在扇区边界之前 = 落在"全量烧字库"的擦除范围之外。
+ */
+static uint32_t flash_store_glyph_addr_from(uint32_t data_start)
+{
+    return (uint32_t)((data_start & ~(uint32_t)4095) - MENU_GLYPH_SIZE);
+}
+
+/**
+ * @brief  读取菜单游戏名追加字模(10 个 24x24 汉字)
+ * @retval 1=读完(没烧过时内容为 0xFF, 字不显示, 其它功能不受影响)
+ */
+uint8_t FlashStore_MenuGlyphRead(uint8_t *buf)
+{
+    flash_store_read(buf, flash_store_glyph_addr_from(s_data_start), (uint16_t)MENU_GLYPH_SIZE);
+    return 1;
+}
+
 uint8_t *FlashStore_Scratch(void)
 {
     return s_scratch;
@@ -546,6 +567,29 @@ typedef struct {
 volatile res_prog_t g_res_prog = { 0, 0, 0, 0, 0, 0 };
 
 /**
+ * @brief  资源布局计算: 补全关卡地图长度 + 累加全部资源总大小
+ * @note   关卡地图(sokoban_maps.c 里 50 个独立数组)编译期算不出长度, 只能按
+ *         sokoban_levels[i] 的行列推: 长度 = ceil(行*列/2)(Bcd 每字节 2 格)。
+ *         ★ 顺序前提: s_resources[] 末尾 50 项 == sok_map1..50 == sokoban_levels[0..49]
+ *         ★ 烧"小块"(按钮图/菜单字模)的 BTN_IMG_STORE_MODE 不进这个表(省 50KB 资源),
+ *           它改从装置上已有的目录头里读 data_start(FlashStore_ResInit) —— 两边地址一致。
+ */
+static uint32_t flash_store_layout_total(void)
+{
+    uint32_t i;
+    uint32_t total = 0;
+
+    for (i = 0; i < SOKOBAN_LEVEL_COUNT; i++) {
+        s_resources[FLASH_STORE_ID_SOK_MAP_0 + i].size =
+            ((uint16_t)sokoban_levels[i].rows * sokoban_levels[i].cols + 1) / 2;
+    }
+    for (i = 0; i < FLASH_STORE_RES_COUNT; i++) {
+        total += s_resources[i].size;
+    }
+    return total;
+}
+
+/**
  * @brief  烧录全部资源到外部 Flash(带进度 UI)。
  */
 void FlashStore_BurnAll(void)
@@ -563,20 +607,8 @@ void FlashStore_BurnAll(void)
     g_res_prog.crc_fail = 0;
     g_res_prog.result   = 0;
 
-    /* 0.2 关卡地图的长度运行期补上: sokoban_maps.c 里 50 张地图是各自独立的数组,
-       头文件只能给"不完整类型"的声明(extern const uint8_t sok_mapN[]), 编译期 sizeof 不出来;
-       长度 = ceil(行*列/2)(Bcd 每字节 2 格), 由 sokoban_levels[i] 推出。
-       ★ 顺序前提: s_resources[] 末尾 50 项 == sok_map1..50 == sokoban_levels[0..49], 三处必须同序 */
-    for (i = 0; i < SOKOBAN_LEVEL_COUNT; i++) {
-        s_resources[FLASH_STORE_ID_SOK_MAP_0 + i].size =
-            ((uint16_t)sokoban_levels[i].rows * sokoban_levels[i].cols + 1) / 2;
-    }
-
-    /* 1. 计算全部资源总大小 */
-    uint32_t total = 0;
-    for (i = 0; i < FLASH_STORE_RES_COUNT; i++) {
-        total += s_resources[i].size;
-    }
+    /* 1. 计算全部资源总大小(含运行期补上的关卡地图长度) */
+    uint32_t total = flash_store_layout_total();
 
     /* 2. 从实际Flash末尾往前布局:
      *    目录区位于最末尾, 数据区紧随其前(从前往后顺序写入) */
@@ -864,14 +896,16 @@ void VideoChunkStore_BurnAll(void)
 #endif /* VIDEO_CHUNK_STORE_MODE */
 
 /* ================================================================
- * 英文版推箱子按钮图烧录 (BTN_IMG_STORE_MODE)
+ * 英文版推箱子按钮图 + 菜单"游戏名"汉字字模 烧录 (BTN_IMG_STORE_MODE)
  * ----------------------------------------------------------------
- * 只写外部 Flash 的固定保留区 BTN_IMG_EN_ADDR (5580 字节 = 3 张 30x31 RGB565),
- * 不碰字库资源区、不碰目录 → 加/换这套图不需要重烧字库。
+ * 只写外部 Flash 的固定保留区 BTN_IMG_EN_ADDR:
+ *   [3 张英文按钮图 5580B][10 个 24x24 汉字字模 720B] = 6300B
+ * 不碰字库资源区、不碰目录 → 加/换这两样都不需要重烧字库。
  * 进度: 擦除 0~10%、写入 10~90%、回读校验 90~100%, 完成后常驻 100%。
  * ================================================================ */
 #ifdef BTN_IMG_STORE_MODE
 #include "sok_img_prev.h"      /* g_btn_img_en[]: 三张英文按钮图连在一起 */
+#include "chinese_fonts.h"     /* g_menu_glyph_ext[]: 菜单游戏名用的 10 个汉字 */
 
 #define BTN_PROG_MAGIC   0x42544E31u   /* 'B','T','N','1' */
 
@@ -885,33 +919,47 @@ typedef struct {
 volatile btn_prog_t g_btn_prog = { 0, 0, 0, 0 };
 
 /**
- * @brief  烧录英文版按钮图到外部 Flash 保留区 (不返回)
+ * @brief  烧录英文按钮图(固定保留区) + 菜单游戏名汉字(字库区紧前面) (不返回)
+ * @note   两小块都不进资源表/目录, 所以改它们不用重烧字库:
+ *         1) 英文按钮图 5580B → BTN_IMG_EN_ADDR (视频区与字库区之间的空闲保留区)
+ *         2) 菜单游戏名 10 个汉字 720B → 字库数据区紧前面的扇区尾部
+ *            (与字库同一个区, 但落在"全量烧字库"的擦除范围之外 → 烧字库擦不到它)
  */
 void BtnImgStore_BurnAll(void)
 {
+    uint32_t glyph_addr = 0;
+    uint8_t  have_glyph;
+
     flash_store_detect_chip();
 
+    /* 字模那一小块紧贴在字库数据区前面 → 地址从装置上**已有字库的目录头**里读 data_start
+       (与游戏模式共用 flash_store_glyph_addr_from, 两边地址必然一致)。
+       目录无效 = 还没烧过字库 → 只烧按钮图、跳过字模(这种板子本来就要先全量烧字库)。 */
+    have_glyph = FlashStore_ResInit() ? 1 : 0;
+    if (have_glyph) glyph_addr = flash_store_glyph_addr_from(s_data_start);
+
     g_btn_prog.magic  = BTN_PROG_MAGIC;
-    g_btn_prog.size   = BTN_IMG_EN_SIZE;
+    g_btn_prog.size   = (uint32_t)BTN_IMG_EN_SIZE + (have_glyph ? (uint32_t)MENU_GLYPH_SIZE : 0UL);
     g_btn_prog.pct    = 0;
     g_btn_prog.result = 0;
 
     flash_store_ui_init();
     flash_store_ui_update(0);
 
-    /* 1. 擦除保留区覆盖的扇区(地址本身 4KB 对齐, 5580B 只占 2 个扇区) */
+    /* 1. 擦除: 按钮保留区覆盖的扇区(2个) + 字模那一小块所在扇区(在字库区之前, 独立扇区) */
     {
         uint32_t start = BTN_IMG_EN_ADDR & ~(uint32_t)4095;
         uint32_t end   = (BTN_IMG_EN_ADDR + BTN_IMG_EN_SIZE + 4095u) & ~(uint32_t)4095;
         uint32_t addr;
         for (addr = start; addr < end; addr += 4096) {
             flash_store_erase_sector(addr);
-            g_btn_prog.pct = (uint8_t)(10UL * (addr + 4096 - start) / (end - start));
-            flash_store_ui_update((uint8_t)g_btn_prog.pct);
         }
+        if (have_glyph) flash_store_erase_sector(glyph_addr & ~(uint32_t)4095);
+        g_btn_prog.pct = 10;
+        flash_store_ui_update(10);
     }
 
-    /* 2. 写入 3 张按钮图 */
+    /* 2. 写入 3 张英文按钮图 */
     {
         uint32_t written = 0;
         while (written < BTN_IMG_EN_SIZE) {
@@ -919,30 +967,53 @@ void BtnImgStore_BurnAll(void)
             if (n > 4096) n = 4096;
             flash_store_write(g_btn_img_en + written, BTN_IMG_EN_ADDR + written, n);
             written += n;
-            g_btn_prog.pct = (uint8_t)(10 + 80UL * written / BTN_IMG_EN_SIZE);
+            g_btn_prog.pct = (uint8_t)(10 + 60UL * written / BTN_IMG_EN_SIZE);
             flash_store_ui_update((uint8_t)g_btn_prog.pct);
         }
     }
 
-    /* 3. 回读校验: 与固件里的源数据比 CRC16 */
-    {
-        uint8_t  rbuf[64];
-        uint32_t left = BTN_IMG_EN_SIZE;
-        uint32_t a    = BTN_IMG_EN_ADDR;
-        uint16_t c    = 0xFFFF;
-        uint8_t  ok;
-
-        while (left) {
-            uint16_t n = (left > sizeof(rbuf)) ? (uint16_t)sizeof(rbuf) : (uint16_t)left;
-            uint16_t j;
-            flash_store_read(rbuf, a, n);
-            for (j = 0; j < n; j++) c = flash_store_crc16_update(c, rbuf[j]);
-            a += n;
-            left -= n;
-            g_btn_prog.pct = (uint8_t)(90 + 10UL * (BTN_IMG_EN_SIZE - left) / BTN_IMG_EN_SIZE);
+    /* 3. 写入菜单游戏名汉字 (720B) */
+    if (have_glyph) {
+        uint32_t written = 0;
+        while (written < MENU_GLYPH_SIZE) {
+            uint32_t n = MENU_GLYPH_SIZE - written;
+            flash_store_write(g_menu_glyph_ext + written, glyph_addr + written, n);
+            written += n;
+            g_btn_prog.pct = (uint8_t)(70 + 15UL * written / MENU_GLYPH_SIZE);
             flash_store_ui_update((uint8_t)g_btn_prog.pct);
         }
-        ok = (c == flash_store_crc16(g_btn_img_en, BTN_IMG_EN_SIZE)) ? 1 : 0;
+    }
+
+    /* 4. 回读校验: 两小块分别与固件里的源数据比 CRC16 */
+    {
+        uint8_t  rbuf[64];
+        uint16_t c1 = 0xFFFF, c2 = 0xFFFF;
+        uint16_t s1, s2 = 0xFFFF;
+        uint32_t i;
+        uint8_t  ok;
+
+        for (i = 0; i < BTN_IMG_EN_SIZE; i += (uint32_t)sizeof(rbuf)) {
+            uint32_t left = BTN_IMG_EN_SIZE - i;
+            uint16_t n = (left > sizeof(rbuf)) ? (uint16_t)sizeof(rbuf) : (uint16_t)left;
+            uint16_t j;
+            flash_store_read(rbuf, BTN_IMG_EN_ADDR + i, n);
+            for (j = 0; j < n; j++) c1 = flash_store_crc16_update(c1, rbuf[j]);
+            g_btn_prog.pct = (uint8_t)(85 + 8UL * i / BTN_IMG_EN_SIZE);
+            flash_store_ui_update((uint8_t)g_btn_prog.pct);
+        }
+        if (have_glyph) {
+            for (i = 0; i < MENU_GLYPH_SIZE; i += (uint32_t)sizeof(rbuf)) {
+                uint32_t left = MENU_GLYPH_SIZE - i;
+                uint16_t n = (left > sizeof(rbuf)) ? (uint16_t)sizeof(rbuf) : (uint16_t)left;
+                uint16_t j;
+                flash_store_read(rbuf, glyph_addr + i, n);
+                for (j = 0; j < n; j++) c2 = flash_store_crc16_update(c2, rbuf[j]);
+            }
+            s2 = flash_store_crc16(g_menu_glyph_ext, MENU_GLYPH_SIZE);
+        }
+        s1 = flash_store_crc16(g_btn_img_en, BTN_IMG_EN_SIZE);
+        ok = ((c1 == s1) && (c2 == s2)) ? 1 : 0;
+
         g_btn_prog.pct    = 100;
         g_btn_prog.result = ok ? 1 : 2;
         if (ok) {

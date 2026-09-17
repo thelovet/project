@@ -26,16 +26,19 @@
 /* ---- 菜单字体缓存/行类型常量 (集中置顶) ---- */
 /* 菜单24x24字库: 从外部Flash整体读入RAM缓存(条带渲染需逐行随机访问)
    槽位 0~21 = 资源ID 0~21(常用汉字); 槽位 22/23 = "语/言"(资源ID 115/116, 见 MENU_FONT_SLOT) */
-#define MENU_FONT_SLOTS  24
+#define MENU_FONT_SLOTS  36   /* 0~23 原有(含语/言) + 24~35 游戏名追加的 12 个字(外部保留区) */
 static uint8_t s_menu_fonts[MENU_FONT_SLOTS * 72];
 static uint8_t s_menu_fonts_ok = 0;
 static uint8_t s_fonts_lang = 0xFF;   /* 缓存里装的是哪套字: 0=中文, 1=英文 */
-static uint8_t s_menu_digits[4 * 64];   /* 2048行数字 2/0/4/8 的字模缓存 */
-static uint8_t s_menu_digits_ok = 0;
 
-/* 资源ID → 缓存槽位: 0~21 原样; 后加的 语(115)/言(116) 顺延到 22/23 */
-#define MENU_FONT_SLOT(id)  ((uint8_t)(((id) >= FLASH_STORE_ID_24_YU2) \
-                            ? (22u + ((id) - FLASH_STORE_ID_24_YU2)) : (id)))
+/* 资源ID → 缓存槽位:
+   0~21 原样; 语(115)/言(116) 顺延到 22/23;
+   游戏名追加的 10 个字(虚ID 128~137, 字模存外部Flash保留区) 放 24~33 */
+#define MENU_EXT_SLOT     24
+#define MENU_FONT_SLOT(id)  ((uint8_t)(((id) >= MENU_EXT_ID_BASE) \
+                            ? (MENU_EXT_SLOT + ((id) - MENU_EXT_ID_BASE)) \
+                            : (((id) >= FLASH_STORE_ID_24_YU2) \
+                               ? (22u + ((id) - FLASH_STORE_ID_24_YU2)) : (id))))
 
 /* 菜单行用到的汉字ID表 (替代原字体指针数组, 数据存外部Flash) */
 static const uint8_t s_fonts_tui_id[3] = { FLASH_STORE_ID_24_TUI, FLASH_STORE_ID_24_XIANG, FLASH_STORE_ID_24_ZI };
@@ -46,6 +49,12 @@ static const uint8_t s_fonts_ld_id[4] = { FLASH_STORE_ID_24_LIANG, FLASH_STORE_I
 static const uint8_t s_fonts_xp_id[4] = { FLASH_STORE_ID_24_XI2, FLASH_STORE_ID_24_PING, FLASH_STORE_ID_24_SHI2, FLASH_STORE_ID_24_JIAN };
 static const uint8_t s_fonts_pm_id[4] = { FLASH_STORE_ID_24_PING, FLASH_STORE_ID_24_MU, FLASH_STORE_ID_24_FAN2, FLASH_STORE_ID_24_XIANG2 };
 static const uint8_t s_fonts_yy_id[4] = { FLASH_STORE_ID_24_YU2, FLASH_STORE_ID_24_YAN, FLASH_STORE_ID_24_SHE, FLASH_STORE_ID_24_ZHI };
+
+/* 三个游戏名(下滑菜单/主菜单里那三行): 字模存外部Flash保留区, 虚ID 128~137 */
+static const uint8_t s_fonts_fkxx_id[4] = { MENU_EXT_ID_FANG, MENU_EXT_ID_KUAI, MENU_EXT_ID_XIAO2, MENU_EXT_ID_XING };  /* 方块消行 */
+static const uint8_t s_fonts_hrd_id[3]  = { MENU_EXT_ID_HUA, MENU_EXT_ID_RONG, MENU_EXT_ID_DAO };                         /* 华容道 */
+static const uint8_t s_fonts_dyxy_id[4] = { MENU_EXT_ID_DA, MENU_EXT_ID_YU, MENU_EXT_ID_XIAO, MENU_EXT_ID_YU };           /* 大鱼小鱼 */
+static const uint8_t s_fonts_fkhb_id[4] = { MENU_EXT_ID_FANG, MENU_EXT_ID_KUAI, MENU_EXT_ID_HE, MENU_EXT_ID_BING };       /* 方块合并 */
 
 /* 双语行文字表: 中文=字模ID数组(24宽全宽字), 英文=ASCII串(16宽半宽字, 见 chinese_fonts.h)
    英文为 0 的行表示语言无关(2048数字行/图标行), 不在此表里 */
@@ -65,9 +74,13 @@ static const MenuRowText s_row_text[MENU_ROW_MAX + 1] = {
     [MENU_ROW_PMFX]     = { s_fonts_pm_id,       "Rotation", 4 },
     [MENU_ROW_YYSH]     = { s_fonts_yy_id,       "Language", 4 },
     [MENU_ROW_FANHUI]   = { s_fonts_fh_id,       "Back",     2 },
+    /* 三个游戏名: 中文用追加字模(方块消行/华容道/大鱼小鱼), 英文用半宽拉丁字;
+       2048 行中英文都改成文字了(方块合并 / Merge), 不再画 2048 数字 */
+    [MENU_ROW_2048]     = { s_fonts_fkhb_id,     "Merge",    4 },
+    [MENU_ROW_TETRIS]   = { s_fonts_fkxx_id,     "Tetris",   4 },
+    [MENU_ROW_KLOTSKI]  = { s_fonts_hrd_id,      "Klotski",  3 },
+    [MENU_ROW_FISH]     = { s_fonts_dyxy_id,     "Big Fish", 4 },
 };
-static const uint8_t s_dig_2048[4] = { 2, 0, 4, 8 };
-
 /* 主菜单行类型 (供 main_menu_draw / main_menu_draw_frame_only 共用, 布局一致) */
 static const uint8_t g_main_menu_row_types[5] = {
     MENU_ROW_TUI, MENU_ROW_2048, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH
@@ -433,17 +446,13 @@ static void menu_font_cache_load(void) {
                 FlashStore_ResRead((FlashStoreId)(FLASH_STORE_ID_24_YU2 + k), 0,
                     s_menu_fonts + (uint16_t)slot * 72, 72);
             }
+            /* 游戏名追加的 10 个字(方块消行/华容道/大鱼小鱼): 字模不在资源表里, 存在
+               外部Flash的"字库数据区紧前面"那一小块(与字库同一个区, 但不在字库擦除
+               范围内), 由 BTN_IMG_STORE_MODE 单独烧一次; 没烧这块只是这 3 行不显示字 */
+            FlashStore_MenuGlyphRead(s_menu_fonts + (uint16_t)MENU_EXT_SLOT * 72);
             s_menu_fonts_ok = 1;
             s_fonts_lang    = 0;
         }
-    }
-
-    if (!s_menu_digits_ok) {
-        for (i = 0; i < 4; i++) {
-            FlashStore_ResRead(FLASH_STORE_ID_DIGITS, (uint32_t)s_dig_2048[i] * 64,
-                s_menu_digits + i * 64, 64);
-        }
-        s_menu_digits_ok = 1;
     }
 }
 
@@ -460,37 +469,6 @@ void main_menu_draw(void) {
  */
 void main_menu_draw_frame_only(int16_t y_top) {
     menu_draw_nrow_frame_only(y_top, g_main_menu_row_types, 5);
-}
-
-/**
- * @brief  生成主菜单里 2048 选项的条带像素。
- * @param  row     条带缓冲
- * @param  cr      条带位置
- * @param  menu_w  菜单宽度
- */
-static void draw_2048_strip(uint8_t* row, uint8_t cr, uint16_t menu_w) {
-    /* 14x28在32px行内: 跳过顶部2px和底部2px */
-    if (cr < 2 || cr >= 30) return;
-    uint8_t ty = cr - 2;
-    uint8_t sy = (uint16_t)ty * 32 / 28;
-
-    uint16_t dx = (menu_w - 56) / 2;  /* 4 * 14 = 56 */
-    for (uint8_t di = 0; di < 4; di++) {
-        const uint8_t* dp = &s_menu_digits[di * 64 + sy * 2];
-        uint8_t left = dp[0];
-        uint8_t right = dp[1];
-
-        for (uint8_t tx = 0; tx < 14; tx++) {
-            uint8_t sx = (uint16_t)tx * 16 / 14;
-            uint8_t byte_val = (sx < 8) ? left : right;
-            uint8_t bit = 7 - (sx & 7);
-            if (byte_val & (1 << bit)) {
-                uint16_t x = dx + tx;
-                if (x < menu_w) { row[x * 2] = 0xF8; row[x * 2 + 1] = 0x1F; }
-            }
-        }
-        dx += 14;
-    }
 }
 
 /**
@@ -742,77 +720,7 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
                 uint8_t ci, cl, co;
 
                 switch (row_types[i]) {
-                case MENU_ROW_2048:
-                    draw_2048_strip(row, cr, mw);
-                    break;
-
-                case MENU_ROW_TETRIS: {
-                    uint16_t cell = 14, g2 = 2;
-                    uint16_t ix = (mw - 3 * cell) / 2;
-                    uint16_t iy_off = (32 - 2 * cell) / 2;
-                    if (cr >= iy_off + g2 && cr < iy_off + cell - g2) {
-                        for (x = ix + cell + g2; x < ix + 2 * cell - g2; x++) {
-                            row[x * 2] = TX_H; row[x * 2 + 1] = TX_L;
-                        }
-                    }
-                    if (cr >= iy_off + cell + g2 && cr < iy_off + 2 * cell - g2) {
-                        for (x = ix + g2; x < ix + cell - g2; x++) {
-                            row[x * 2] = TX_H; row[x * 2 + 1] = TX_L;
-                        }
-                        for (x = ix + cell + g2; x < ix + 2 * cell - g2; x++) {
-                            row[x * 2] = TX_H; row[x * 2 + 1] = TX_L;
-                        }
-                        for (x = ix + 2 * cell + g2; x < ix + 3 * cell - g2; x++) {
-                            row[x * 2] = TX_H; row[x * 2 + 1] = TX_L;
-                        }
-                    }
-                } break;
-
-                case MENU_ROW_KLOTSKI: {
-                    uint8_t cell = 6, g1 = 1, gs = cell + g1;
-                    uint16_t iw = 4 * cell + 3 * g1;
-                    uint16_t ix = (uint16_t)(mw - iw) / 2;
-                    uint16_t iy_off = (uint16_t)(32 - iw) / 2;
-                    if (cr >= iy_off && cr < iy_off + iw) {
-                        uint16_t gr = (cr - iy_off) / gs;
-                        if (gr < 4) {
-                            uint16_t gy = (cr - iy_off) % gs;
-                            if (gy < cell) {
-                                for (uint8_t gc = 0; gc < 4; gc++) {
-                                    if (gr == 3 && gc == 3) continue;
-                                    for (x = ix + gc * gs; x < ix + gc * gs + cell; x++) {
-                                        row[x * 2] = TX_H; row[x * 2 + 1] = TX_L;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } break;
-
-                case MENU_ROW_FISH: {
-                    if (g_language_index == 1) {
-                        /* 英文模式: 这行显示 "Fish" 文字(与 Sokoban/Video 一致), 不再画"鱼"字图标 */
-                        if (cr < 4 || cr >= 28) break;
-                        menu_blit_en_row(row, mw, (uint16_t)(cr - 4), "Fish", TX_H, TX_L);
-                        break;
-                    }
-                    /* Chinese "yu" icon (24x24) via font_yu */
-                    uint16_t iw = 24;
-                    uint16_t ih = 24;
-                    uint16_t ix = (uint16_t)(mw - iw) / 2;
-                    uint16_t iy_off = (uint16_t)(32 - ih) / 2;
-                    if (cr < iy_off || cr >= iy_off + ih) break;
-                    uint16_t ry = cr - iy_off;
-                    uint16_t px;
-                    for (px = 0; px < 24; px++) {
-                        uint8_t bt = font_yu[(uint16_t)ry * 3 + (px >> 3)];
-                        if (bt & (0x80 >> (px & 7))) {
-                            uint16_t x = ix + px;
-                            row[x * 2] = TX_H; row[x * 2 + 1] = TX_L;
-                        }
-                    }
-                } break;
-
+                case MENU_ROW_2048:        /* 2048行: 中文"方块合并" / 英文"Merge" */
                 case MENU_ROW_CHONGXIN:
                 case MENU_ROW_LDSZ:
                 case MENU_ROW_XPSJ:
@@ -821,7 +729,10 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
                 case MENU_ROW_TUI:
                 case MENU_ROW_SHIPIN:
                 case MENU_ROW_SHEZHI:
-                case MENU_ROW_FANHUI: {
+                case MENU_ROW_FANHUI:
+                case MENU_ROW_TETRIS:      /* 这几个行(俄罗斯方块/华容道/鱼)改成中英文字, */
+                case MENU_ROW_KLOTSKI:     /* 不再画图标: 中文用追加字模(外部保留区), */
+                case MENU_ROW_FISH: {      /* 英文用半宽拉丁字, 与 Sokoban/Video 一致 */
                     const MenuRowText* rt = (row_types[i] <= MENU_ROW_MAX)
                         ? &s_row_text[row_types[i]] : 0;
                     if (!rt) break;
