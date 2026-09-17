@@ -339,11 +339,18 @@ void sok_win_draw(uint16_t x, uint16_t y)
 void sok_draw_digit_16x32(uint16_t x, uint16_t y, uint8_t digit, uint16_t color)
 {
     if (digit > 9) return;
-    /* 优先从外部Flash读取字模, 烧录模式下回退内部Flash */
+    /* 数字字模只在外部Flash里存一份(sok_img_win.c 的 font_digits[640] 是给烧录模式用的,
+       游戏模式不引用它 → --gc-sections 回收, 省 640B 内部Flash) */
     const uint8_t *data = FlashStore_ResLoad(FLASH_STORE_ID_DIGITS,
                                              (uint32_t)digit * FONT_DIGIT_BYTES,
                                              FONT_DIGIT_BYTES);
+#if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE) || defined(BTN_IMG_STORE_MODE)
+    /* 烧录模式: 字模还没写进外部Flash, 回退内部数组(进度百分比要能显示) */
     if (!data) data = &font_digits[digit * FONT_DIGIT_BYTES];
+#else
+    /* 游戏模式: 资源目录无效(外部Flash未烧过)则整屏资源都没有, 直接不画 */
+    if (!data) return;
+#endif
     uint8_t py, px;
     for (py = 0; py < 32; py++) {
         uint8_t left_byte  = data[py * 2];
@@ -441,11 +448,15 @@ void sok_draw_digit_scaled(uint16_t x, uint16_t y, uint8_t digit,
 {
     if (digit > 9 || tw == 0 || th == 0) return;
 
-    /* 优先从外部Flash读取字模, 烧录模式下回退内部Flash */
+    /* 数字字模只在外部Flash里存一份(同 sok_draw_digit_16x32) */
     const uint8_t *data = FlashStore_ResLoad(FLASH_STORE_ID_DIGITS,
                                              (uint32_t)digit * FONT_DIGIT_BYTES,
                                              FONT_DIGIT_BYTES);
-    if (!data) data = &font_digits[digit * FONT_DIGIT_BYTES];
+#if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE) || defined(BTN_IMG_STORE_MODE)
+    if (!data) data = &font_digits[digit * FONT_DIGIT_BYTES];   /* 烧录模式: 回退内部数组 */
+#else
+    if (!data) return;                                          /* 游戏模式: 目录无效则不画 */
+#endif
     uint8_t ty, tx;
 
     for (ty = 0; ty < th; ty++) {
