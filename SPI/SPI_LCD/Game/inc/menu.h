@@ -354,6 +354,21 @@ uint8_t menu_swipe_to_restart_handler(uint16_t y_threshold, uint8_t release_thre
 uint8_t uint_to_digits(uint32_t val, uint8_t *digits);
 
 /**
+ * @brief  在格子里居中绘制数字(2048 与华容道共用)
+ * @param  tx, ty     格子左上角像素坐标
+ * @param  tile_size  格子边长(像素)
+ * @param  val        数值(0 = 不画)
+ * @param  text_color 文字颜色
+ * @param  digit_offy 16x32 字号相对格子顶部的竖直偏移
+ * @param  big_first  1 = 1~2 位就用 16x32 大字(华容道); 0 = 4 位以上才缩小(2048)
+ * @note   两者原本各有一份约 40 行、框架完全相同的实现, 差异只在"字号档位表 / 取色
+ *         规则 / dc==2 时的间距", 已参数化合并到这一份。
+ */
+void game_grid_draw_number(uint16_t tx, uint16_t ty, uint16_t tile_size,
+                           uint16_t val, uint16_t text_color,
+                           uint8_t digit_offy, uint8_t big_first);
+
+/**
  * @brief  统一退出菜单关闭清理
  */
 void menu_exit_back_cleanup(void);

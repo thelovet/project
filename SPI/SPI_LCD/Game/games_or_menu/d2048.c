@@ -101,7 +101,11 @@ static uint16_t tile_y(uint8_t row) {
 static void draw_tile_bg(uint8_t row, uint8_t col, uint16_t color) {
     uint16_t x = tile_x(col);
     uint16_t y = tile_y(row);
-    LCD_Fill(x, y, x + D2048_TILE_SIZE - 1, y + D2048_TILE_SIZE - 1, color);
+    /* ★ LCD_Fill 的 end 参数是"不含"的(内部为 j < xend), 所以要传 x+TILE_SIZE 而不是
+       x+TILE_SIZE-1 —— 原来传 -1 时实际只填了 x~x+38, 格子的最右列(x+39)从来没被清过。
+       3 位数(如 512)的最后一位正好画到 x+39, 数字消失后那一列的墨迹就永久留在原地,
+       表现为"格子旁边一个不会消失的小白点"(只有放过数字的格子才有)。 */
+    LCD_Fill(x, y, x + D2048_TILE_SIZE, y + D2048_TILE_SIZE, color);
 }
 
 /**
@@ -111,46 +115,11 @@ static void draw_tile_bg(uint8_t row, uint8_t col, uint16_t color) {
  * @param  val 数值
  */
 static void draw_tile_number(uint8_t row, uint8_t col, uint16_t val) {
-    if (val == 0) return;
-
-    uint16_t text_color = (val <= 32) ? LCD_BLACK : LCD_WHITE;
-
-    /* 转数字数组并居中 */
-    uint8_t digits[8];
-    uint8_t dc = uint_to_digits(val, digits);
-
-    LCD_CS_CLR;
-    uint8_t i;
-
-    if (dc >= 4) {
-        /* 4+位数用缩放到适配小字体 */
-        uint8_t tw, th, gap;
-        if (dc == 4) { tw = 9;  th = 18; gap = 1; }  /* 39px */
-        else if (dc == 5) { tw = 7;  th = 14; gap = 1; }  /* 39px */
-        else { tw = 6;  th = 12; gap = 0; }  /* 6位 36px */
-        uint16_t total_w = dc * tw + (dc - 1) * gap;
-        uint16_t start_x = tile_x(col) + (D2048_TILE_SIZE - total_w) / 2;
-        uint16_t y = tile_y(row) + (D2048_TILE_SIZE - th) / 2;
-        for (i = 0; i < dc; i++) {
-            uint8_t d = digits[dc - 1 - i];
-            sok_draw_digit_scaled(start_x + i * (tw + gap), y, d, text_color, tw, th);
-        }
-    }
-    else {
-        /* 1~3位用16x32大字体 */
-        uint8_t  gap;
-        if (dc == 1)      gap = 0;
-        else if (dc == 2) gap = 16;
-        else              gap = (D2048_TILE_SIZE - 16) / 2;   /* 12 */
-        uint16_t total_w = 16 + (dc - 1) * gap;
-        uint16_t start_x = tile_x(col) + (D2048_TILE_SIZE - total_w) / 2;
-        uint16_t y = tile_y(row) + D2048_DIGIT_OFFY;
-        for (i = 0; i < dc; i++) {
-            uint8_t d = digits[dc - 1 - i];
-            sok_draw_digit_16x32(start_x + i * gap, y, d, text_color);
-        }
-    }
-    LCD_CS_SET;
+    /* 取色规则保留在这里: 数值大(=深色底)用白字, 小用黑字。
+       居中排版的绘制本体已合并到 menu.c 的 game_grid_draw_number(与华容道共用)。 */
+    game_grid_draw_number(tile_x(col), tile_y(row), D2048_TILE_SIZE,
+                          val, (val <= 32) ? LCD_BLACK : LCD_WHITE,
+                          D2048_DIGIT_OFFY, 0);
 }
 
 /**

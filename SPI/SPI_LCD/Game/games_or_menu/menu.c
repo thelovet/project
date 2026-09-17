@@ -1114,6 +1114,66 @@ static MainMode game_ret_to_mode(uint8_t ret) {
 }
 
 /**
+ * @brief  在格子里居中绘制数字(2048 与华容道共用)
+ * @note   两份原实现(各约40行)的框架完全一致: val==0 直接返回 → uint_to_digits 分解 →
+ *         LCD_CS 包住 → 二选一的字号分支 → 逐位居中绘制。差异只有三处, 已参数化:
+ *         1) 字号档位: 2048 是"4位及以上才缩放", 华容道是"3位及以上才缩放"(big_first);
+ *         2) 取色: 2048 按 val<=32 取黑/白, 华容道恒白 —— 由调用方传入 text_color;
+ *         3) 两位数的间距: 2048 固定 16, 华容道用 (tile_size-16)/2 —— 见下面的 gap 计算。
+ */
+void game_grid_draw_number(uint16_t tx, uint16_t ty, uint16_t tile_size,
+                           uint16_t val, uint16_t text_color,
+                           uint8_t digit_offy, uint8_t big_first)
+{
+    uint8_t digits[8];
+    uint8_t dc;
+    uint8_t i;
+
+    if (val == 0) return;
+
+    dc = uint_to_digits(val, digits);
+
+    LCD_CS_CLR;
+    if (big_first ? (dc <= 2) : (dc <= 3)) {
+        /* 16x32 大字号: 两位数间距按 tile_size 算(2048 位宽固定 16) */
+        uint8_t gap;
+        uint16_t total_w, sx, y;
+
+        if (dc == 1)      gap = 0;
+        else if (dc == 2) gap = big_first ? (uint8_t)((tile_size - 16) / 2) : 16;
+        else              gap = (uint8_t)((tile_size - 16) / 2);
+
+        total_w = (uint16_t)(16 + (dc - 1) * gap);
+        sx = (uint16_t)(tx + (tile_size - total_w) / 2);
+        y  = (uint16_t)(ty + digit_offy);
+        for (i = 0; i < dc; i++) {
+            sok_draw_digit_16x32(sx + i * gap, y, digits[dc - 1 - i], text_color);
+        }
+    }
+    else {
+        /* 缩放字号: 位数越多字越小, 总宽压在格子内 */
+        uint8_t tw, th, gap;
+        uint16_t total_w, sx, y;
+
+        if (big_first) {
+            tw = 10; th = 20; gap = 1;          /* 华容道 3 位 */
+        }
+        else if (dc == 4) { tw = 9; th = 18; gap = 1; }
+        else if (dc == 5) { tw = 7; th = 14; gap = 1; }
+        else              { tw = 6; th = 12; gap = 0; }
+
+        total_w = (uint16_t)(dc * tw + (dc - 1) * gap);
+        sx = (uint16_t)(tx + (tile_size - total_w) / 2);
+        y  = (uint16_t)(ty + (tile_size - th) / 2);
+        for (i = 0; i < dc; i++) {
+            sok_draw_digit_scaled(sx + i * (tw + gap), y,
+                                  digits[dc - 1 - i], text_color, tw, th);
+        }
+    }
+    LCD_CS_SET;
+}
+
+/**
  * @brief  复位触摸状态(操作的全是 menu.h 里的全局: g_prev_pressed / g_touch_down /
  *         g_touch_start_x / g_touch_start_y / g_menu_cooldown)。
  * @note   d2048 与 klotski 的 reset_touch 逐字节相同, 合并成这一份;

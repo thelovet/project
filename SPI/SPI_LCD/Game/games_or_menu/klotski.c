@@ -82,7 +82,9 @@ static uint16_t tile_y(uint8_t row) {
 static void draw_tile_bg(uint8_t row, uint8_t col, uint16_t color) {
     uint16_t x = tile_x(col);
     uint16_t y = tile_y(row);
-    LCD_Fill(x, y, x + KLOTSKI_TILE_SIZE - 1, y + KLOTSKI_TILE_SIZE - 1, color);
+    /* ★ 同 2048 的坑: LCD_Fill 的 end 参数不含, 传 -1 会漏掉格子最右列/最底行,
+       数字消失后那几列会留下不消失的残留(见 d2048.c draw_tile_bg 的说明)。 */
+    LCD_Fill(x, y, x + KLOTSKI_TILE_SIZE, y + KLOTSKI_TILE_SIZE, color);
 }
 
 /**
@@ -92,39 +94,9 @@ static void draw_tile_bg(uint8_t row, uint8_t col, uint16_t color) {
  * @param  val 数值
  */
 static void draw_tile_number(uint8_t row, uint8_t col, uint8_t val) {
-    if (val == 0) return;
-
-    uint16_t text_color = LCD_WHITE;
-
-    uint8_t digits[8];
-    uint8_t dc = uint_to_digits(val, digits);
-
-    LCD_CS_CLR;
-    uint8_t i;
-
-    if (dc <= 2) {
-        /* 1~2位用16x32大字体 */
-        uint8_t gap = (dc == 1) ? 0 : (KLOTSKI_TILE_SIZE - 16) / 2;
-        uint16_t total_w = 16 + (dc - 1) * gap;
-        uint16_t start_x = tile_x(col) + (KLOTSKI_TILE_SIZE - total_w) / 2;
-        uint16_t y = tile_y(row) + KLOTSKI_DIGIT_OFFY;
-        for (i = 0; i < dc; i++) {
-            uint8_t d = digits[dc - 1 - i];
-            sok_draw_digit_16x32(start_x + i * gap, y, d, text_color);
-        }
-    }
-    else {
-        /* 3位缩放绘制 (正常华容道最多15即2位, 预留扩展) */
-        uint8_t tw = 10, th = 20, gap = 1;
-        uint16_t total_w = dc * tw + (dc - 1) * gap;
-        uint16_t start_x = tile_x(col) + (KLOTSKI_TILE_SIZE - total_w) / 2;
-        uint16_t y = tile_y(row) + (KLOTSKI_TILE_SIZE - th) / 2;
-        for (i = 0; i < dc; i++) {
-            uint8_t d = digits[dc - 1 - i];
-            sok_draw_digit_scaled(start_x + i * (tw + gap), y, d, text_color, tw, th);
-        }
-    }
-    LCD_CS_SET;
+    /* 华容道恒白字; 居中排版的绘制本体已合并到 menu.c 的 game_grid_draw_number */
+    game_grid_draw_number(tile_x(col), tile_y(row), KLOTSKI_TILE_SIZE,
+                          val, LCD_WHITE, KLOTSKI_DIGIT_OFFY, 1);
 }
 
 /**
