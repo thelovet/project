@@ -490,9 +490,15 @@ static void sok_level_clear(void) {
     uint8_t lv = s_level_num;
     uint8_t dc = (lv / 10 > 0) ? 2 : 1;
     uint16_t dw = dc * 16 + (dc - 1) * 2;
-    uint16_t total_w = 64 + 4 + dw;
-    uint16_t x = (240 - total_w) / 2;
-    LCD_Fill(x, 84, x + total_w, 116, LCD_BLACK);
+    /* 中英两套布局宽度/起点不同: 中文 "关"+“卡”+数字 = 64+4+dw; 英文 "Level"+数字 = 5*16+6+dw
+       (英文比中文宽 18px, 居中后左边界还要往左 9px)。只按当前语言清会漏掉另一套的边缘 —— 
+       表现为切成英文后, "Level" 最左边的 L 残留在屏上。两套都居中, 窄的必被宽的包含,
+       故按较宽那套整带清一次即可。*/
+    uint16_t w_cn = 64 + 4 + dw;
+    uint16_t w_en = 5 * 16 + 6 + dw;
+    uint16_t w_wide = (w_cn > w_en) ? w_cn : w_en;
+    uint16_t x = (uint16_t)((240 - w_wide) / 2);
+    LCD_Fill(x, 84, x + w_wide, 116, LCD_BLACK);
 }
 
 /**
