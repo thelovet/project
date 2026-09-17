@@ -1038,6 +1038,12 @@ void tetris_lowbatt_restore(void)
         if (g_state_before_menu == TETRIS_STATE_OVER) draw_game_over_text();
         else tetris_restore_board_above_menu(g_restart_slide_y, RESTART_MENU_H);
         menu_draw_nrow_frame_only(g_restart_slide_y, g_restart_row_types, 3);
+    } else if (g_settings_from_game) {
+        /* 设置模式(二级设置条带 x=45~195 压在游戏上, 已盖住电池主体/感叹号):
+           只需恢复条带外的凸点区(x=195~210, y=104~136) —— 凸点跨在右侧预览区上,
+           draw_preview() 即可覆盖。不能走下面的棋盘分支: 整棋盘重绘范围大, 会
+           "先画棋盘再画条带", 明显闪一帧(§16 的坑; 2048/华容道/推箱子都有这个分支) */
+        draw_preview();
     } else {
         draw_preview();
         if (g_state == TETRIS_STATE_OVER) {

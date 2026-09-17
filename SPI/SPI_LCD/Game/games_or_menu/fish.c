@@ -220,6 +220,67 @@ static void draw_image_sprite(FlashStoreId id_base, const uint16_t dims[][2],
  * @note   透明图增量绘制用背景色填满某实体旧矩形时, 会误伤与其重叠的其他实体像素;
  *         因此填背景后立即按固定顺序重绘矩形内的所有实体, 防止残留。
  */
+/**
+ * @brief  重绘与给定矩形相交的实体(玩家/小鱼), 不动背景。
+ * @note   供"只用背景色擦掉低电图标线条"的恢复路径复用(见 fish_erase_lowbatt_icon):
+ *         那条路不能整块填背景 —— 会把框内的鱼/玩家一起擦掉再重画, 而重画要从外部
+ *         Flash 流式读精灵图, 那期间框内是空的, 用户看到"电池框内部黑一下"。
+ */
+static void redraw_entities_in_rect(const uint16_t dims[][2], uint8_t level,
+    int16_t cx, int16_t cy) {
+    uint16_t w = dims[level][0];
+    uint16_t h = dims[level][1];
+    int16_t x0 = cx - (int16_t)(w / 2);
+    int16_t y0 = cy - (int16_t)(h / 2);
+    int16_t x1 = x0 + (int16_t)w - 1;
+    int16_t y1 = y0 + (int16_t)h - 1;
+    if (x0 < 0) x0 = 0;
+    if (y0 < PLAY_TOP) y0 = PLAY_TOP;
+    if (x1 > 239) x1 = 239;
+    if (y1 > 239) y1 = 239;
+    if (x1 < x0 || y1 < y0) return;
+
+    uint16_t pw = player_imgs_dim[PLAYER_IMG_LVL][0];
+    uint16_t ph = player_imgs_dim[PLAYER_IMG_LVL][1];
+    int16_t px0 = (int16_t)g_player.x - (int16_t)(pw / 2);
+    int16_t py0 = (int16_t)g_player.y - (int16_t)(ph / 2);
+    int16_t px1 = px0 + (int16_t)pw - 1;
+    int16_t py1 = py0 + (int16_t)ph - 1;
+    if (px1 >= x0 && px0 <= x1 && py1 >= y0 && py0 <= y1)
+        draw_image_sprite(FLASH_STORE_ID_PLAYER_0, player_imgs_dim,
+            PLAYER_COUNT, g_player.level, g_player.x, g_player.y, g_player.facing);
+    uint8_t i;
+    for (i = 0; i < FISH_NUM_FOOD; i++) {
+        FishEntity* f = &g_food[i];
+        if (!f->active) continue;
+        uint16_t fw = fish_imgs_dim[f->level][0];
+        uint16_t fh = fish_imgs_dim[f->level][1];
+        int16_t fx0 = (int16_t)f->x - (int16_t)(fw / 2);
+        int16_t fy0 = (int16_t)f->y - (int16_t)(fh / 2);
+        int16_t fx1 = fx0 + (int16_t)fw - 1;
+        int16_t fy1 = fy0 + (int16_t)fh - 1;
+        if (fx1 >= x0 && fx0 <= x1 && fy1 >= y0 && fy0 <= y1)
+            draw_image_sprite(FLASH_STORE_ID_FISH_0, fish_imgs_dim,
+                FISH_COUNT, f->level, f->x, f->y, f->facing);
+    }
+}
+
+/**
+ * @brief  用背景色擦掉低电大图标(只擦线条/凸点/感叹号那几条窄带)
+ * @note   几何与 display.c 的 LowBattery_ComputeGeo 一致(bx=45,by=79,bw=150,bh=82)。
+ *         不整块填背景: 框内本来就是游戏画面, 没有任何东西需要恢复; 只把图标画上去
+ *         的那几条线擦回背景色即可 —— 线只有 2px 宽, 几乎碰不到框内的鱼/玩家。
+ */
+static void fish_erase_lowbatt_icon(void) {
+    LCD_Fill_DMA(45,  79, 195,  81, COLOR_BG);   /* 上边(2px) */
+    LCD_Fill_DMA(45, 159, 195, 161, COLOR_BG);   /* 下边(2px) */
+    LCD_Fill_DMA(45,  79,  47, 161, COLOR_BG);   /* 左边(2px) */
+    LCD_Fill_DMA(193, 79, 195, 161, COLOR_BG);   /* 右边(2px) */
+    LCD_Fill_DMA(195, 104, 210, 136, COLOR_BG);  /* 右凸点 */
+    LCD_Fill_DMA(111, 92, 129, 128, COLOR_BG);   /* 感叹号竖条 */
+    LCD_Fill_DMA(111, 137, 129, 155, COLOR_BG);  /* 感叹号点 */
+}
+
 static void clear_entity_rect(const uint16_t dims[][2], uint8_t level,
     int16_t cx, int16_t cy) {
     uint16_t w = dims[level][0];
@@ -233,34 +294,11 @@ static void clear_entity_rect(const uint16_t dims[][2], uint8_t level,
     if (x1 > 239) x1 = 239;
     if (y1 > 239) y1 = 239;
     if (x1 < x0 || y1 < y0) return;
-    /* 填背景 (LCD_Fill 的 end 不含坐标) */
-    LCD_Fill((uint16_t)x0, (uint16_t)y0, (uint16_t)(x1 + 1), (uint16_t)(y1 + 1), COLOR_BG);
+    /* 填背景(LCD_Fill 的 end 不含坐标); 走 DMA: 低电灭段恢复时这块是 166x83≈13.8K 像素,
+       CPU 逐像素写要好几毫秒, 那几毫秒里屏幕上还是刚被"刷黑"的图标线条 → 看着黑一下 */
+    LCD_Fill_DMA((uint16_t)x0, (uint16_t)y0, (uint16_t)(x1 + 1), (uint16_t)(y1 + 1), COLOR_BG);
     /* 重绘所有与该矩形相交的实体(按当前坐标), 避免被背景误伤 */
-    {
-        uint16_t pw = player_imgs_dim[PLAYER_IMG_LVL][0];
-        uint16_t ph = player_imgs_dim[PLAYER_IMG_LVL][1];
-        int16_t px0 = (int16_t)g_player.x - (int16_t)(pw / 2);
-        int16_t py0 = (int16_t)g_player.y - (int16_t)(ph / 2);
-        int16_t px1 = px0 + (int16_t)pw - 1;
-        int16_t py1 = py0 + (int16_t)ph - 1;
-        if (px1 >= x0 && px0 <= x1 && py1 >= y0 && py0 <= y1)
-            draw_image_sprite(FLASH_STORE_ID_PLAYER_0, player_imgs_dim,
-                PLAYER_COUNT, g_player.level, g_player.x, g_player.y, g_player.facing);
-        uint8_t i;
-        for (i = 0; i < FISH_NUM_FOOD; i++) {
-            FishEntity* f = &g_food[i];
-            if (!f->active) continue;
-            uint16_t fw = fish_imgs_dim[f->level][0];
-            uint16_t fh = fish_imgs_dim[f->level][1];
-            int16_t fx0 = (int16_t)f->x - (int16_t)(fw / 2);
-            int16_t fy0 = (int16_t)f->y - (int16_t)(fh / 2);
-            int16_t fx1 = fx0 + (int16_t)fw - 1;
-            int16_t fy1 = fy0 + (int16_t)fh - 1;
-            if (fx1 >= x0 && fx0 <= x1 && fy1 >= y0 && fy0 <= y1)
-                draw_image_sprite(FLASH_STORE_ID_FISH_0, fish_imgs_dim,
-                    FISH_COUNT, f->level, f->x, f->y, f->facing);
-        }
-    }
+    redraw_entities_in_rect(dims, level, cx, cy);
 }
 
 /**
@@ -1171,6 +1209,15 @@ void fish_clear_lowbattery(void) {
     /* 低电图标覆盖区: 中心(127,120), 宽166, 高83 (x=44~209, y=79~161) */
     static const uint16_t lb_dims[][2] = { {166, 83} };
 
+    /* ★ 设置模式(二级设置条带压在游戏上): 屏幕是"游戏+设置条带", 条带已盖住电池主体,
+       只恢复电池矩形(含条带外的凸点)内的实体即可 —— 不能走下面的菜单分支(会把游戏
+       菜单画到设置条带上), 也不能整屏重绘(会闪, 见 §16 鱼的坑) */
+    if (g_settings_from_game) {
+        fish_erase_lowbatt_icon();                      /* 用背景色擦掉图标线条 */
+        redraw_entities_in_rect(lb_dims, 0, 127, 120);  /* 补回压在线条上的鱼/玩家 */
+        return;
+    }
+
     if (g_state == FISH_STATE_EXIT_MENU || g_state == FISH_STATE_RESTART_MENU) {
         /* 区域刷新(不整屏重绘, 避免游戏画面闪): 清红色低电图标后, 填电池区为背景色
            并重绘与其相交的玩家/小鱼实体, 再同帧重画菜单框架. 菜单拖拽/滑入中(未到位)
@@ -1178,12 +1225,15 @@ void fish_clear_lowbattery(void) {
         /* 菜单背后是"游戏结束"画面(g_state_before_menu==OVER)时, 不能重绘小鱼(会盖掉结束文字),
            改为图标区填背景+重绘结束文字(不整屏清黑, 避免闪); 否则按透明实体场景区域恢复 */
         if (g_state_before_menu == FISH_STATE_OVER) {
-            LCD_Fill(44, 79, 210, 162, COLOR_BG);
+            LCD_Fill_DMA(44, 79, 210, 162, COLOR_BG);   /* 填电池区(走 DMA 提速) */
             draw_game_over_text();
         }
         else {
-            LCD_ClearLowBatteryOverlay();
-            clear_entity_rect(lb_dims, 0, 127, 120);
+            /* 只擦图标线条本身(用背景色), 不整块填背景 —— 整块填会把框内的鱼/玩家
+               一起擦掉再重画, 而重画要从外部 Flash 流式读精灵图, 那期间框内是空的,
+               用户看到"电池框内部黑一下" */
+            fish_erase_lowbatt_icon();
+            redraw_entities_in_rect(lb_dims, 0, 127, 120);
         }
         if (g_state == FISH_STATE_EXIT_MENU)
             menu_draw_nrow_frame_only(g_exit_drag_y, fish_row_types, 5);
@@ -1193,11 +1243,12 @@ void fish_clear_lowbattery(void) {
     }
     /* 游戏结束(无菜单): 图标区填背景(清图标)+重绘结束文字, 不整屏清黑, 避免闪 */
     if (g_state == FISH_STATE_OVER) {
-        LCD_Fill(44, 79, 210, 162, COLOR_BG);
+        LCD_Fill_DMA(44, 79, 210, 162, COLOR_BG);   /* 填电池区(走 DMA 提速) */
         draw_game_over_text();
     }
     else {
-        clear_entity_rect(lb_dims, 0, 127, 120);
+        fish_erase_lowbatt_icon();                      /* 用背景色擦掉图标线条 */
+        redraw_entities_in_rect(lb_dims, 0, 127, 120);  /* 补回压在线条上的鱼/玩家 */
     }
 }
 
