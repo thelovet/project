@@ -958,10 +958,19 @@ static void main_lowbatt_restore_under_icon(void)
  * @note   仅4种游戏模式有效, BAT_LEVEL_0时触发
  *         闪烁时叠加LowBattery图标, SPI占用时可能产生撕裂
  */
+
+/* 亮屏段里补画低电图标的最小间隔(us)。
+   原来亮段内"每帧"都重画, 而一次 overlay 是 7 次填充(约 2.2K 像素、纯 CPU 逐像素写),
+   60fps 下每秒要吃掉约 36ms 帧时间 —— 菜单滑动(每帧2px)、方块软降(每帧1格)这类
+   "按帧计速度"的动画会明显变慢。游戏画面只在状态变化时重绘, 100ms(约6帧)补一次足够跟上。
+   ★ 菜单场景不需要这里补: 条带渲染会按 g_lowbatt_showing 用 lmbat_strip 把电池行画进去。 */
+#define LOWBATT_OVERLAY_REDRAW_US  100000UL
+
 static void Main_FlashLowBattery(void)
 {
     static uint8_t  s_flash_on = 0;
     static uint32_t s_flash_tick = 0;
+    static uint32_t s_overlay_tick = 0;
 
     /* 非游戏模式关闭闪烁 */
     if (s_main_mode != MAIN_MODE_SOKOBAN
@@ -991,8 +1000,13 @@ static void Main_FlashLowBattery(void)
             g_lowbatt_showing = 0;
             main_lowbatt_restore_under_icon();
         } else {
-            LCD_ShowLowBatteryOverlay();
+            /* "图标在显示"这个标记必须每帧维持(菜单条带据此补画电池行),
+               但重画本身按间隔做: 游戏重绘会盖掉图标, 补太多帧就白吃帧时间 */
             g_lowbatt_showing = 1;
+            if ((uint32_t)(now - s_overlay_tick) >= LOWBATT_OVERLAY_REDRAW_US) {
+                LCD_ShowLowBatteryOverlay();
+                s_overlay_tick = now;
+            }
         }
     } else {
         /* 灭屏段，持续2秒 */
@@ -1000,6 +1014,9 @@ static void Main_FlashLowBattery(void)
         if ((uint32_t)(now - s_flash_tick) >= 2000000UL) {
             s_flash_on = 1;
             s_flash_tick = now;
+            /* 刚进亮段立即画一次, 不用等间隔到期 */
+            LCD_ShowLowBatteryOverlay();
+            s_overlay_tick = now;
         }
     }
 }
