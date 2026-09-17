@@ -529,11 +529,16 @@ static void menu_blit_en_row(uint8_t* row, uint16_t mw, uint16_t cr,
         uint8_t gi = g_latin24_idx[(uint8_t)str[ci]];
         if (gi != LATIN_INDEX_NONE) {
             const uint8_t* fp = &s_menu_fonts[((uint16_t)gi * 24u + cr) * 2u];
+            /* 字模只有 14 列宽: 第 1 字节覆盖列 0~7, 第 2 字节覆盖列 8~15 但低 2 位恒 0。
+               两级省循环: ① 整字节为 0 直接跳过(空格、窄字母 i/l 常整字节空, 原来白跑 8 次);
+               ② 第 2 字节只扫高 6 位。英文菜单一行 33 个字符, 每字符原本固定 16 次位判断 */
             for (uint8_t b = 0; b < 2; b++) {
                 uint8_t bits = fp[b];
-                for (int8_t bt = 7; bt >= 0; bt--) {
+                if (!bits) continue;
+                int8_t bt_lo = b ? 2 : 0;   /* b=1 时 bit1/bit0 对应列 14/15, 恒 0 */
+                for (int8_t bt = 7; bt >= bt_lo; bt--) {
                     if (bits & (1 << bt)) {
-                        x = cx + b * 8 + (7 - (uint8_t)bt);
+                        x = (uint16_t)(cx + b * 8 + (7 - (uint8_t)bt));
                         if (x < mw) { row[x * 2] = hi; row[x * 2 + 1] = lo; }
                     }
                 }
@@ -698,9 +703,14 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
                     }
                 }
                 else {
-                    for (x = txt_l; x <= txt_r; x++) {
-                        row[x * 2] = CY_H; row[x * 2 + 1] = CY_L;
-                    }
+                    /* 文字区的青色底不用在这里重填: 上面"内饰行"分支已经把 mb..mw-mb 整行刷成青色,
+                       而文字框 txt_l..txt_r 一定落在该范围内
+                       (txt_l = (mw-txt_span)/2 - PAD, txt_r = txt_l + txt_span + 2*PAD - 1;
+                        各尺寸菜单都是 mw=150 / mb=5, 且 txt_y_top~txt_y_bot 也都在内饰行里)。
+                       原来"先整片填青、再拿蓝框覆盖一遍"等于白写一遍文字区宽度, 每帧要跑
+                       约 190 行 × (txt_span+20) 次; 而英文的 txt_span(112) 比中文(96) 宽,
+                       白写的量还更多 —— 这就是"英文菜单比中文慢一点"的那点差距来源。
+                       这里只画左右两条蓝竖框。 */
                     for (x = txt_l; x < blu_l; x++) {
                         row[x * 2] = BL_H; row[x * 2 + 1] = BL_L;
                     }
