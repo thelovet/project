@@ -329,30 +329,11 @@ void klotski_init(void) {
     g_restart_slide_y = RESTART_MENU_Y + RESTART_MENU_H;
 }
 /**
- * @brief  重置触摸状态(从其他游戏返回时调用)。
- */
-void klotski_reset_touch(void) {
-    g_prev_pressed = 1;
-    g_touch_down = 0;
-    g_touch_start_x = 0;
-    g_touch_start_y = 0;
-    g_menu_cooldown = 0;
-}
-
-/**
  * @brief  华容道全屏重绘，用于电池闪灭恢复，避免全屏LCD_Fill闪烁
  * @note   由 klotski_update() 下一帧执行增量grid重绘以降低SPI占用
  */
 void klotski_full_redraw(void) {
     g_grid_dirty = 2;  /* 电池闪灭重绘，跳过全屏大填充 */
-}
-
-/**
- * @brief  检查退出菜单/重新开始菜单是否可见
- * @retval 1=菜单可见, 0=不可见
- */
-uint8_t klotski_is_menu_visible(void) {
-    return g_exit_menu_visible || g_restart_menu_visible;
 }
 
 /* klotski_redraw_battery_rows 定义在本文件下方, 此处前向声明 */
@@ -579,7 +560,7 @@ uint8_t klotski_restore_state(const uint8_t* buf, uint8_t len) {
     find_empty();
     g_timer_start = GetTimerCount() - (uint32_t)g_time_sec * 1000000UL;
     g_grid_dirty = 1;
-    klotski_reset_touch();
+    game_reset_touch_common();
 
     LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
     klotski_update();

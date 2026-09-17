@@ -208,6 +208,13 @@ extern uint8_t  g_game_consume_release;
 
 /* ---- 随机数/电池图标 ---- */
 uint32_t game_rand(void);
+/**
+ * @brief  复位触摸状态(只操作 menu.h 的全局: g_prev_pressed / g_touch_down /
+ *         g_touch_start_x / g_touch_start_y / g_menu_cooldown)
+ * @note   d2048 与 klotski 原本各有一份逐字节相同的实现, 已合并到这一份
+ */
+void game_reset_touch_common(void);
+
 void game_battery_icon_reset(void);
 void game_battery_icon_update(uint16_t x, uint16_t y, uint8_t force_redraw);
 BatteryLevel game_battery_icon_get_level(void);

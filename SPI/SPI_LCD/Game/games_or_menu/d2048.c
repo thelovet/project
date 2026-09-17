@@ -392,31 +392,12 @@ void d2048_init(void) {
 }
 
 /**
- * @brief  重置触摸状态(从其他游戏返回时调用)。
- */
-void d2048_reset_touch(void) {
-    g_prev_pressed = 1;      /* 设为1防止进入时触发释放, 待首帧清零 */
-    g_touch_down = 0;
-    g_touch_start_x = 0;
-    g_touch_start_y = 0;
-    g_menu_cooldown = 0;
-}
-
-/**
  * @brief  2048全屏重绘，用于电池闪灭恢复，避免全屏LCD_Fill闪烁
  * @note   由 d2048_update() 下一帧执行完整grid重绘以降低SPI占用
  */
 void d2048_full_redraw(void) {
     g_full_redraw = 1;
     g_grid_dirty = 2;  /* 电池闪灭重绘，跳过全屏大填充 */
-}
-
-/**
- * @brief  判断当前是否显示菜单(退出/重开)。
- * @return 1=有菜单, 0=无
- */
-uint8_t d2048_is_menu_visible(void) {
-    return g_exit_menu_visible || g_restart_menu_visible;
 }
 
 /**
@@ -569,7 +550,7 @@ uint8_t d2048_restore_state(const uint8_t* buf, uint8_t len) {
     g_state_before_menu = g_state;
     g_grid_dirty = 1;
     g_full_redraw = 1;
-    d2048_reset_touch();
+    game_reset_touch_common();
 
     LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
     d2048_update();

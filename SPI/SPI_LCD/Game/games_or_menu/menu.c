@@ -1114,15 +1114,31 @@ static MainMode game_ret_to_mode(uint8_t ret) {
 }
 
 /**
+ * @brief  复位触摸状态(操作的全是 menu.h 里的全局: g_prev_pressed / g_touch_down /
+ *         g_touch_start_x / g_touch_start_y / g_menu_cooldown)。
+ * @note   d2048 与 klotski 的 reset_touch 逐字节相同, 合并成这一份;
+ *         sokoban(用 s_* 私有变量) / fish(g_prev_pressed=0 + 拖动起点) /
+ *         tetris(多置 g_wait_touch_release) 的实现各不相同, 仍各自保留。
+ */
+void game_reset_touch_common(void)
+{
+    g_prev_pressed = 1;      /* 设为1防止进入时触发释放, 待首帧清零 */
+    g_touch_down = 0;
+    g_touch_start_x = 0;
+    g_touch_start_y = 0;
+    g_menu_cooldown = 0;
+}
+
+/**
  * @brief  模式切换时重置触摸状态并标记等待松手。
  * @param  ret 切换返回命令
  */
 static void game_reset_touch(uint8_t ret) {
     switch (ret) {
-    case EXIT_RET_D2048:   d2048_reset_touch();   break;
+    case EXIT_RET_D2048:
+    case EXIT_RET_KLOTSKI: game_reset_touch_common(); break;
     case EXIT_RET_SOKOBAN: sokoban_reset_touch(); break;
     case EXIT_RET_TETRIS:  tetris_reset_touch();  break;
-    case EXIT_RET_KLOTSKI: klotski_reset_touch(); break;
     case EXIT_RET_FISH:    fish_reset_touch();    break;
     }
 }

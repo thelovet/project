@@ -23,7 +23,6 @@ uint8_t fish_update(void);    /* 返回: GAME_RET_* */
 void    fish_reset_touch(void);
 void    fish_full_redraw(void);
 void    fish_clear_lowbattery(void);    /* 局部清除低电图标覆盖区(不整屏重绘) */
-uint8_t fish_is_menu_visible(void);
 uint8_t fish_save_state(uint8_t *buf, uint8_t max_len);
 uint8_t fish_restore_state(const uint8_t *buf, uint8_t len);
 

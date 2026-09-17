@@ -1252,14 +1252,6 @@ void fish_clear_lowbattery(void) {
     }
 }
 
-/**
- * @brief  判断当前是否显示菜单(退出/重开)。
- * @return 1=有菜单, 0=无
- */
-uint8_t fish_is_menu_visible(void) {
-    return (g_state == FISH_STATE_EXIT_MENU || g_state == FISH_STATE_RESTART_MENU);
-}
-
 /* 存档 / 恢复: 存玩家等级/坐标/朝向 + 完整得分/状态 + 每条小鱼位置/速度。
    恢复时原地继续, 避免"鱼被重新生成到屏幕外边缘、短暂无鱼"的问题 */
    /**

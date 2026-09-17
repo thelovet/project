@@ -719,15 +719,6 @@ void tetris_full_redraw(void)
 }
 
 /**
- * @brief  判断退出/重开菜单是否正在显示
- * @retval 1=菜单可见, 0=不可见
- */
-uint8_t tetris_is_menu_visible(void)
-{
-    return g_exit_menu_visible || g_restart_menu_visible;
-}
-
-/**
  * @brief  移动当前方块: 若无碰撞则更新位置并重置锁定延迟
  * @param  dx  列偏移 (-1=左, 1=右, 0=无)
  * @param  dy  行偏移 (通常为0或1)

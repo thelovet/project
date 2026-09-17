@@ -605,14 +605,6 @@ void sokoban_full_redraw(void) {
 }
 
 /**
- * @brief  检查退出菜单或导航菜单是否可见
- * @retval 1=菜单可见, 0=不可见
- */
-uint8_t sokoban_is_menu_visible(void) {
-    return s_exit_menu_visible || s_menu_visible;
-}
-
-/**
  * @brief  从设置菜单返回到按钮面板 (main.c GameSettings_Update 返回分支调用)
  * @note   置 s_menu_visible=1 让下一帧 sokoban_update 重绘导航按钮面板 + 关卡编号
  */

@@ -119,7 +119,6 @@ uint8_t       sokoban_save_state(uint8_t *buf, uint8_t max_len);
 uint8_t       sokoban_restore_state(const uint8_t *buf, uint8_t len);
 void          sokoban_full_redraw(void);
 void          sokoban_lowbatt_restore(void);
-uint8_t       sokoban_is_menu_visible(void);
 void          sokoban_menu_settings_restore(void);  /* 从设置菜单返回到按钮面板 */
 void sokoban_menu_settings_restore_full(void);      /* 从设置页(整屏绘制)返回: 整幅重画地图+按钮面板 */
 
