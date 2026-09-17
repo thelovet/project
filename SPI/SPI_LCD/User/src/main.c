@@ -128,12 +128,19 @@ static TouchState ts;                        /* 触摸状态, Touch_GetXY()更�
 static uint8_t  g_charge_pending = 0;       /* 充电倒计时中 */
 static uint32_t g_charge_pending_time = 0;   /* 充电倒计时起点 */
 
+/* "按住不动也要休眠"的判定死区(像素): 触摸IC静止时会有±1~2px抖动, 直接逐像素比较会把
+   抖动当成"手指在动" → 计时器每帧被刷新 → 长按时永远到不了息屏时间(表现: 无法休眠)。
+   3px 以内视为没动; 真实拖动每帧远超 3px, 不受影响。 */
+#define GAME_SLEEP_MOVE_DEADZONE  3
+
 static uint32_t s_game_last_activity_us = 0;
 static MainMode s_game_sleep_mode = MAIN_MODE_VIDEO;
 static uint8_t s_game_wait_release = 0;
 static uint8_t s_game_release_count = 0;
+static uint8_t s_game_wait_frames = 0;   /* 隔离已持续的帧数(兜底超时用) */
 static uint8_t s_wake_wait_release = 0;
 static uint8_t s_wake_release_count = 0;
+static uint8_t s_wake_wait_frames = 0;   /* 隔离已持续的帧数(兜底超时用) */
 static uint8_t s_standby_touch_wake = 0;
 static uint8_t s_standby_charge_wake = 0;
 static uint8_t s_standby_unknown_wake = 0;
@@ -174,6 +181,7 @@ static uint8_t GameRestore_ApplyPending(void)
     s_touch_down = 0;
     s_game_wait_release = 1;
     s_game_release_count = 0;
+    s_game_wait_frames = 0;
     s_game_sleep_mode = s_main_mode;
     s_game_last_activity_us = GetTimerCount();
     if (!s_standby_charge_wake) {
@@ -230,16 +238,28 @@ static uint8_t GameAutoSleep_AfterTouch(void)
         s_game_last_activity_us = now;
         s_game_wait_release = 0;
         s_game_release_count = 0;
+        s_game_wait_frames = 0;
     }
 
     if (is_game && s_game_wait_release) {
         if (ts.pressed) {
             s_game_release_count = 0;
+            /* ★ 兜底超时: 本分支直接 return 1, 会绕过下面的休眠超时检查 —— 只要触摸IC
+               报"还按着", 隔离就永不解除, 到了息屏时间也不休眠(与 s_wake_wait_release
+               同源的坑)。给隔离一个上限(约1秒), 到点强制解除,
+               让"按住不动也要休眠"(下面的"只有坐标变化才保活")重新生效。 */
+            if (++s_game_wait_frames >= 60) {
+                s_game_wait_release = 0;
+                s_game_release_count = 0;
+                s_game_wait_frames = 0;
+                s_game_last_activity_us = now;
+            }
             return 1;
         }
         if (++s_game_release_count < 2) return 1;
         s_game_wait_release = 0;
         s_game_release_count = 0;
+        s_game_wait_frames = 0;
         s_game_last_activity_us = now;
         return 1;
     }
@@ -248,7 +268,15 @@ static uint8_t GameAutoSleep_AfterTouch(void)
         static uint8_t  s_last_pressed = 0;
         static uint16_t s_last_x = 0, s_last_y = 0;
         if (ts.pressed && (s_settings_mode != SETTINGS_NONE || is_game || s_video_menu_visible || s_video_menu_dragging || s_menu_dragging)) {
-            if (ts.x != s_last_x || ts.y != s_last_y) {
+            /* ★ 用 3px 死区而不是"逐像素不等": 触摸IC静止死区只滤掉±1, 长按时±2的抖动
+               (或手指接触状态的缓慢微调)会被当成"手指在动"→ 每帧刷新计时器 →
+               "按住不动也要休眠"永远触发不了(到时间也不休眠)。
+               3px 以内视为没动, 既不影响拖动(拖动每帧远超3px), 又能让长按正常休眠。 */
+            uint16_t dx = (ts.x > s_last_x) ? (uint16_t)(ts.x - s_last_x)
+                                            : (uint16_t)(s_last_x - ts.x);
+            uint16_t dy = (ts.y > s_last_y) ? (uint16_t)(ts.y - s_last_y)
+                                            : (uint16_t)(s_last_y - ts.y);
+            if (dx >= GAME_SLEEP_MOVE_DEADZONE || dy >= GAME_SLEEP_MOVE_DEADZONE) {
                 s_game_last_activity_us = now;   /* 坐标变化才保活 */
             }
             s_last_x = ts.x;
@@ -663,6 +691,16 @@ static uint8_t Main_HandleTouchInput(void)
         else if (++s_wake_release_count >= 2) {
             s_wake_wait_release = 0;
             s_wake_release_count = 0;
+            s_wake_wait_frames = 0;
+            s_touch_down = 0;
+        }
+        /* ★ 兜底超时: 解除隔离的唯一条件是"连续2帧读到松开", 若触摸IC异常时一直报"按下"
+           (残留包/I2C故障), 这个条件永远不成立 → 隔离永不解除 → 本函数每帧直接return,
+           所有触摸被吞掉, 屏幕彻底没反应。故给隔离一个上限: 最多约1秒(60帧)后无条件放开。 */
+        if (s_wake_wait_release && ++s_wake_wait_frames >= 60) {
+            s_wake_wait_release = 0;
+            s_wake_release_count = 0;
+            s_wake_wait_frames = 0;
             s_touch_down = 0;
         }
         return 1;
@@ -1709,6 +1747,7 @@ int main(void) {
         end_flag = 0;
         s_wake_wait_release = 1;
         s_wake_release_count = 0;
+        s_wake_wait_frames = 0;
     }
     IWDG_Init();//初始化独立看门狗
 #endif

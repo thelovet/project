@@ -68,6 +68,10 @@ static uint16_t g_touch_pending_raw_x = 0;
 static uint16_t g_touch_pending_raw_y = 0;
 static uint8_t g_touch_have_valid_sample = 0;
 static uint8_t g_touch_have_pending_sample = 0;
+/* 1=本次启动是"待机触摸唤醒", Touch_WakeResumeInit() 已经正确复位过一次 IC */
+static uint8_t s_wake_resumed = 0;
+/* 连续I2C读失败计数(兜底自愈用) */
+static uint16_t s_i2c_fail_cnt = 0;
 
 /**
  * @brief 待机唤醒后恢复软件I2C和触摸输入，但不复位CST816S
@@ -120,6 +124,8 @@ void Touch_WakeResumeInit(void)
     g_touch_pressed = 0;
     g_touch_have_valid_sample = 0;
     g_touch_have_pending_sample = 0;
+    s_wake_resumed = 1;      /* 已复位过 IC, Touch_Init 里不必再拉低 RST */
+    s_i2c_fail_cnt = 0;
 }
 
 /**
@@ -455,6 +461,33 @@ void Touch_WaitWakeInputsReleased(void)
 
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB, ENABLE);
 
+    /*
+     * ★ 待机前先复位一次触摸IC —— 本函数是"等用户松手"的循环, 而只要用户一直按着屏幕,
+     * IC 就会持续上报、INT 持续为低, 循环会永远等不到释放 → 卡死在待机流程里
+     * (现象: 背光已关却不进待机, 松手才睡; 循环里一直在喂狗, IWDG 也救不了)。
+     * 复位后 IC 回到刚启动的状态, 不再主动产生点报告, 循环第一次判断即视为"已释放"。
+     * 这也正是"休眠时手指就一直按着"能正常到点休眠的原因(唤醒流程里已复位过一次)。
+     * 两种 IC 都要做, 只是复位脉宽要求不同。
+     */
+    {
+        GPIO_InitTypeDef rst = {0};
+        rst.GPIO_Pin   = TOUCH_RST_PIN;
+        rst.GPIO_Mode  = GPIO_Mode_Out_PP;
+        rst.GPIO_Speed = GPIO_Speed_2MHz;
+        GPIO_Init(TOUCH_RST_PORT, &rst);
+        GPIO_ResetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
+#if TOUCH_IC_IT7259
+        /* IT7259: 脉宽必须 <1ms —— 手册7章"RST 低脉冲>1ms 进 sleep(0.1uA)":
+           那是彻底停机, 点屏幕也唤不醒 */
+        Delay_Us(100);
+#else
+        /* CST816S: 低电平脉宽要求较宽(沿用 Touch_Init 的复位时序) */
+        Delay_Ms(10);
+#endif
+        GPIO_SetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
+        Delay_Ms(100);
+    }
+
     gpio.GPIO_Pin = TOUCH_INT_PIN;
     gpio.GPIO_Mode = GPIO_Mode_IPU;
     GPIO_Init(TOUCH_INT_PORT, &gpio);
@@ -500,7 +533,14 @@ void Touch_WaitWakeInputsReleased(void)
 #endif
 
         if (touch_released
-            && GPIO_ReadInputDataBit(TOUCH_INT_PORT, TOUCH_INT_PIN) == Bit_SET) {
+#if TOUCH_IC_IT7259
+            /* IT7259: INT 只在有事件时拉低, 可作"无触摸"的旁证 */
+            && GPIO_ReadInputDataBit(TOUCH_INT_PORT, TOUCH_INT_PIN) == Bit_SET
+#else
+            /* CST816S: 0xFA=0x40 配的是"周期产生中断", 按住期间 INT 会周期性拉低,
+               拿它当"是否释放"的判据会把计数反复清零 → 只看手指数寄存器 */
+#endif
+           ) {
             stable_count++;
         } else {
             stable_count = 0;
@@ -705,10 +745,19 @@ void Touch_Init(void)
        - IT7259 : 复位脉宽须 <1ms (手册7章: 低电平脉宽>1ms 会使芯片进sleep模式),
                   故低电平只保持100us, 拉高后再等100ms */
 #if TOUCH_IC_IT7259
-    GPIO_ResetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
-    Delay_Us(100);
+    /* ★ IT7259 的 RST 低脉冲必须 <1ms(手册7章): >1ms 会让芯片进 sleep(0.1uA) —— 彻底停机,
+       I2C 不再应答、INT 不再输出, 症状正是"唤醒后触摸没反应, 之后点屏幕也唤不醒"。
+       而 Delay_Us 是 SysTick 忙等、会被中断打断, 偶发冲过 1ms(唤醒时 TIMER2/LCD DMA 中断
+       都已使能) → 这就是"有时候"的来源。
+       待机触摸唤醒路径上 Touch_WakeResumeInit() 已经做过一次正确复位(那时中断还没使能),
+       这里不再重复拉低, 只把 RST 保持高电平让芯片跑起来。 */
+    if (!s_wake_resumed) {
+        GPIO_ResetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
+        Delay_Us(100);
+    }
     GPIO_SetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
     Delay_Ms(100);
+    s_wake_resumed = 0;
 #else
     GPIO_ResetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
     Delay_Ms(10);
@@ -923,8 +972,20 @@ uint8_t Touch_IsPressed(void)
         if (got < 0)
         {
             /* I2C读失败: 状态未知, 保持原状态(否则误判抬手, 拖动一卡一卡) */
+            /* ★ 兜底自愈: 连续失败(每次轮询+1)说明 IC 通信已经坏掉 —— 例如被复位脉冲
+               弄进 sleep(见 Touch_Init 的说明)。这里主动重新初始化一次, 不必等用户重启设备;
+               否则通信一坏就坏到底, 表现就是"触摸彻底没反应"。 */
+            if (++s_i2c_fail_cnt >= 120)
+            {
+                s_i2c_fail_cnt = 0;
+                s_no_point_cnt = 0;
+                g_triggered = 0;
+                g_touch_pressed = 0;
+                Touch_Init();
+            }
             return 0;
         }
+        s_i2c_fail_cnt = 0;
         if (got == 0)
         {
             /* 无点: 连续2次才判抬手(报点间隙/空包会误判断触) */
