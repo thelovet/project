@@ -896,16 +896,20 @@ void VideoChunkStore_BurnAll(void)
 #endif /* VIDEO_CHUNK_STORE_MODE */
 
 /* ================================================================
- * 英文版推箱子按钮图 + 菜单"游戏名"汉字字模 烧录 (BTN_IMG_STORE_MODE)
+ * 英文版推箱子按钮图 + 撤销界面按钮图 + 菜单追加字模 烧录 (BTN_IMG_STORE_MODE)
  * ----------------------------------------------------------------
- * 只写外部 Flash 的固定保留区 BTN_IMG_EN_ADDR:
- *   [3 张英文按钮图 5580B][10 个 24x24 汉字字模 720B] = 6300B
- * 不碰字库资源区、不碰目录 → 加/换这两样都不需要重烧字库。
- * 进度: 擦除 0~10%、写入 10~90%、回读校验 90~100%, 完成后常驻 100%。
+ * 只写外部 Flash 的固定保留区(不碰字库资源区、不碰目录):
+ *   1) [3 张英文按钮图 5580B]                      → BTN_IMG_EN_ADDR
+ *   2) [撤销按钮图 中文套 5580B]                   → BTN_IMG_UNDO_CN_ADDR
+ *   3) [撤销按钮图 英文套 5580B]                   → BTN_IMG_UNDO_EN_ADDR
+ *   4) [14 个 24x24 汉字字模 1008B]                → 字库数据区紧前面
+ * 四块都不进资源表/目录 → 加/换它们都不需要重烧字库。
+ * 进度: 擦除 0~10%、写入 10~85%、回读校验 85~100%, 完成后常驻 100%。
  * ================================================================ */
 #ifdef BTN_IMG_STORE_MODE
 #include "sok_img_prev.h"      /* g_btn_img_en[]: 三张英文按钮图连在一起 */
-#include "chinese_fonts.h"     /* g_menu_glyph_ext[]: 菜单游戏名用的 10 个汉字 */
+#include "sok_img_undo.h"      /* g_btn_img_undo_cn[]/en[]: 撤销按钮图中英各三张 */
+#include "chinese_fonts.h"     /* g_menu_glyph_ext[]: 菜单追加的 14 个汉字 */
 
 #define BTN_PROG_MAGIC   0x42544E31u   /* 'B','T','N','1' */
 
@@ -939,18 +943,29 @@ void BtnImgStore_BurnAll(void)
     if (have_glyph) glyph_addr = flash_store_glyph_addr_from(s_data_start);
 
     g_btn_prog.magic  = BTN_PROG_MAGIC;
-    g_btn_prog.size   = (uint32_t)BTN_IMG_EN_SIZE + (have_glyph ? (uint32_t)MENU_GLYPH_SIZE : 0UL);
+    g_btn_prog.size   = (uint32_t)BTN_IMG_EN_SIZE + (uint32_t)BTN_IMG_UNDO_SIZE * 2UL
+                        + (have_glyph ? (uint32_t)MENU_GLYPH_SIZE : 0UL);
     g_btn_prog.pct    = 0;
     g_btn_prog.result = 0;
 
     flash_store_ui_init();
     flash_store_ui_update(0);
 
-    /* 1. 擦除: 按钮保留区覆盖的扇区(2个) + 字模那一小块所在扇区(在字库区之前, 独立扇区) */
+    /* 1. 擦除: 三块按钮保留区覆盖的扇区(各2个) + 字模那一小块所在扇区(在字库区之前, 独立扇区) */
     {
         uint32_t start = BTN_IMG_EN_ADDR & ~(uint32_t)4095;
         uint32_t end   = (BTN_IMG_EN_ADDR + BTN_IMG_EN_SIZE + 4095u) & ~(uint32_t)4095;
         uint32_t addr;
+        for (addr = start; addr < end; addr += 4096) {
+            flash_store_erase_sector(addr);
+        }
+        start = BTN_IMG_UNDO_CN_ADDR & ~(uint32_t)4095;
+        end   = (BTN_IMG_UNDO_CN_ADDR + BTN_IMG_UNDO_SIZE + 4095u) & ~(uint32_t)4095;
+        for (addr = start; addr < end; addr += 4096) {
+            flash_store_erase_sector(addr);
+        }
+        start = BTN_IMG_UNDO_EN_ADDR & ~(uint32_t)4095;
+        end   = (BTN_IMG_UNDO_EN_ADDR + BTN_IMG_UNDO_SIZE + 4095u) & ~(uint32_t)4095;
         for (addr = start; addr < end; addr += 4096) {
             flash_store_erase_sector(addr);
         }
@@ -967,28 +982,42 @@ void BtnImgStore_BurnAll(void)
             if (n > 4096) n = 4096;
             flash_store_write(g_btn_img_en + written, BTN_IMG_EN_ADDR + written, n);
             written += n;
-            g_btn_prog.pct = (uint8_t)(10 + 60UL * written / BTN_IMG_EN_SIZE);
+            g_btn_prog.pct = (uint8_t)(10 + 25UL * written / BTN_IMG_EN_SIZE);
             flash_store_ui_update((uint8_t)g_btn_prog.pct);
         }
     }
 
-    /* 3. 写入菜单游戏名汉字 (720B) */
+    /* 3. 写入撤销按钮图(中文套 + 英文套) */
+    {
+        uint32_t written = 0;
+        while (written < BTN_IMG_UNDO_SIZE) {
+            uint32_t n = BTN_IMG_UNDO_SIZE - written;
+            if (n > 4096) n = 4096;
+            flash_store_write(g_btn_img_undo_cn + written, BTN_IMG_UNDO_CN_ADDR + written, n);
+            flash_store_write(g_btn_img_undo_en + written, BTN_IMG_UNDO_EN_ADDR + written, n);
+            written += n;
+            g_btn_prog.pct = (uint8_t)(35 + 45UL * written / BTN_IMG_UNDO_SIZE);
+            flash_store_ui_update((uint8_t)g_btn_prog.pct);
+        }
+    }
+
+    /* 4. 写入菜单追加字模 (1008B) */
     if (have_glyph) {
         uint32_t written = 0;
         while (written < MENU_GLYPH_SIZE) {
             uint32_t n = MENU_GLYPH_SIZE - written;
             flash_store_write(g_menu_glyph_ext + written, glyph_addr + written, n);
             written += n;
-            g_btn_prog.pct = (uint8_t)(70 + 15UL * written / MENU_GLYPH_SIZE);
+            g_btn_prog.pct = (uint8_t)(80 + 5UL * written / MENU_GLYPH_SIZE);
             flash_store_ui_update((uint8_t)g_btn_prog.pct);
         }
     }
 
-    /* 4. 回读校验: 两小块分别与固件里的源数据比 CRC16 */
+    /* 5. 回读校验: 四小块分别与固件里的源数据比 CRC16 */
     {
         uint8_t  rbuf[64];
-        uint16_t c1 = 0xFFFF, c2 = 0xFFFF;
-        uint16_t s1, s2 = 0xFFFF;
+        uint16_t c1 = 0xFFFF, c2 = 0xFFFF, c3 = 0xFFFF, c4 = 0xFFFF;
+        uint16_t s1, s2, s3, s4 = 0xFFFF;
         uint32_t i;
         uint8_t  ok;
 
@@ -998,7 +1027,18 @@ void BtnImgStore_BurnAll(void)
             uint16_t j;
             flash_store_read(rbuf, BTN_IMG_EN_ADDR + i, n);
             for (j = 0; j < n; j++) c1 = flash_store_crc16_update(c1, rbuf[j]);
-            g_btn_prog.pct = (uint8_t)(85 + 8UL * i / BTN_IMG_EN_SIZE);
+            g_btn_prog.pct = (uint8_t)(85 + 5UL * i / BTN_IMG_EN_SIZE);
+            flash_store_ui_update((uint8_t)g_btn_prog.pct);
+        }
+        for (i = 0; i < BTN_IMG_UNDO_SIZE; i += (uint32_t)sizeof(rbuf)) {
+            uint32_t left = BTN_IMG_UNDO_SIZE - i;
+            uint16_t n = (left > sizeof(rbuf)) ? (uint16_t)sizeof(rbuf) : (uint16_t)left;
+            uint16_t j;
+            flash_store_read(rbuf, BTN_IMG_UNDO_CN_ADDR + i, n);
+            for (j = 0; j < n; j++) c2 = flash_store_crc16_update(c2, rbuf[j]);
+            flash_store_read(rbuf, BTN_IMG_UNDO_EN_ADDR + i, n);
+            for (j = 0; j < n; j++) c3 = flash_store_crc16_update(c3, rbuf[j]);
+            g_btn_prog.pct = (uint8_t)(90 + 5UL * i / BTN_IMG_UNDO_SIZE);
             flash_store_ui_update((uint8_t)g_btn_prog.pct);
         }
         if (have_glyph) {
@@ -1007,12 +1047,14 @@ void BtnImgStore_BurnAll(void)
                 uint16_t n = (left > sizeof(rbuf)) ? (uint16_t)sizeof(rbuf) : (uint16_t)left;
                 uint16_t j;
                 flash_store_read(rbuf, glyph_addr + i, n);
-                for (j = 0; j < n; j++) c2 = flash_store_crc16_update(c2, rbuf[j]);
+                for (j = 0; j < n; j++) c4 = flash_store_crc16_update(c4, rbuf[j]);
             }
-            s2 = flash_store_crc16(g_menu_glyph_ext, MENU_GLYPH_SIZE);
+            s4 = flash_store_crc16(g_menu_glyph_ext, MENU_GLYPH_SIZE);
         }
         s1 = flash_store_crc16(g_btn_img_en, BTN_IMG_EN_SIZE);
-        ok = ((c1 == s1) && (c2 == s2)) ? 1 : 0;
+        s2 = flash_store_crc16(g_btn_img_undo_cn, BTN_IMG_UNDO_SIZE);
+        s3 = flash_store_crc16(g_btn_img_undo_en, BTN_IMG_UNDO_SIZE);
+        ok = ((c1 == s1) && (c2 == s2) && (c3 == s3) && (c4 == s4)) ? 1 : 0;
 
         g_btn_prog.pct    = 100;
         g_btn_prog.result = ok ? 1 : 2;

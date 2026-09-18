@@ -3,29 +3,36 @@
 
 #include <stdint.h>
 
-// å›¾åƒå°ºå¯¸: 30x30 åƒç´ 
-// é¢œè‰²æ ¼å¼: RGB565 (16ä½è¾“å‡º)
-// å­—èŠ‚åº: å°ç«¯åº
+// Í¼Ïñ³ß´ç: 30x30 ÏñËØ
+// ÑÕÉ«¸ñÊ½: RGB565 (16Î»Êä³ö)
+// ×Ö½ÚĞò: Ğ¡¶ËĞò
 #define PREV_IMG_W  30
 #define PREV_IMG_H  31
 
 /**
- * @brief  ç»˜åˆ¶ä¸Šä¸€å…³å›¾æ ‡(è·³è¿‡ç™½è‰²èƒŒæ™¯, å åŠ æ˜¾ç¤º)
- * @param  x  å·¦ä¸Šè§’Xåæ ‡
- * @param  y  å·¦ä¸Šè§’Yåæ ‡
+ * @brief  »æÖÆÉÏÒ»¹ØÍ¼±ê(Ìø¹ı°×É«±³¾°, µş¼ÓÏÔÊ¾)
+ * @param  x  ×óÉÏ½ÇX×ø±ê
+ * @param  y  ×óÉÏ½ÇY×ø±ê
  */
 extern const uint16_t sok_img_prev[PREV_IMG_W * PREV_IMG_H];
 
 void sok_prev_draw(uint16_t x, uint16_t y);
 void sok_nav_draw_rgb565(uint16_t x, uint16_t y, const uint16_t *image);
 
-/* è‹±æ–‡æ¨¡å¼ä¸‹çš„"ä¸Šä¸€å…³"æŒ‰é’®(å†…å®¹ä¸åŒ, å°ºå¯¸ä¸ä¸­æ–‡é‚£å¥—å®Œå…¨ç›¸åŒ)
-   èµ„æº ID: FLASH_STORE_ID_IMG_PREV_EN */
+/**
+ * @brief  »æÖÆ°´Å¥Í¼²¢Ö¸¶¨ÕûÊıËõ·Å±¶ÂÊ
+ * @param  scale  1=30x31(³·Ïú½çÃæ°´Å¥), 2=60x62(Ò»¼¶°´Å¥×é), 0 ÊÓ×÷ 1
+ */
+void sok_nav_draw_rgb565_scaled(uint16_t x, uint16_t y, const uint16_t *image,
+                                uint8_t scale);
+
+/* Ó¢ÎÄÄ£Ê½ÏÂµÄ"ÉÏÒ»¹Ø"°´Å¥(ÄÚÈİ²»Í¬, ³ß´çÓëÖĞÎÄÄÇÌ×ÍêÈ«ÏàÍ¬)
+   ×ÊÔ´ ID: FLASH_STORE_ID_IMG_PREV_EN */
 extern const uint16_t sok_img_prev_en[PREV_IMG_W * PREV_IMG_H];
 
 #ifdef BTN_IMG_STORE_MODE
-/* ä¸‰å¼ è‹±æ–‡æŒ‰é’®å›¾(ä¸Šä¸€å…³/ä¸‹ä¸€å…³/é‡æ–°å¼€å§‹), æ¯å¼  30x31 RGB565 å°ç«¯(è§ flash_store.c
-   çš„ BtnImgStore_BurnAll; ä¿ç•™åŒºåœ°å€/å¸ƒå±€è§ flash_store.h çš„ BTN_IMG_EN_*) */
+/* ÈıÕÅÓ¢ÎÄ°´Å¥Í¼(ÉÏÒ»¹Ø/ÏÂÒ»¹Ø/ÖØĞÂ¿ªÊ¼), Ã¿ÕÅ 30x31 RGB565 Ğ¡¶Ë(¼û flash_store.c
+   µÄ BtnImgStore_BurnAll; ±£ÁôÇøµØÖ·/²¼¾Ö¼û flash_store.h µÄ BTN_IMG_EN_*) */
 extern const uint8_t g_btn_img_en[PREV_IMG_W * PREV_IMG_H * 2 * 3];
 #endif
 

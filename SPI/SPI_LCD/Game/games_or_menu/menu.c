@@ -26,14 +26,14 @@
 /* ---- 菜单字体缓存/行类型常量 (集中置顶) ---- */
 /* 菜单24x24字库: 从外部Flash整体读入RAM缓存(条带渲染需逐行随机访问)
    槽位 0~21 = 资源ID 0~21(常用汉字); 槽位 22/23 = "语/言"(资源ID 115/116, 见 MENU_FONT_SLOT) */
-#define MENU_FONT_SLOTS  36   /* 0~23 原有(含语/言) + 24~35 游戏名追加的 12 个字(外部保留区) */
+#define MENU_FONT_SLOTS  38   /* 0~23 原有(含语/言) + 24~37 菜单追加的 14 个字(外部保留区) */
 static uint8_t s_menu_fonts[MENU_FONT_SLOTS * 72];
 static uint8_t s_menu_fonts_ok = 0;
 static uint8_t s_fonts_lang = 0xFF;   /* 缓存里装的是哪套字: 0=中文, 1=英文 */
 
 /* 资源ID → 缓存槽位:
    0~21 原样; 语(115)/言(116) 顺延到 22/23;
-   游戏名追加的 10 个字(虚ID 128~137, 字模存外部Flash保留区) 放 24~33 */
+   追加的 14 个字(虚ID 128~141, 字模存外部Flash保留区) 放 24~37 */
 #define MENU_EXT_SLOT     24
 #define MENU_FONT_SLOT(id)  ((uint8_t)(((id) >= MENU_EXT_ID_BASE) \
                             ? (MENU_EXT_SLOT + ((id) - MENU_EXT_ID_BASE)) \
@@ -55,6 +55,7 @@ static const uint8_t s_fonts_fkxx_id[4] = { MENU_EXT_ID_FANG, MENU_EXT_ID_KUAI, 
 static const uint8_t s_fonts_hrd_id[3]  = { MENU_EXT_ID_HUA, MENU_EXT_ID_RONG, MENU_EXT_ID_DAO };                         /* 华容道 */
 static const uint8_t s_fonts_dyxy_id[4] = { MENU_EXT_ID_DA, MENU_EXT_ID_YU, MENU_EXT_ID_XIAO, MENU_EXT_ID_YU };           /* 大鱼小鱼 */
 static const uint8_t s_fonts_fkhb_id[4] = { MENU_EXT_ID_FANG, MENU_EXT_ID_KUAI, MENU_EXT_ID_HE, MENU_EXT_ID_BING };       /* 方块合并 */
+static const uint8_t s_fonts_cx2_id[2]  = { MENU_EXT_ID_CHE,  MENU_EXT_ID_XIAO3 };                                          /* 撤销(推箱子二级菜单) */
 
 /* 双语行文字表: 中文=字模ID数组(24宽全宽字), 英文=ASCII串(16宽半宽字, 见 chinese_fonts.h)
    英文为 0 的行表示语言无关(2048数字行/图标行), 不在此表里 */
@@ -80,6 +81,7 @@ static const MenuRowText s_row_text[MENU_ROW_MAX + 1] = {
     [MENU_ROW_TETRIS]   = { s_fonts_fkxx_id,     "Tetris",   4 },
     [MENU_ROW_KLOTSKI]  = { s_fonts_hrd_id,      "Klotski",  3 },
     [MENU_ROW_FISH]     = { s_fonts_dyxy_id,     "Big Fish", 4 },
+    [MENU_ROW_CHEXIAO]  = { s_fonts_cx2_id,      "Step Back", 2 },   /* 撤销 (推箱子二级菜单) */
 };
 /* 主菜单行类型 (供 main_menu_draw / main_menu_draw_frame_only 共用, 布局一致) */
 static const uint8_t g_main_menu_row_types[5] = {
@@ -742,7 +744,8 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
                 case MENU_ROW_FANHUI:
                 case MENU_ROW_TETRIS:      /* 这几个行(俄罗斯方块/华容道/鱼)改成中英文字, */
                 case MENU_ROW_KLOTSKI:     /* 不再画图标: 中文用追加字模(外部保留区), */
-                case MENU_ROW_FISH: {      /* 英文用半宽拉丁字, 与 Sokoban/Video 一致 */
+                case MENU_ROW_FISH:        /* 英文用半宽拉丁字, 与 Sokoban/Video 一致 */
+                case MENU_ROW_CHEXIAO: {
                     const MenuRowText* rt = (row_types[i] <= MENU_ROW_MAX)
                         ? &s_row_text[row_types[i]] : 0;
                     if (!rt) break;

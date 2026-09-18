@@ -119,7 +119,8 @@ typedef struct {
 #define MENU_ROW_PMFX     10  /* "屏幕方向" 4字 */
 #define MENU_ROW_SHEZHI   11  /* "设置" 2字 */
 #define MENU_ROW_YYSH     12  /* "语言设置" 4字 */
-#define MENU_ROW_MAX      12  /* 行类型最大值(双语文字表用) */
+#define MENU_ROW_CHEXIAO  13  /* "撤销" 2字 (推箱子二级菜单) */
+#define MENU_ROW_MAX      13  /* 行类型最大值(双语文字表用) */
 
 /* ================= 常量: 返回值/命令 ================= */
 

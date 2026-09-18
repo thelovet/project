@@ -170,6 +170,20 @@ typedef enum {
 #define BTN_IMG_EN_NEXT     BTN_IMG_EN_ONE
 #define BTN_IMG_EN_RESTART  (BTN_IMG_EN_ONE * 2UL)
 
+/* ---- 撤销界面的 3 个按钮图 (上一步/返回/下一步, 中英各一套) ----
+   和上面英文按钮图走完全相同的路子(固定保留区 + BTN_IMG_STORE_MODE 单独烧):
+   ★ 中文这套也**不能**进资源表 —— 字库固件只余 316B, 而一套 3 张 = 5580B。
+   布局: [上一步][返回][下一步], 每张 30x31 RGB565 小端 = 1860 字节。
+   运行期按 g_language_index 选基地址, 再用下面的偏移取图(见 sokoban.c)。
+   两块都是 4KB 对齐, 且 0x602000+5580 < 0x604000, 不会互相覆盖。 */
+#define BTN_IMG_UNDO_ONE     1860UL                    /* 单张字节数 (30*31*2) */
+#define BTN_IMG_UNDO_SIZE    (BTN_IMG_UNDO_ONE * 3UL)  /* 一套 3 张 = 5580 */
+#define BTN_IMG_UNDO_PREV    0UL                       /* 上一步 */
+#define BTN_IMG_UNDO_BACK    BTN_IMG_UNDO_ONE          /* 返回 */
+#define BTN_IMG_UNDO_NEXT    (BTN_IMG_UNDO_ONE * 2UL)  /* 下一步 */
+#define BTN_IMG_UNDO_CN_ADDR 0x00602000UL              /* 中文套保留区(4KB对齐) */
+#define BTN_IMG_UNDO_EN_ADDR 0x00604000UL              /* 英文套保留区(4KB对齐) */
+
 /* 菜单"游戏名"用的汉字字模 (见 chinese_fonts.h 的 MENU_EXT_ID_*):
    放在**字库数据区紧前面**(与字库同一个区), 地址 = (data_start 向下取整到 4KB) - MENU_GLYPH_SIZE。
    这样它落在"全量烧字库"的擦除范围(从 data_start 所在扇区起到芯片末尾)之外,
@@ -177,8 +191,8 @@ typedef enum {
    ★ 字库资源总量变化(data_start 移动)后, 必须重烧这一块。
    读取接口 FlashStore_MenuGlyphRead() 内部按目录头里的 data_start 现算地址。 */
 #define MENU_GLYPH_ONE    72UL                                  /* 单字 24x24 1bpp */
-#define MENU_GLYPH_CNT    12UL                                  /* 方块消行/华容道/大鱼小鱼/合并 */
-#define MENU_GLYPH_SIZE   (MENU_GLYPH_ONE * MENU_GLYPH_CNT)     /* 864 字节 */
+#define MENU_GLYPH_CNT    14UL                                  /* 方块消行/华容道/大鱼小鱼/合并 + 撤销 */
+#define MENU_GLYPH_SIZE   (MENU_GLYPH_ONE * MENU_GLYPH_CNT)     /* 1008 字节 */
 
 /* ================================================================
  * 接口
@@ -191,16 +205,17 @@ typedef enum {
 void FlashStore_BurnAll(void);
 
 /**
- * @brief  英文版按钮图 + 菜单游戏名汉字 烧录 (BTN_IMG_STORE_MODE)
- * @note   写两小块, 都不碰字库资源区/目录, 所以不用重烧字库:
+ * @brief  英文版按钮图 + 撤销界面按钮图 + 菜单字模 烧录 (BTN_IMG_STORE_MODE)
+ * @note   写三小块, 都不碰字库资源区/目录, 所以不用重烧字库:
  *         1) 英文按钮图 5580B → 固定保留区 BTN_IMG_EN_ADDR
- *         2) 菜单游戏名 10 个汉字 720B → 字库数据区紧前面(见 MENU_GLYPH_SIZE 注释)
+ *         2) 撤销按钮图(中英各 5580B) → BTN_IMG_UNDO_CN_ADDR / BTN_IMG_UNDO_EN_ADDR
+ *         3) 菜单追加字模(14 个汉字 1008B) → 字库数据区紧前面(见 MENU_GLYPH_SIZE 注释)
  *         擦除+写入+CRC回读校验, 完成常驻显示100%; 本函数不返回。
  */
 void BtnImgStore_BurnAll(void);
 
 /**
- * @brief  读取"菜单游戏名"追加字模 (10 个 24x24 汉字, 共 MENU_GLYPH_SIZE 字节)
+ * @brief  读取"菜单"追加字模 (14 个 24x24 汉字, 共 MENU_GLYPH_SIZE 字节)
  * @param  buf 目标缓冲(至少 MENU_GLYPH_SIZE 字节)
  * @return 1=读取完成(没烧过时内容是 0xFF, 字不显示, 其它功能不受影响)
  * @note   地址按目录头里的 data_start 现算: (data_start 向下取整 4KB) - MENU_GLYPH_SIZE

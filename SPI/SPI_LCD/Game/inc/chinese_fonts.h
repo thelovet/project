@@ -35,17 +35,17 @@ extern const uint8_t font_xiang2[72];
 extern const uint8_t font_yu[72];   /* 鱼(主菜单小鱼图标, 直接放内部Flash) */
 
 /**
- * @brief 菜单"游戏名"追加汉字 (24x24, 72字节/字, 共 12 个字)
- *        顺序(即 g_menu_glyph_ext 里字节的排列): 方 块 消 行 | 华 容 道 | 鱼 大 小 | 合 并
- * @note  这 12 个字不进资源表也不放内部 Flash:
- *        字库固件内部 Flash 只剩几百 B 装不下(12*72=864B), 而改资源表就要重烧整个字库。
+ * @brief 菜单"游戏名"+撤销 追加汉字 (24x24, 72字节/字, 共 14 个字)
+ *        顺序(即 g_menu_glyph_ext 里字节的排列): 方 块 消 行 | 华 容 道 | 鱼 大 小 | 合 并 | 撤 销
+ * @note  这 14 个字不进资源表也不放内部 Flash:
+ *        字库固件内部 Flash 只剩几百 B 装不下, 而改资源表就要重烧整个字库。
  *        所以和英文按钮图一样由 BTN_IMG_STORE_MODE 单独烧一次, 存在"字库数据区紧前面"
  *        的那一小块(MENU_GLYPH_SIZE), 游戏固件也不占空间(只在中文模式下载入字模缓存)。
  *        虚 ID 从 128 起(资源 ID 最大 127, 不会冲突), 槽位换算见 menu.c 的 MENU_FONT_SLOT。
- *        ★ 顺序不能改: 现有 10 个字的字节位置必须保持不变(加字只能往后追加)
+ *        ★ 顺序不能改: 现有 12 个字的字节位置必须保持不变(加字只能往后追加)
  */
 #define MENU_EXT_ID_BASE   128
-#define MENU_EXT_CNT       12
+#define MENU_EXT_CNT       14
 #define MENU_EXT_ID_FANG   (MENU_EXT_ID_BASE + 0)   /* 方 */
 #define MENU_EXT_ID_KUAI   (MENU_EXT_ID_BASE + 1)   /* 块 */
 #define MENU_EXT_ID_XIAO2  (MENU_EXT_ID_BASE + 2)   /* 消 */
@@ -58,8 +58,10 @@ extern const uint8_t font_yu[72];   /* 鱼(主菜单小鱼图标, 直接放内�
 #define MENU_EXT_ID_XIAO   (MENU_EXT_ID_BASE + 9)   /* 小 */
 #define MENU_EXT_ID_HE     (MENU_EXT_ID_BASE + 10)  /* 合 */
 #define MENU_EXT_ID_BING   (MENU_EXT_ID_BASE + 11)  /* 并 */
+#define MENU_EXT_ID_CHE    (MENU_EXT_ID_BASE + 12)  /* 撤 */
+#define MENU_EXT_ID_XIAO3  (MENU_EXT_ID_BASE + 13)  /* 销 */
 
-extern const uint8_t g_menu_glyph_ext[864];
+extern const uint8_t g_menu_glyph_ext[1008];
 
 /**
  * @brief 24x24 追加汉字 "语言设置"页用 (语 言) + 子页选项 (中 文)
