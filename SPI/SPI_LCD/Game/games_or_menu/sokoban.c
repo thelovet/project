@@ -644,6 +644,7 @@ void sokoban_full_redraw(void) {
  */
 void sokoban_menu_settings_restore(void) {
     s_menu_visible = 1;
+    s_menu_slide_y = SOK_BTN_Y;   /* 复位滑动位置: 电池恢复按面板上缘裁剪, 别用二级菜单的旧值 */
     /* 局部恢复(参照按钮面板退出/下划打断做法): 只清设置条带覆盖区(y>=VIDEO_MENU_Y)重绘图格,
        再画按钮面板, 不全屏重绘(会闪)。设置条带覆盖 y=52~240, 故从 VIDEO_MENU_Y 清起。 */
     LCD_Fill(0, VIDEO_MENU_Y, 239, 239, LCD_BLACK);
@@ -659,6 +660,7 @@ void sokoban_menu_settings_restore(void) {
  */
 void sokoban_menu_settings_restore_full(void) {
     s_menu_visible = 1;
+    s_menu_slide_y = SOK_BTN_Y;   /* 复位滑动位置: 电池恢复按面板上缘裁剪, 别用二级菜单的旧值 */
     sokoban_draw_level(s_current_level);
     sok_redraw_nav_group();
 }
@@ -937,14 +939,16 @@ static void sok_panel_clear_from(int16_t y) {
 
 /**
  * @brief  启动跟手上划(导航按钮组 或 二级菜单, 三处共用: 游戏内上划/一级面板上划/撤销界面上划)
- * @param  kind    0=导航按钮组(停在 SOK_BTN_Y), 1=二级菜单(停在 RESTART_MENU_Y)
+ * @param  kind    0=导航按钮组(停在 SOK_BTN_Y), 1=二级菜单(停在 RESTART_MENU_Y-1)
  * @param  up_move 本次上划的位移(px)
  * @note   与一级按钮面板共用同一套滑动状态(s_menu_sliding/s_menu_slide_y), 靠 s_panel_kind 区分画什么
  */
 static void sok_panel_drag_start(uint8_t kind, int16_t up_move) {
     int16_t y0 = (int16_t)(240 - up_move);
     s_panel_kind = kind;
-    s_panel_rest = (kind == 1) ? RESTART_MENU_Y : SOK_BTN_Y;
+    /* 二级菜单停在 RESTART_MENU_Y-1: 顶边上移1px, 正好盖掉低电图标上边框露在菜单框外的第79行 */
+    s_panel_rest = (kind == 1) ? (RESTART_MENU_Y - 1) : SOK_BTN_Y;
+
     s_slide_max_dy = up_move;
     if (y0 < s_panel_rest) y0 = s_panel_rest;
     s_menu_slide_y = y0;
@@ -956,9 +960,10 @@ static void sok_panel_drag_start(uint8_t kind, int16_t up_move) {
  */
 static void sok_lvl2_clear_frame(void) {
     s_lvl2_visible = 0;
-    LCD_Fill_DMA(RESTART_MENU_X, RESTART_MENU_Y,
+    s_menu_slide_y = 240;   /* 面板已收, 滑动位置复位(电池恢复按面板上缘裁剪, 别用陈旧值) */
+    LCD_Fill_DMA(RESTART_MENU_X, RESTART_MENU_Y - 1,
                  RESTART_MENU_X + RESTART_MENU_W, 240, LCD_BLACK);
-    sok_redraw_grid_below(RESTART_MENU_Y);
+    sok_redraw_grid_below(RESTART_MENU_Y - 1);
 }
 
 /**
@@ -1369,7 +1374,7 @@ static void sokoban_hold_update(void) {
     if (!s_hold_button) {
         Touch_UpdateCoords();
         Touch_Scan(&ts);
-        s_drag_btn = sok_btn_hit_test(ts.x, ts.y);
+        if (s_drag_btn != 4) s_drag_btn = sok_btn_hit_test(ts.x, ts.y);   /* 已作废的手势不复活 */
         if (ts.y > s_btn_max_y) s_btn_max_y = ts.y;
     }
     /* 锁定按住目标, 防手指微移导致计时归零 */
@@ -1416,6 +1421,7 @@ static void sokoban_hold_update(void) {
  * @param  x0,y0,x1,y1  像素矩形范围(不含右/下边界, 与 LCD_Fill 一致)
  */
 static void sok_redraw_battery_tiles(int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
+
     int16_t br_start = ((int16_t)y0 - g_oy) / (int16_t)g_tile_size;
     int16_t br_end = ((int16_t)y1 - g_oy) / (int16_t)g_tile_size;
     int16_t bc_start = ((int16_t)x0 - g_ox) / (int16_t)g_tile_size;
@@ -1488,29 +1494,32 @@ uint8_t sokoban_update(void) {
 
     /* ---- 电池闪灭恢复: 整块刷黑图标(红→黑)+重绘该处瓦片 ---- */
     if (g_sok_dirty) {
+        LCD_ClearLowBatteryOverlay();
+        /* 电池凸点/右边框落在菜单框右缘(x=195)之外, 任何状态都要补 */
+        sok_redraw_battery_tiles(195, 79, 210, 161);
         if (!s_exit_menu_visible) {
-            /* 非菜单: 先把电池图标整块刷黑(红→黑), 再重绘电池区地图瓦片 */
-            LCD_ClearLowBatteryOverlay();
-            sok_redraw_battery_tiles(45, 79, 210, 161);
             /* 重绘UI覆盖层: 二级菜单框(盖住电池区) / 导航按钮 / 通关画面。
                撤销按钮在 y=189 以下, 电池区重绘够不到它, 不用管 */
             if (s_lvl2_visible) {
-                menu_draw_nrow_frame_only(RESTART_MENU_Y, sok_lvl2_row_types, 3);
+                menu_draw_nrow_frame_only(RESTART_MENU_Y - 1, sok_lvl2_row_types, 3);
             }
-            else if (s_menu_visible) {
-                if (s_won) sok_win_draw(65, 120);
-                sok_redraw_nav_group();
+            else {
+                /* 只补面板上缘(s_menu_slide_y, 纯游戏=240)以上露出的电池区: 跟手滑动时面板
+                   上缘每帧都在变, 先补瓦片再由面板盖回去会闪一帧, 面板盖住的部分交给面板 */
+
+                sok_redraw_battery_tiles(45, 79, 195, s_menu_slide_y);
+                if (s_menu_visible) {
+                    if (s_won) sok_win_draw(65, 120);
+                    sok_redraw_nav_group();
+                }
             }
         }
         else {
-            LCD_ClearLowBatteryOverlay();
             /* 退出菜单框(x=45~195)盖住电池主体, 不重绘框内(否则先瓦片后菜单闪一帧);
-               只重绘框右缘外的凸点(x=195~210) + 菜单拖拽中(未盖住电池)框外露出的主体 */
-            sok_redraw_battery_tiles(195, 104, 210, 136);
+               只重绘菜单拖拽中(未盖住电池)框外露出的主体(凸点已在上方补过) */
             {
                 int16_t mb = s_exit_drag_y + MENU_H;   /* 菜单框底部y */
-                if (mb < 79) mb = 79;
-                if (mb <= 161) sok_redraw_battery_tiles(45, mb, 195, 161);
+                sok_redraw_battery_tiles(45, mb, 195, 161);
             }
             menu_draw_nrow_frame_only(s_exit_drag_y, sok_row_types, 5);
         }
@@ -1696,21 +1705,30 @@ uint8_t sokoban_update(void) {
 
             /* 二次上划: 按钮面板已显示时, 再次上划打开二级菜单(撤销/设置/返回)
              * 起手位置与一级按钮一致(最底部窄带 Y > SOK_SWIPE_Y), 距离也用同一个 5px */
-            if (s_menu_cooldown == 0 && s_swipe_origin_y > SOK_SWIPE_Y
+            if (s_menu_cooldown == 0
                 && (int16_t)s_swipe_origin_y - (int16_t)ts.y > MENU_SWIPE_TRIGGER_DIST) {
                 int16_t up_move;
                 Touch_UpdateCoords();
                 Touch_Scan(&ts);
                 up_move = (int16_t)s_swipe_origin_y - (int16_t)ts.y;
                 if (up_move > MENU_SWIPE_TRIGGER_DIST) {
-                    s_hold_button = 0;
-                    s_hold_us = 0;
-                    s_prev_pressed = 1;    /* 按住态, 防下一帧误触 */
-                    /* 局部清除按钮面板区(与按钮面板退出一致): 只清文字窄带 + 按钮带两个小区域,
-                       不全宽/不全屏重绘(会闪)。 */
-                    sok_close_nav_panel();
-                    sok_panel_drag_start(1, up_move);   /* 二级菜单跟手滑入 */
-                    return interacted;
+                    if (s_swipe_origin_y > SOK_SWIPE_Y) {
+                        s_hold_button = 0;
+                        s_hold_us = 0;
+                        s_prev_pressed = 1;    /* 按住态, 防下一帧误触 */
+                        /* 局部清除按钮面板区(与按钮面板退出一致): 只清文字窄带 + 按钮带两个小区域,
+                           不全宽/不全屏重绘(会闪)。 */
+                        sok_close_nav_panel();
+                        sok_panel_drag_start(1, up_move);   /* 二级菜单跟手滑入 */
+                        return interacted;
+                    }
+                    /* 按钮区起手划动>20px: 本手势作废(4) —— 不连跳, 松手也不点击 */
+                    if (up_move > MENU_SWIPE_COMMIT_DIST) {
+                        s_drag_btn = 4;
+                        s_hold_button = 0;   /* 已开始锁定的长按计时也要停, 否则1s后仍会连跳 */
+                        s_hold_us = 0;
+                        return interacted;
+                    }
                 }
             }
             sokoban_hold_update();
