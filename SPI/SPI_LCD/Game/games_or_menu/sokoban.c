@@ -143,6 +143,7 @@ static void sok_redraw_nav_group(void);       /* ÖØ»æÒ»¼¶µ¼º½°´Å¥×é+¹Ø¿¨±àºÅ(¶¨Ò
 static void sok_draw_nav_buttons_at(int16_t y);   /* µ¼º½°´Å¥×é»æÖÆ(¶¨ÒåÔÚÏÂ·½) */
 static void sok_redraw_battery_tiles(int16_t x0, int16_t y0, int16_t x1, int16_t y1); /* °´¾ØĞÎÖØ»æµØÍ¼ÍßÆ¬(¶¨ÒåÔÚÏÂ·½) */
 static void sok_hist_push(uint8_t step);      /* ¼ÇÂ¼Ò»²½³·ÏúÀúÊ·(¶¨ÒåÔÚÏÂ·½) */
+static uint8_t sok_try_open_exit_menu(uint16_t y);  /* ÉÏ·½ÇøÓòÏÂ»¬´ò¿ªÍË³ö²Ëµ¥(ÓÎÏ·ÄÚ/¶ş¼¶²Ëµ¥/³·Ïú½çÃæ¹²ÓÃ) */
 
 /** @brief  ÖØ»æ skip_y ÒÔÏÂµÄÓÎÏ·¸ñ×Ó (0~239), º¬CS¿ØÖÆ */
 static void sok_redraw_grid_below(int16_t y_skip) {
@@ -646,7 +647,7 @@ void sokoban_full_redraw(void) {
  * @note   s_undo_group ÔÚ½øÉèÖÃÇ°¾Í±»ÖÃ 1(³·Ïú½çÃæ->ÉÏ»®¶ş¼¶²Ëµ¥->ÉèÖÃ), ÆÚ¼äÃ»±»Çå¹ı,
  *         ËùÒÔÕâÀï°´ËüÅĞ¶Ï¸Ã»ØÄÄ¸ö½çÃæ
  */
-static void sok_settings_restore_panel(void) {
+static void sok_restore_panel_by_mode(void) {
     if (s_undo_group) {
         s_menu_slide_y = SOK_BTN_Y;   /* µç³Ø»Ö¸´°´Õâ¸öÉÏÔµ²Ã¼ô, ±ğÁô¶ş¼¶²Ëµ¥µÄ¾ÉÖµ */
         s_undo_visible = 1;
@@ -664,7 +665,7 @@ static void sok_settings_restore_panel(void) {
 void sokoban_menu_settings_restore(void) {
     LCD_Fill(0, VIDEO_MENU_Y, 239, 239, LCD_BLACK);
     sok_redraw_grid_below(VIDEO_MENU_Y);
-    sok_settings_restore_panel();
+    sok_restore_panel_by_mode();
 }
 
 /**
@@ -675,7 +676,7 @@ void sokoban_menu_settings_restore(void) {
  */
 void sokoban_menu_settings_restore_full(void) {
     sokoban_draw_level(s_current_level);
-    sok_settings_restore_panel();
+    sok_restore_panel_by_mode();
 }
 
 
@@ -995,13 +996,27 @@ static uint8_t sok_lvl2_update(void) {
     /* ¸ÕÓÉÉÏ»®À­³ö: ±¾´ÎÊÖÊÆÖ»¿´ËÉ¿ª, ²»µ±µã»÷ */
     if (sok_swipe_enter(ts.pressed)) return 0;
 
-    if (!s_prev_pressed && ts.pressed) {   /* °´ÏÂ: Ö»¼ÇÂ¼, ËÉÊÖ²ÅÅĞ¶¨ */
-        s_prev_pressed = 1;
+    if (ts.pressed) {
+        if (!s_prev_pressed) {         /* °´ÏÂ: ¼ÇÂ¼ÆğÊÖY(ËÉÊÖºó²ÅÅĞ¶¨) */
+            s_prev_pressed = 1;
+            s_swipe_origin_y = ts.y;
+        }
+        /* °´×¡ÖĞ: ÉÏ·½ÇøÓò(y<40)ÏÂ»¬ -> ÊÕÆğ¶ş¼¶²Ëµ¥, ´ò¿ªÍË³ö²Ëµ¥(ÓëÓÎÏ·ÄÚÒ»ÖÂ) */
+        else if (sok_try_open_exit_menu(ts.y)) {
+            sok_lvl2_clear_frame();
+            s_menu_cooldown = 15;
+        }
         return 0;
     }
-    if (!s_prev_pressed || ts.pressed) return 0;
+    if (!s_prev_pressed) return 0;
 
     s_prev_pressed = 0;
+    /* »®¶¯¹ı(Î»ÒÆ>ãĞÖµ)ÔÙËÉÊÖ²»Ëãµã»÷: Õû¶ÎÊÖÊÆ×÷·Ï, ²»´¥·¢ĞĞ */
+    {
+        int16_t dy = (int16_t)ts.y - (int16_t)s_swipe_origin_y;
+        if (dy < 0) dy = -dy;
+        if (dy > MENU_SWIPE_COMMIT_DIST) return 0;
+    }
     if (ts.x >= RESTART_MENU_X && ts.x < RESTART_MENU_X + RESTART_MENU_W
         && ts.y >= RESTART_MENU_Y) {
         row = menu_row_from_y(RESTART_MENU_Y, ts.y, 3);
@@ -1010,7 +1025,6 @@ static uint8_t sok_lvl2_update(void) {
     }
     if (row == 1) {                        /* ÉèÖÃ: Ë²¼äµ¯³öÕûÆÁÉèÖÃÒ³(²»×ö¸úÊÖ¶¯»­, Ê¡¿Õ¼ä) */
         s_lvl2_visible = 0;
-        s_menu_visible = 0;
         menu_enter_game_settings();
         return EXIT_RET_SETTINGS;
     }
@@ -1020,8 +1034,8 @@ static uint8_t sok_lvl2_update(void) {
         s_undo_group = 1;
         s_undo_visible = 1;
         sok_draw_undo_buttons();
-    } else if (row == 2) {                 /* ·µ»Ø: »»»ØÒ»¼¶°´Å¥×é */
-        sok_show_nav_group();
+    } else if (row == 2) {                 /* ·µ»Ø: °´Ä£Ê½»Øµ½³·ÏúµÄ3¸ö°´Å¥ / Ò»¼¶°´Å¥×é */
+        sok_restore_panel_by_mode();
     }
     s_menu_cooldown = 15;
     return 0;
@@ -1209,6 +1223,22 @@ static void sok_undo_hide(uint8_t back_to_nav) {
 }
 
 /**
+ * @brief  ÉÏ·½ÇøÓòÏÂ»¬ -> ´ò¿ªÍË³ö²Ëµ¥(ÓÎÏ·ÄÚ/¶ş¼¶²Ëµ¥/³·Ïú½çÃæ¹²ÓÃ)
+ * @param  y  µ±Ç°´¥µãY
+ * @retval 1=ÒÑ´ò¿ª(µ÷ÓÃ·½°´ĞèÔÙÊÕµô×Ô¼ºµÄÃæ°å)
+ */
+static uint8_t sok_try_open_exit_menu(uint16_t y) {
+    if (s_menu_cooldown != 0 || s_swipe_origin_y >= MENU_SWIPE_START_Y) return 0;
+    if ((int16_t)y - (int16_t)s_swipe_origin_y <= MENU_SWIPE_TRIGGER_DIST) return 0;
+    s_exit_menu_visible = 1;
+    s_exit_dragging = 1;
+    s_exit_sliding = 0;
+    s_exit_drag_y = -MENU_H + MENU_DRAG_MAX_STEP;
+    s_exit_drag_start_y = y;
+    return 1;
+}
+
+/**
  * @brief  ³·Ïú½çÃæÃ¿Ö¡´¦Àí: ÉÏÒ»²½/ÏÂÒ»²½/·µ»Ø/µã¿Õ°×
  */
 static void sok_undo_ui_update(void) {
@@ -1233,6 +1263,8 @@ static void sok_undo_ui_update(void) {
             sok_undo_hide(0);
             sok_panel_drag_start(1, up_move);
         }
+        /* ÉÏ·½ÇøÓòÏÂ»¬ -> ÊÕÆğ³·Ïú°´Å¥, ´ò¿ªÍË³ö²Ëµ¥(ÓëÓÎÏ·ÄÚÒ»ÖÂ) */
+        if (sok_try_open_exit_menu(ts.y)) sok_undo_hide(0);
         return;
     }
     if (!s_prev_pressed) return;
@@ -1604,21 +1636,10 @@ uint8_t sokoban_update(void) {
             s_prev_pressed = 1;
         }
         /* ÏÂ»¬½øÈëÍË³ö²Ëµ¥ (Î´ÃüÖĞ·Çrestart°´Å¥Ê±ÉúĞ§) */
-        if (ts.pressed && s_won
-            && s_swipe_origin_y < MENU_SWIPE_START_Y
-            && s_menu_cooldown == 0) {
-            int16_t dy_move;
+        if (ts.pressed && s_won) {
             Touch_UpdateCoords();
             Touch_Scan(&ts);
-            dy_move = (int16_t)ts.y - (int16_t)s_swipe_origin_y;
-            if (dy_move > MENU_SWIPE_TRIGGER_DIST) {
-                s_exit_menu_visible = 1;
-                s_exit_dragging = 1;
-                s_exit_sliding = 0;
-                s_exit_drag_start_y = ts.y;
-                if (dy_move > MENU_DRAG_MAX_STEP)
-                    dy_move = MENU_DRAG_MAX_STEP;
-                s_exit_drag_y = -MENU_H + dy_move;
+            if (sok_try_open_exit_menu(ts.y)) {
                 s_hold_button = 0;
                 return interacted;
             }
@@ -1685,19 +1706,10 @@ uint8_t sokoban_update(void) {
             /* ÏÂ»®´ò¶Ï°´Å¥²Ëµ¥, ´ò¿ªÍË³ö²Ëµ¥ */
             if (s_swipe_origin_y < MENU_SWIPE_START_Y
                 && s_menu_cooldown == 0) {
-                int16_t dy_move;
                 Touch_UpdateCoords();
                 Touch_Scan(&ts);
-                dy_move = (int16_t)ts.y - (int16_t)s_swipe_origin_y;
-                if (dy_move > MENU_SWIPE_TRIGGER_DIST) {
+                if (sok_try_open_exit_menu(ts.y)) {
                     s_menu_visible = 0;
-                    s_exit_menu_visible = 1;
-                    s_exit_dragging = 1;
-                    s_exit_sliding = 0;
-                    s_exit_drag_start_y = ts.y;
-                    if (dy_move > MENU_DRAG_MAX_STEP)
-                        dy_move = MENU_DRAG_MAX_STEP;
-                    s_exit_drag_y = -MENU_H + dy_move;
                     s_hold_button = 0;
                     s_hold_us = 0;
                     /* Çå³ı°´Å¥ÇøÓò: ÏÈºÚµ×ÔÙÖØ»æÓÎÏ·¸ñ×Ó, ·À±ßÔµ²ĞÁô */
@@ -1987,19 +1999,7 @@ process_exit_menu:
         Touch_Scan(&ts);
 
         /* ¼ì²âÍË³ö²Ëµ¥ÊÖÊÆ: ÉÏ·½ÇøÓò + ÏòÏÂ»¬¶¯ > 5px Ôò¿ÉÍÏ³öÍË³ö²Ëµ¥ */
-        if (s_swipe_origin_y < MENU_SWIPE_START_Y
-            && s_menu_cooldown == 0) {
-            int16_t dy_move = (int16_t)ts.y - (int16_t)s_swipe_origin_y;
-            if (dy_move > MENU_SWIPE_TRIGGER_DIST) {
-                s_exit_menu_visible = 1;
-                s_exit_dragging = 1;
-                s_exit_drag_start_y = ts.y;
-                if (dy_move > MENU_DRAG_MAX_STEP)
-                    dy_move = MENU_DRAG_MAX_STEP;
-                s_exit_drag_y = -MENU_H + dy_move;
-                return 0;
-            }
-        }
+        if (sok_try_open_exit_menu(ts.y)) return 0;
 
         /* µ×²¿ÉÏ»®: ¸úÏÂ»¬²Ëµ¥Ò»Ñù, ÒÆ¶¯>5px¼´Æô¶¯¸úÊÖ»¬¶¯ */
         if (s_swipe_origin_y > SOK_SWIPE_Y

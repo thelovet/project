@@ -1312,7 +1312,10 @@ uint8_t game_menu_swipe_up_poll(uint16_t y_threshold, uint8_t release_thresh,
     }
     else { g_touch_down = 0; }
 
-    if (ts_up.pressed && prev_up && g_touch_start_y > y_threshold
+    /* 退出菜单滑入期间不认"按住上划": 手指刚下滑打开菜单后常还停在底部,
+       按住路径只要 5px 就会误触发(见 game_menu_command 里 exit 分支的注释);
+       滑入期间由"松手路径"(阈值 release_thresh, 通常 20px)负责打断 */
+    if (ts_up.pressed && prev_up && !g_exit_sliding && g_touch_start_y > y_threshold
         && g_menu_cooldown == 0) {
         int16_t dy_move = (int16_t)ts_up.y - (int16_t)g_touch_start_y;
         if (dy_move < -5) {
@@ -1632,13 +1635,11 @@ uint8_t game_menu_command(const GameMenuCfg* cfg, uint8_t* state, uint8_t* out_r
             menu_draw_nrow_frame_only(g_exit_drag_y, cfg->exit_row_types, 5);
 
         /* 底部上划打断 → 切换到重新开始菜单
-           仅在退出菜单已静止时判定: 拖拽/滑入期间不判。
-           否则"下滑打开退出菜单"这个动作本身就会撞上它 —— 手指拖到屏幕下方(y>y_threshold)
-           后松开, 菜单还在慢慢滑入时手指再按下, 上划检测会把起点重录在那片底部区域,
-           随后任何几像素的上漂(抬手/噪声)都会满足"上划"→ 上划菜单被抢出来,
-           同时退出菜单仍按原动画下滑, 表现为"下滑菜单时上划菜单也弹出来"。
-           与下方 game_menu_swipe_mid_up_close 的门控保持一致。 */
-        if (!g_exit_dragging && !g_exit_sliding) {
+           静止时: 按住/松手两条路径都判;
+           滑入期间: 只认松手路径(game_menu_swipe_up_poll 里已按 g_exit_sliding 屏蔽按住路径),
+           这样"下滑打开退出菜单"那一下的手指抖动不会误触发, 而真正想上划切菜单的手势仍能打断;
+           拖拽期间不判(那时手势归拖拽所有) */
+        if (!g_exit_dragging) {
             uint8_t r = menu_swipe_to_restart_handler(cfg->y_threshold, cfg->release_thresh);
             if (r) {
                 cfg->mark_dirty();
