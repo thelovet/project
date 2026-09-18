@@ -603,6 +603,9 @@ static uint8_t sokoban_prepare_level(uint8_t level_index) {
     s_current_level = level_index;
     s_won = 0;
     s_exit_menu_visible = 0;
+    s_undo_group = 0;
+    s_undo_visible = 0;
+    s_lvl2_visible = 0;
     s_menu_sliding = 0;
     s_menu_slide_y = 240;
     s_menu_slide_anim = 0;
@@ -639,17 +642,29 @@ void sokoban_full_redraw(void) {
 }
 
 /**
+ * @brief  从设置返回游戏时恢复游戏内面板: 撤销模式回撤销按钮组, 否则回一级按钮组
+ * @note   s_undo_group 在进设置前就被置 1(撤销界面->上划二级菜单->设置), 期间没被清过,
+ *         所以这里按它判断该回哪个界面
+ */
+static void sok_settings_restore_panel(void) {
+    if (s_undo_group) {
+        s_menu_slide_y = SOK_BTN_Y;   /* 电池恢复按这个上缘裁剪, 别留二级菜单的旧值 */
+        s_undo_visible = 1;
+        sok_draw_undo_buttons();
+    }
+    else {
+        sok_show_nav_group();
+    }
+}
+
+/**
  * @brief  从设置菜单返回到按钮面板 (main.c GameSettings_Update 返回分支调用)
- * @note   置 s_menu_visible=1 让下一帧 sokoban_update 重绘导航按钮面板 + 关卡编号
+ * @note   局部恢复: 只清设置条带覆盖区(y>=VIDEO_MENU_Y)重绘图格, 再补面板, 不全屏重绘(会闪)
  */
 void sokoban_menu_settings_restore(void) {
-    s_menu_visible = 1;
-    s_menu_slide_y = SOK_BTN_Y;   /* 复位滑动位置: 电池恢复按面板上缘裁剪, 别用二级菜单的旧值 */
-    /* 局部恢复(参照按钮面板退出/下划打断做法): 只清设置条带覆盖区(y>=VIDEO_MENU_Y)重绘图格,
-       再画按钮面板, 不全屏重绘(会闪)。设置条带覆盖 y=52~240, 故从 VIDEO_MENU_Y 清起。 */
     LCD_Fill(0, VIDEO_MENU_Y, 239, 239, LCD_BLACK);
     sok_redraw_grid_below(VIDEO_MENU_Y);
-    sok_redraw_nav_group();
+    sok_settings_restore_panel();
 }
 
 /**
@@ -659,10 +674,8 @@ void sokoban_menu_settings_restore(void) {
  *         退出菜单"同一做法), 再补按钮面板与关卡编号。
  */
 void sokoban_menu_settings_restore_full(void) {
-    s_menu_visible = 1;
-    s_menu_slide_y = SOK_BTN_Y;   /* 复位滑动位置: 电池恢复按面板上缘裁剪, 别用二级菜单的旧值 */
     sokoban_draw_level(s_current_level);
-    sok_redraw_nav_group();
+    sok_settings_restore_panel();
 }
 
 
@@ -960,7 +973,9 @@ static void sok_panel_drag_start(uint8_t kind, int16_t up_move) {
  */
 static void sok_lvl2_clear_frame(void) {
     s_lvl2_visible = 0;
-    s_menu_slide_y = 240;   /* 面板已收, 滑动位置复位(电池恢复按面板上缘裁剪, 别用陈旧值) */
+    /* 滑动位置复位到按钮面板停靠位: 电池恢复按这个上缘裁剪, 用 240 会一直补到 y=219,
+       把撤销界面的三个按钮(189 起)盖在地图下面 */
+    s_menu_slide_y = SOK_BTN_Y;
     LCD_Fill_DMA(RESTART_MENU_X, RESTART_MENU_Y - 1,
                  RESTART_MENU_X + RESTART_MENU_W, 240, LCD_BLACK);
     sok_redraw_grid_below(RESTART_MENU_Y - 1);
@@ -1051,6 +1066,7 @@ static void sok_redraw_nav_group(void) {
  */
 static void sok_show_nav_group(void) {
     s_menu_visible = 1;
+    s_menu_slide_y = SOK_BTN_Y;   /* 面板停靠位: 电池恢复按这个上缘裁剪, 别留旧值 */
     sok_redraw_nav_group();
 }
 
@@ -1685,19 +1701,9 @@ uint8_t sokoban_update(void) {
                     s_hold_button = 0;
                     s_hold_us = 0;
                     /* 清除按钮区域: 先黑底再重绘游戏格子, 防边缘残留 */
-                    {
-                        int16_t fy;
-                        LCD_CS_CLR;
-                        for (fy = SOK_BTN_Y; fy < SOK_BTN_Y + SOK_BTN_H + 2; fy++) {
-                            LCD_Address_Set(SOK_BTN1_X, fy, SOK_BTN1_X + SOK_BTN_W - 1, fy);
-                            for (uint8_t k = 0; k < SOK_BTN_W; k++) LCD_WR_DATA_16Bit(LCD_BLACK);
-                            LCD_Address_Set(SOK_BTN2_X, fy, SOK_BTN2_X + SOK_BTN_W - 1, fy);
-                            for (uint8_t k = 0; k < SOK_BTN_W; k++) LCD_WR_DATA_16Bit(LCD_BLACK);
-                            LCD_Address_Set(SOK_BTN3_X, fy, SOK_BTN3_X + SOK_BTN_W - 1, fy);
-                            for (uint8_t k = 0; k < SOK_BTN_W; k++) LCD_WR_DATA_16Bit(LCD_BLACK);
-                        }
-                        LCD_CS_SET;
-                    }
+                    LCD_Fill(SOK_BTN1_X, SOK_BTN_Y, SOK_BTN1_X + SOK_BTN_W, SOK_BTN_Y + SOK_BTN_H + 2, LCD_BLACK);
+                    LCD_Fill(SOK_BTN2_X, SOK_BTN_Y, SOK_BTN2_X + SOK_BTN_W, SOK_BTN_Y + SOK_BTN_H + 2, LCD_BLACK);
+                    LCD_Fill(SOK_BTN3_X, SOK_BTN_Y, SOK_BTN3_X + SOK_BTN_W, SOK_BTN_Y + SOK_BTN_H + 2, LCD_BLACK);
                     sok_redraw_grid_below(SOK_BTN_Y);
                     return interacted;
                 }

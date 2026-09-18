@@ -191,8 +191,8 @@ typedef enum {
    ★ 字库资源总量变化(data_start 移动)后, 必须重烧这一块。
    读取接口 FlashStore_MenuGlyphRead() 内部按目录头里的 data_start 现算地址。 */
 #define MENU_GLYPH_ONE    72UL                                  /* 单字 24x24 1bpp */
-#define MENU_GLYPH_CNT    14UL                                  /* 方块消行/华容道/大鱼小鱼/合并 + 撤销 */
-#define MENU_GLYPH_SIZE   (MENU_GLYPH_ONE * MENU_GLYPH_CNT)     /* 1008 字节 */
+#define MENU_GLYPH_CNT    21UL                                  /* 方块消行/华容道/大鱼小鱼/合并/撤销 + 俄罗斯块/数字相融 */
+#define MENU_GLYPH_SIZE   (MENU_GLYPH_ONE * MENU_GLYPH_CNT)     /* 1512 字节 */
 
 /* ================================================================
  * 接口

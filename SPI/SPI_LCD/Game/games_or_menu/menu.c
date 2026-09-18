@@ -26,14 +26,14 @@
 /* ---- 菜单字体缓存/行类型常量 (集中置顶) ---- */
 /* 菜单24x24字库: 从外部Flash整体读入RAM缓存(条带渲染需逐行随机访问)
    槽位 0~21 = 资源ID 0~21(常用汉字); 槽位 22/23 = "语/言"(资源ID 115/116, 见 MENU_FONT_SLOT) */
-#define MENU_FONT_SLOTS  38   /* 0~23 原有(含语/言) + 24~37 菜单追加的 14 个字(外部保留区) */
+#define MENU_FONT_SLOTS  45   /* 0~23 原有(含语/言) + 24~44 菜单追加的 21 个字(外部保留区) */
 static uint8_t s_menu_fonts[MENU_FONT_SLOTS * 72];
 static uint8_t s_menu_fonts_ok = 0;
 static uint8_t s_fonts_lang = 0xFF;   /* 缓存里装的是哪套字: 0=中文, 1=英文 */
 
 /* 资源ID → 缓存槽位:
    0~21 原样; 语(115)/言(116) 顺延到 22/23;
-   追加的 14 个字(虚ID 128~141, 字模存外部Flash保留区) 放 24~37 */
+   追加的 21 个字(虚ID 128~148, 字模存外部Flash保留区) 放 24~44 */
 #define MENU_EXT_SLOT     24
 #define MENU_FONT_SLOT(id)  ((uint8_t)(((id) >= MENU_EXT_ID_BASE) \
                             ? (MENU_EXT_SLOT + ((id) - MENU_EXT_ID_BASE)) \
@@ -50,11 +50,11 @@ static const uint8_t s_fonts_xp_id[4] = { FLASH_STORE_ID_24_XI2, FLASH_STORE_ID_
 static const uint8_t s_fonts_pm_id[4] = { FLASH_STORE_ID_24_PING, FLASH_STORE_ID_24_MU, FLASH_STORE_ID_24_FAN2, FLASH_STORE_ID_24_XIANG2 };
 static const uint8_t s_fonts_yy_id[4] = { FLASH_STORE_ID_24_YU2, FLASH_STORE_ID_24_YAN, FLASH_STORE_ID_24_SHE, FLASH_STORE_ID_24_ZHI };
 
-/* 三个游戏名(下滑菜单/主菜单里那三行): 字模存外部Flash保留区, 虚ID 128~137 */
-static const uint8_t s_fonts_fkxx_id[4] = { MENU_EXT_ID_FANG, MENU_EXT_ID_KUAI, MENU_EXT_ID_XIAO2, MENU_EXT_ID_XING };  /* 方块消行 */
+/* 三个游戏名(下滑菜单/主菜单里那三行): 字模存外部Flash保留区, 虚ID 128~148 */
+static const uint8_t s_fonts_els_id[4]  = { MENU_EXT_ID_E, MENU_EXT_ID_LUO, MENU_EXT_ID_SI, MENU_EXT_ID_KUAI };            /* 俄罗斯块 */
 static const uint8_t s_fonts_hrd_id[3]  = { MENU_EXT_ID_HUA, MENU_EXT_ID_RONG, MENU_EXT_ID_DAO };                         /* 华容道 */
 static const uint8_t s_fonts_dyxy_id[4] = { MENU_EXT_ID_DA, MENU_EXT_ID_YU, MENU_EXT_ID_XIAO, MENU_EXT_ID_YU };           /* 大鱼小鱼 */
-static const uint8_t s_fonts_fkhb_id[4] = { MENU_EXT_ID_FANG, MENU_EXT_ID_KUAI, MENU_EXT_ID_HE, MENU_EXT_ID_BING };       /* 方块合并 */
+static const uint8_t s_fonts_szxr_id[4] = { MENU_EXT_ID_SHU, MENU_EXT_ID_ZI, MENU_EXT_ID_XIANG, MENU_EXT_ID_RONG2 };       /* 数字相融 */
 static const uint8_t s_fonts_cx2_id[2]  = { MENU_EXT_ID_CHE,  MENU_EXT_ID_XIAO3 };                                          /* 撤销(推箱子二级菜单) */
 
 /* 双语行文字表: 中文=字模ID数组(24宽全宽字), 英文=ASCII串(16宽半宽字, 见 chinese_fonts.h)
@@ -75,10 +75,10 @@ static const MenuRowText s_row_text[MENU_ROW_MAX + 1] = {
     [MENU_ROW_PMFX]     = { s_fonts_pm_id,       "Rotation", 4 },
     [MENU_ROW_YYSH]     = { s_fonts_yy_id,       "Language", 4 },
     [MENU_ROW_FANHUI]   = { s_fonts_fh_id,       "Back",     2 },
-    /* 三个游戏名: 中文用追加字模(方块消行/华容道/大鱼小鱼), 英文用半宽拉丁字;
-       2048 行中英文都改成文字了(方块合并 / Merge), 不再画 2048 数字 */
-    [MENU_ROW_2048]     = { s_fonts_fkhb_id,     "Merge",    4 },
-    [MENU_ROW_TETRIS]   = { s_fonts_fkxx_id,     "Tetris",   4 },
+    /* 三个游戏名: 中文用追加字模(俄罗斯块/华容道/大鱼小鱼), 英文用半宽拉丁字;
+       2048 行中英文都改成文字了(数字相融 / Merge), 不再画 2048 数字 */
+    [MENU_ROW_2048]     = { s_fonts_szxr_id,     "Merge",    4 },
+    [MENU_ROW_TETRIS]   = { s_fonts_els_id,      "Tetris",   4 },
     [MENU_ROW_KLOTSKI]  = { s_fonts_hrd_id,      "Klotski",  3 },
     [MENU_ROW_FISH]     = { s_fonts_dyxy_id,     "Big Fish", 4 },
     [MENU_ROW_CHEXIAO]  = { s_fonts_cx2_id,      "Step Back", 2 },   /* 撤销 (推箱子二级菜单) */
