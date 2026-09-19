@@ -167,7 +167,7 @@ for idx, (d, flat) in enumerate(output):
 c_code = '\n'.join(lines)
 
 # Write to output file
-out_path = r'c:\Users\windows\Desktop\10.SA-250514(????)\0.SOLO-AI eyes-?????\??????????????\?????\03-60fps-240-LOGO-64MB-????? - ??????\SPI\SPI_LCD\Game\font_data_output.txt'
+out_path = __file__.rsplit("\\", 1)[0] + "\\font_data_output.txt"
 with open(out_path, 'w', encoding='utf-8') as f:
     f.write(c_code)
 
