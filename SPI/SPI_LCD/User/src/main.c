@@ -1678,6 +1678,12 @@ int main(void) {
 #else
         wake_touch_confirmed = Main_ConfirmTouchWake();
 #endif
+        /* ★ 触摸初始化提前到此处(原先在 LCD/Flash/定时器初始化之后) —— 实测唤醒后约 500ms
+           触摸才可用, 用户"单击唤醒后马上下滑"就会没反应。这里先做, 触摸可用时间提前约 400ms,
+           总耗时不变(只是把 Touch_Init 里的 100ms 等待挪到前面)。Touch_Init 只用 GPIOB/PA8
+           和 SysTick 延时, 不依赖 LCD/Flash/TIMER2; 顺带还避免它的 100us 复位脉冲被
+           LCD DMA/TIMER2 中断拉长到 >1ms(§6/§7 记录过的坑)。 */
+        Touch_Init();
     }
 
     Delay_Ms(20);            // 等待LCD复位完成和SPI稳定
@@ -1690,7 +1696,7 @@ int main(void) {
     TIMER2_Init();           // 初始化定时器2
     LCD_DMA_Interrupt_Init();//LCD DMA中断配置
     BAT_ADC_Init();          // 初始化ADC电池检测
-    VOICE_SW_Init();         // 语音IC电源控制(PB3, 低电平有效)
+    //    VOICE_SW_Init();         // 语音IC 已停用(用户确认不用了): 注释掉省 Flash, 函数随 --gc-sections 回收
 //#if 0
 //    /* 语音IC UART1: PA9 AF_PP, 9600 8N1, 直接写BRR避免__udivdi3(省~1.2K Flash) */
 //    {
@@ -1728,8 +1734,7 @@ int main(void) {
             while (1);
         }
         CheckWakeupSource(1);
-        /* 确认PA8有效触摸后，重新初始化触摸IC确保通信 */
-        Touch_Init();
+        /* Touch_Init() 已提前到上面 s_standby_touch_wake 分支里执行(见那里的注释) */
     }
     // if (current_state == 1) {//菜单模式
     //     VOICE_SW_ON;//打开语音IC
@@ -1794,7 +1799,7 @@ int main(void) {
             // 待机/充电模式
             // STDBY和CHRG电平检测
             BatteryStatus bat = Battery_GetStatus();
-            VOICE_SW_OFF;//关闭语音IC
+            // VOICE_SW_OFF;      // 语音IC 已停用(同上)
             if (bat == BAT_CHARGING || bat == BAT_FULL) {//充电/满电模式
                 uint16_t voltage = BAT_ADC_ReadVoltage();
                 Main_DisableTouchInput();

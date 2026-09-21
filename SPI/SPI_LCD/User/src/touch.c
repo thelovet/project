@@ -332,23 +332,41 @@ err:
  *         即把 [命令, 子命令, 参数] 依次写入 0x20(Command Buffer); 命令执行状态见 Query Buffer
  *         的 bit1-0 (00b=Done, 01b=Busy, 10b=Error)。
  */
+static uint8_t CST816S_ReadReg(uint8_t reg, uint8_t *buf, uint8_t len);   /* 等命令状态要用, 定义在下面 */
 static uint8_t IT7259_WriteCmd3(uint8_t cmd, uint8_t sub, uint8_t param)
 {
-    I2C_Start();
-    I2C_SendByte(CST816S_ADDR << 1);
-    if (I2C_WaitAck()) goto err;
-    I2C_SendByte(CST816S_REG_CMD_BUF);
-    if (I2C_WaitAck()) goto err;
-    I2C_SendByte(cmd);
-    if (I2C_WaitAck()) goto err;
-    I2C_SendByte(sub);
-    if (I2C_WaitAck()) goto err;
-    I2C_SendByte(param);
-    if (I2C_WaitAck()) goto err;
-    I2C_Stop();
-    return 1;
-err:
-    I2C_Stop();
+    uint8_t retry;
+    for (retry = 0; retry < 3; retry++)
+    {
+        I2C_Start();
+        I2C_SendByte(CST816S_ADDR << 1);
+        if (I2C_WaitAck()) goto err;
+        I2C_SendByte(CST816S_REG_CMD_BUF);
+        if (I2C_WaitAck()) goto err;
+        I2C_SendByte(cmd);
+        if (I2C_WaitAck()) goto err;
+        I2C_SendByte(sub);
+        if (I2C_WaitAck()) goto err;
+        I2C_SendByte(param);
+        if (I2C_WaitAck()) goto err;
+        I2C_Stop();
+        /* ★ 写完必须等命令执行完再返回: Query Buffer 的 bit1-0 = 00b(Done)。
+           实测(逻辑分析仪): 不等就写下一条时, 芯片"忙"会 NACK 整个写入 —— 唤醒初始化里
+           0x1A/0x04(引擎模式) 与 电源模式两条命令就是这样悄悄丢掉的, 芯片没进期望状态。 */
+        {
+            uint8_t q, i;
+            for (i = 0; i < 20; i++)
+            {
+                if (CST816S_ReadReg(CST816S_REG_QUERY_BUF, &q, 1) && (q & 0x03) == 0x00)
+                    return 1;
+                Delay_Ms(1);
+            }
+        }
+        return 0;                       /* 命令没执行完/状态异常: 不再往下写 */
+    err:
+        I2C_Stop();
+        Delay_Ms(2);                    /* 芯片忙: 稍等重发 */
+    }
     return 0;
 }
 #endif
@@ -790,14 +808,12 @@ void Touch_Init(void)
 
     /* 3.2 算法参数(手册5.3.17 命令0x15): 决定坐标上报密度。
        手册原文(5.3.17.4): "Point Threshold —— 若移动距离 > threshold*resolution/1000
-       才上报该点", 默认值下要移动十几像素才更新一次 → 滑动时坐标一格一格跳(如118→129)。 */
+       才上报该点", 默认值下要移动十几像素才更新一次 → 滑动时坐标一格一格跳(如118→129)。
+       注: 每条命令的"执行完成等待 + 失败重试"已并入 IT7259_WriteCmd3, 故下面不再各自 Delay_Ms。 */
 #if CST816S_IT7259_TH_ENABLE
     IT7259_WriteCmd3(0x15, 0x1D, CST816S_IT7259_POINT_TH);    /* 子命令0x1D: Point Threshold */
-    Delay_Ms(5);
     IT7259_WriteCmd3(0x15, 0x18, CST816S_IT7259_SCAN_PERIOD); /* 子命令0x18: 引擎扫描周期(ms) */
-    Delay_Ms(5);
     IT7259_WriteCmd3(0x15, 0x06, CST816S_IT7259_LAST_POINT);  /* 子命令0x06: 输出最后一点 */
-    Delay_Ms(5);
     /* 子命令0x07: AFE 增益(bit3-2=浮空/放桌上档, bit1-0=接地/拿手里档, 越大越灵敏)。
        实测"轻触时按下标志会跳(判不到按下)"、"拿着只能到200/不拿到239", 故把两档都调高试,
        让轻触也能稳定检出、两种握持状态下手感接近。
@@ -805,7 +821,6 @@ void Touch_Init(void)
        Y 的稳定是不是靠这条命令来的。 */
 #if CST816S_IT7259_GAIN_EN
     IT7259_WriteCmd3(0x15, 0x07, CST816S_IT7259_GAIN);
-    Delay_Ms(5);
 #endif
 #endif
 
@@ -816,14 +831,11 @@ void Touch_Init(void)
        背景: 实测"轻触时按下标志会跳(判不到按下)"、而基线(CSEL)正常且不随握持变化,
        说明问题在"手指→面板→地"的信号链前端, 故从这两条入手改善信噪比/一致性。 */
     IT7259_WriteCmd3(0x1A, 0x02, CST816S_IT7259_AFE_FILTER);
-    Delay_Ms(5);
     IT7259_WriteCmd3(0x1A, 0x04, CST816S_IT7259_ENGINE_MODE);
-    Delay_Ms(5);
 
     /* 3.3 置为 Active 模式(手册5.3.4: Command 0x04/子命令0x00, 参数0x01=Idle, 0x00=Active)。
        Idle 是省电态(25uA), 不上报任何数据包、也不接受命令, 直到用户触摸才唤醒。 */
     IT7259_WriteCmd3(CST816S_REG_POWER_MODE, 0x00, 0x00);
-    Delay_Ms(10);
 
 #if TOUCH_DEBUG_SHOW
     /* 调试: 回读 Query Buffer 的命令状态位(bit1-0): 0=Done(命令已被接受), 1=Busy, 2=Error */
@@ -953,7 +965,7 @@ uint8_t Touch_IsPressed(void)
 
 #if TOUCH_IC_IT7259
     /* IT7259: 纯I2C轮询(不依赖INT), 每帧读点数据报告 */
-    g_touch_int_flag = 0;
+        g_touch_int_flag = 0;
     {
         static uint8_t s_no_point_cnt = 0;   /* 连续无点计数(释放去抖) */
         uint16_t raw_x = 0, raw_y = 0;
