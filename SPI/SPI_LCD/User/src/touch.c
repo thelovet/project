@@ -163,6 +163,9 @@ static void SDA_IN(void)
  * @param  无
  * @retval 无
  */
+/* 试过把下面的半周期延时从 5us 降到 2us(约 200kHz) —— 实测"更差": 抓包里 Touch_Init
+   被反复重入(I2C 连读失败触发自愈), 上下滑动无反应, 已回退到 5us(约 100kHz)。
+   结论: 这颗 IT7259 + 本板走线, 软件 I2C 不要提速。 */
 static void I2C_Start(void)
 {
     SDA_OUT();

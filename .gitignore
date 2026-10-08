@@ -26,3 +26,9 @@ SPI/SPI_LCD/User/inc/video_chunk.h
 
 # ³ö³§ÉÕÂ¼½Å±¾µÄ¹Ì¼ş»º´æÖ¸ÎÆ(burn_factory.ps1 Éú³É; *.elf ÒÑ±»ÉÏÃæµÄ¹æÔòºöÂÔ)
 *.elf.hash
+
+# simulator folder is its own git repo
+è§¦æ‘¸å±æ¨¡æ‹Ÿ/
+
+# scope capture CSVs (large, local only)
+æ³¢å½¢å›¾/
