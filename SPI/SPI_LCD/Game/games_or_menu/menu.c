@@ -1023,6 +1023,7 @@ uint8_t video_menu_swipe_up_poll(const TouchState* ts, uint8_t* touch_down,
  * @param  key_resp    key_response 指针
  * @return 1 = 已处理, 0 = 未处理
  */
+static void menu_start_game_prep(uint8_t* game_inited);  /* 前向声明 */
 static uint8_t main_menu_hit_test(uint16_t x, uint16_t y);  /* 前向声明 */
 /**
  * @brief  主菜单命中检测与点击处理(返回值切换模式)。
@@ -1044,33 +1045,23 @@ uint8_t main_menu_handle(uint16_t x, uint16_t y,
 
     /* 游戏模式切换：清屏 + 设置背光 + 重置初始化标志 */
     if (sel == MAIN_MENU_ACT_D2048) {
-        LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
-        LCD_Backlight_PWM_SetDuty(g_brightness);
-        *game_inited = 0;
+        menu_start_game_prep(game_inited);
         *mode = MAIN_MODE_D2048;
     }
     else if (sel == MAIN_MENU_ACT_SOKOBAN) {
-        LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
-        LCD_Backlight_PWM_SetDuty(g_brightness);
-        *game_inited = 0;
+        menu_start_game_prep(game_inited);
         *mode = MAIN_MODE_SOKOBAN;
     }
     else if (sel == MAIN_MENU_ACT_TETRIS) {
-        LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
-        LCD_Backlight_PWM_SetDuty(g_brightness);
-        *game_inited = 0;
+        menu_start_game_prep(game_inited);
         *mode = MAIN_MODE_TETRIS;
     }
     else if (sel == MAIN_MENU_ACT_KLOTSKI) {
-        LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
-        LCD_Backlight_PWM_SetDuty(g_brightness);
-        *game_inited = 0;
+        menu_start_game_prep(game_inited);
         *mode = MAIN_MODE_KLOTSKI;
     }
     else if (sel == MAIN_MENU_ACT_FISH) {
-        LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
-        LCD_Backlight_PWM_SetDuty(g_brightness);
-        *game_inited = 0;
+        menu_start_game_prep(game_inited);
         *mode = MAIN_MODE_FISH;
     }
     else if (sel == MAIN_MENU_ACT_VIDEO) {
@@ -1102,6 +1093,13 @@ uint8_t main_menu_hit_test(uint16_t x, uint16_t y) {
         MAIN_MENU_ACT_FISH
     };
     return map[hit];
+}
+
+/* 进入各游戏前共用的 3 步(清屏/亮背光/标记未初始化): 收成一个函数省 Flash */
+static void menu_start_game_prep(uint8_t* game_inited) {
+    LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
+    LCD_Backlight_PWM_SetDuty(g_brightness);
+    *game_inited = 0;
 }
 
 /* ---- 内部辅助：ret→MainMode ---- */
@@ -1254,12 +1252,14 @@ uint8_t game_handle_ret(uint8_t ret, MainMode* mode, uint8_t* game_inited,
 uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t* prev_pressed,
     TouchState* out_ts) {
     static int8_t pressed_hit = -1;
+    static uint16_t pressed_y = 0;
     TouchState ts;
     Touch_Scan(&ts);
     if (out_ts) *out_ts = ts;
 
     if (!(*prev_pressed) && ts.pressed) {
         pressed_hit = menu_hit_test(ts.x, ts.y, 5);
+        pressed_y = ts.y;
     }
     else if (*prev_pressed && !ts.pressed) {
         int8_t released_hit = menu_hit_test(ts.x, ts.y, 5);
@@ -1277,7 +1277,9 @@ uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t* prev_pressed,
             && ts.y >= MENU_Y + MENU_H)
             released_hit = pressed_hit;
 
-        if (released_hit == pressed_hit) {
+        if (released_hit == pressed_hit
+            && (int16_t)((int16_t)ts.y - (int16_t)pressed_y) <= MENU_SWIPE_COMMIT_DIST
+            && (int16_t)((int16_t)pressed_y - (int16_t)ts.y) <= MENU_SWIPE_COMMIT_DIST) {
             if (released_hit >= 0 && released_hit < 5)
                 ret = ret_map[released_hit];
             else
@@ -1807,13 +1809,17 @@ uint8_t game_menu_command(const GameMenuCfg* cfg, uint8_t* state, uint8_t* out_r
            视觉中线归属, 不会掉空, 也不会把"设置"下半截算成"返回") */
         {
             static int8_t ph = -1;
+            static uint16_t ph_y = 0;
             int8_t ch = -1;
             if (ts.x >= RESTART_MENU_X && ts.x < RESTART_MENU_X + RESTART_MENU_W)
                 ch = menu_row_from_y(RESTART_MENU_Y, ts.y, 3);
             if (!g_prev_pressed && ts.pressed) {
                 ph = ch;
+                ph_y = ts.y;
             }
-            else if (g_prev_pressed && !ts.pressed && ch == ph) {
+            else if (g_prev_pressed && !ts.pressed && ch == ph
+                && (int16_t)((int16_t)ts.y - (int16_t)ph_y) <= MENU_SWIPE_COMMIT_DIST
+                && (int16_t)((int16_t)ph_y - (int16_t)ts.y) <= MENU_SWIPE_COMMIT_DIST) {
                 if (ph < 0) {
                     /* 点击菜单外 → 关闭 */
                     goto restart_close;

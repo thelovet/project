@@ -149,6 +149,19 @@ static uint8_t s_standby_unknown_wake = 0;
 
 static void IWDG_Init(void);
 
+/* 把反复出现的"画出下一帧"收成一个小函数, 省 Flash(noinline 防内联回去) */
+static void __attribute__((noinline)) flash_show_next_frame(void)
+{
+    flash_decompress_and_show(&next_bank, &next_higvh, &next_high, &next_low);
+}
+
+/* 同上: "回到视频并画下一帧" 成对出现多次, 也收成一个函数 */
+static void __attribute__((noinline)) video_reload_show(void)
+{
+    LoadVideoAddress();
+    flash_show_next_frame();
+}
+
 /**
  * @brief  获取触摸坐标到变量 ts (调用 Touch_Scan)
  */
@@ -667,9 +680,7 @@ static void main_menu_close_to_video(void)
     vm_touch_down = 0;      /* 重置上划检测, 避免视频上划误触发 */
     vm_sliding = 0;
     /* 视频第一帧为完整帧, 直接填充背景, 避免黑屏闪烁 */
-    LoadVideoAddress();
-    flash_decompress_and_show(&next_bank, &next_higvh,
-                              &next_high, &next_low);
+    video_reload_show();
     s_m2v_swipe = 1;
     /* 保留 s_touch_down: 在video轮询中vm_touch_down需要它来判断swipe,
        菜单返回视频时一并重置swipe状态; 此处swipe帧清屏后已保证下一帧不重复 */
@@ -767,9 +778,7 @@ static uint8_t Main_HandleTouchInput(void)
             if (s_top_defer_clear) {
                 s_top_defer_clear = 0;
                 s_video_menu_visible = 0;
-                LoadVideoAddress();
-                flash_decompress_and_show(&next_bank, &next_higvh,
-                                          &next_high, &next_low);
+                video_reload_show();
             }
             if (target_y > MENU_Y - MENU_RELEASE_GAP)
                 target_y = MENU_Y - MENU_RELEASE_GAP;
@@ -784,9 +793,7 @@ static uint8_t Main_HandleTouchInput(void)
                 /* 视频设置页顶部下滑拖主菜单即退出设置页, 背景重载视频第一帧(同视频菜单清背景) */
                 if (s_settings_mode != SETTINGS_NONE && !g_settings_from_game) {
                     s_settings_mode = SETTINGS_NONE;
-                    LoadVideoAddress();
-                    flash_decompress_and_show(&next_bank, &next_higvh,
-                                              &next_high, &next_low);
+                    video_reload_show();
                 }
             }
             if (ts.y > s_menu_drag_max_y)
@@ -805,9 +812,7 @@ static uint8_t Main_HandleTouchInput(void)
         /* 视频上滑菜单显示时, 中间/底部下滑关闭返回视频; 顶部(起点<40)下滑保留给打开主菜单(上下可打断) */
         s_video_menu_visible = 0;
         vm_touch_down = 0;
-        LoadVideoAddress();
-        flash_decompress_and_show(&next_bank, &next_higvh,
-                                  &next_high, &next_low);
+        video_reload_show();
         s_m2v_swipe = 1;
     }
     else if (!ts.pressed && s_touch_down) {
@@ -855,7 +860,10 @@ static uint8_t Main_HandleTouchInput(void)
 
         /* 菜单5行点击 (2048 / 推箱子 / 俄罗斯方块 / 华容道 / 设置) */
         if (!handled && s_main_mode == MAIN_MODE_MENU) {
-            handled = main_menu_handle(ts.x, s_touch_start_y,
+            /* 菜单里“滑动无效”(同游戏菜单的判法): 位移超过 MENU_SWIPE_COMMIT_DIST 就不算点击 */
+            if ((int16_t)((int16_t)ts.y - (int16_t)s_touch_start_y) <= MENU_SWIPE_COMMIT_DIST
+                && (int16_t)((int16_t)s_touch_start_y - (int16_t)ts.y) <= MENU_SWIPE_COMMIT_DIST)
+                handled = main_menu_handle(ts.x, s_touch_start_y,
                                        &s_main_mode, &s_menu_drawn,
                                        &s_game_inited, &s_touch_down,
                                        &key_response);
@@ -904,7 +912,9 @@ static uint8_t Main_HandleTouchInput(void)
                行取值用按下位置(滑动时松手坐标会漂, 起点更准)。 */
             int8_t pr = menu_row_from_y(VIDEO_MENU_Y5, s_touch_start_y, 5);
             int8_t rl = menu_row_from_y(VIDEO_MENU_Y5, ts.y, 5);
-            uint8_t is_tap = (pr == rl);
+            uint8_t is_tap = (pr == rl   /* 滑动不算点击 */
+                && (int16_t)((int16_t)ts.y - (int16_t)s_touch_start_y) <= MENU_SWIPE_COMMIT_DIST
+                && (int16_t)((int16_t)s_touch_start_y - (int16_t)ts.y) <= MENU_SWIPE_COMMIT_DIST);
             /* 菜单框上方(y<VIDEO_MENU_Y5)也算菜单内: 就近归到第一行(此处 pr=-1)。 */
             if (is_tap && pr < 0) pr = 0;
 
@@ -923,9 +933,7 @@ static uint8_t Main_HandleTouchInput(void)
                     }
                     if (hit != -1 || s_settings_mode == SETTINGS_NONE) {
                         if (!g_settings_from_game) {
-                            LoadVideoAddress();
-                            flash_decompress_and_show(&next_bank, &next_higvh,
-                                                      &next_high, &next_low);
+                            video_reload_show();
                         }
                     }
                 } else if (hit >= 0 && hit <= 3) {
@@ -1089,9 +1097,7 @@ static void VideoMenu_Update(const TouchState *ts, uint8_t is_video_mode)
                 uint16_t save_higvh = next_higvh;
                 uint16_t save_high  = next_high;
                 uint16_t save_low   = next_low;
-                LoadVideoAddress();
-                flash_decompress_and_show(&next_bank, &next_higvh,
-                                          &next_high, &next_low);
+                video_reload_show();
                 next_bank  = save_bank;
                 next_higvh = save_higvh;
                 next_high  = save_high;
@@ -1112,9 +1118,7 @@ static void VideoMenu_Update(const TouchState *ts, uint8_t is_video_mode)
             if (s_settings_mode != SETTINGS_NONE) {
                 Settings_Enter(s_settings_mode);
             } else if (!g_settings_from_game) {
-                LoadVideoAddress();
-                flash_decompress_and_show(&next_bank, &next_higvh,
-                                          &next_high, &next_low);
+                video_reload_show();
             }
         }
     }
@@ -1405,8 +1409,7 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
         }
         else if (s_settings_mode == SETTINGS_NONE
                  && !VideoMenu_IsActive() && !s_menu_dragging && !s_menu_sliding) {
-            flash_decompress_and_show(&next_bank, &next_higvh,
-                                      &next_high, &next_low);
+            flash_show_next_frame();
         }
 
         /* 主菜单拖拽中: 位置变化时绘制, 避免重复绘制 */
