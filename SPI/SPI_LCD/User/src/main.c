@@ -111,7 +111,6 @@ static uint8_t  s_menu_sliding = 0;         /* 松手后菜单自动下滑动画中 */
 static uint8_t  s_drag_rel_cnt = 0;         /* 拖拽释放防抖: 连丢2帧才确认 */
 static int16_t  s_menu_drag_y = -230;       /* 拖拽/动画中菜单顶部Y坐标 (-MENU_H) */
 static int16_t  s_menu_drag_y_prev = -999;  /* 上一帧已绘制的Y (变化检测) */
-static uint16_t s_menu_drag_touch_y = 0;    /* 上一帧拖拽触摸Y */
 static uint16_t s_menu_drag_max_y = 0;     /* 本次拖拽手指到达的最远Y */
 static uint8_t  s_video_menu_dragging = 0;   /* 视频上划菜单拖拽中 */
 uint8_t  g_lowbatt_showing = 0;   /* 低电图标正显示中(亮段), 供菜单重绘跳过电池区 */
@@ -122,6 +121,8 @@ static uint8_t  s_m2v_swipe = 0;              /* 下划菜单→上划菜单打断中 */
 uint8_t  vm_touch_down = 0;            /* 视频块上划检测触摸追踪 */
 static uint16_t vm_start_x = 0, vm_start_y = 0;
 static uint8_t  vm_sliding = 0;               /* 视频上划菜单松手回滑动画中 */
+static uint8_t  s_vm_touch_void = 0;          /* 动画中按下的那根手指: 整段作废到抬起 */
+static uint8_t  s_top_defer_clear = 0;        /* 顶部按下先不取消上划菜单: 可能只是点第一行 */
 static SettingsMode s_settings_mode = SETTINGS_NONE; /* 当前设置界面 */
 static TouchState ts;                        /* 触摸状态, Touch_GetXY()更新 */
 
@@ -718,35 +719,35 @@ static uint8_t Main_HandleTouchInput(void)
         return 0;
     }
 
+    /* 视频上划菜单"没停稳"(松手后滑出/回滑动画中)时, 与主菜单下滑动画一致:
+       这一根手指整段作废。★ 必须用 s_vm_touch_void 记住"它是在动画中按下的",
+       连它的"抬起"也一并作废 —— 否则"动画中按下、滑到位才松手"会被当成落位后
+       的一次正常点击, 误进设置(语言/亮度…)或误关菜单返回视频。 */
+    if (vm_sliding && ts.pressed) s_vm_touch_void = 1;
+    if (s_vm_touch_void) {
+        s_touch_down = 0;
+        if (!ts.pressed) s_vm_touch_void = 0;
+        return 0;
+    }
+
     if (ts.pressed && !s_touch_down) {
         /* 触摸按下: 记录起始位置 */
         s_touch_down = 1;
         s_touch_start_y = ts.y;
-        s_menu_drag_touch_y = ts.y;
         s_touch_started_top =
             (ts.y < MENU_SWIPE_START_Y
              && (s_settings_mode == SETTINGS_NONE || !g_settings_from_game)  /* 视频设置页也允许顶部下滑弹主菜单 */
-             && s_main_mode != MAIN_MODE_MENU
-             && s_main_mode != MAIN_MODE_SOKOBAN
-             && s_main_mode != MAIN_MODE_D2048
-             && s_main_mode != MAIN_MODE_TETRIS
-             && s_main_mode != MAIN_MODE_KLOTSKI
-             && s_main_mode != MAIN_MODE_FISH) ? 1 : 0;
+             && s_main_mode == MAIN_MODE_VIDEO);
         s_touch_started_bottom =
-            (ts.y > 210) ? 1 : 0;  /* >210 底部区域, 与video_menu_swipe_up_poll一致 */
+            (ts.y > 210);  /* >210 底部区域, 与video_menu_swipe_up_poll一致 */
+        /* 顶部按下: 若是"点上划菜单第一行"呢? 先别取消菜单, 只记一个待取消标记;
+           只有手指真的往下拖(见下方"顶部拖拽"分支)才当"顶部下滑"把它取消掉。 */
+        s_top_defer_clear = (s_touch_started_top && s_video_menu_visible) ? 1 : 0;
         if (s_touch_started_top) {
-            uint8_t need_clear = s_video_menu_dragging || vm_sliding || s_video_menu_visible;
             s_menu_drag_max_y = ts.y;    /* 记录手指起始位置作为最远Y */
             s_video_menu_dragging = 0;   /* 停止上划拖拽/滑动 */
             vm_sliding = 0;
-            s_video_menu_visible = 0;    /* 下滑菜单时清除上划菜单 */
             vm_touch_down = 0;           /* 重置swipe检测, 防假触发 */
-            if (need_clear) {
-                /* 上划菜单存在时才需要重绘背景, 纯视频模式当前帧已是背景 */
-                LoadVideoAddress();
-                flash_decompress_and_show(&next_bank, &next_higvh,
-                                          &next_high, &next_low);
-            }
         }
         s_menu_dragging = 0;  /* 重置: 关闭拖拽 */
         s_menu_sliding = 0;   /* 重置: 终止滑动 */
@@ -755,19 +756,21 @@ static uint8_t Main_HandleTouchInput(void)
         s_m2v_swipe = 0;      /* 清除打断标志 */
     }
     else if (ts.pressed && s_touch_down && s_touch_started_top
-             && s_main_mode != MAIN_MODE_MENU
-             && s_main_mode != MAIN_MODE_SOKOBAN
-             && s_main_mode != MAIN_MODE_D2048
-             && s_main_mode != MAIN_MODE_TETRIS
-             && s_main_mode != MAIN_MODE_KLOTSKI
-             && s_main_mode != MAIN_MODE_FISH
+             && s_main_mode == MAIN_MODE_VIDEO
              && (int16_t)ts.y - (int16_t)s_touch_start_y
-                > MENU_SWIPE_TRIGGER_DIST) {
+                > (s_top_defer_clear ? MENU_SWIPE_COMMIT_DIST : MENU_SWIPE_TRIGGER_DIST)) {
         /* 顶部拖拽: 根据手指总位移算目标位置, 逐帧追过去 */
         {
             int16_t total_dy = (int16_t)ts.y - (int16_t)s_touch_start_y;
             int16_t target_y = (int16_t)(-MENU_H) + total_dy;
-            s_menu_drag_touch_y = ts.y;
+            /* 确认是"顶部下滑"(而非点上第一行): 此刻才取消上划菜单、重绘视频背景 */
+            if (s_top_defer_clear) {
+                s_top_defer_clear = 0;
+                s_video_menu_visible = 0;
+                LoadVideoAddress();
+                flash_decompress_and_show(&next_bank, &next_higvh,
+                                          &next_high, &next_low);
+            }
             if (target_y > MENU_Y - MENU_RELEASE_GAP)
                 target_y = MENU_Y - MENU_RELEASE_GAP;
             if (target_y > s_menu_drag_y) {
@@ -838,15 +841,11 @@ static uint8_t Main_HandleTouchInput(void)
 
         /* 1. 视频播放或游戏模式顶部快速下划 → 弹出菜单 (无需拖拽, 静默拖动距离已达标) */
         if (!handled && s_touch_started_top
+            && !s_top_defer_clear
             && (int16_t)ts.y - (int16_t)s_touch_start_y
                >= MENU_SWIPE_COMMIT_DIST
             && (int16_t)s_menu_drag_max_y - (int16_t)ts.y <= 10) {
-            if (s_main_mode != MAIN_MODE_MENU
-                && s_main_mode != MAIN_MODE_SOKOBAN
-                && s_main_mode != MAIN_MODE_D2048
-                && s_main_mode != MAIN_MODE_TETRIS
-                && s_main_mode != MAIN_MODE_KLOTSKI
-                && s_main_mode != MAIN_MODE_FISH) {
+            if (s_main_mode == MAIN_MODE_VIDEO) {
                 /* 顶部下划, 切换菜单模式 (弹出动画) */
                 s_menu_sliding = 1;
                 /* 切换游戏复位参数, 清除游戏初始化标志 */
@@ -906,6 +905,8 @@ static uint8_t Main_HandleTouchInput(void)
             int8_t pr = menu_row_from_y(VIDEO_MENU_Y5, s_touch_start_y, 5);
             int8_t rl = menu_row_from_y(VIDEO_MENU_Y5, ts.y, 5);
             uint8_t is_tap = (pr == rl);
+            /* 菜单框上方(y<VIDEO_MENU_Y5)也算菜单内: 就近归到第一行(此处 pr=-1)。 */
+            if (is_tap && pr < 0) pr = 0;
 
             if (is_tap
                 && ts.x >= VIDEO_MENU_X && ts.x < VIDEO_MENU_X + VIDEO_MENU_W)
@@ -1015,11 +1016,7 @@ static void Main_FlashLowBattery(void)
     static uint32_t s_overlay_tick = 0;
 
     /* 非游戏模式关闭闪烁 */
-    if (s_main_mode != MAIN_MODE_SOKOBAN
-        && s_main_mode != MAIN_MODE_D2048
-        && s_main_mode != MAIN_MODE_TETRIS
-        && s_main_mode != MAIN_MODE_KLOTSKI
-        && s_main_mode != MAIN_MODE_FISH) {
+    if (s_main_mode == MAIN_MODE_VIDEO || s_main_mode == MAIN_MODE_MENU) {
         s_flash_on = 0;
         g_lowbatt_showing = 0;
         return;
