@@ -828,3 +828,16 @@ uint8_t klotski_update(void) {
     game_battery_icon_update(164, 22, 0);
     return interacted;
 }
+
+#ifdef SIM_BUILD
+/* ---- sim-only: report klotski's playing-state touch regions -------------- */
+int klotski_sim_touch_rects(void)
+{
+    sim_touch_add(KLOTSKI_GRID_X, KLOTSKI_GRID_Y,
+                  KLOTSKI_GRID_X + KLOTSKI_GRID_W, KLOTSKI_GRID_Y + KLOTSKI_GRID_W,
+                  SIM_TOUCH_SWIPE);                             /* swipe the board */
+    sim_touch_add(0, 0, 240, MENU_SWIPE_START_Y, SIM_TOUCH_BAND);/* top: exit menu */
+    sim_touch_add(0, 211, 240, 240, SIM_TOUCH_BAND);             /* y>210: restart menu */
+    return 1;
+}
+#endif

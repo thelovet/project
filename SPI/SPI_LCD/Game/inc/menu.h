@@ -64,6 +64,9 @@ typedef struct {
 #define VIDEO_MENU_H5  230  /* 5行: 2*5 + 5*32 + 6*10 = 230 (= MENU_H, 与主菜单同尺寸) */
 #define VIDEO_MENU_BDR 5
 #define VIDEO_MENU_X   ((240 - VIDEO_MENU_W) / 2)
+/* 视频模式底部"上滑开视频菜单"手势带: 起点 y > 此值, 即带 = [VIDEO_SWIPE_START_Y+1, 240)
+   —— 公开出来给设置页算避让区间、给模拟器画触摸区域叠加层用, 改这一处即可全局生效 */
+#define VIDEO_SWIPE_START_Y  210
 #define VIDEO_MENU_Y   (240 - VIDEO_MENU_H4)  /* 底部对齐, 4行顶部Y=72 */
 #define VIDEO_MENU_Y5  (240 - VIDEO_MENU_H5)  /* 底部对齐, 5行顶部Y=10 */
 

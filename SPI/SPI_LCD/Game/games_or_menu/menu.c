@@ -20,7 +20,7 @@
 
  /* ---- 视频上滑菜单参数 (集中置顶) ---- */
 #define VIDEO_MENU_DRAG_MAX_STEP 4       /* 拖拽单步最大移动 */
-#define VIDEO_SWIPE_START_Y  210         /* 上划起点最小Y (接近底部) */
+/* VIDEO_SWIPE_START_Y 已上移到 menu.h (设置页避让区间 / 模拟器触摸区域叠加层也要用) */
 #define VIDEO_SWIPE_TRIGGER   5          /* 上划触发距离 */
 
 /* ---- 菜单字体缓存/行类型常量 (集中置顶) ---- */
@@ -1861,3 +1861,36 @@ uint8_t game_menu_command(const GameMenuCfg* cfg, uint8_t* state, uint8_t* out_r
 
     return GAME_MENU_CMD_NONE;
 }
+
+#ifdef SIM_BUILD
+/* ---- sim-only: the "settings options" strip (5 rows).  Used by the video mode
+   and by the strip a game shows when it enters settings.  Returns 1 when it
+   owns the screen. */
+int menu_sim_video_touch_rects(void)
+{
+    if (s_video_menu_visible) {
+        int top = (int)s_video_menu_slide_y;
+        sim_touch_add_rows(VIDEO_MENU_X, VIDEO_MENU_W, top, top + VIDEO_MENU_H5 - 1, 5, SIM_TOUCH_TAP);
+        return 1;
+    }
+    return 0;
+}
+
+/* ---- sim-only: exit (5 rows) / restart (3 rows) menus of the four CFG-driven
+   games (d2048/klotski/tetris/fish).
+   ★ 不能拿它判推箱子: 那四个游戏用共享的 g_exit_menu_visible, 而推箱子有自己的
+   s_exit_menu_visible、从不碰共享那个; 但 main.c 的游戏设置页下拉路径(GameSettings_Update)
+   会无条件把共享标志置 1, 推箱子关菜单时又不清它 → 残留下来会让叠加层一直画菜单。 */
+int menu_sim_game_touch_rects(void)
+{
+    if (g_exit_menu_visible) {
+        sim_touch_add_rows(MENU_X, MENU_W, MENU_Y, MENU_Y + MENU_H - 1, 5, SIM_TOUCH_TAP);
+        return 1;
+    }
+    if (g_restart_menu_visible) {
+        sim_touch_add_rows(RESTART_MENU_X, RESTART_MENU_W, RESTART_MENU_Y, 239, 3, SIM_TOUCH_TAP);
+        return 1;
+    }
+    return 0;
+}
+#endif

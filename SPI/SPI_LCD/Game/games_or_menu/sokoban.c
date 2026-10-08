@@ -46,6 +46,9 @@ static const SokobanLevel* g_cur_level;   /* 当前关卡 (只读, 指向关卡数组) */
 #define SOK_BTN_Y      160     // 按钮起始Y
 #define SOK_BTN_HIT_Y0 140     // 按钮命中区Y起点 (按钮上边 160 - 20)
 #define SOK_BTN_HIT_Y1 240     // 按钮命中区Y终点: 判定是 y>=此值则不算, 所以 240 = 直到 y=239(屏幕最底)
+/* 横向分界 = 相邻按钮中线, 让三个命中区"无缝"(不留死区)、且都以按钮为中心(与撤销组做法一致) */
+#define SOK_BTN_HIT_SPLIT1  82   // (75+90)/2  = 82.5 -> 上一关/重新开始 的分界
+#define SOK_BTN_HIT_SPLIT2 157   // (150+165)/2 = 157.5 -> 重新开始/下一关 的分界
 #define SOK_SWIPE_Y    230     // 滑动检测: 下方区域Y阈值 (当Y>此值显示菜单)
 #define SOK_SLIDE_MAX_STEP   2  // 跟手拖拽每帧最大步进(防跳变)
 #define SOK_SLIDE_SPEED      2  // 松手后自动滑动速度(px/帧)
@@ -113,7 +116,8 @@ static const uint8_t sok_lvl2_row_types[3] = {
 /* ---- 撤销界面: 1:1(30x31) 三个按钮 上一步/返回/下一步 ----
    位置按"底边 220 不变、左钮右缘 75 不变、右钮左缘 165 不变"排:
    一级按钮 (2x, 60x62) 在 x=15/90/165, y=160; 撤销按钮 (1x, 30x31) 在下面这三个位置。
-   触摸判定沿用 60px 槽位(45/105/165 起), 与一级按钮一样"宽松好点"。 */
+   触摸判定: 横向按"相邻按钮中线"(90/150, 见 SOK_UNDO_HIT_SPLIT1/2) 分, 让三个区都以按钮为中心
+   (旧写法直接拿 X2/X3 当分界 —— 那俩是按钮左缘, 中间的"返回"会整体右偏 15px)。 */
 #define SOK_UNDO_X1     45
 #define SOK_UNDO_X2     105
 #define SOK_UNDO_X3     165
@@ -122,6 +126,9 @@ static const uint8_t sok_lvl2_row_types[3] = {
    几十像素"的带, 上面一大片空白都会算成点按钮(中间的"返回"尤其容易误触)。
    这里只在上方放宽 10px, 下方一直到底边(与一级按钮一致)。 */
 #define SOK_UNDO_HIT_Y0 179            /* = 189 - 10 */
+#define SOK_UNDO_HIT_SPLIT1  90   /* 横向分界: 相邻按钮中线 (75+105)/2, 使三个区都以按钮为中心 */
+#define SOK_UNDO_HIT_SPLIT2 150   /* 横向分界: (135+165)/2 (画图坐标 105/165 是按钮左缘, 直接用会让
+                                     中间<返回>的区整体右偏15px) */
 #define SOK_UNDO_HIT_Y1 240            /* 到底边(判定 y>=此值不算, 240 = 含 y=239) */
 static uint8_t  s_undo_group = 0;      /* 1 = 撤销模式: 上划显示撤销按钮组(而不是导航按钮) */
 static uint8_t  s_undo_visible = 0;    /* 撤销按钮组当前显示中 */
@@ -756,14 +763,15 @@ uint8_t sokoban_move(SokobanDir dir) {
 /* 触摸输入 (长按移动和菜单手势) */
 
 /**
- * @brief  按钮命中检测: 返回 0=未命中, 1=上一关, 2=重新开始, 3=下一关
+ * @brief  按钮命中检测: 返回 0=未命中(Y 在命中带外), 1=上一关, 2=重新开始, 3=下一关
+ * @note   横向按"相邻按钮中线"(82/157)分, 三个区无缝 [0,82)/[82,157)/[157,240) ——
+ *         原先直接拿按钮左右缘(75/90, 150/165)判, 按钮之间会留 15px 死区(点了当"点空白")
  */
 static uint8_t sok_btn_hit_test(uint16_t x, uint16_t y) {
     if (y < SOK_BTN_HIT_Y0 || y >= SOK_BTN_HIT_Y1) return 0;
-    if (x < SOK_BTN1_X + SOK_BTN_W)                return 1;
-    if (x >= SOK_BTN2_X && x < SOK_BTN2_X + SOK_BTN_W) return 2;
-    if (x >= SOK_BTN3_X)                          return 3;
-    return 0;
+    if (x < SOK_BTN_HIT_SPLIT1) return 1;
+    if (x < SOK_BTN_HIT_SPLIT2) return 2;
+    return 3;
 }
 
 /**
@@ -1079,8 +1087,8 @@ static void sok_show_nav_group(void) {
  */
 static uint8_t sok_undo_hit_test(uint16_t x, uint16_t y) {
     if (y < SOK_UNDO_HIT_Y0 || y >= SOK_UNDO_HIT_Y1) return 0;
-    if (x < SOK_UNDO_X2) return 1;
-    if (x < SOK_UNDO_X3) return 2;
+    if (x < SOK_UNDO_HIT_SPLIT1) return 1;
+    if (x < SOK_UNDO_HIT_SPLIT2) return 2;
     return 3;
 }
 
@@ -2126,3 +2134,41 @@ process_exit_menu:
     s_prev_pressed = ts.pressed;
     return interacted;
 }
+#ifdef SIM_BUILD
+/* ==================================================================
+ *  sim-only -- never compiled into the device image (wasm/build.ps1 adds
+ *  -DSIM_BUILD).  The simulator's touch-region overlay asks whichever module
+ *  owns the screen to report its regions, so it can never drift from the real
+ *  hit-test -- sokoban's panel state is file-static here, so only this file
+ *  can answer it.
+ * ================================================================== */
+int sokoban_sim_touch_rects(void)
+{
+    if (s_exit_menu_visible) {                  /* exit menu: 5 rows, MENU geometry */
+        sim_touch_add_rows(MENU_X, MENU_W, MENU_Y, MENU_Y + MENU_H - 1, 5, SIM_TOUCH_TAP);
+        return 1;
+    }
+    if (s_lvl2_visible) {                       /* level-2 menu: 3 rows, bottom aligned */
+        sim_touch_add_rows(RESTART_MENU_X, RESTART_MENU_W,
+                           RESTART_MENU_Y, 239, 3, SIM_TOUCH_TAP);
+        return 1;
+    }
+
+    /* playing: swipe anywhere to move + the two edge gesture bands */
+    sim_touch_add(0, 0, 240, 240, SIM_TOUCH_SWIPE);
+    sim_touch_add(0, 0, 240, MENU_SWIPE_START_Y, SIM_TOUCH_BAND);
+    sim_touch_add(0, SOK_SWIPE_Y + 1, 240, 240, SIM_TOUCH_BAND);
+
+    if (s_undo_visible) {                       /* undo / back / redo */
+        sim_touch_add(0, SOK_UNDO_HIT_Y0, SOK_UNDO_HIT_SPLIT1, SOK_UNDO_HIT_Y1, SIM_TOUCH_TAP);
+        sim_touch_add(SOK_UNDO_HIT_SPLIT1, SOK_UNDO_HIT_Y0, SOK_UNDO_HIT_SPLIT2, SOK_UNDO_HIT_Y1, SIM_TOUCH_TAP);
+        sim_touch_add(SOK_UNDO_HIT_SPLIT2, SOK_UNDO_HIT_Y0, 240, SOK_UNDO_HIT_Y1, SIM_TOUCH_TAP);
+    }
+    else if (s_menu_visible) {                  /* prev level / restart / next level */
+        sim_touch_add(0, SOK_BTN_HIT_Y0, SOK_BTN_HIT_SPLIT1, SOK_BTN_HIT_Y1, SIM_TOUCH_TAP);
+        sim_touch_add(SOK_BTN_HIT_SPLIT1, SOK_BTN_HIT_Y0, SOK_BTN_HIT_SPLIT2, SOK_BTN_HIT_Y1, SIM_TOUCH_TAP);
+        sim_touch_add(SOK_BTN_HIT_SPLIT2, SOK_BTN_HIT_Y0, 240, SOK_BTN_HIT_Y1, SIM_TOUCH_TAP);
+    }
+    return 1;
+}
+#endif

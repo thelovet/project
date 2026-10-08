@@ -1435,3 +1435,25 @@ render_only:
     Delay_Ms(FRAME_DELAY_MS);
     return interacted ? GAME_RET_INTERACT : GAME_RET_NONE;
 }
+
+#ifdef SIM_BUILD
+/* ---- sim-only: report tetris's playing-state touch regions ---------------
+   Rotate / left / right are decided by where the touch STARTS. */
+int tetris_sim_touch_rects(void)
+{
+    /* All four are SINGLE TAPS (left / right also repeat while held).
+       Zones follow tetris.c exactly: on press, y[20,180) decides by x; the
+       upper middle is rotate, y>=180 is a tap-hard-drop. */
+    sim_touch_add(0, 20, 60, 110, SIM_TOUCH_TAP);      /* y<110,  x<60 : move left  */
+    sim_touch_add(0, 110, 120, 180, SIM_TOUCH_TAP);    /* y>=110, x<120: move left  */
+    sim_touch_add(180, 20, 240, 110, SIM_TOUCH_TAP);   /* y<110,  x>=180: move right */
+    sim_touch_add(120, 110, 240, 180, SIM_TOUCH_TAP);  /* y>=110, x>=120: move right */
+    sim_touch_add(60, 20, 180, 110, SIM_TOUCH_TAP);    /* upper middle: rotate      */
+    sim_touch_add(0, 180, 240, 240, SIM_TOUCH_TAP);    /* y>=180: hard drop         */
+    /* edge gesture bands */
+    sim_touch_add(0, 0, 240, MENU_SWIPE_START_Y, SIM_TOUCH_BAND);  /* top: exit menu    */
+    sim_touch_add(0, 211, 240, 240, SIM_TOUCH_BAND);               /* bottom: restart   */
+    return 1;
+}
+
+#endif

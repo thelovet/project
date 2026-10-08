@@ -44,6 +44,10 @@
 #define BR_NUM_CX  120                       /* 数字居中X */
 #define BR_NUM_Y   (BR_Y - 30)               /* 数字Y中心 (78) */
 #define TAP_THRESHOLD 15
+/* 设置页点击的 Y 门控: 只认 [MENU_SWIPE_START_Y, VIDEO_SWIPE_START_Y] —— 正好夹在
+   顶部下拉(开主菜单)与底部上划(开视频菜单)两条手势带之间, 防误触。
+   三个设置页共用这一处定义; 手势带位置改了这里自动跟着变。 */
+#define SETTINGS_TAP_Y_OK(y)  ((y) >= MENU_SWIPE_START_Y && (y) <= VIDEO_SWIPE_START_Y)
 #define BR_SMOOTH_DIV 3                      /* 滑块位置平滑强度: 每帧向手指位置靠近 1/该值(防手抖带得数字乱跳) */
 #define BR_MAX_LAG    8                      /* 滑块最大滞后(px): 快拖时最多落后手指这么多, 超出部分直接跟上 */
 static uint8_t  s_br_drag = 0;              /* 亮度拖动中标志 */
@@ -417,9 +421,10 @@ static uint8_t SleepTime_Update(void)
         int16_t dy = (int16_t)ts.y - (int16_t)s_st_start_y;
         if (dx < 0) dx = -dx;
         if (dy < 0) dy = -dy;
-        /* 仅Y<200的区域响应点击, 屏蔽下方200~240(防止划菜单时误触) */
+        /* 只认 SETTINGS_TAP_Y_OK 的 Y 区间: 上下两条手势带(顶部下拉主菜单 /
+           底部上划视频菜单)不参与, 防止划菜单时误触本页 */
         if (dx <= TAP_THRESHOLD && dy <= TAP_THRESHOLD
-            && s_st_start_y < 200) {
+            && SETTINGS_TAP_Y_OK(s_st_start_y)) {
             if (s_st_start_x < 120) {
                 if (g_sleep_time_index > 0) {
                     g_sleep_time_index--;
@@ -485,7 +490,9 @@ static uint8_t Orientation_Update(void)
         int16_t dy = (int16_t)ts.y - (int16_t)s_or_start_y;
         if (dx < 0) dx = -dx;
         if (dy < 0) dy = -dy;
-        if (dx <= TAP_THRESHOLD && dy <= TAP_THRESHOLD) {
+        /* 与其它设置页一致: 避让顶部下拉/底部上划手势带, 防误触 */
+        if (dx <= TAP_THRESHOLD && dy <= TAP_THRESHOLD
+            && SETTINGS_TAP_Y_OK(s_or_start_y)) {
             g_orientation_index = (g_orientation_index + 1) & 3;
             Settings_ApplyOrientation(g_orientation_index);
             Settings_SaveAll();
@@ -599,7 +606,8 @@ static uint8_t Language_Update(void)
         int16_t dy = (int16_t)ts.y - (int16_t)s_lg_start_y;
         if (dx < 0) dx = -dx;
         if (dy < 0) dy = -dy;
-        if (dx <= TAP_THRESHOLD && dy <= TAP_THRESHOLD && s_lg_start_y < 200) {
+        if (dx <= TAP_THRESHOLD && dy <= TAP_THRESHOLD
+            && SETTINGS_TAP_Y_OK(s_lg_start_y)) {
             uint8_t idx = (s_lg_start_y < LG_TAP_SPLIT) ? 0 : 1;
             if (idx != g_language_index) {
                 g_language_index = idx;
@@ -646,3 +654,35 @@ uint8_t Settings_Update(void)
     default: s_mode = SETTINGS_NONE; return 0;
     }
 }
+
+#ifdef SIM_BUILD
+/* ---- sim-only: report the touch regions of the settings page in use -------
+   The page index is passed in because s_settings_mode lives in main.c.
+   Returns 1 when a settings page owns the screen. */
+int settings_sim_touch_rects(int mode)
+{
+    if (mode == SETTINGS_NONE) return 0;
+
+    sim_touch_add(BACK_X, BACK_Y, BACK_X + BACK_W, BACK_Y + BACK_H, SIM_TOUCH_TAP);
+    switch (mode) {
+    case SETTINGS_BRIGHTNESS:      /* slider band: x[44,196) y[90,138) */
+        sim_touch_add(44, 90, 196, 138, SIM_TOUCH_DRAG);
+        break;
+    /* 这三页都只认 SETTINGS_TAP_Y_OK: 上下两条手势带留空(避让/防误触) */
+    case SETTINGS_SLEEP_TIME:      /* left half = '-', right half = '+' */
+        sim_touch_add(0, MENU_SWIPE_START_Y, 120, VIDEO_SWIPE_START_Y + 1, SIM_TOUCH_TAP);
+        sim_touch_add(120, MENU_SWIPE_START_Y, 240, VIDEO_SWIPE_START_Y + 1, SIM_TOUCH_TAP);
+        break;
+    case SETTINGS_ORIENTATION:     /* any tap on the page rotates it */
+        sim_touch_add(0, MENU_SWIPE_START_Y, 240, VIDEO_SWIPE_START_Y + 1, SIM_TOUCH_TAP);
+        break;
+    case SETTINGS_LANGUAGE:        /* upper half = CN, lower half = English */
+        sim_touch_add(0, MENU_SWIPE_START_Y, 240, 110, SIM_TOUCH_TAP);
+        sim_touch_add(0, 110, 240, VIDEO_SWIPE_START_Y + 1, SIM_TOUCH_TAP);
+        break;
+    default:
+        break;
+    }
+    return 1;
+}
+#endif

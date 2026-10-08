@@ -1378,3 +1378,14 @@ uint8_t fish_restore_state(const uint8_t* buf, uint8_t len) {
     else fish_draw_scene();
     return 1;
 }
+
+#ifdef SIM_BUILD
+/* ---- sim-only: report fish's playing-state touch regions ---------------- */
+int fish_sim_touch_rects(void)
+{
+    sim_touch_add(0, 0, 240, 240, SIM_TOUCH_SWIPE);              /* finger steers the fish */
+    sim_touch_add(0, 0, 240, MENU_SWIPE_START_Y, SIM_TOUCH_BAND);
+    sim_touch_add(0, 221, 240, 240, SIM_TOUCH_BAND);             /* y>220: restart menu */
+    return 1;
+}
+#endif
