@@ -32,3 +32,6 @@ SPI/SPI_LCD/User/inc/video_chunk.h
 
 # scope capture CSVs (large, local only)
 波形图/
+
+# product manuals (local only)
+说明书/
