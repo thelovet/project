@@ -2172,3 +2172,18 @@ int sokoban_sim_touch_rects(void)
     return 1;
 }
 #endif
+#ifdef SIM_BUILD
+/* ---- sim-only: 长按诊断探针 (which: 0=累计ms 1=hold按钮 2=drag按钮 3=菜单冷却 4=面板位) ---- */
+int sokoban_sim_hold_info(int which)
+{
+    switch (which) {
+    case 0:  return (int)(s_hold_us / 1000);
+    case 1:  return (int)s_hold_button;
+    case 2:  return (int)s_drag_btn;
+    case 3:  return (int)s_menu_cooldown;
+    case 4:  return (int)(s_menu_visible | (s_undo_visible << 1) | (s_lvl2_visible << 2));
+    case 5:  return (int)s_exit_menu_visible;
+    default: return -1;
+    }
+}
+#endif
