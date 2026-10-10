@@ -146,6 +146,7 @@ static uint8_t  s_hist_pos = 0;        /* 当前进度(0..cnt); cnt-pos = 可重做步数
 static void sokoban_draw_cell_at(uint8_t row, uint8_t col);
 static void sok_draw_undo_buttons(void);      /* 撤销按钮组(定义在下方) */
 static void sok_show_nav_group(void);         /* 显示一级导航按钮组(定义在下方) */
+static void sok_redraw_cell_ui(uint8_t r, uint8_t c);  /* 重绘一格(跳过被撤销按钮盖住的) */
 static void sok_redraw_nav_group(void);       /* 重绘一级导航按钮组+关卡编号(定义在下方) */
 static void sok_draw_nav_buttons_at(int16_t y);   /* 导航按钮组绘制(定义在下方) */
 static void sok_redraw_battery_tiles(int16_t x0, int16_t y0, int16_t x1, int16_t y1); /* 按矩形重绘地图瓦片(定义在下方) */
@@ -745,16 +746,19 @@ uint8_t sokoban_move(SokobanDir dir) {
     sok_hist_push((uint8_t)((uint8_t)dir
         | (uint8_t)(((target_cell == SOK_BOX || target_cell == SOK_BOX_ON_TARGET) ? 1u : 0u) << 2)));
 
-    /* 局部刷新 (三个变化的格子) */
+    /* 局部刷新 (三个变化的格子; 用 sok_redraw_cell_ui(): 跳过被撤销按钮盖住的格子,
+       否则箱子从底部那排移走时这一格重绘会把中间按钮抠出缺口) */
     LCD_CS_CLR;
-    sokoban_draw_cell_at(pr, pc);   /* 玩家原位置 */
-    sokoban_draw_cell_at((uint8_t)nr, (uint8_t)nc);   /* 玩家新位置 */
+    sok_redraw_cell_ui(pr, pc);   /* 玩家原位置 */
+    sok_redraw_cell_ui((uint8_t)nr, (uint8_t)nc);   /* 玩家新位置 */
     if (target_cell == SOK_BOX || target_cell == SOK_BOX_ON_TARGET) {
         int8_t br = nr + dr[dir];
         int8_t bc = nc + dc[dir];
-        sokoban_draw_cell_at((uint8_t)br, (uint8_t)bc); /* 箱子新位置 */
+        sok_redraw_cell_ui((uint8_t)br, (uint8_t)bc); /* 箱子新位置 */
     }
     LCD_CS_SET;
+    /* 撤销面板是不透明板: 跨在它上边缘的格子会盖住按钮, 补画一次(否则中间按钮被抠出缺口) */
+    if (s_undo_visible) sok_draw_undo_buttons();
     game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 1);
 
     return 1;
@@ -1099,6 +1103,8 @@ static uint8_t sok_undo_hit_test(uint16_t x, uint16_t y) {
  * @note   noinline: 有 4 处调用, 内联会把这段比较复制 4 份, 反而更占 flash
  */
 static void __attribute__((noinline)) sok_redraw_cell_ui(uint8_t r, uint8_t c) {
+    /* 只跳'完全被按钮盖住'的格子; 跨在按钮上边缘那一格要照画(它在面板上方还露一条),
+       盖住按钮的部分随后由 sok_draw_undo_buttons() 补回来 */
     if (g_oy + (int16_t)r * (int16_t)g_tile_size >= SOK_UNDO_Y) return;
     sokoban_draw_cell_at(r, c);
 }
@@ -1174,6 +1180,7 @@ static uint8_t sok_hist_step(uint8_t step, uint8_t forward) {
         sok_redraw_cell_ui((uint8_t)tx, (uint8_t)tc);
     }
     LCD_CS_SET;
+    if (s_undo_visible) sok_draw_undo_buttons();   /* 同上: 跨线格子会盖住按钮, 补画 */
     game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 1);
     return 1;
 }

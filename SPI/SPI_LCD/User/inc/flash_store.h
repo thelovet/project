@@ -159,11 +159,11 @@ typedef enum {
  *     所以英文这套用独立烧录模式 BTN_IMG_STORE_MODE 单独烧一次;
  *   - 不放进资源表 = 不动目录/不动布局 → 不用重烧整份字库, 也不用担心
  *     "跳过不写的项和邻居共用扇区被擦掉"的问题(这是原方案最大的坑)。
- * 区域地址: 视频区(0 ~ 约2.87M)与字库区(约8.19M起)之间的空闲区, 取 4KB 对齐。
- *   ★ 以后视频长度大幅增加 / 字库区变大时, 要重新确认这块不被占用。
+ * 区域地址: 放在**尾部之前**的固定保留区(0x7E0000 起), 取 4KB 对齐。
+ *   ★ 挪过来的原因: 原来在 0x600000 会把"连续视频区"卡在 6MiB; 现在视频可用到约 7.5MiB。
  * 布局: [prev_en][next_en][restart_en], 每张 30x31 RGB565 小端 = 1860 字节。
  * ================================================================ */
-#define BTN_IMG_EN_ADDR   0x00600000UL        /* 保留区起始地址(4KB对齐) */
+#define BTN_IMG_EN_ADDR   0x007E0000UL        /* 保留区起始地址(4KB对齐) */
 #define BTN_IMG_EN_ONE    1860UL              /* 单张按钮图字节数 (30*31*2) */
 #define BTN_IMG_EN_SIZE   (BTN_IMG_EN_ONE * 3UL)   /* 3 张: 上一关/下一关/重新开始 */
 #define BTN_IMG_EN_PREV     0UL               /* 区域内偏移 */
@@ -175,14 +175,14 @@ typedef enum {
    ★ 中文这套也**不能**进资源表 —— 字库固件只余 316B, 而一套 3 张 = 5580B。
    布局: [上一步][返回][下一步], 每张 30x31 RGB565 小端 = 1860 字节。
    运行期按 g_language_index 选基地址, 再用下面的偏移取图(见 sokoban.c)。
-   两块都是 4KB 对齐, 且 0x602000+5580 < 0x604000, 不会互相覆盖。 */
+   两块都是 4KB 对齐, 且 0x7E2000+5580 < 0x7E4000, 不会互相覆盖。 */
 #define BTN_IMG_UNDO_ONE     1860UL                    /* 单张字节数 (30*31*2) */
 #define BTN_IMG_UNDO_SIZE    (BTN_IMG_UNDO_ONE * 3UL)  /* 一套 3 张 = 5580 */
 #define BTN_IMG_UNDO_PREV    0UL                       /* 上一步 */
 #define BTN_IMG_UNDO_BACK    BTN_IMG_UNDO_ONE          /* 返回 */
 #define BTN_IMG_UNDO_NEXT    (BTN_IMG_UNDO_ONE * 2UL)  /* 下一步 */
-#define BTN_IMG_UNDO_CN_ADDR 0x00602000UL              /* 中文套保留区(4KB对齐) */
-#define BTN_IMG_UNDO_EN_ADDR 0x00604000UL              /* 英文套保留区(4KB对齐) */
+#define BTN_IMG_UNDO_CN_ADDR 0x007E2000UL              /* 中文套保留区(4KB对齐) */
+#define BTN_IMG_UNDO_EN_ADDR 0x007E4000UL              /* 英文套保留区(4KB对齐) */
 
 /* 菜单"游戏名"用的汉字字模 (见 chinese_fonts.h 的 MENU_EXT_ID_*):
    放在**字库数据区紧前面**(与字库同一个区), 地址 = (data_start 向下取整到 4KB) - MENU_GLYPH_SIZE。
