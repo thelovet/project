@@ -64,7 +64,9 @@
 /* 屏幕背光极性（定义=测试屏，高电平亮，注释=正常屏，低电平亮） */
 //#define TEST_SCREEN_BACKLIGHT
 /* Standby模式保持LCD供电，支持触摸唤醒（会增加功耗） */
-#define KEEP_LCD_POWER_IN_STANDBY
+/* 试验: 待机时真正切断 LCD 电源(断电前已把屏相关引脚拉低, 见 Standby_PinConfig);
+   开回来 = 待机保持屏供电(支持触摸唤醒但费电) */
+/* #define KEEP_LCD_POWER_IN_STANDBY */
 
 /* ================================================================
  * 烧录模式切换 (二选一, 都注释 = 正常游戏程序)

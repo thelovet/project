@@ -156,10 +156,13 @@ void LCD_ShowNum(uint16_t num, uint16_t y)
 void System_PrepareForStandby(void)
 {
     SPI_Flash_PowerDown();// Flash进入PowerDown模式
-    CST816S_SleepEnable();// CST816S进入待机模式
     LCD_Enter_Sleep();// LCD进入待机模式
     LCD_PWR_OFF;// 关闭LCD电源
     Touch_WaitWakeInputsReleased();// 等待触摸输入释放
+    /* ★ 顺序很重要: 本函数里会对触摸IC做一次硬件复位(IC 回到 Active 态), 所以"让 IC 进省电态"
+       必须排在它**后面** —— 否则刚进省电态就被这次复位叫醒, 省电命令白下
+       (这正是之前下了 Idle 命令、待机电流却仍 1900uA 的原因)。 */
+    CST816S_SleepEnable();
 }
 
 

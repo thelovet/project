@@ -498,8 +498,9 @@ void Touch_WaitWakeInputsReleased(void)
         GPIO_Init(TOUCH_RST_PORT, &rst);
         GPIO_ResetBits(TOUCH_RST_PORT, TOUCH_RST_PIN);
 #if TOUCH_IC_IT7259
-        /* IT7259: 脉宽必须 <1ms —— 手册7章"RST 低脉冲>1ms 进 sleep(0.1uA)":
-           那是彻底停机, 点屏幕也唤不醒 */
+        /* IT7259: 脉宽必须 <1ms(手册7章: RST 低电平>1ms 会让芯片进 sleep=彻底停机)。
+           ● 已实测: 就算把它改成 >1ms 也没能让芯片降功耗(电流不变) —— 这颗 IC 不吃"RST 深睡眠",
+             那一下只是把它复位回 Active。待机省电实际靠 Touch_StandbyWakeupConfig() 末尾的 Idle 命令。 */
         Delay_Us(100);
 #else
         /* CST816S: 低电平脉宽要求较宽(沿用 Touch_Init 的复位时序) */
@@ -918,9 +919,8 @@ void EXTI9_5_IRQHandler(void)
 void CST816S_SleepEnable(void)
 {
 #if TOUCH_IC_IT7259
-    /* IT7259: 待机前不能让它进 sleep —— 手册7章的"RST 低脉冲>1ms 进 sleep"是深睡眠(0.1uA),
-       芯片会完全停止响应触摸、INT 不再输出 → 待机后点屏幕唤不醒(实测)。故这里保持芯片工作,
-       只靠 INT 在触摸时唤醒 MCU(功耗换可用性); 若以后要低功耗, 需改用 Idle 模式命令。 */
+    /* IT7259: 省电不在这里做 —— 本函数排在 Touch_WaitWakeInputsReleased() 之前, 下了会被它的复位冲掉。
+       实际落地在 Touch_StandbyWakeupConfig() 末尾(Idle 命令, 25uA, 待机触摸唤醒保留)。 */
 #else
     CST816S_WriteReg(CST816S_REG_LP_SCAN_TH,
                      CST816S_LP_SCAN_THRESHOLD);
@@ -1169,6 +1169,19 @@ void Touch_StandbyWakeupConfig(void)
     EXTI_InitStructure.EXTI_LineCmd = ENABLE;
     EXTI_Init(&EXTI_InitStructure);
 
+#if TOUCH_IC_IT7259
+    /* ★ 待机省电(定案): 电源模式命令 Idle —— 手册5.3.4: Command 0x04/子命令0x00, 参数0x01=Idle,
+       标称 25uA; 不上报数据包, 用户触摸时自动回 Active → 待机触摸唤醒保留。
+       位置是关键: 必须放在这里(= Touch_WaitWakeInputsReleased() 之后, 待机路径上最后一次碰 IC),
+       否则会被那次复位脉冲冲掉(之前电流不降就是栽在这个顺序上)。
+       ● 另外两条路都试过、走不通, 别再试:
+         (1) 把 PB8 一直拉低 —— Standby 下 I/O 全高阻, 电平保持不住(实测仍能唤醒、电流仍 1900uA);
+         (2) RST 低脉冲 >1ms 进深睡眠(0.1uA) —— 这颗 IC 不吃, 没反应。
+       ● 实测: 1900uA(Active) → 20~90uA 循环(Idle 的周期性低功耗扫描, 均值 ~25uA, 与手册标称一致);
+         进 Idle 前改"引擎扫描周期"(0x15/0x18) 对 Idle 无效, 命令已撤掉。
+       ● 若以后要"彻底 0uA": 只能硬件给 TP_VCC 加受控负载开关(代价: 待机触摸唤醒失效)。 */
+    (void)IT7259_WriteCmd3(CST816S_REG_POWER_MODE, 0x00, 0x01);
+#endif
     EXTI_ClearFlag(EXTI_Line8);
 }
 

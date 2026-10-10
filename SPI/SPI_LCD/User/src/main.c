@@ -389,8 +389,10 @@ static void Standby_PinConfig(void) {
 
     // GPIOB CFGHR: PB8=AIN(0x0) PB9=PP50(0x3) PB10~11=AIN(0x0) PB12=PP50(0x3) PB13~15=AIN(0x0)
     GPIOB->CFGHR = 0x00030030;
-    LCD_LED_SET;                                 // 关背光(避免待机闪亮/降低功耗)
-    GPIOB->BSHR = GPIO_Pin_12;                  // PB12置高(LCD_CS)
+    /* ★ 屏在待机时是断电的: 背光(PB9)和片选(PB12)必须拉低 ——
+       拉高的话, 面板断电后引脚上的高电平会经面板 IO 的保护二极管给面板"灌电"(幽灵供电), 反而更费电 */
+    GPIOB->BCR  = GPIO_Pin_9;                   // PB9拉低(面板无电, 背光不会亮; 同时避免灌电)
+    GPIOB->BCR  = GPIO_Pin_12;                  // PB12拉低(片选低; 同时避免灌电)
 }
 
 /**
@@ -471,10 +473,9 @@ void Enter_Standby(void) {
     NVIC_ClearPendingIRQ(DMA1_Channel5_IRQn);  // SPI2_TX
 
     Battery_StandbyWakeupConfig();
-#ifdef KEEP_LCD_POWER_IN_STANDBY
+    /* 触摸唤醒: 触摸IC现在是独立供电(2026-10 硬件改动), 与LCD是否断电无关 → 恒定启用 */
     Touch_WaitWakeInputsReleased();
     Touch_StandbyWakeupConfig();
-#endif
 
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_BKP, ENABLE);
     PWR_BackupAccessCmd(ENABLE);
@@ -1619,11 +1620,9 @@ int main(void) {
 
         // 配置PB6(CHRG) EXTI中断唤醒
         Battery_StandbyWakeupConfig();
-#ifdef KEEP_LCD_POWER_IN_STANDBY
-        // 保电时配置LCD供电和PA8 EXTI唤醒
+        /* 触摸唤醒: 触摸IC独立供电, 与LCD断电无关 → 恒定启用 */
         Touch_WaitWakeInputsReleased();
         Touch_StandbyWakeupConfig();
-#endif
 
         /* PA0作为KEY未启用，PA8仅作触摸唤醒，PB5/PB6充电唤醒 */
         PWR_WakeUpPinCmd(DISABLE);
