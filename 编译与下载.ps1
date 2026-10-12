@@ -41,6 +41,9 @@ function Show-MemUsage {
 
 function Do-Build {
     # 先增量编译(快); 若失败(如源码转码后旧.o调试信息失配导致链接错), 再清理过期目标文件重编一次
+    # [apply_lto] enable LTO but keep LCD/src/lcd.c out (see memo 56)
+    $lto = Join-Path $PSScriptRoot 'apply_lto.ps1'
+    if (Test-Path $lto) { & powershell -NoProfile -ExecutionPolicy Bypass -File "$lto" | Out-Null }
     Write-Host "==> make all" -ForegroundColor Cyan
     make all
     if ($LASTEXITCODE -ne 0) {

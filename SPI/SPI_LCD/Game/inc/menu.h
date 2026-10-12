@@ -281,7 +281,7 @@ void menu_draw_fish_icon(uint16_t y);
  */
 uint8_t game_menu_drag_poll(int16_t *drag_y, uint16_t *drag_touch_y,
                              uint8_t *dragging, const TouchState *ts,
-                             const uint8_t row_types[6]);
+                             const uint8_t row_types[5]);
 
 /**
  * @brief  重置 game_menu_drag_poll 内部状态，确保下次拖拽从干净状态启动
