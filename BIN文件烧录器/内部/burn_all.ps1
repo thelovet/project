@@ -86,11 +86,11 @@ $dataBin  = Join-Path $obj "chunk_data.bin"       # 块数据 53248 字节
 $log      = Join-Path $obj "burn_log.txt"
 $openocd  = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\components\WCH\OpenOCD\OpenOCD\bin\openocd.exe"
 $cfg      = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\components\WCH\OpenOCD\OpenOCD\bin\wch-riscv.cfg"
-$gcc      = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\components\WCH\Toolchain\RISC-V Embedded GCC\bin"
+$gcc      = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\components\WCH\Toolchain\RISC-V Embedded GCC12\bin"
 $mk       = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\others\Build_Tools\Make\bin"
 $env:Path = "$gcc;$mk;" + $env:Path
-$nm       = Join-Path $gcc "riscv-none-embed-nm.exe"
-$objdump  = Join-Path $gcc "riscv-none-embed-objdump.exe"
+$nm       = Join-Path $gcc "riscv-wch-elf-nm.exe"
+$objdump  = Join-Path $gcc "riscv-wch-elf-objdump.exe"
 
 # g_burn_prog 结构有效标志(固件里 BURN_PROG_MAGIC = 'B','U','R','N')与字段个数
 $BurnMagic = 0x4255524E

@@ -43,13 +43,14 @@ $elf     = Join-Path $obj 'SPI_LCD.elf'
 $logFile = Join-Path $obj 'burn_log.txt'
 $switchScript = Join-Path $PSScriptRoot 'switch_mode.ps1'
 $burnAll = Join-Path $PSScriptRoot 'burn_all.ps1'
+$buildScript = Join-Path $proj '编译与下载.ps1'   # 编译复用根目录脚本(工具链/开关只维护一处)
 
 $mrs     = 'D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32'
 $openocd = Join-Path $mrs 'components\WCH\OpenOCD\OpenOCD\bin\openocd.exe'
 $ocfg    = Join-Path $mrs 'components\WCH\OpenOCD\OpenOCD\bin\wch-riscv.cfg'
-$gcc     = Join-Path $mrs 'components\WCH\Toolchain\RISC-V Embedded GCC\bin'
+$gcc     = Join-Path $mrs 'components\WCH\Toolchain\RISC-V Embedded GCC12\bin'
 $mkbin   = Join-Path $mrs 'others\Build_Tools\Make\bin'
-$nm      = Join-Path $gcc 'riscv-none-embed-nm.exe'
+$nm      = Join-Path $gcc 'riscv-wch-elf-nm.exe'
 $env:Path = "$gcc;$mkbin;" + $env:Path
 $latin = [Text.Encoding]::GetEncoding(28591)      # byte<->char 1:1, 保住 config.h 原编码
 
@@ -86,18 +87,18 @@ function Start-PsScript {
     return (Start-Process powershell -ArgumentList $a -PassThru -WindowStyle Hidden)
 }
 function Build([string]$tag) {
-    Push-Location $obj
-    & make clean *> $null
-    $o = & make all 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) {
-        Get-ChildItem -Path $obj -Recurse -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.Extension -in '.o', '.d', '.map', '.lst' } | Remove-Item -Force
-        $o = & make all 2>&1 | Out-String
-    }
+    # 复用根目录 编译与下载.ps1 的 rebuild 模式(清 + 编译, 不烧写):
+    # 工具链(GCC12)与编译开关只在那边维护一处, 避免两边不一致(见备忘录 §52/§54)
+    if (-not (Test-Path $buildScript)) { Log ("找不到编译脚本: {0}" -f $buildScript); return 1 }
+    $o = & powershell -NoProfile -ExecutionPolicy Bypass -File "$buildScript" rebuild 2>&1 | Out-String
     $ec = $LASTEXITCODE
-    Pop-Location
-    $s = ($o -split "`n" | Where-Object { $_ -match '^\s+FLASH:' } | Select-Object -First 1)
-    if ($ec -ne 0) { Log ("编译失败({0})" -f $tag); Log ("$o") } else { Log ("编译成功({0}) {1}" -f $tag, "$s".Trim()) }
+    if ($ec -ne 0) {
+        Log ("编译失败({0})" -f $tag)
+        Log ("$o")
+    } else {
+        Log ("编译成功({0})" -f $tag)
+        ($o -split "`n" | Where-Object { $_ -match 'Flash 已用' } | Select-Object -First 1) | ForEach-Object { Log ($_.Trim()) }
+    }
     return $ec
 }
 

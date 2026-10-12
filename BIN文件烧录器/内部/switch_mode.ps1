@@ -3,7 +3,7 @@
 #   powershell -File switch_mode.ps1 burn   -> VIDEO_CHUNK_STORE_MODE ON
 #   powershell -File switch_mode.ps1 game   -> VIDEO_CHUNK_STORE_MODE OFF
 #   powershell -File switch_mode.ps1        -> show current state
-# NOTE: both modes compile WITHOUT -flto (flto breaks game-mode linking)
+# NOTE: both modes KEEP -flto (GCC12 实测: 字库/按钮/视频/游戏 四种模式都能链过, LTO 省约 4KB)
 param([string]$mode, [string]$ProjPath = '')
 
 $latin = [System.Text.Encoding]::GetEncoding(28591)   # byte<->char 1:1, keeps GBK/UTF-8 intact
@@ -68,7 +68,7 @@ function Set-FltoFile($path, [bool]$wantBurn) {
     $changed = $false
     for ($i = 0; $i -lt $lines.Length; $i++) {
         $L = $lines[$i]
-        if ($L -match 'riscv-none-embed-gcc' -and ($L -match '-c -o ' -or $L -match 'SPI_LCD\.elf')) {
+        if ($L -match 'riscv-wch-elf-gcc' -and ($L -match '-c -o ' -or $L -match 'SPI_LCD\.elf')) {
             $n = $L
             if ($wantBurn) {
                 $n = [regex]::Replace($n, '\s+-flto', '')
@@ -119,14 +119,13 @@ else { Write-Output ("unknown mode: {0}" -f $mode); exit 1 }
 # 1. config.h macro
 Set-BurnMacro $wantBurn
 
-# 2. flto options in all subdir.mk + makefile
-#    两种模式都要去掉 -flto (flto 会让游戏模式链接报 relocation truncated 之类的错误)
+# 2. -flto: keep as-is, do NOT strip it.
+#    (GCC12 + LTO 已验证: 字库/按钮/视频/游戏 四种模式都能链过且体积更小)
+#    (原"删除 -flto"的循环已移除; Set-FltoFile / Get-FltoCount 保留备用/自查)
 $nChanged = 0
-$files = @(Get-ChildItem -Path $obj -Recurse -Filter *.mk) + @(Get-Item "$obj\makefile")
-foreach ($f in $files) { if (Set-FltoFile $f.FullName $true) { $nChanged++ } }
 
 # 3. clean to force rebuild with new options
-$gcc  = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\components\WCH\Toolchain\RISC-V Embedded GCC\bin"
+$gcc  = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\components\WCH\Toolchain\RISC-V Embedded GCC12\bin"
 $mkbn = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\others\Build_Tools\Make\bin"
 $env:Path = "$gcc;$mkbn;" + $env:Path
 Push-Location $obj
@@ -136,9 +135,9 @@ Pop-Location
 # 4. report
 $burn = Get-BurnState
 if ($burn) {
-    Write-Output ("switched to: BURN mode (VIDEO_CHUNK_STORE_MODE defined, no -flto), {0} files updated, make clean done" -f $nChanged)
+    Write-Output ("switched to: BURN mode (VIDEO_CHUNK_STORE_MODE defined, LTO kept), {0} files updated, make clean done" -f $nChanged)
     Write-Output "next: python gen_video_chunk.py <N> then run burn_all.ps1 (it does gen + make itself)"
 } else {
-    Write-Output ("switched to: GAME mode (VIDEO_CHUNK_STORE_MODE commented, no -flto), {0} files updated, make clean done" -f $nChanged)
+    Write-Output ("switched to: GAME mode (VIDEO_CHUNK_STORE_MODE commented, LTO kept), {0} files updated, make clean done" -f $nChanged)
     Write-Output "next: make all, then SWD download (openocd program ... reset exit)"
 }

@@ -9,7 +9,7 @@ param([string]$mode = "all")  # all | build | flash | clean
 # --- MRS 工具链路径 ---
 $openocd = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\components\WCH\OpenOCD\OpenOCD\bin\openocd.exe"
 $cfg     = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\components\WCH\OpenOCD\OpenOCD\bin\wch-riscv.cfg"
-$gcc     = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\components\WCH\Toolchain\RISC-V Embedded GCC\bin"
+$gcc     = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\components\WCH\Toolchain\RISC-V Embedded GCC12\bin"
 $mk      = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\others\Build_Tools\Make\bin"
 
 $env:Path = "$gcc;$mk;" + $env:Path
@@ -24,7 +24,7 @@ $script:flashOk = $false
 $script:hadError = 0
 
 function Show-MemUsage {
-    $line = (& riscv-none-embed-size --format=berkeley SPI_LCD.elf 2>$null |
+    $line = (& riscv-wch-elf-size --format=berkeley SPI_LCD.elf 2>$null |
              Where-Object { $_ -match '\.elf$' -and $_ -match '\d' } |
              Select-Object -First 1)
     if (-not $line) { Write-Host "  未能解析内存占用" -ForegroundColor Yellow; return }
@@ -81,6 +81,12 @@ $sw = [System.Diagnostics.Stopwatch]::StartNew()
 switch ($mode) {
     "build" { Do-Build; Show-BuildResult }
     "flash" { Do-Flash; Show-FlashResult }
+    "rebuild" {
+        Write-Host "==> 清理" -ForegroundColor Cyan
+        make clean
+        Do-Build
+        Show-BuildResult
+    }
     "clean" {
         Write-Host "==> 清理" -ForegroundColor Cyan
         make clean

@@ -22,9 +22,9 @@ $ErrorActionPreference = 'Continue'
 $mrs  = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32"
 $openocd = Join-Path $mrs "components\WCH\OpenOCD\OpenOCD\bin\openocd.exe"
 $ocfg    = Join-Path $mrs "components\WCH\OpenOCD\OpenOCD\bin\wch-riscv.cfg"
-$gcc     = Join-Path $mrs "components\WCH\Toolchain\RISC-V Embedded GCC\bin"
+$gcc     = Join-Path $mrs "components\WCH\Toolchain\RISC-V Embedded GCC12\bin"
 $mkbin   = Join-Path $mrs "others\Build_Tools\Make\bin"
-$nm      = Join-Path $gcc "riscv-none-embed-nm.exe"
+$nm      = Join-Path $gcc "riscv-wch-elf-nm.exe"
 $env:Path = "$gcc;$mkbin;" + $env:Path
 $latin = [Text.Encoding]::GetEncoding(28591)   # byte<->char 1:1, 保住 config.h 的原编码
 
