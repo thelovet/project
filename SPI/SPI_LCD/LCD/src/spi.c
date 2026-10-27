@@ -297,8 +297,13 @@ void SPI2_Init(void)
     SPI_InitStructure.SPI_Direction         = SPI_Direction_1Line_Tx;//单线模式，发送数据
     SPI_InitStructure.SPI_Mode              = SPI_Mode_Master;//主模式
     SPI_InitStructure.SPI_DataSize          = SPI_DataSize_8b;//数据大小为8位
-    SPI_InitStructure.SPI_CPOL              = SPI_CPOL_High;//时钟极性高电平
-    SPI_InitStructure.SPI_CPHA              = SPI_CPHA_2Edge;//时钟相位第二个边沿
+#if LCD_PANEL_INIT == 1
+    SPI_InitStructure.SPI_CPOL              = SPI_CPOL_Low;    /* ST77912: SPI mode 0 */
+    SPI_InitStructure.SPI_CPHA              = SPI_CPHA_1Edge;
+#else
+    SPI_InitStructure.SPI_CPOL              = SPI_CPOL_High;   /* GC9A01/TFT: SPI mode 3 */
+    SPI_InitStructure.SPI_CPHA              = SPI_CPHA_2Edge;
+#endif
     SPI_InitStructure.SPI_NSS               = SPI_NSS_Soft;//软件控制NSS
     #if SPI2_SPEED_MODE == SPI_VELOCITY_2
         SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_2;
@@ -448,7 +453,7 @@ void SPI2_SetDataSize(uint16_t DataSize)
     SPI_InitStructure.SPI_Mode              = SPI_Mode_Master;
     SPI_InitStructure.SPI_DataSize          = DataSize;
     SPI_InitStructure.SPI_CPOL              = SPI_CPOL_Low;
-    SPI_InitStructure.SPI_CPHA              = SPI_CPHA_1Edge;
+    SPI_InitStructure.SPI_CPHA              = SPI_CPHA_2Edge;
     SPI_InitStructure.SPI_NSS               = SPI_NSS_Soft;
     SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_2;
     SPI_InitStructure.SPI_FirstBit          = SPI_FirstBit_MSB;

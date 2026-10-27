@@ -409,6 +409,52 @@ int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count) {
     return menu_row_from_y(MENU_Y, y, item_count);
 }
 
+#if TOUCH_DEBUG_SHOW
+/* debug overlay: menu hit-box + row dividers (green) and touch cross (magenta/yellow).
+   Wait for the pending menu DMA first: menu text is pushed by SPI2_Write_DMA which
+   returns before the transfer finishes, so without waiting it would paint OVER the cross. */
+void Menu_DebugDrawRegions(void)
+{
+    TouchState ts;
+    uint16_t xl = MENU_X;
+    uint16_t yt = MENU_Y;
+    uint16_t xr = (uint16_t)(MENU_X + MENU_W);
+    uint16_t yb = (uint16_t)(MENU_Y + MENU_H);
+    uint16_t gap  = (uint16_t)((MENU_H - 2 * MENU_BDR - 5u * 32u) / 6u);
+    uint16_t base = (uint16_t)(MENU_Y + MENU_BDR + gap / 2);
+    uint8_t  k;
+
+    Touch_Scan(&ts);
+    SPI2_WaitIdle();
+
+    LCD_CS_CLR;
+    LCD_Fill(xl, yt, xr, yt + 1, LCD_GREEN);
+    LCD_Fill(xl, yb - 1, xr, yb, LCD_GREEN);
+    LCD_Fill(xl, yt, xl + 1, yb, LCD_GREEN);
+    LCD_Fill(xr - 1, yt, xr, yb, LCD_GREEN);
+    for (k = 1; k < 5; k++) {
+        uint16_t yy = (uint16_t)(MENU_Y + base + 1u + (uint16_t)k * (32u + gap));
+        if (yy > yt && yy < yb) LCD_Fill(xl, yy, xr, yy + 1, LCD_GREEN);
+    }
+    {
+        uint16_t col = ts.pressed ? LCD_MAGENTA : LCD_YELLOW;
+        uint16_t px = ts.x;
+        uint16_t py = ts.y;
+        uint16_t hx0 = (px > 12) ? (uint16_t)(px - 12) : 0;
+        uint16_t hx1 = (px + 13u > 240u) ? 240u : (uint16_t)(px + 13u);
+        uint16_t hy0 = (py > 12) ? (uint16_t)(py - 12) : 0;
+        uint16_t hy1 = (py + 13u > 240u) ? 240u : (uint16_t)(py + 13u);
+        uint16_t cx0 = (px > 1) ? (uint16_t)(px - 1) : 0;
+        uint16_t cx1 = (px + 2u > 240u) ? 240u : (uint16_t)(px + 2u);
+        uint16_t cy0 = (py > 1) ? (uint16_t)(py - 1) : 0;
+        uint16_t cy1 = (py + 2u > 240u) ? 240u : (uint16_t)(py + 2u);
+        LCD_Fill(hx0, cy0, hx1, cy1, col);
+        LCD_Fill(cx0, hy0, cx1, hy1, col);
+    }
+    LCD_CS_SET;
+}
+#endif
+
 /**
  * @brief  加载菜单字体缓存(从外部 Flash 按需载入字库块)。
  */
@@ -1253,6 +1299,7 @@ uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t* prev_pressed,
     TouchState* out_ts) {
     static int8_t pressed_hit = -1;
     static uint16_t pressed_y = 0;
+    static uint16_t pressed_x = 0;
     TouchState ts;
     Touch_Scan(&ts);
     if (out_ts) *out_ts = ts;
@@ -1260,6 +1307,7 @@ uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t* prev_pressed,
     if (!(*prev_pressed) && ts.pressed) {
         pressed_hit = menu_hit_test(ts.x, ts.y, 5);
         pressed_y = ts.y;
+        pressed_x = ts.x;
     }
     else if (*prev_pressed && !ts.pressed) {
         int8_t released_hit = menu_hit_test(ts.x, ts.y, 5);
@@ -1284,6 +1332,16 @@ uint8_t game_exit_menu_poll(const uint8_t ret_map[5], uint8_t* prev_pressed,
                 ret = ret_map[released_hit];
             else
                 ret = EXIT_RET_BACK;  /* hit==-1(菜单外)→关闭菜单; 无返回行 */
+        }
+        else if (((ts.x >= pressed_x ? ts.x - pressed_x : pressed_x - ts.x) <= MENU_SWIPE_COMMIT_DIST)
+              && ((ts.y >= pressed_y ? ts.y - pressed_y : pressed_y - ts.y) <= MENU_SWIPE_COMMIT_DIST)) {
+            /* pressed/released verdicts differ but the finger barely moved => it is a tap.
+               Use the press-position verdict so a tap right on the outside/inside boundary
+               (x == MENU_X) is not swallowed as a swipe (which would do nothing at all). */
+            if (pressed_hit >= 0 && pressed_hit < 5)
+                ret = ret_map[pressed_hit];
+            else
+                ret = EXIT_RET_BACK;
         }
         pressed_hit = -1;
         *prev_pressed = 0;

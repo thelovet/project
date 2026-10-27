@@ -93,4 +93,12 @@
    注意: 打开后菜单关闭时不会再用视频帧盖掉菜单残留, 属正常现象, 只用于调试。 */
 //#define DEBUG_BLACK_VIDEO   /* 调试用: 打开=视频不刷帧(黑屏), 菜单/触摸照常; 正式版必须注释掉 */
 
+/* 测试模式: 不休眠, 屏幕常亮(用于触摸调试) */
+#define TEST_NO_SLEEP   0
+
+/* LCD 初始化选择: 0=旧GC9A01, 1=新ST77912, 2=TFT */
+#define LCD_PANEL_INIT   0
+
+/* 屏幕测试: 常显白色 (debug only) */
+//#define LCD_TEST_WHITE  1
 #endif

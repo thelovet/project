@@ -12,12 +12,14 @@
  *    VCC -- 3.3V (8脚)
  *    GND -- GND (4脚)
  *
+ * 
  *    LCD_LED    -- PB9
  *    LCD_DC     -- PB0
  *    LCD_RST    -- PB1
  *    LCD_CS     -- PB12
  *    LCD_SCK    -- PB13(SPI2_SCK)
  *    LCD_MOSI   -- PB15(SPI2_MOSI)
+ *    LCD_PWR    -- PB4   (低=上电，高=断电)
  *
  *    触摸 RST   -- PB8
  *    触摸 INT   -- PA8
@@ -210,6 +212,11 @@ static uint8_t GameRestore_ApplyPending(void)
  */
 static void GameAutoSleep_Enter(void)
 {
+#ifdef TEST_NO_SLEEP
+    /* 测试模式: 不进待机, 屏幕保持常亮 */
+    s_game_last_activity_us = GetTimerCount();
+    return;
+#endif
     LCD_Backlight_PWM_Stop();
 #ifndef DEBUG_NO_STANDBY
     IWDG_Disable();
@@ -1603,6 +1610,7 @@ int main(void) {
         g_language_index = (uint8_t)((orient >> 2) & 0x0001u); /* bit2=语言(DR11 超出 BKP 范围, 不用) */
     }
 
+#ifndef TEST_NO_SLEEP
     if (RCC_GetFlagStatus(RCC_FLAG_SFTRST) != RESET
         && !s_standby_touch_wake && !s_standby_charge_wake
         && !s_standby_unknown_wake) {
@@ -1639,6 +1647,7 @@ int main(void) {
         NVIC_SystemReset();
         while (1);
     }
+#endif
     RCC_ClearFlag();
 #endif
 
@@ -1695,6 +1704,12 @@ int main(void) {
     FlashStore_ResInit();    // 读取外部Flash资源目录(字库/图片数据已烧录)
 
     PVD_CheckLowVoltage(); // 低电压检测<2.7V复位,>= 2.7V正常
+#ifdef LCD_TEST_WHITE
+    LCD_Backlight_PWM_Stop();
+    LCD_LED_CLR;
+    LCD_Fill(0, 0, LCD_W, LCD_H, LCD_WHITE);
+    while (1) { IWDG_ReloadCounter(); Delay_Ms(100); }
+#endif
 
     TIMER2_Init();           // 初始化定时器2
     LCD_DMA_Interrupt_Init();//LCD DMA中断配置
@@ -1788,7 +1803,7 @@ int main(void) {
                 || s_settings_mode != SETTINGS_NONE
                 || g_settings_from_game)
             && Main_HandleTouchInput()) {
-            TOUCH_DEBUG_FRAME();   /* 调试: 触摸坐标显示在最上层 */
+            TOUCH_DEBUG_FRAME(); MENU_DEBUG_FRAME();   /* 调试: 触摸坐标显示在最上层 */
             continue;
         }
 
@@ -1796,7 +1811,7 @@ int main(void) {
         if (current_state == 1 && end_flag == 0) {
             Main_UpdateActiveMode(&charging_game_saved);//活动模式更新: 菜单/游戏/视频主循环处理
             Main_FlashLowBattery();  /* 电量0级时低频闪烁低电图标 */
-            TOUCH_DEBUG_FRAME();   /* 调试: 触摸坐标显示在最上层 */
+            TOUCH_DEBUG_FRAME(); MENU_DEBUG_FRAME();   /* 调试: 触摸坐标显示在最上层 */
         }
         else {
             // 待机/充电模式

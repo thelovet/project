@@ -421,6 +421,14 @@ int8_t menu_row_from_y(uint16_t y_top, uint16_t y, uint8_t n_rows);
  */
 int8_t menu_hit_test(uint16_t x, uint16_t y, uint8_t item_count);
 
+#if TOUCH_DEBUG_SHOW
+/* debug overlay: draw menu hit-box + touch cross (see menu.c) */
+void Menu_DebugDrawRegions(void);
+#define MENU_DEBUG_FRAME()   Menu_DebugDrawRegions()
+#else
+#define MENU_DEBUG_FRAME()
+#endif
+
 /**
  * @brief  退出菜单触摸轮询 (通用: 4个游戏共用重复的代码)
  *         按下时记录菜单行，松手仍在同一行才触发

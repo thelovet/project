@@ -44,6 +44,12 @@
 #define TOUCH_NORM_MIN_Y  0
 #define TOUCH_NORM_MAX_Y  239
 
+/* Touch IC reports X shifted left in the upper area (round panel). Compensate the
+   panel-X by panel-Y BEFORE rotation. TOPX_Y = active range (panel Y < it),
+   TOPX_ADD = max add at Y=0. TOPX_ADD=0 disables (calibration mode). */
+#define TOUCH_TOPX_Y      100
+#define TOUCH_TOPX_ADD    0
+
 /**
  * @brief 全局状态变量
  * @note  g_touch_int_flag: INT触发标志, ISR置1, Touch_IsPressed清零
@@ -711,6 +717,13 @@ static uint8_t Touch_TryApplyCoords(uint16_t raw_x, uint16_t raw_y)
     {
         uint16_t mx = MapCoord(raw_x, 0);
         uint16_t my = MapCoord(raw_y, 1);
+#if TOUCH_TOPX_ADD > 0
+        if (my < TOUCH_TOPX_Y) {
+            uint16_t add = (uint16_t)((uint32_t)(TOUCH_TOPX_Y - my) * TOUCH_TOPX_ADD / TOUCH_TOPX_Y);
+            uint16_t nx = (uint16_t)(mx + add);
+            mx = (nx > 239u) ? 239u : nx;
+        }
+#endif
         /* 根据屏幕方向旋转触摸坐标 (坐标已在 MapCoord 里按各轴窗口归一化, 四方向一致) */
         switch (g_orientation_index) {
         case 0: g_touch_x = mx;        g_touch_y = my;        break;
@@ -1255,21 +1268,21 @@ void Touch_DebugShow(void)
 #endif
     /* 位置在菜单框(x 45~195)左侧之外的那条竖带里: 菜单打开时不会被盖掉。
        圆屏限制: x=11~35 处可见 y 约 35~205, 故从 y=60 起、行距 14、共 10 行到 y=186。 */
-    LCD_Fill(11, 58, 35, 200, LCD_BLACK);
+    LCD_Fill(205, 58, 229, 200, LCD_BLACK);
     LCD_CS_CLR;
-    Touch_DebugNum3(11,  60, (uint16_t)(g_touch_pressed ? 1U : 0U), LCD_RED);   /* 行1 按下标志 */
-    Touch_DebugNum3(11,  74, g_dbg_point_buf[0], LCD_WHITE);                    /* 行2 Byte0(格式标志) */
-    Touch_DebugNum3(11,  88, g_dbg_point_buf[2], LCD_YELLOW);                   /* 行3 Byte2 = 原始X低8位 */
-    Touch_DebugNum3(11, 102, g_dbg_point_buf[3], LCD_GBLUE);                    /* 行4 Byte3 = X/Y高位 */
-    Touch_DebugNum3(11, 116, g_dbg_point_buf[4], LCD_WHITE);                    /* 行5 Byte4 = 原始Y低8位 */
-    Touch_DebugNum3(11, 130, g_touch_x, LCD_GREEN);                             /* 行6 映射后X */
-    Touch_DebugNum3(11, 144, g_touch_y, LCD_RED);                               /* 行7 映射后Y */
+    Touch_DebugNum3(205,  60, (uint16_t)(g_touch_pressed ? 1U : 0U), LCD_RED);   /* 行1 按下标志 */
+    Touch_DebugNum3(205,  74, g_dbg_point_buf[0], LCD_WHITE);                    /* 行2 Byte0(格式标志) */
+    Touch_DebugNum3(205,  88, g_dbg_point_buf[2], LCD_YELLOW);                   /* 行3 Byte2 = 原始X低8位 */
+    Touch_DebugNum3(205, 102, g_dbg_point_buf[3], LCD_GBLUE);                    /* 行4 Byte3 = X/Y高位 */
+    Touch_DebugNum3(205, 116, g_dbg_point_buf[4], LCD_WHITE);                    /* 行5 Byte4 = 原始Y低8位 */
+    Touch_DebugNum3(205, 130, g_touch_x, LCD_GREEN);                             /* 行6 映射后X */
+    Touch_DebugNum3(205, 144, g_touch_y, LCD_RED);                               /* 行7 映射后Y */
 #if TOUCH_IC_IT7259
     /* 行8/9: 当前模式各通道 CSEL(基线补偿)的最小/最大值 —— 贴到 0 或 255 说明基线顶到边界,
        正是"轻触判不到/坐标随握持变化"的典型特征; 行10: 1=本帧读取成功 */
-    Touch_DebugNum3(11, 158, g_dbg_csel_min, LCD_CYAN);
-    Touch_DebugNum3(11, 172, g_dbg_csel_max, LCD_BLUE);
-    Touch_DebugNum3(11, 186, (uint16_t)g_dbg_csel_ok, LCD_WHITE);
+    Touch_DebugNum3(205, 158, g_dbg_csel_min, LCD_CYAN);
+    Touch_DebugNum3(205, 172, g_dbg_csel_max, LCD_BLUE);
+    Touch_DebugNum3(205, 186, (uint16_t)g_dbg_csel_ok, LCD_WHITE);
 #endif
     LCD_CS_SET;
 }
