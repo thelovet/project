@@ -166,7 +166,24 @@ void Set_display_range_DMA() {//读取坐标后配置屏幕显示位置
  * 3. 将解压后的数据直接写入LCD显示缓冲区
  * 4. 使用24位全局地址指针(input_pos2/1/0)加速读取位置
  */
+#ifdef SIM_BUILD
+/* 模拟器专用: 没导入视频时, 用一张循环静帧代替视频流 */
+int  sim_image_active(void);
+void sim_image_draw(void);
+#endif
 u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16* location1) {
+#ifdef SIM_BUILD
+	/* 模拟器: 循环静帧(60fps 节流), 让固件每帧整屏重绘背景, 避免菜单残影 */
+	if (sim_image_active()) {
+		static uint32_t s_img_last_us = 0;
+		uint32_t img_now = GetTimerCount();
+		if ((uint32_t)(img_now - s_img_last_us) >= 16000u) {
+			s_img_last_us = img_now;
+			sim_image_draw();
+		}
+		return 0;
+	}
+#endif
 #ifdef DEBUG_BLACK_VIDEO
 	/* 触摸/噪声调试(config.h 里打开): 视频模式不刷视频帧(保持黑屏), 菜单与触摸逻辑照常运行,
 	   用于隔离"显示屏/背光刷新与 SPI 活动"对触摸的影响 */

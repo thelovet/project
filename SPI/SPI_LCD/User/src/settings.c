@@ -16,7 +16,12 @@
 #include "ch32v20x_bkp.h"
 
 /* ================= 常量与全局设置定义(统一置顶) ================= */
-
+/* 新旧屏的 RGB/BGR 相反, 按面板选 */
+#if LCD_PANEL_INIT == 1
+static const uint8_t madctl_rotations[4] = {0x00, 0x60, 0xC0, 0xA0};  /* ST77912 新屏: D3=0 RGB */
+#else
+static const uint8_t madctl_rotations[4] = {0x08, 0x68, 0xC8, 0xA8};  /* GC9A01/TFT 旧屏: D3=1 BGR */
+#endif
 /* ---- 设置持久化(BKP 后备寄存器) ---- */
 #define BKP_SLEEP_MAGIC  0xB071
 #define BKP_SLEEP_DR_MAGIC  BKP_DR6
@@ -91,7 +96,7 @@ uint8_t g_sleep_time_index = 2;             /* 息屏时间索引(0=2s ... 5=60s
 uint8_t g_orientation_index = 0;            /* 屏幕方向索引 0~3 */
 uint8_t g_language_index = 0;               /* 语言: 0=中文, 1=English */
 const uint16_t g_sleep_times[6] = {2, 5, 10, 20, 30, 60};   /* 可选息屏秒数 */
-static const uint8_t madctl_rotations[4] = {0x08, 0x68, 0xC8, 0xA8};  /* MADCTL 方向 */
+
 static SettingsMode s_mode = SETTINGS_NONE;  /* 当前设置页 */
 
 /* ---- 各设置页函数前置声明 ---- */

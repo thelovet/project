@@ -9,7 +9,7 @@
  *        差异在 I2C 地址与读点协议: CST816S 用 FT6x36 寄存器(0x02/0x03~0x06);
  *        IT7259 用点数据报告(从 0xE0 读, 12位坐标 + Point Information 判抬手), 纯I2C轮询。
  */
-#define TOUCH_IC_IT7259   1
+#define TOUCH_IC_IT7259   0
 
 /**
  * @brief 触摸坐标调试显示开关: 1=屏幕左上角实时显示(行1=按下标志, 行2=X, 行3=Y)
