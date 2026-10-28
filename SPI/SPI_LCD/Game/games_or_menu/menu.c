@@ -425,7 +425,10 @@ void Menu_DebugDrawRegions(void)
     uint8_t  k;
 
     Touch_Scan(&ts);
+#ifndef SIM_BUILD
+    /* 模拟器里 LCD 是 JS 复刻的, 没有 SPI2_DMA 通道, 也就没有 SPI2_WaitIdle */
     SPI2_WaitIdle();
+#endif
 
     LCD_CS_CLR;
     LCD_Fill(xl, yt, xr, yt + 1, LCD_GREEN);

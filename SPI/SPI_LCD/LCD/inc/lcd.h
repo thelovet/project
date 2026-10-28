@@ -9,96 +9,96 @@
 // [15:11] 5bit red
 //  [10:5] 6bit green
 //   [4:0] 5bit blue
-#define LCD_WHITE    0xFFFF//°×É«
-#define LCD_BLACK    0x0000//ºÚÉ«
-#define LCD_BLUE     0x001F//À¶É«
-#define LCD_BRED     0XF81F//°µºì
-#define LCD_GRED     0XFFE0//»ÒÂÌ
-#define LCD_GBLUE    0X07FF//Ç³À¶
-#define LCD_RED      0xF800//ºìÉ«
-#define LCD_MAGENTA  0xF81F//Æ·ºì
-#define LCD_GREEN    0x07E0//ÂÌÉ«
-#define LCD_CYAN     0x7FFF//ÇàÉ«
-#define LCD_YELLOW   0xFFE0//»ÆÉ«
-#define LCD_BROWN    0XBC40//×ØÉ«
-#define LCD_BRRED    0XFC07//×©ºì
-#define LCD_GRAY     0X8430//»ÒÉ«
+#define LCD_WHITE    0xFFFF//ç™½è‰²
+#define LCD_BLACK    0x0000//é»‘è‰²
+#define LCD_BLUE     0x001F//è“è‰²
+#define LCD_BRED     0XF81F//æš—çº¢
+#define LCD_GRED     0XFFE0//ç°ç»¿
+#define LCD_GBLUE    0X07FF//æµ…è“
+#define LCD_RED      0xF800//çº¢è‰²
+#define LCD_MAGENTA  0xF81F//å“çº¢
+#define LCD_GREEN    0x07E0//ç»¿è‰²
+#define LCD_CYAN     0x7FFF//é’è‰²
+#define LCD_YELLOW   0xFFE0//é»„è‰²
+#define LCD_BROWN    0XBC40//æ£•è‰²
+#define LCD_BRRED    0XFC07//ç –çº¢
+#define LCD_GRAY     0X8430//ç°è‰²
 
 #ifdef TEST_SCREEN_BACKLIGHT
-  #define LCD_LED_SET  (LCD_LED_PORT->BCR = LCD_LED_PIN)   // ²âÊÔÆÁ£ºÖÃµÍ¹Ø±Õ±³¹â
-  #define LCD_LED_CLR  (LCD_LED_PORT->BSHR = LCD_LED_PIN)  // ²âÊÔÆÁ£ºÖÃ¸ß´ò¿ª±³¹â
+  #define LCD_LED_SET  (LCD_LED_PORT->BCR = LCD_LED_PIN)   // æµ‹è¯•å±ï¼šç½®ä½å…³é—­èƒŒå…‰
+  #define LCD_LED_CLR  (LCD_LED_PORT->BSHR = LCD_LED_PIN)  // æµ‹è¯•å±ï¼šç½®é«˜æ‰“å¼€èƒŒå…‰
 #else
-  #define LCD_LED_SET  (LCD_LED_PORT->BSHR = LCD_LED_PIN)  // Õı³£ÆÁ£ºÖÃ¸ß¹Ø±Õ±³¹â
-  #define LCD_LED_CLR  (LCD_LED_PORT->BCR = LCD_LED_PIN)   // Õı³£ÆÁ£ºÖÃµÍ´ò¿ª±³¹â
+  #define LCD_LED_SET  (LCD_LED_PORT->BSHR = LCD_LED_PIN)  // æ­£å¸¸å±ï¼šç½®é«˜å…³é—­èƒŒå…‰
+  #define LCD_LED_CLR  (LCD_LED_PORT->BCR = LCD_LED_PIN)   // æ­£å¸¸å±ï¼šç½®ä½æ‰“å¼€èƒŒå…‰
 #endif
-#define LCD_CS_SET   (LCD_CS_PORT->BSHR = LCD_CS_PIN)    // LCDÆ¬Ñ¡Òı½ÅÖÃ¸ß (Æ¬Ñ¡ÎŞĞ§)
-#define LCD_DC_SET   (LCD_DC_PORT->BSHR = LCD_DC_PIN)    // LCDÊı¾İ/ÃüÁîÒı½ÅÖÃ¸ß (Êı¾İÄ£Ê½)
-#define LCD_RST_SET  (LCD_RST_PORT->BSHR = LCD_RST_PIN)  // LCD¸´Î»Òı½ÅÖÃ¸ß (Õı³£¹¤×÷)
-#define LCD_CS_CLR   (LCD_CS_PORT->BCR = LCD_CS_PIN)     // LCDÆ¬Ñ¡Òı½ÅÖÃµÍ (Æ¬Ñ¡ÓĞĞ§)
-#define LCD_DC_CLR   (LCD_DC_PORT->BCR = LCD_DC_PIN)     // LCDÊı¾İ/ÃüÁîÒı½ÅÖÃµÍ (ÃüÁîÄ£Ê½)
-#define LCD_RST_CLR  (LCD_RST_PORT->BCR = LCD_RST_PIN)   // LCD¸´Î»Òı½ÅÖÃµÍ (¸´Î»×´Ì¬)
+#define LCD_CS_SET   (LCD_CS_PORT->BSHR = LCD_CS_PIN)    // LCDç‰‡é€‰å¼•è„šç½®é«˜ (ç‰‡é€‰æ— æ•ˆ)
+#define LCD_DC_SET   (LCD_DC_PORT->BSHR = LCD_DC_PIN)    // LCDæ•°æ®/å‘½ä»¤å¼•è„šç½®é«˜ (æ•°æ®æ¨¡å¼)
+#define LCD_RST_SET  (LCD_RST_PORT->BSHR = LCD_RST_PIN)  // LCDå¤ä½å¼•è„šç½®é«˜ (æ­£å¸¸å·¥ä½œ)
+#define LCD_CS_CLR   (LCD_CS_PORT->BCR = LCD_CS_PIN)     // LCDç‰‡é€‰å¼•è„šç½®ä½ (ç‰‡é€‰æœ‰æ•ˆ)
+#define LCD_DC_CLR   (LCD_DC_PORT->BCR = LCD_DC_PIN)     // LCDæ•°æ®/å‘½ä»¤å¼•è„šç½®ä½ (å‘½ä»¤æ¨¡å¼)
+#define LCD_RST_CLR  (LCD_RST_PORT->BCR = LCD_RST_PIN)   // LCDå¤ä½å¼•è„šç½®ä½ (å¤ä½çŠ¶æ€)
 
-// LCDµçÔ´¿ØÖÆ£ºPB4µÍµçÆ½=´ò¿ª¹©µç
-#define LCD_PWR_ON   (LCD_PWR_PORT->BCR = LCD_PWR_PIN)   // PB4ÖÃµÍ¡úLCDÉÏµç
+// LCDç”µæºæ§åˆ¶ï¼šPB4ä½ç”µå¹³=æ‰“å¼€ä¾›ç”µ
+#define LCD_PWR_ON   (LCD_PWR_PORT->BCR = LCD_PWR_PIN)   // PB4ç½®ä½â†’LCDä¸Šç”µ
 #ifdef KEEP_LCD_POWER_IN_STANDBY
-  #define LCD_PWR_OFF  ((void)0)                           // ĞİÃßÊ±±£³Ö¹©µç
+  #define LCD_PWR_OFF  ((void)0)                           // ä¼‘çœ æ—¶ä¿æŒä¾›ç”µ
 #else
-  #define LCD_PWR_OFF  (LCD_PWR_PORT->BSHR = LCD_PWR_PIN)  // PB4ÖÃ¸ß¡úLCD¶Ïµç
+  #define LCD_PWR_OFF  (LCD_PWR_PORT->BSHR = LCD_PWR_PIN)  // PB4ç½®é«˜â†’LCDæ–­ç”µ
 #endif
 
-// Ò»¼¶ÃüÁî
-#define READ_DISPLAY_IDENTIFICATION_INFORMATION 0x04 // ¶ÁÈ¡ÏÔÊ¾Ê¶±ğĞÅÏ¢
-#define READ_DISPLAY_STATUS 0x09 // ¶ÁÈ¡ÏÔÊ¾×´Ì¬
-#define ENTER_SLEEP_MODE 0x10 // ½øÈëË¯ÃßÄ£Ê½
-#define SLEEP_OUT_MODE 0x11 // Ë¯ÃßÍË³öÄ£Ê½
-#define PARTIAL_MODE_ON 0x12 // ²¿·ÖÄ£Ê½¿ªÆô
-#define NORMAL_DISPLAY_MODE_ON 0x13 // Õı³£ÏÔÊ¾Ä£Ê½¿ªÆô
-#define DISPLAY_INVERSION_OFF 0x20 // ÏÔÊ¾·´×ª¹Ø±Õ
-#define DISPLAY_INVERSION_ON 0x21 // ÏÔÊ¾·´×ª¿ªÆô
-#define DISPLAY_OFF 0x28 // ÏÔÊ¾¹Ø±Õ
-#define DISPLAY_ON 0x29 // ÏÔÊ¾¿ªÆô
-#define COLUMN_ADDRESS_SET 0x2A // ÁĞµØÖ·ÉèÖÃ
-#define ROW_ADDRESS_SET 0x2B // ĞĞµØÖ·ÉèÖÃ
-#define MEMORY_WRITE 0x2C // ÄÚ´æĞ´Èë
-#define PARTIAL_AREA 0x30 // ²¿·ÖÇøÓò
-#define VERTICAL_SCROLLING_DEFINITION 0x33 // ´¹Ö±¹ö¶¯¶¨Òå
-#define TEARING_EFFECT_LINE_OFF 0x34 // ËºÁÑĞ§¹ûÏß¹Ø±Õ
-#define TEARING_EFFECT_LINE_ON 0x35 // ËºÁÑĞ§¹ûÏß¿ªÆô
-#define MEMORY_ACCESS_CONTROL 0x36 // ÄÚ´æ·ÃÎÊ¿ØÖÆ
-#define VERTICAL_SCROLLING_START_ADDRESS 0x37 // ´¹Ö±¹ö¶¯ÆğÊ¼µØÖ·
-#define IDLE_MODE_OFF 0x38 // ¿ÕÏĞÄ£Ê½¹Ø±Õ
-#define IDLE_MODE_ON 0x39 // ¿ÕÏĞÄ£Ê½¿ªÆô
-#define PIXEL_FORMAT_SET 0x3A // ÏñËØ¸ñÊ½ÉèÖÃ
-#define WRITE_MEMORY_CONTINUE 0x3C // ¼ÌĞøĞ´ÈëÄÚ´æ
-#define SET_TEAR_SCANLINE 0x44 // ÉèÖÃËºÁÑÉ¨ÃèÏß
-#define GET_SCANLINE 0x45 // »ñÈ¡É¨ÃèÏß
-#define WRITE_DISPLAY_BRIGHTNESS 0x51 // Ğ´ÈëÏÔÊ¾ÁÁ¶È
-#define WRITE_CTRL_DISPLAY 0x53 // Ğ´Èë¿ØÖÆÏÔÊ¾
-#define READ_ID1 0xDA // ¶ÁÈ¡ ID1
-#define READ_ID2 0xDB // ¶ÁÈ¡ ID2
-#define READ_ID3 0xDC // ¶ÁÈ¡ ID3
+// ä¸€çº§å‘½ä»¤
+#define READ_DISPLAY_IDENTIFICATION_INFORMATION 0x04 // è¯»å–æ˜¾ç¤ºè¯†åˆ«ä¿¡æ¯
+#define READ_DISPLAY_STATUS 0x09 // è¯»å–æ˜¾ç¤ºçŠ¶æ€
+#define ENTER_SLEEP_MODE 0x10 // è¿›å…¥ç¡çœ æ¨¡å¼
+#define SLEEP_OUT_MODE 0x11 // ç¡çœ é€€å‡ºæ¨¡å¼
+#define PARTIAL_MODE_ON 0x12 // éƒ¨åˆ†æ¨¡å¼å¼€å¯
+#define NORMAL_DISPLAY_MODE_ON 0x13 // æ­£å¸¸æ˜¾ç¤ºæ¨¡å¼å¼€å¯
+#define DISPLAY_INVERSION_OFF 0x20 // æ˜¾ç¤ºåè½¬å…³é—­
+#define DISPLAY_INVERSION_ON 0x21 // æ˜¾ç¤ºåè½¬å¼€å¯
+#define DISPLAY_OFF 0x28 // æ˜¾ç¤ºå…³é—­
+#define DISPLAY_ON 0x29 // æ˜¾ç¤ºå¼€å¯
+#define COLUMN_ADDRESS_SET 0x2A // åˆ—åœ°å€è®¾ç½®
+#define ROW_ADDRESS_SET 0x2B // è¡Œåœ°å€è®¾ç½®
+#define MEMORY_WRITE 0x2C // å†…å­˜å†™å…¥
+#define PARTIAL_AREA 0x30 // éƒ¨åˆ†åŒºåŸŸ
+#define VERTICAL_SCROLLING_DEFINITION 0x33 // å‚ç›´æ»šåŠ¨å®šä¹‰
+#define TEARING_EFFECT_LINE_OFF 0x34 // æ’•è£‚æ•ˆæœçº¿å…³é—­
+#define TEARING_EFFECT_LINE_ON 0x35 // æ’•è£‚æ•ˆæœçº¿å¼€å¯
+#define MEMORY_ACCESS_CONTROL 0x36 // å†…å­˜è®¿é—®æ§åˆ¶
+#define VERTICAL_SCROLLING_START_ADDRESS 0x37 // å‚ç›´æ»šåŠ¨èµ·å§‹åœ°å€
+#define IDLE_MODE_OFF 0x38 // ç©ºé—²æ¨¡å¼å…³é—­
+#define IDLE_MODE_ON 0x39 // ç©ºé—²æ¨¡å¼å¼€å¯
+#define PIXEL_FORMAT_SET 0x3A // åƒç´ æ ¼å¼è®¾ç½®
+#define WRITE_MEMORY_CONTINUE 0x3C // ç»§ç»­å†™å…¥å†…å­˜
+#define SET_TEAR_SCANLINE 0x44 // è®¾ç½®æ’•è£‚æ‰«æçº¿
+#define GET_SCANLINE 0x45 // è·å–æ‰«æçº¿
+#define WRITE_DISPLAY_BRIGHTNESS 0x51 // å†™å…¥æ˜¾ç¤ºäº®åº¦
+#define WRITE_CTRL_DISPLAY 0x53 // å†™å…¥æ§åˆ¶æ˜¾ç¤º
+#define READ_ID1 0xDA // è¯»å– ID1
+#define READ_ID2 0xDB // è¯»å– ID2
+#define READ_ID3 0xDC // è¯»å– ID3
 
-// ¶ş¼¶ÃüÁî
-#define RGB_INTERFACE_SIGNAL_CONTROL 0xB0 // RGB ½Ó¿ÚĞÅºÅ¿ØÖÆ
-#define BLANKING_PORCH_CONTROL 0xB5 // ¿Õ°×ÇøÓò¿ØÖÆ
-#define DISPLAY_FUNCTION_CONTROL 0xB6 // ÏÔÊ¾¹¦ÄÜ¿ØÖÆ
-#define TEARING_EFFECT_CONTROL 0xBA // ËºÁÑĞ§¹û¿ØÖÆ
-#define INTERFACE_CONTROL 0xF6 // ½Ó¿Ú¿ØÖÆ
+// äºŒçº§å‘½ä»¤
+#define RGB_INTERFACE_SIGNAL_CONTROL 0xB0 // RGB æ¥å£ä¿¡å·æ§åˆ¶
+#define BLANKING_PORCH_CONTROL 0xB5 // ç©ºç™½åŒºåŸŸæ§åˆ¶
+#define DISPLAY_FUNCTION_CONTROL 0xB6 // æ˜¾ç¤ºåŠŸèƒ½æ§åˆ¶
+#define TEARING_EFFECT_CONTROL 0xBA // æ’•è£‚æ•ˆæœæ§åˆ¶
+#define INTERFACE_CONTROL 0xF6 // æ¥å£æ§åˆ¶
 
-// Èı¼¶ÃüÁî
-#define FRAME_RATE 0xE8 // Ö¡ÂÊ
-#define SPI2DATA_CONTROL 0xE9 // SPI2DATA ¿ØÖÆ
-#define POWER_CONTROL_1 0xC1 // µçÔ´¿ØÖÆ 1
-#define POWER_CONTROL_2 0xC3 // µçÔ´¿ØÖÆ 2
-#define POWER_CONTROL_3 0xC4 // µçÔ´¿ØÖÆ 3
-#define POWER_CONTROL_4 0xC9 // µçÔ´¿ØÖÆ 4
-#define POWER_CONTROL_7 0xA7 // µçÔ´¿ØÖÆ 7
-#define INTER_REGISTER_ENABLE1 0xFE // ÄÚ²¿¼Ä´æÆ÷ÆôÓÃ 1
-#define INTER_REGISTER_ENABLE2 0xEF // ÄÚ²¿¼Ä´æÆ÷ÆôÓÃ 2
-#define SET_GAMMA1 0xF0 // ÉèÖÃÙ¤Âí 1
-#define SET_GAMMA2 0xF1 // ÉèÖÃÙ¤Âí 2
-#define SET_GAMMA3 0xF2 // ÉèÖÃÙ¤Âí 3
-#define SET_GAMMA4 0xF3 // ÉèÖÃÙ¤Âí 4
+// ä¸‰çº§å‘½ä»¤
+#define FRAME_RATE 0xE8 // å¸§ç‡
+#define SPI2DATA_CONTROL 0xE9 // SPI2DATA æ§åˆ¶
+#define POWER_CONTROL_1 0xC1 // ç”µæºæ§åˆ¶ 1
+#define POWER_CONTROL_2 0xC3 // ç”µæºæ§åˆ¶ 2
+#define POWER_CONTROL_3 0xC4 // ç”µæºæ§åˆ¶ 3
+#define POWER_CONTROL_4 0xC9 // ç”µæºæ§åˆ¶ 4
+#define POWER_CONTROL_7 0xA7 // ç”µæºæ§åˆ¶ 7
+#define INTER_REGISTER_ENABLE1 0xFE // å†…éƒ¨å¯„å­˜å™¨å¯ç”¨ 1
+#define INTER_REGISTER_ENABLE2 0xEF // å†…éƒ¨å¯„å­˜å™¨å¯ç”¨ 2
+#define SET_GAMMA1 0xF0 // è®¾ç½®ä¼½é©¬ 1
+#define SET_GAMMA2 0xF1 // è®¾ç½®ä¼½é©¬ 2
+#define SET_GAMMA3 0xF2 // è®¾ç½®ä¼½é©¬ 3
+#define SET_GAMMA4 0xF3 // è®¾ç½®ä¼½é©¬ 4
 
 void LCD_Init(void);
 void LCD_Clear(uint16_t Color);
@@ -107,22 +107,22 @@ void LCD_WR_DATA(uint8_t data);
 void LCD_WR_DATA_16Bit(uint16_t dat);
 void LCD_WR_REG(uint8_t data);
 
-void LCD_Fill(uint16_t xsta, uint16_t ysta, uint16_t xend, uint16_t yend, uint16_t color);//Ìî³äÇøÓò
-void LCD_Fill_DMA(uint16_t xsta, uint16_t ysta, uint16_t xend, uint16_t yend, uint16_t color);//DMAÌî³äÇøÓò(Í¬²½, µÈ·¢ËÍÍê)
-void LCD_DMA_Write_Buffer(uint16_t color, uint32_t total_size);//DMAĞ´Èë»º³åÇø
-void LCD_Address_Set(uint16_t x, uint16_t y, uint16_t xEnd, uint16_t yEnd);//ÉèÖÃ×ø±ê
-void LCD_drawImageWithSize_DMA(uint16_t count, uint8_t pre_count);//DMA»æÖÆÍ¼Æ¬
-void LCD_DMA_Interrupt_Init(void);//DMAÖĞ¶Ï³õÊ¼»¯
-void LCD_Address_Set_DMA(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2);//DMAÉèÖÃ×ø±ê
-void FastFill_16bit_Repeat(uint8_t *buf, uint32_t len, uint8_t color_l, uint8_t color_h);//Ìî³äÖØ¸´¿é
-void LCD_DMA_Write_Buffer_Add_coordinates(uint16_t datah, uint16_t datal, uint32_t total_size);//DMAĞ´Èë»º³åÇø²¢Ìí¼Ó×ø±êĞÅÏ¢
-void LCD_Address_Set_DMA_Calculate_remaining(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2);//DMAĞ´Èë»º³åÇø²¢Ìí¼Ó×ø±êĞÅÏ¢
-void LCD_Enter_Sleep(void);   // LCD½øÈëË¯ÃßµÍ¹¦ºÄ
+void LCD_Fill(uint16_t xsta, uint16_t ysta, uint16_t xend, uint16_t yend, uint16_t color);//å¡«å……åŒºåŸŸ
+void LCD_Fill_DMA(uint16_t xsta, uint16_t ysta, uint16_t xend, uint16_t yend, uint16_t color);//DMAå¡«å……åŒºåŸŸ(åŒæ­¥, ç­‰å‘é€å®Œ)
+void LCD_DMA_Write_Buffer(uint16_t color, uint32_t total_size);//DMAå†™å…¥ç¼“å†²åŒº
+void LCD_Address_Set(uint16_t x, uint16_t y, uint16_t xEnd, uint16_t yEnd);//è®¾ç½®åæ ‡
+void LCD_drawImageWithSize_DMA(uint16_t count, uint8_t pre_count);//DMAç»˜åˆ¶å›¾ç‰‡
+void LCD_DMA_Interrupt_Init(void);//DMAä¸­æ–­åˆå§‹åŒ–
+void LCD_Address_Set_DMA(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2);//DMAè®¾ç½®åæ ‡
+void FastFill_16bit_Repeat(uint8_t *buf, uint32_t len, uint8_t color_l, uint8_t color_h);//å¡«å……é‡å¤å—
+void LCD_DMA_Write_Buffer_Add_coordinates(uint16_t datah, uint16_t datal, uint32_t total_size);//DMAå†™å…¥ç¼“å†²åŒºå¹¶æ·»åŠ åæ ‡ä¿¡æ¯
+void LCD_Address_Set_DMA_Calculate_remaining(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2);//DMAå†™å…¥ç¼“å†²åŒºå¹¶æ·»åŠ åæ ‡ä¿¡æ¯
+void LCD_Enter_Sleep(void);   // LCDè¿›å…¥ç¡çœ ä½åŠŸè€—
 
-// ±³¹âPWM¿ØÖÆ (PB9 ¡ú TIM4_CH4)
-void LCD_Backlight_PWM_Init(void);              // ³õÊ¼»¯TIM4_CH4 PWMÊä³ö
-void LCD_Backlight_PWM_SetDuty(uint8_t duty);   // ÉèÖÃÕ¼¿Õ±È 0-100 (µÍµçÆ½Õ¼±È%)
-void LCD_Backlight_PWM_Stop(void);              // Í£Ö¹PWM,»Ö¸´GPIOÍÆÍìÊä³ö
+// èƒŒå…‰PWMæ§åˆ¶ (PB9 â†’ TIM4_CH4)
+void LCD_Backlight_PWM_Init(void);              // åˆå§‹åŒ–TIM4_CH4 PWMè¾“å‡º
+void LCD_Backlight_PWM_SetDuty(uint8_t duty);   // è®¾ç½®å ç©ºæ¯” 0-100 (ä½ç”µå¹³å æ¯”%)
+void LCD_Backlight_PWM_Stop(void);              // åœæ­¢PWM,æ¢å¤GPIOæ¨æŒ½è¾“å‡º
 
 extern u8 shared_buffer[FILL_BUFFER_SIZE];
 

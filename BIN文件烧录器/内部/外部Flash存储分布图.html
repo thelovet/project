@@ -87,10 +87,11 @@
   <div class="pwrap"><div class="pbar" id="pbar"></div></div>
   <div class="row import">
     <span class="lb">视频 bin 导入：</span>
-    <label class="btn imp" for="binFile">选择视频 bin 文件</label>
-    <input type="file" id="binFile" accept=".bin">
+    <label class="btn imp" for="binFile">选择视频 bin 文件（可多选）</label>
+    <input type="file" id="binFile" accept=".bin" multiple>
     <span id="binInfo" class="dim">未导入</span>
   </div>
+  <pre id="segInfo" class="dim" style="margin:6px 0 0;font-size:11.5px;line-height:1.5;white-space:pre;overflow-x:auto"></pre>
   <div class="row">
     <button class="btn" data-step="font">1 · 字库烧录</button>
     <button class="btn" data-step="btn">2 · 按钮烧录</button>
@@ -429,6 +430,7 @@ function poll(){
     }
     hasBin = !!st.bin;
     $binInfo.textContent = st.bin ? ((st.bin.orig ? st.bin.orig + ' → ' : '') + st.bin.name + ' · ' + kb(st.bin.size)) : '未导入';
+    renderSegs(st.bin && st.bin.segs);
     /* 兜底: 导入的 bin 块数和图上画的不一致 -> 记下并刷新一次(之后 vblk 一致, 不会反复刷) */
     if (st.bin && st.bin.size) {
       var blk2 = Math.ceil(st.bin.size / 53248), shown = VBLK_DEF;
@@ -487,25 +489,72 @@ $quit.addEventListener('click', function(){
   fetch('/api/quit', { method: 'POST' }).then(function(){ setTimeout(poll, 800); });
 });
 
+/* ---- 多文件: 起止地址表 + 可直接粘贴进 decompress.c 的 video_ranges ---- */
+function hex8(v){
+  var s = (v >>> 0).toString(16).toUpperCase();
+  while (s.length < 8) s = '0' + s;
+  return '0x' + s;
+}
+function b4(v){ return [(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255]; }
+function hex2(b){ return '0x' + ('0' + b.toString(16).toUpperCase()).slice(-2); }
+function renderSegs(segs){
+  var el = document.getElementById('segInfo');
+  if (!el) return;
+  if (!segs || !segs.length) { el.textContent = ''; return; }
+  var L = [], i;
+  L.push('段  起始         结束         大小        文件');
+  for (i = 0; i < segs.length; i++) {
+    var s = segs[i];
+    L.push((i + 1) + '   ' + hex8(s.start) + '   ' + hex8(s.end) + '   ' +
+           (kb(s.size) + '      ').slice(0, 11) + (s.name || ''));
+  }
+  L.push('');
+  L.push('/* 复制到 decompress.c 的 video_ranges（' + segs.length + ' 段） */');
+  for (i = 0; i < segs.length; i++) {
+    var b = b4(segs[i].start).concat(b4(segs[i].end));
+    L.push('  ' + b.map(hex2).join(', ') + ',');
+  }
+  el.textContent = L.join('\n');
+}
+
 $file.addEventListener('change', function(ev){
-  var f = ev.target.files && ev.target.files[0];
-  if (!f) return;
-  $binInfo.textContent = '导入中：' + f.name + ' ...';
-  var fr = new FileReader();
-  fr.onload = function(){
-    fetch('/api/import_bin?name=' + encodeURIComponent(f.name), { method: 'POST', body: fr.result })
+  var files = ev.target.files ? Array.prototype.slice.call(ev.target.files) : [];
+  if (!files.length) return;
+  $binInfo.textContent = '导入中：' + files.length + ' 个文件 ...';
+  var bufs = [], segs = [], total = 0, idx = 0;
+
+  function readNext(){
+    if (idx >= files.length) { upload(); return; }
+    var f = files[idx], fr = new FileReader();
+    fr.onload = function(){
+      var u8 = new Uint8Array(fr.result);
+      bufs.push(u8); segs.push({ name: f.name, size: u8.length }); total += u8.length;
+      idx++; readNext();
+    };
+    fr.onerror = function(){ alert('读取失败：' + f.name); };
+    fr.readAsArrayBuffer(f);
+  }
+
+  function upload(){
+    var all = new Uint8Array(total), off = 0;
+    for (var i = 0; i < bufs.length; i++) { all.set(bufs[i], off); off += bufs[i].length; }
+    var names = files.map(function(f){ return f.name; }).join('+');
+    var url = '/api/import_bin?name=' + encodeURIComponent(names) +
+              '&segs=' + encodeURIComponent(JSON.stringify(segs));
+    fetch(url, { method: 'POST', body: all })
       .then(function(r){ return r.json(); })
       .then(function(j){
         if (!j.ok) { alert(j.msg || '导入失败'); return; }
-        $binInfo.textContent = f.name + ' · ' + kb(j.size) + ' · MD5 ' + j.md5.slice(0, 8);
-        /* 块数变了 -> 记下并刷新, 让总览/表格跟着重画 */
+        renderSegs(j.segs);
+        $binInfo.textContent = files.length + ' 个文件 · ' + kb(j.size) + ' · MD5 ' + j.md5.slice(0, 8);
         var blk = Math.ceil(j.size / 53248), cur = 0;
         try { cur = Number(sessionStorage.getItem('vblk')) || 0; } catch (e) { }
         if (blk !== cur) { try { sessionStorage.setItem('vblk', String(blk)); } catch (e) { } location.reload(); }
       })
       .catch(function(){ alert('导入失败：服务没在跑？'); });
-  };
-  fr.readAsArrayBuffer(f);
+  }
+
+  readNext();
 });
 
 setInterval(poll, 1500);

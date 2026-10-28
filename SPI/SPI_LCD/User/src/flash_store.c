@@ -439,6 +439,16 @@ uint8_t *FlashStore_Scratch(void)
  * ================================================================ */
 #if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE) \
     || defined(BTN_IMG_STORE_MODE)
+/* 屏上进度条开关: FLASH_DATA_STORE_MODE 下关掉 —— 该模式内部 Flash 只剩几百字节,
+   而进度 PC 端已经从 g_res_prog 读走了(见 burn_step.ps1), 屏幕显示纯属占地方。
+   视频块/按钮图两种模式固件很小, 保留屏上进度。 */
+#if defined(FLASH_DATA_STORE_MODE)
+#define FS_UI_ENABLE 0
+#else
+#define FS_UI_ENABLE 1
+#endif
+
+#if FS_UI_ENABLE
 #define UI_BAR_X0      17   /* 进度条填充区左边界 */
 #define UI_BAR_X1      225  /* 进度条填充区右边界(不含) */
 #define UI_BAR_Y0      92   /* 进度条填充区上边界 */
@@ -542,6 +552,13 @@ static void flash_store_ui_fail(uint8_t pct)
     LCD_Fill(UI_BAR_X0, UI_BAR_Y0, UI_BAR_X1, UI_BAR_Y1, LCD_RED);
     flash_store_ui_draw_pct(pct, LCD_RED);
 }
+#else  /* FS_UI_ENABLE == 0: 不画屏, 但保留同名函数, 调用处不用改 */
+static uint8_t s_ui_last_pct = 0xFF;
+static void flash_store_ui_init(void) { }
+static void flash_store_ui_update(uint8_t pct) { (void)pct; }
+static void flash_store_ui_done(void) { }
+static void flash_store_ui_fail(uint8_t pct) { (void)pct; }
+#endif /* FS_UI_ENABLE */
 #endif /* FLASH_DATA_STORE_MODE || VIDEO_CHUNK_STORE_MODE || BTN_IMG_STORE_MODE */
 
 /* ================================================================

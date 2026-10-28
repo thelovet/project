@@ -1,11 +1,11 @@
 /**
  * @file    sok_img_prev.c
- * @brief   ÉÏÒ»¹ØÍ¼±êÍ¼Æ¬Êý¾ÝºÍ»æÖÆº¯Êý
+ * @brief   ä¸Šä¸€å…³å›¾æ ‡å›¾ç‰‡æ•°æ®å’Œç»˜åˆ¶å‡½æ•°
  */
 
 #include "sok_img_prev.h"
 #include "lcd.h"
-#include "flash_store.h"   /* Í¼±êÊý¾Ý´ÓÍâ²¿Flash¶ÁÈ¡ */
+#include "flash_store.h"   /* å›¾æ ‡æ•°æ®ä»Žå¤–éƒ¨Flashè¯»å– */
 
 const uint16_t sok_img_prev[PREV_IMG_W * PREV_IMG_H] = {
     0x0000, 0x0000, 0x624c, 0xab17, 0xb359, 0xb379, 0xb399, 0xb3b9, 0xbc1a, 0xc45b, 0xcc9b, 0xd4dc,
@@ -89,9 +89,9 @@ const uint16_t sok_img_prev[PREV_IMG_W * PREV_IMG_H] = {
 };
 
 
-/* Ó¢ÎÄ°´Å¥: "ÉÏÒ»¹Ø" (ÓëÉÏÃæÖÐÎÄÄÇÌ×Í¬³ß´ç 30x31 RGB565 Ð¡¶Ë, ½öÄÚÈÝ²»Í¬)
-   ÖÐÎÄ×ßÔ­×ÊÔ´ ID, Ó¢ÎÄ×ßÍâ²¿ Flash µÄ¹Ì¶¨±£ÁôÇø BTN_IMG_EN_ADDR(¼û flash_store.h):
-   ÄÚ²¿ Flash ×°²»ÏÂÁ½Ì× ¡ú Ó¢ÎÄÄÇÌ×ÓÃ¶ÀÁ¢Ä£Ê½ BTN_IMG_STORE_MODE µ¥¶ÀÉÕÒ»´Î */
+/* è‹±æ–‡æŒ‰é’®: "ä¸Šä¸€å…³" (ä¸Žä¸Šé¢ä¸­æ–‡é‚£å¥—åŒå°ºå¯¸ 30x31 RGB565 å°ç«¯, ä»…å†…å®¹ä¸åŒ)
+   ä¸­æ–‡èµ°åŽŸèµ„æº ID, è‹±æ–‡èµ°å¤–éƒ¨ Flash çš„å›ºå®šä¿ç•™åŒº BTN_IMG_EN_ADDR(è§ flash_store.h):
+   å†…éƒ¨ Flash è£…ä¸ä¸‹ä¸¤å¥— â†’ è‹±æ–‡é‚£å¥—ç”¨ç‹¬ç«‹æ¨¡å¼ BTN_IMG_STORE_MODE å•ç‹¬çƒ§ä¸€æ¬¡ */
 const uint16_t sok_img_prev_en[PREV_IMG_W * PREV_IMG_H] = {
     0x0000, 0x0000, 0x520a, 0xabb7, 0xbc19, 0xbc39, 0xbc39, 0xbc7a, 0xc4bb, 0xccdb, 0xccfb, 0xd53c,
     0xdd7d, 0xe5dd, 0xedfe, 0xee1e, 0xedfe, 0xe5bd, 0xdd5d, 0xd51c, 0xccfb, 0xccbb, 0xc47a, 0xbc5a,
@@ -174,14 +174,14 @@ const uint16_t sok_img_prev_en[PREV_IMG_W * PREV_IMG_H] = {
 };
 
 /**
- * @brief  »æÖÆµ¼º½/³·Ïú°´Å¥Í¼£¨Ìø¹ý0x0000ºÚÉ«±³¾°£¬µþ¼ÓÏÔÊ¾£©£¬¿ÉÖ¸¶¨ÕûÊýËõ·Å±¶ÂÊ
- * @param  x      ×óÉÏ½ÇX×ø±ê
- * @param  y      ×óÉÏ½ÇY×ø±ê
- * @param  image  30x31 RGB565 Ð¡¶ËÍ¼ÏñÊý¾Ý
- * @param  scale  ÕûÊýËõ·Å±¶ÂÊ (Ò»¼¶°´Å¥=2 ¡ú ÆÁÉÏ 60x62; ³·Ïú½çÃæ°´Å¥=1 ¡ú ÆÁÉÏ 30x31)
- * @note   Ö»Ö§³ÖÕûÊý±¶(1/2/3): Ã¿Ô´ÐÐ¸´ÖÆ scale ÐÐ¡¢Ã¿Ô´ÏñËØ¸´ÖÆ scale ÁÐ, ÎÞÐè³ý·¨¡£
- *         ×îºóÒ»ÐÐ(µÚ31ÐÐ)²»Ìø¹ý 0x0000, ÓÃÓÚ²Áµô°´Å¥µ×±ß²ÐÁô; Ëõ·ÅºóËüÓë°´Å¥Í¬¿í,
- *         ²»»áÍâÂ¶ºÚ±ß(1x Ê±Í¬ÑùÈç´Ë)¡£
+ * @brief  ç»˜åˆ¶å¯¼èˆª/æ’¤é”€æŒ‰é’®å›¾ï¼ˆè·³è¿‡0x0000é»‘è‰²èƒŒæ™¯ï¼Œå åŠ æ˜¾ç¤ºï¼‰ï¼Œå¯æŒ‡å®šæ•´æ•°ç¼©æ”¾å€çŽ‡
+ * @param  x      å·¦ä¸Šè§’Xåæ ‡
+ * @param  y      å·¦ä¸Šè§’Yåæ ‡
+ * @param  image  30x31 RGB565 å°ç«¯å›¾åƒæ•°æ®
+ * @param  scale  æ•´æ•°ç¼©æ”¾å€çŽ‡ (ä¸€çº§æŒ‰é’®=2 â†’ å±ä¸Š 60x62; æ’¤é”€ç•Œé¢æŒ‰é’®=1 â†’ å±ä¸Š 30x31)
+ * @note   åªæ”¯æŒæ•´æ•°å€(1/2/3): æ¯æºè¡Œå¤åˆ¶ scale è¡Œã€æ¯æºåƒç´ å¤åˆ¶ scale åˆ—, æ— éœ€é™¤æ³•ã€‚
+ *         æœ€åŽä¸€è¡Œ(ç¬¬31è¡Œ)ä¸è·³è¿‡ 0x0000, ç”¨äºŽæ“¦æŽ‰æŒ‰é’®åº•è¾¹æ®‹ç•™; ç¼©æ”¾åŽå®ƒä¸ŽæŒ‰é’®åŒå®½,
+ *         ä¸ä¼šå¤–éœ²é»‘è¾¹(1x æ—¶åŒæ ·å¦‚æ­¤)ã€‚
  */
 void sok_nav_draw_rgb565_scaled(uint16_t x, uint16_t y, const uint16_t *image,
                                 uint8_t scale)
@@ -190,25 +190,25 @@ void sok_nav_draw_rgb565_scaled(uint16_t x, uint16_t y, const uint16_t *image,
     if (scale == 0) scale = 1;
     LCD_CS_CLR;
     for (r = 0; r < PREV_IMG_H; r++) {
-        uint8_t is_last = (r == PREV_IMG_H - 1);  /* ×îºóÒ»ÐÐºÚÉ«, ²»Ìø¹ý0x0000 */
-        for (sr = 0; sr < scale; sr++) {  /* Ã¿Ô´ÐÐ ¡ú scale ¸öÊä³öÐÐ */
+        uint8_t is_last = (r == PREV_IMG_H - 1);  /* æœ€åŽä¸€è¡Œé»‘è‰², ä¸è·³è¿‡0x0000 */
+        for (sr = 0; sr < scale; sr++) {  /* æ¯æºè¡Œ â†’ scale ä¸ªè¾“å‡ºè¡Œ */
             c = 0;
             while (c < PREV_IMG_W) {
-                /* Ìø¹ýºÚÉ«±³¾°ÏñËØ (×îºóÒ»ÐÐ²»Ìø¹ý, »­´¿ºÚ¸²¸Ç²ÐÁô) */
+                /* è·³è¿‡é»‘è‰²èƒŒæ™¯åƒç´  (æœ€åŽä¸€è¡Œä¸è·³è¿‡, ç”»çº¯é»‘è¦†ç›–æ®‹ç•™) */
                 if (!is_last) {
                     while (c < PREV_IMG_W && image[r * PREV_IMG_W + c] == 0x0000) c++;
                 }
                 if (c >= PREV_IMG_W) break;
 
                 start = c;
-                /* ÊÕ¼¯Á¬Ðø·ÇºÚÉ«ÏñËØ (×îºóÒ»ÐÐÕûÐÐÈ¡Íê) */
+                /* æ”¶é›†è¿žç»­éžé»‘è‰²åƒç´  (æœ€åŽä¸€è¡Œæ•´è¡Œå–å®Œ) */
                 if (is_last) {
                     c = PREV_IMG_W;
                 } else {
                     while (c < PREV_IMG_W && image[r * PREV_IMG_W + c] != 0x0000) c++;
                 }
 
-                /* Ò»´Î Address_Set »­Ò»Õû¶ÎÁ¬ÐøÏñËØ (Ëõ·Åºó¿í¶È = (c-start)*scale) */
+                /* ä¸€æ¬¡ Address_Set ç”»ä¸€æ•´æ®µè¿žç»­åƒç´  (ç¼©æ”¾åŽå®½åº¦ = (c-start)*scale) */
                 LCD_Address_Set(x + start * scale, y + r * scale + sr,
                                 x + c * scale - 1, y + r * scale + sr);
                 for (; start < c; start++) {
@@ -224,7 +224,7 @@ void sok_nav_draw_rgb565_scaled(uint16_t x, uint16_t y, const uint16_t *image,
 }
 
 /**
- * @brief  °´ 2 ±¶»æÖÆ°´Å¥Í¼ (Ò»¼¶°´Å¥×éÓÃ; ±£ÁôÔ­½Ó¿Ú, ÀÏµ÷ÓÃµã²»ÓÃ¸Ä)
+ * @brief  æŒ‰ 2 å€ç»˜åˆ¶æŒ‰é’®å›¾ (ä¸€çº§æŒ‰é’®ç»„ç”¨; ä¿ç•™åŽŸæŽ¥å£, è€è°ƒç”¨ç‚¹ä¸ç”¨æ”¹)
  */
 void sok_nav_draw_rgb565(uint16_t x, uint16_t y, const uint16_t *image)
 {
@@ -233,7 +233,7 @@ void sok_nav_draw_rgb565(uint16_t x, uint16_t y, const uint16_t *image)
 
 void sok_prev_draw(uint16_t x, uint16_t y)
 {
-    /* Í¼±êÊý¾ÝÒÑÉÕÂ¼µ½Íâ²¿Flash, ¶ÁÈë¹²Ïíscratchºó»æÖÆ */
+    /* å›¾æ ‡æ•°æ®å·²çƒ§å½•åˆ°å¤–éƒ¨Flash, è¯»å…¥å…±äº«scratchåŽç»˜åˆ¶ */
     const uint8_t *img = FlashStore_ResLoad(FLASH_STORE_ID_IMG_PREV, 0,
                                             PREV_IMG_W * PREV_IMG_H * 2);
     if (img) sok_nav_draw_rgb565(x, y, (const uint16_t *)img);
@@ -241,10 +241,10 @@ void sok_prev_draw(uint16_t x, uint16_t y)
 
 
 #ifdef BTN_IMG_STORE_MODE
-/* Ó¢ÎÄ°æÈýÕÅ°´Å¥Í¼(ÉÏÒ»¹Ø/ÏÂÒ»¹Ø/ÖØÐÂ¿ªÊ¼)Á¬ÔÚÒ»Æð, ¹© BTN_IMG_STORE_MODE
-   ÉÕ½øÍâ²¿ Flash µÄ±£ÁôÇø BTN_IMG_EN_ADDR: ²¼¾ÖÓëÔËÐÐÆÚÒ»ÖÂ
-   [prev_en][next_en][restart_en], Ã¿ÕÅ 30x31 RGB565 Ð¡¶Ë = 1860 ×Ö½Ú,
-   Ð¡¶Ë×Ö½ÚÐòÔÚÕâÀïÒÑÊÇ³ÉÆ·(Ö±½Ó°´×Ö½ÚÉÕ), ¸ÄÍ¼ÇëÓÃ gen ½Å±¾ÖØÉú³É */
+/* è‹±æ–‡ç‰ˆä¸‰å¼ æŒ‰é’®å›¾(ä¸Šä¸€å…³/ä¸‹ä¸€å…³/é‡æ–°å¼€å§‹)è¿žåœ¨ä¸€èµ·, ä¾› BTN_IMG_STORE_MODE
+   çƒ§è¿›å¤–éƒ¨ Flash çš„ä¿ç•™åŒº BTN_IMG_EN_ADDR: å¸ƒå±€ä¸Žè¿è¡ŒæœŸä¸€è‡´
+   [prev_en][next_en][restart_en], æ¯å¼  30x31 RGB565 å°ç«¯ = 1860 å­—èŠ‚,
+   å°ç«¯å­—èŠ‚åºåœ¨è¿™é‡Œå·²æ˜¯æˆå“(ç›´æŽ¥æŒ‰å­—èŠ‚çƒ§), æ”¹å›¾è¯·ç”¨ gen è„šæœ¬é‡ç”Ÿæˆ */
 const uint8_t g_btn_img_en[PREV_IMG_W * PREV_IMG_H * 2 * 3] = {
     0x00,0x00,0x00,0x00,0x0a,0x52,0xb7,0xab,0x19,0xbc,0x39,0xbc,0x39,0xbc,0x7a,0xbc,
     0xbb,0xc4,0xdb,0xcc,0xfb,0xcc,0x3c,0xd5,0x7d,0xdd,0xdd,0xe5,0xfe,0xed,0x1e,0xee,

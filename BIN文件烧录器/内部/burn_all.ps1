@@ -58,6 +58,23 @@ if ($proj -eq '' -or -not (Test-Path $proj)) {
 $py = Join-Path $PSScriptRoot "gen_video_chunk.py"
 if (-not (Test-Path $py)) { $py = Join-Path $proj "gen_video_chunk.py" }
 
+# python 解释器: PATH 上的 python 可能只是 Microsoft Store 占位程序(退出码 9009 且没有任何输出),
+# 所以优先用 py 启动器, 其次常见安装路径, 最后才退回 PATH 上的 python
+$pyExe = 'python'
+$pyPre = @()
+if (Get-Command py -ErrorAction SilentlyContinue) {
+    $pyExe = 'py'; $pyPre = @('-3')
+} else {
+    foreach ($c in @('C:\Python313\python.exe', "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe")) {
+        if (Test-Path $c) { $pyExe = $c; break }
+    }
+}
+# 生成指定块的数据(必须带 --bin: 否则脚本会自己瞎找第一个 .bin, 与 -BinPath 不是同一个文件)
+function Invoke-Gen([string[]]$GenArgs) {
+    $a = $pyPre + @($py, '--bin', $bin) + $GenArgs
+    return (& $pyExe @a 2>&1 | Out-String)
+}
+
 # 源视频 .bin: -BinPath 优先; 否则 脚本目录 -> 工程内 数据\娜娜莉 -> 外层 数据\娜娜莉
 if ($BinPath -ne '') {
     $bin = (Get-Item -LiteralPath $BinPath).FullName          # 外部指定: 直接烧这个文件, 不用搬到本目录
@@ -154,6 +171,19 @@ function Read-BurnProg([string]$addr) {
     return $obj2
 }
 
+# 等 SWD 连上(设备在 Standby 时调试口是断的, 只能靠触摸/充电唤醒): 每 1.2s 探一次
+function Wait-Swd([int]$max = 40) {
+    $f = Join-Path $obj "burn_probe.txt"
+    for ($k = 1; $k -le $max; $k++) {
+        & $openocd -f $cfg -c "adapter speed $SwdSpeed" -c 'chip_id CH32V20x' -c 'init' -c 'shutdown' *> $f
+        $t = [Text.Encoding]::GetEncoding(936).GetString([IO.File]::ReadAllBytes($f))
+        if ($t -notmatch 'failed to connect') { return $true }
+        if ($k -eq 1) { Add-Content $log '等待 SWD 连接... 设备若是待机, 请点一下屏幕' }
+        Start-Sleep -Milliseconds 1200
+    }
+    return $false
+}
+
 Set-Location $obj
 
 $BS = 53248
@@ -164,10 +194,10 @@ if ($count -gt 0 -and ($start + $count) -lt $blockCount) { $endIndex = $start + 
 Add-Content $log ("==== burn_all(patch) start={0} blocks={1} at {2} ====" -f $start, $blockCount, [DateTime]::Now.ToString('HH:mm:ss'))
 
 # --- 首块准备(同步): 生成 .c/.h + 编译 = 基准镜像; 之后整个 run 不再编译 ---
-$po = & python $py $start 2>&1 | Out-String
-if ($LASTEXITCODE -ne 0) { Add-Content $log ("block {0} GEN FAIL: {1}" -f $start, $po); exit }
+$po = Invoke-Gen @($start.ToString())
+if ($LASTEXITCODE -ne 0) { Add-Content $log ("block {0} GEN FAIL: {1}" -f $start, $po); exit 1 }
 $mo = & make all 2>&1 | Out-String
-if ($LASTEXITCODE -ne 0) { Add-Content $log ("block {0} MAKE FAIL: {1}" -f $start, $mo); exit }
+if ($LASTEXITCODE -ne 0) { Add-Content $log ("block {0} MAKE FAIL: {1}" -f $start, $mo); exit 1 }
 Start-Sleep -Seconds 2
 
 # --- 算出两处补丁在 elf 文件里的偏移(基准镜像后续只读, 每块贴到副本上); 进度结构地址也在这查一次 ---
@@ -176,22 +206,23 @@ $dataOff = Get-FileOff (Get-SymAddr 'g_video_chunk')
 $stAddr  = Get-SymAddr 'g_burn_prog'
 if ($metaOff -lt 0 -or $dataOff -lt 0) {
     Add-Content $log ("PATCH OFFSET FAIL: meta={0} data={1} (基准镜像里找不到符号)" -f $metaOff, $dataOff)
-    exit
+    exit 1
 }
 $base = [IO.File]::ReadAllBytes($elf)
 Add-Content $log ("base image: {0} bytes, patch meta@{1} data@{2}" -f $base.Length, $metaOff, $dataOff)
 
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
+$failed = $false   # 中途任何一块失败都要以非 0 退出, 否则 burn_step.ps1 会误报"成功"
 for ($i = $start; $i -lt $endIndex; $i++) {
     $t0 = $sw.Elapsed.TotalSeconds
 
     # 1) 只生成这一块的原始数据 + CRC(不重编, 所以很快)
-    $po = & python $py $i raw 2>&1 | Out-String
+    $po = Invoke-Gen @($i.ToString(), 'raw')
     if ($LASTEXITCODE -ne 0) {
-        Add-Content $log ("block {0} GEN FAIL: {1}" -f $i, $po); break
+        Add-Content $log ("block {0} GEN FAIL: {1}" -f $i, $po); $failed = $true; break
     }
     $cm = [regex]::Match($po, 'CRC=0x([0-9a-fA-F]+)')
-    if (-not $cm.Success) { Add-Content $log ("block {0} 取不到 CRC: {1}" -f $i, $po); break }
+    if (-not $cm.Success) { Add-Content $log ("block {0} 取不到 CRC: {1}" -f $i, $po); $failed = $true; break }
     $expCrc = [Convert]::ToUInt32($cm.Groups[1].Value, 16)
 
     # 2) 打补丁: 基准镜像副本 + 参数表 24B + 数据 53248B
@@ -203,51 +234,67 @@ for ($i = $start; $i -lt $endIndex; $i++) {
     [Array]::Copy($db, 0, $img, $dataOff, $db.Length)
     [IO.File]::WriteAllBytes($patchElf, $img)
 
-    # 3) SWD 烧录这份补丁镜像(说明: 试过把"烧录+轮询"塞进同一个 openocd 会话, 但 program 之后
-    #    在同一会话里读 RAM 拿到的是固定不变的垃圾值, 只能分开做)
-    $oo = & $openocd -f $cfg -c "adapter speed $SwdSpeed" -c "chip_id CH32V20x" -c "program {$patchElf} reset exit" 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) {
-        Add-Content $log ("block {0} SWD FAIL: {1}" -f $i, $oo); break
-    }
+    # 3) SWD 烧录这份补丁镜像; 4) 回读握手。两步整体重试: SWD 连接偶发失败(设备刚复位、
+    #    或已进入 Standby)时不要整个 run 直接死掉 —— 等一下、提示点屏, 再把这个块重烧一遍即可。
+    #    说明: 试过把"烧录+轮询"塞进同一个 openocd 会话, 但 program 之后在同一会话里读 RAM
+    #    拿到的是固定不变的垃圾值, 只能分开做
+    $pr = $null
+    $ok = $false
+    for ($att = 1; $att -le 3; $att++) {
+        if ($att -gt 1) {
+            Add-Content $log ("block {0} 重试 {1}/2: 等 SWD(设备待机的话请点一下屏幕)" -f $i, ($att - 1))
+            Wait-Swd 40 | Out-Null
+        }
+        $oo = & $openocd -f $cfg -c "adapter speed $SwdSpeed" -c "chip_id CH32V20x" -c "program {$patchElf} reset exit" 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) {
+            Add-Content $log ("block {0} SWD FAIL: {1}" -f $i, $oo)
+            continue
+        }
 
-    # 4) 等固件烧完: 结构里的 result 由固件在"写完 + CRC 校验完"之后才置位; 最多等 30s
-    #    program 会话自己要 ~2.6s, 结束时固件早就烧完了(复位后约 1.1s), 所以立刻首读即可命中
-    $pr   = $null
-    $last = $null
-    if ($stAddr -ne '') {
-        $deadline = (Get-Date).AddSeconds(30)
-        while ((Get-Date) -lt $deadline) {
-            $r = Read-BurnProg $stAddr        # $null = 回读失败/还是随机 RAM, 直接重试
-            if ($r) { $last = $r }
-            if ($r -and $r.Result -ne 0) { $pr = $r; break }
-            Start-Sleep -Milliseconds 150
-        }
-        $stgName = @('erase', 'write', 'verify', 'done')
-        if (-not $pr) {
-            if ($last) {
-                Add-Content $log ("block {0} HANDSHAKE TIMEOUT(30s) 停在 stage={1}({2}) pct={3}" -f `
-                                  $i, $last.Stage, $stgName[$last.Stage], $last.Pct)
-            } else {
-                Add-Content $log ("block {0} HANDSHAKE TIMEOUT(30s) 回读一直失败" -f $i)
+        # 等固件烧完: 结构里的 result 由固件在"写完 + CRC 校验完"之后才置位; 最多等 30s
+        # program 会话自己要 ~2.6s, 结束时固件早就烧完了(复位后约 1.1s), 所以立刻首读即可命中
+        $last = $null
+        if ($stAddr -ne '') {
+            $deadline = (Get-Date).AddSeconds(30)
+            while ((Get-Date) -lt $deadline) {
+                $r = Read-BurnProg $stAddr        # $null = 回读失败/还是随机 RAM, 直接重试
+                if ($r) { $last = $r }
+                if ($r -and $r.Result -ne 0) { $pr = $r; break }
+                Start-Sleep -Milliseconds 150
             }
-            break
-        } elseif ($pr.Result -ne 1) {
-            Add-Content $log ("block {0} BURN FAIL stage={1}({2}) pct={3} crc_src=0x{4:X4} crc_rd=0x{5:X4}" -f `
-                              $i, $pr.Stage, $stgName[$pr.Stage], $pr.Pct, $pr.CrcSrc, $pr.CrcRd)
-            break
+            $stgName = @('erase', 'write', 'verify', 'done')
+            if (-not $pr) {
+                if ($last) {
+                    Add-Content $log ("block {0} HANDSHAKE TIMEOUT(30s) 停在 stage={1}({2}) pct={3}" -f `
+                                      $i, $last.Stage, $stgName[$last.Stage], $last.Pct)
+                } else {
+                    Add-Content $log ("block {0} HANDSHAKE TIMEOUT(30s) 回读一直失败" -f $i)
+                }
+                continue
+            }
+            if ($pr.Result -ne 1) {
+                Add-Content $log ("block {0} BURN FAIL stage={1}({2}) pct={3} crc_src=0x{4:X4} crc_rd=0x{5:X4}" -f `
+                                  $i, $pr.Stage, $stgName[$pr.Stage], $pr.Pct, $pr.CrcSrc, $pr.CrcRd)
+                continue
+            }
+            # ★ 端到端校验: 块号与 CRC 必须和"我以为在烧的块"一致 —— 补丁贴错位置/用错基准镜像都会在这里暴露
+            if ($pr.Index -ne $i) {
+                Add-Content $log ("block {0} IDX MISMATCH idx={1} (补丁/镜像不对, 已停)" -f $i, $pr.Index)
+                $ok = $true; $failed = $true; break       # 镜像本身不对, 重试没意义
+            }
+            if ($pr.CrcSrc -ne $expCrc) {
+                Add-Content $log ("block {0} CRC MISMATCH 固件=0x{1:X4} 期望=0x{2:X4} (补丁贴错位置?, 已停)" -f `
+                                  $i, $pr.CrcSrc, $expCrc)
+                $ok = $true; $failed = $true; break       # 同上
+            }
+        } else {
+            # 固件里查不到进度结构(旧固件): 退回固定等待
+            Start-Sleep -Milliseconds $SettleMs
         }
-        # ★ 端到端校验: 块号与 CRC 必须和"我以为在烧的块"一致 —— 补丁贴错位置/用错基准镜像都会在这里暴露
-        if ($pr.Index -ne $i) {
-            Add-Content $log ("block {0} IDX MISMATCH idx={1} (补丁/镜像不对, 已停)" -f $i, $pr.Index); break
-        }
-        if ($pr.CrcSrc -ne $expCrc) {
-            Add-Content $log ("block {0} CRC MISMATCH 固件=0x{1:X4} 期望=0x{2:X4} (补丁贴错位置?, 已停)" -f `
-                              $i, $pr.CrcSrc, $expCrc); break
-        }
-    } else {
-        # 固件里查不到进度结构(旧固件): 退回固定等待
-        Start-Sleep -Milliseconds $SettleMs
+        $ok = $true
+        break
     }
+    if (-not $ok) { $failed = $true; break }
 
     $tinfo = ''
     if ($pr) {
@@ -258,3 +305,4 @@ for ($i = $start; $i -lt $endIndex; $i++) {
                       $i, ($i * $BS), ($sw.Elapsed.TotalSeconds - $t0), $sw.Elapsed.TotalSeconds, $tinfo)
 }
 Add-Content $log ("==== finished total {0:N1}s ====" -f $sw.Elapsed.TotalSeconds)
+if ($failed) { exit 1 }

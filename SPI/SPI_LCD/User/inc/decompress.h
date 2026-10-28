@@ -1,5 +1,6 @@
 #include "debug.h"
 #include "config.h"
+#include "video_map.h"   /* VIDEO_SEGMENT_COUNT + VIDEO_RANGES_INIT(烧录面板导入视频时自动生成) */
 
 #ifndef __decompress_h
 #define __decompress_h 			   
@@ -18,12 +19,7 @@ extern uint8_t blink_touched; //闪烁期间触摸标志，main.c用后清零
 extern uint8_t current_video_index;
 //最大视频数量
 extern uint8_t max_video_count;
-// 视频段数量(数组第一维, 与decompress.c定义一致, 修改时只需改此宏)
-/* ★ 视频段数: 同时决定 video_ranges 的行数, 必须等于表里"有值的行数"(当前 8 行 = 压缩数据1~8)。
-   填错的后果: ①填 1 时 `(idx+1) % max_video_count` 恒为 0 -> 点击变成"重播当前段"、切不了视频;
-               ②填多了多出全 0 行 -> seg_end=0, 播到帧末立刻重播(看着像卡住)。
-   以后启用 decompress.c 表里那些注释掉的段时, 记得把这个数字一起加。 */
-#define VIDEO_SEGMENT_COUNT  4
+
 // 视频段地址范围表：每段{起始地址4字节, 结束地址4字节}
 extern const uint8_t video_ranges[VIDEO_SEGMENT_COUNT][8];
 

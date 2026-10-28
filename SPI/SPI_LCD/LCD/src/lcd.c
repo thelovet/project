@@ -37,6 +37,13 @@ static void LCD_InitPanel_New(void);//遍历初始化序列表，依次发送寄
    行宽最大 240 → 缓冲 480B。
    g_lcd_flip180 由 Settings_ApplyOrientation() 设置(方向=180° 时为 1)。 */
 unsigned char g_lcd_flip180 = 0;
+/* 烧录固件(FLASH_DATA_STORE_MODE)不播视频、不换方向: 把判断变成常量 0,
+   编译器会把下面所有翻转分支连同 FlipWindow/Flush 一起优化掉, 给字库镜像腾 Flash。 */
+#if defined(FLASH_DATA_STORE_MODE)
+#define FLIP_ON()   0
+#else
+#define FLIP_ON()   (g_lcd_flip180)
+#endif
 static uint16_t s_flip_row[LCD_W];   /* 单行像素缓存 */
 static uint16_t s_flip_len;          /* 已缓存像素数 */
 static uint16_t s_flip_max;          /* 当前窗口一行几像素; 0=不缓存(多行窗口/DMA窗口) */
@@ -84,9 +91,13 @@ static void LCD_FlipSync(void)
  */
 void LCD_SetFlip180(unsigned char on)
 {
+#if defined(FLASH_DATA_STORE_MODE)
+    (void)on;          /* 烧录镜像不做翻转: 不保留行缓冲相关代码 */
+#else
     LCD_FlipSync();
     s_flip_len = 0;
     g_lcd_flip180 = on ? 1 : 0;
+#endif
 }
 
 
@@ -97,7 +108,9 @@ void LCD_SetFlip180(unsigned char on)
  */
 void LCD_WR_REG(uint8_t data)
 {
+#if !defined(FLASH_DATA_STORE_MODE)
     LCD_FlipSync();   /* 180°: 发命令前把没凑满的行先倒序送完 */
+#endif
     //LCD_CS_CLR;
     LCD_DC_CLR;
     SPI2_Write(data);
@@ -126,7 +139,7 @@ void LCD_WR_DATA(uint8_t data)
 void LCD_WR_DATA_16Bit(uint16_t dat)
 {
     /* 180° 且是单行窗口: 先攒着, 凑满一行再整行倒序送出(逐点画的图/字才不会被镜像) */
-    if (g_lcd_flip180 && s_flip_max) {
+    if (FLIP_ON() && s_flip_max) {
         s_flip_row[s_flip_len++] = dat;
         if (s_flip_len >= s_flip_max) LCD_FlipFlush();
         return;
@@ -562,7 +575,7 @@ void LCD_Clear(uint16_t Color)
  */
 void LCD_Address_Set(uint16_t x1,uint16_t y1,uint16_t x2,uint16_t y2)
 {
-		if (g_lcd_flip180) {
+		if (FLIP_ON()) {
 			LCD_FlipSync();                          /* 上一窗口没凑满的行先送完 */
 			LCD_FlipWindow(&x1, &y1, &x2, &y2);      /* 窗口映射到 180° 后的对角位置 */
 		}
@@ -577,7 +590,7 @@ void LCD_Address_Set(uint16_t x1,uint16_t y1,uint16_t x2,uint16_t y2)
 		//P_SWI = 0x04;
 		/* 180° 且高=1 的窗口才走行缓冲: 这时"倒序"才等价于 180°;
 		   多行窗口要整段倒序, 由调用方负责(menu.c / decompress.c) */
-		if (g_lcd_flip180 && y1 == y2) {
+		if (FLIP_ON() && y1 == y2) {
 			s_flip_len = 0;
 			s_flip_max = (uint16_t)(x2 - x1 + 1);
 		}
@@ -597,7 +610,7 @@ void LCD_Address_Set_DMA(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
 {
     uint8_t *buf = shared_buffer;
     
-    if (g_lcd_flip180) {
+    if (FLIP_ON()) {
         LCD_FlipSync();                          /* 180°: 没凑满的行先送完 + 退出逐点缓存 */
         LCD_FlipWindow(&x1, &y1, &x2, &y2);      /* 窗口映射到对角位置 */
     }
@@ -660,7 +673,7 @@ void LCD_Address_Set_DMA_Calculate_remaining(uint16_t x1, uint16_t y1, uint16_t 
     uint8_t buf[11] = {0};
     // uint16_t remaining = 0;
     
-    if (g_lcd_flip180) {
+    if (FLIP_ON()) {
         LCD_FlipSync();                          /* 180°: 没凑满的行先送完 + 退出逐点缓存 */
         LCD_FlipWindow(&x1, &y1, &x2, &y2);      /* 窗口映射到对角位置 */
     }

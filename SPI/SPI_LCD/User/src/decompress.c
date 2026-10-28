@@ -29,6 +29,26 @@ uint32_t seg_end = 0;//当前数据段结束地址
 uint32_t last_seg_end = 0;//最后一个数据段结束地址
 uint8_t pre_data[PARALLEL_BUFFER_COUNT];//预读数据数组
 
+/* ---- 真机帧耗时采样(标定模拟器用) -------------------------------------
+   视频每帧把"纯处理耗时"frame_duration(us, 不含后面那段节流等待)记进 RAM 环形数组,
+   记录满即停。用 读帧率.ps1 通过 WCH-Link 在线 halt 读内存即可, 不占屏、不写 flash。
+   ★ 这些量故意做成 volatile 全局: 调试器按符号名找地址, 不要被 LTO 优化掉。 */
+/* ★ 帧率/耗时调试开关: 1=在屏上显示"真实处理帧率/最低帧率/当前帧率"并把每帧耗时
+   记进 RAM(g_perf_*, 供 读帧率.ps1 读取)。量产/烧录时关掉 —— 它占 Flash, 而字库
+   烧录镜像(FLASH_DATA_STORE_MODE)本来就很紧。 */
+#define PERF_DEBUG  0
+
+#if PERF_DEBUG
+#define PERF_LOG_MAX  64
+volatile uint32_t g_perf_log[PERF_LOG_MAX];  /* 每帧处理耗时(us) */
+volatile uint32_t g_perf_cnt;                /* 已记录帧数(<=PERF_LOG_MAX) */
+volatile uint32_t g_perf_avg_us;             /* 固件自算的平均帧间隔(含节流下限) */
+volatile uint32_t g_perf_low_fps;            /* GetLowestFPS() */
+
+/* 真实处理帧率: 用"节流等待之前"的 frame_duration 直接取倒数(不节流) */
+volatile uint32_t g_perf_raw_fps;
+#endif
+
 #define AVG_FRAME_COUNT       10    // 滑动窗10帧求平均值
 #define TARGET_FPS            60    // 目标帧率，改这一个值即可
 #define INIT_FRAME_TIME_US    (1000000 / TARGET_FPS)  // 自动计算每帧微秒数，60FPS=16666us
@@ -52,18 +72,8 @@ uint8_t current_video_index = 0;
 uint8_t max_video_count = VIDEO_SEGMENT_COUNT;
 
 // 视频段地址范围定义（每组{起始地址4字节, 结束地址4字节}）
-const uint8_t video_ranges[VIDEO_SEGMENT_COUNT][8] = {
-	//{0x00, 0x00, 0x00, 0x00, 0x00, 0x79, 0xC0, 0x1D},娜娜莉
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x36, 0x5C,
-	0x00, 0x04, 0x36, 0x5D, 0x00, 0x0C, 0x7F, 0x96,
-	0x00, 0x0C, 0x7F, 0x97, 0x00, 0x14, 0xEC, 0x1A,
-	0x00, 0x14, 0xEC, 0x1B, 0x00, 0x2D, 0xF3, 0x9F,
-	// {0x00, 0x00, 0x00, 0x00, 0x00, 0x0A, 0xD1, 0xE2},
-	// {0x00, 0x0A, 0xD1, 0xE3, 0x00, 0x1D, 0x47, 0x93},
-	// {0x00, 0x1D, 0x47, 0x94, 0x00, 0x30, 0xFB, 0x35},
-	// {0x00, 0x30, 0xFB, 0x36, 0x00, 0x5C, 0x1E, 0x2B},
-	//{0x00, 0x61, 0x07, 0xEC, 0x00, 0x6C, 0xF1, 0xFF},
-};
+// ★ 内容来自 video_map.h —— 烧录面板导入视频 bin 时自动生成(段数 + 每段地址), 不要手改
+const uint8_t video_ranges[VIDEO_SEGMENT_COUNT][8] = { VIDEO_RANGES_INIT };
 
 
 
@@ -152,34 +162,36 @@ void Set_display_range_DMA() {//读取坐标后配置屏幕显示位置
 	//LCD_Address_Set_DMA_Calculate_remaining(start_x, start_y, end_x, end_y);//设置显示范围
 }
 
-/**
- * @brief 解压缩并显示SPI Flash中的图像数据到LCD
- *
- * @param location4    待读取的flash位置高字节
- * @param location3    待读取的flash位置次高字节
- * @param location2    待读取的flash位置次低字节
- * @param location1    待读取的flash位置低字节
- *
- * 功能说明：
- * 1. 从SPI Flash读取自定义压缩格式的图像数据
- * 2. 实时解压图像数据（支持RLE重复块/非重复块）
- * 3. 将解压后的数据直接写入LCD显示缓冲区
- * 4. 使用24位全局地址指针(input_pos2/1/0)加速读取位置
- */
 #ifdef SIM_BUILD
 /* 模拟器专用: 没导入视频时, 用一张循环静帧代替视频流 */
 int  sim_image_active(void);
 void sim_image_draw(void);
 #endif
 
-/* ---------------- 180° 翻转: 视频段写到镜像后的位置 ----------------
-   (g_lcd_flip180=1 时才走这里; 屏幕方向=180° 时由 Settings_ApplyOrientation 打开)
-   一帧 = 一个窗口 (start_x..end_x, start_y..end_y), 后面紧跟一串"长度为 n 的连续段"
-   (纯色段 / 原始像素段), 按行主序填满整个窗口。180° 之后整帧的像素顺序完全倒过来,
-   所以每一段都要写到"帧内序号 q = w*h - k - n"开始的地方, 并把段内像素倒序:
-     · 纯色段: 颜色一样, 不用倒序, 只要窗口位置对;
-     · 像素段: 先在内存里把 n 个像素倒过来, 再按行段顺序送出。
-   段长 n 最大 255(编码格式限制), 所以每段最多跨 2~3 行, 按行拆窗口就够。 */
+/**
+ * @brief  按 180° 镜像后的位置写出一段视频数据(纯色段或像素段)
+ *
+ * @param  bx      本帧窗口左上角 X (逻辑坐标)
+ * @param  by      本帧窗口左上角 Y (逻辑坐标)
+ * @param  w       本帧窗口宽度(像素)
+ * @param  h       本帧窗口高度(像素)
+ * @param  k       本段之前已送出的像素数(即本段在帧内的起始序号)
+ * @param  n       本段像素数(1~255, 编码格式限制)
+ * @param  data    像素段数据; NULL 表示纯色段
+ * @param  colorh  纯色段颜色高字节(像素段时忽略)
+ * @param  colorl  纯色段颜色低字节(像素段时忽略)
+ * @return 无
+ *
+ * @note   仅在 g_lcd_flip180=1(屏幕方向=180°)时被调用, 由 Settings_ApplyOrientation() 打开。
+ * @note   一帧 = 一个窗口(start_x..end_x, start_y..end_y) + 一串"长度为 n 的连续段",
+ *         按行主序填满整个窗口。180° 之后整帧的像素顺序完全倒过来, 所以每一段都要写到
+ *         "帧内序号 q = w*h - k - n"开始的地方, 并把段内像素倒序:
+ *           · 纯色段: 颜色一样, 不用倒序, 只要窗口位置对;
+ *           · 像素段: 先在内存里把 n 个像素倒过来, 再按行段顺序送出。
+ *         段长最大 255, 每段最多跨 2~3 行, 按行拆窗口就够。
+ * @note   每段设窗口前必须等上一段 DMA 发完: 窗口函数靠数 DMA 剩余字节切 DC,
+ *         没发完就设窗口会把 DC 时序切错(画面花屏, 严重时面板不认)。
+ */
 static void LCD_EmitRunFlipped(uint16_t bx, uint16_t by, uint16_t w, uint16_t h,
                                uint32_t k, uint16_t n, uint8_t *data,
                                uint8_t colorh, uint8_t colorl)
@@ -257,10 +269,23 @@ static void LCD_EmitRunFlipped(uint16_t bx, uint16_t by, uint16_t w, uint16_t h,
     }
 }
 
-/* 像素段: pre_count 个像素已在 shared_buffer, 剩下的 count 个直接接着读进 shared_buffer,
-   整段倒序后送到镜像位置。
-   注意: 这里不能用 LCD_Address_Set_DMA(它会拿 shared_buffer 存地址字节), 只能用
-   局部缓冲的 LCD_Address_Set_DMA_Calculate_remaining, 这样 shared_buffer 里的像素不会被踩。 */
+/**
+ * @brief  读入一段像素并按 180° 镜像位置送出
+ *
+ * @param  count      还需从 flash 追加读取的像素数
+ * @param  pre_count  已预读进 shared_buffer 的像素数
+ * @param  bx         本帧窗口左上角 X
+ * @param  by         本帧窗口左上角 Y
+ * @param  w          本帧窗口宽度
+ * @param  h          本帧窗口高度
+ * @param  k          本段在帧内的起始序号
+ * @return 无
+ *
+ * @note   180° 不能"边读边发"(必须先整段倒序), 所以剩下的像素全部读进 shared_buffer 再送。
+ * @note   这里不能用 LCD_Address_Set_DMA(它会拿 shared_buffer 存地址字节, 会把像素踩掉),
+ *         只能用局部缓冲的 LCD_Address_Set_DMA_Calculate_remaining。
+ * @note   SIM_BUILD 下走 FLASH_Read() 循环, 真机走 SPI1 DMA 一次性读入。
+ */
 static void LCD_drawImageFlipped(uint16_t count, uint8_t pre_count,
                                  uint16_t bx, uint16_t by, uint16_t w, uint16_t h, uint32_t k)
 {
@@ -283,13 +308,31 @@ static void LCD_drawImageFlipped(uint16_t count, uint8_t pre_count,
     LCD_EmitRunFlipped(bx, by, w, h, k, total, (uint8_t *)shared_buffer, 0, 0);
 }
 
-/* 180° 是否生效(窗口尺寸有效时才算) */
+/**
+ * @brief  判断本帧是否要走 180° 镜像路径
+ *
+ * @param  w  本帧窗口宽度
+ * @param  h  本帧窗口高度
+ * @return 1=镜像(翻转已打开且窗口尺寸有效), 0=照旧直接送
+ */
 static uint8_t LCD_FlipOn(uint16_t w, uint16_t h)
 {
     return (uint8_t)(g_lcd_flip180 && w && h);
 }
 
-/* 送一段纯色: 180° 走镜像位置, 否则照旧整段填 */
+/**
+ * @brief  送出一段纯色视频数据(180° 时写到镜像位置)
+ *
+ * @param  bx   本帧窗口左上角 X
+ * @param  by   本帧窗口左上角 Y
+ * @param  w    本帧窗口宽度
+ * @param  h    本帧窗口高度
+ * @param  pk   帧内已送出的像素计数(进出都更新)
+ * @param  len  本段像素数
+ * @param  ch   颜色高字节
+ * @param  cl   颜色低字节
+ * @return 无
+ */
 static void LCD_FillRun(uint16_t bx, uint16_t by, uint16_t w, uint16_t h,
                         uint32_t *pk, uint32_t len, uint8_t ch, uint8_t cl)
 {
@@ -298,7 +341,18 @@ static void LCD_FillRun(uint16_t bx, uint16_t by, uint16_t w, uint16_t h,
     *pk += len;
 }
 
-/* 送一段像素: 180° 先整段倒序再按行段送, 否则照旧边读边发 */
+/**
+ * @brief  送出一段像素视频数据(180° 时先整段倒序再送到镜像位置)
+ *
+ * @param  bx         本帧窗口左上角 X
+ * @param  by         本帧窗口左上角 Y
+ * @param  w          本帧窗口宽度
+ * @param  h          本帧窗口高度
+ * @param  pk         帧内已送出的像素计数(进出都更新)
+ * @param  count      还需从 flash 读取的像素数
+ * @param  pre_count  已预读进 shared_buffer 的像素数
+ * @return 无
+ */
 static void LCD_DrawRun(uint16_t bx, uint16_t by, uint16_t w, uint16_t h,
                         uint32_t *pk, uint16_t count, uint8_t pre_count)
 {
@@ -307,6 +361,27 @@ static void LCD_DrawRun(uint16_t bx, uint16_t by, uint16_t w, uint16_t h,
     *pk += (uint32_t)count + pre_count;
 }
 
+/**
+ * @brief  解压缩并显示 SPI Flash 中的图像数据到 LCD
+ *
+ * @param  location4  待读取的 flash 位置高字节
+ * @param  location3  待读取的 flash 位置次高字节
+ * @param  location2  待读取的 flash 位置次低字节
+ * @param  location1  待读取的 flash 位置低字节
+ * @return 0(本帧/本段处理完毕; 该函数各返回分支均为 0)
+ *
+ * @note   功能:
+ *         1. 从 SPI Flash 读取自定义压缩格式的图像数据;
+ *         2. 实时解压(支持 RLE 重复块 / 非重复块);
+ *         3. 解压后的数据直接写入 LCD;
+ *         4. 用 32 位全局地址 input_pos 加速读取位置。
+ * @note   一帧 = 一个窗口(4 字节块头) + 一串连续段, 帧尾标记 F1 F1 FF FF FF,
+ *         块尾标记 F2 F2 FF FF FF。
+ * @note   g_lcd_flip180=1(屏幕方向 180°)时不再整帧设窗口, 由 LCD_EmitRunFlipped
+ *         按镜像位置逐段设窗口; 此时像素段不做预读(必须先整段倒序)。
+ * @note   SIM_BUILD 且无导入视频时, 改用 sim_image_draw() 循环静帧;
+ *         DEBUG_BLACK_VIDEO=1 时保持黑屏, 用于隔离显示/SPI 活动对触摸的影响。
+ */
 u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16* location1) {
 #ifdef SIM_BUILD
 	/* 模拟器: 循环静帧(60fps 节流), 让固件每帧整屏重绘背景, 避免菜单残影 */
@@ -402,6 +477,10 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 			if (end_x == 0xFF && end_y == 0xFF) {//符合帧结束标志
 				uint32_t frame_end = GetTimerCount();//记录帧结束时间
 				uint32_t frame_duration = frame_end - frame_start;//计算当前帧处理时间
+#if PERF_DEBUG
+				/* 真实处理帧率: 此刻还没做下面的节流等待, 直接用本帧耗时取倒数 */
+				g_perf_raw_fps = frame_duration ? (1000000UL / frame_duration) : 0;
+#endif
 				//UpdateMaxFrameTime(frame_duration);//更新最大帧耗时，用于最低帧率
 				LCD_Backlight_PWM_SetDuty(g_brightness);//开启LCD背光(用户亮度)
 				input_pos += 1;//地址加1
@@ -466,9 +545,14 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 				while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//等待屏幕刷新完成
 				//while ((SPI2_DMA_TX_CH->CNTR) > 0);//等待SPI2屏幕刷新完成
 				FLASH_CS_SET;// 释放Flash
-				//FrameTrigger();//触发帧率计算，用于显示帧率——已注释，不需要显示帧率
-				// LCD_ShowNum(GetLowestFPS(), START_Y - SEG_HEIGHT - 4);//显示最低帧率
-				// LCD_ShowNum(GetFPS(), START_Y);//显示当前帧率
+				/* 帧率显示(标定模拟器用): 黄字显示"当前 fps"和"最低 fps"。
+				   注意这两个数字本身要画到屏上, 会有几像素的遮挡, 不测时关掉。 */
+#if PERF_DEBUG
+				FrameTrigger();//触发帧率计算
+				LCD_ShowNum(g_perf_raw_fps, START_Y - 2 * SEG_HEIGHT - 8);//真实处理帧率(不节流)
+				LCD_ShowNum(GetLowestFPS(), START_Y - SEG_HEIGHT - 4);//显示最低帧率
+				LCD_ShowNum(GetFPS(), START_Y);//显示当前帧率
+#endif
 				// 触摸坐标调试: 确认触摸IC正常后再取消注释
 				// TouchState ts;
 				// Touch_Scan(&ts);
@@ -486,6 +570,13 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 
 				if (frame_duration > 10000)//排除异常值（小于10ms不统计）
 					UpdateAvgFrameTime(frame_duration);//更新平均帧时间
+
+#if PERF_DEBUG
+				/* 采样: 记进 RAM, 用 读帧率.ps1 通过调试器读(min/avg/max 一次看全) */
+				if (g_perf_cnt < PERF_LOG_MAX) g_perf_log[g_perf_cnt++] = frame_duration;
+				g_perf_avg_us  = avg_frame_time;
+				g_perf_low_fps = GetLowestFPS();
+#endif
 
 				if (frame_duration < avg_frame_time) {//等待剩余时间
 					while ((GetTimerCount() - frame_end) < (avg_frame_time - frame_duration));

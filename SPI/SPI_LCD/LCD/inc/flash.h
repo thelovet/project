@@ -18,65 +18,65 @@
 #define W25X_JedecDeviceID    0x9F
 
 
-/*1. ×´Ì¬¼Ä´æÆ÷-1 (Status Register-1)
-   - Ã¦±êÖ¾ (BUSY)£ºÖ¸Ê¾Éè±¸ÊÇ·ñÕıÔÚÖ´ĞĞ±à³Ì¡¢²Á³ı»òĞ´×´Ì¬¼Ä´æÆ÷Ö¸Áî¡£
-   - Ğ´Ê¹ÄÜËø´æÆ÷ (WEL)£ºÖ¸Ê¾Éè±¸ÊÇ·ñ´¦ÓÚĞ´Ê¹ÄÜ×´Ì¬¡£
-   - ¿é±£»¤Î» (BP3, BP2, BP1, BP0)£ºÓÃÓÚ¿ØÖÆ´æ´¢Æ÷ÕóÁĞµÄĞ´±£»¤¡£
-   - ¶¥²¿/µ×²¿¿é±£»¤ (TB)£º¿ØÖÆ¿é±£»¤Î»ÊÇ±£»¤´æ´¢Æ÷ÕóÁĞµÄ¶¥²¿»¹ÊÇµ×²¿¡£
-2. ×´Ì¬¼Ä´æÆ÷-2 (Status Register-2)
-   - ËÄÏßÊ¹ÄÜ (QE)£º¿ØÖÆÉè±¸ÊÇ·ñÆôÓÃËÄÏßSPI²Ù×÷¡£
-   - ×´Ì¬¼Ä´æÆ÷±£»¤ (SRP, SRL)£º¿ØÖÆ×´Ì¬¼Ä´æÆ÷ÊÇ·ñ±»Ó²¼ş»òÈí¼ş±£»¤¡£
-   - ²Á³ı/±à³ÌÔİÍ£×´Ì¬ (SUS)£ºÖ¸Ê¾Éè±¸ÊÇ·ñ´¦ÓÚ²Á³ı»ò±à³ÌÔİÍ£×´Ì¬¡£
-   - °²È«¼Ä´æÆ÷ËøÎ» (LB3, LB2, LB1)£ºÓÃÓÚÒ»´ÎĞÔ±à³Ì (OTP) ±£»¤°²È«¼Ä´æÆ÷¡£
-3. ×´Ì¬¼Ä´æÆ÷-3 (Status Register-3)
-   - µ±Ç°µØÖ·Ä£Ê½ (ADS)£ºÖ¸Ê¾Éè±¸µ±Ç°Ê¹ÓÃµÄÊÇ3×Ö½ÚµØÖ·Ä£Ê½»¹ÊÇ4×Ö½ÚµØÖ·Ä£Ê½¡£
-   - ÉÏµçµØÖ·Ä£Ê½ (ADP)£ºÈ·¶¨Éè±¸ÉÏµç»ò¸´Î»ºóµÄ³õÊ¼µØÖ·Ä£Ê½¡£
-   - Ğ´±£»¤Ñ¡Ôñ (WPS)£ºÑ¡ÔñÊ¹ÓÃÄÄÖÖĞ´±£»¤·½°¸¡£
-   - Êä³öÇı¶¯Æ÷Ç¿¶È (DRV1, DRV0)£º¿ØÖÆ¶Á²Ù×÷Ê±µÄÊä³öÇı¶¯Æ÷Ç¿¶È¡£
+/*1. çŠ¶æ€å¯„å­˜å™¨-1 (Status Register-1)
+   - å¿™æ ‡å¿— (BUSY)ï¼šæŒ‡ç¤ºè®¾å¤‡æ˜¯å¦æ­£åœ¨æ‰§è¡Œç¼–ç¨‹ã€æ“¦é™¤æˆ–å†™çŠ¶æ€å¯„å­˜å™¨æŒ‡ä»¤ã€‚
+   - å†™ä½¿èƒ½é”å­˜å™¨ (WEL)ï¼šæŒ‡ç¤ºè®¾å¤‡æ˜¯å¦å¤„äºå†™ä½¿èƒ½çŠ¶æ€ã€‚
+   - å—ä¿æŠ¤ä½ (BP3, BP2, BP1, BP0)ï¼šç”¨äºæ§åˆ¶å­˜å‚¨å™¨é˜µåˆ—çš„å†™ä¿æŠ¤ã€‚
+   - é¡¶éƒ¨/åº•éƒ¨å—ä¿æŠ¤ (TB)ï¼šæ§åˆ¶å—ä¿æŠ¤ä½æ˜¯ä¿æŠ¤å­˜å‚¨å™¨é˜µåˆ—çš„é¡¶éƒ¨è¿˜æ˜¯åº•éƒ¨ã€‚
+2. çŠ¶æ€å¯„å­˜å™¨-2 (Status Register-2)
+   - å››çº¿ä½¿èƒ½ (QE)ï¼šæ§åˆ¶è®¾å¤‡æ˜¯å¦å¯ç”¨å››çº¿SPIæ“ä½œã€‚
+   - çŠ¶æ€å¯„å­˜å™¨ä¿æŠ¤ (SRP, SRL)ï¼šæ§åˆ¶çŠ¶æ€å¯„å­˜å™¨æ˜¯å¦è¢«ç¡¬ä»¶æˆ–è½¯ä»¶ä¿æŠ¤ã€‚
+   - æ“¦é™¤/ç¼–ç¨‹æš‚åœçŠ¶æ€ (SUS)ï¼šæŒ‡ç¤ºè®¾å¤‡æ˜¯å¦å¤„äºæ“¦é™¤æˆ–ç¼–ç¨‹æš‚åœçŠ¶æ€ã€‚
+   - å®‰å…¨å¯„å­˜å™¨é”ä½ (LB3, LB2, LB1)ï¼šç”¨äºä¸€æ¬¡æ€§ç¼–ç¨‹ (OTP) ä¿æŠ¤å®‰å…¨å¯„å­˜å™¨ã€‚
+3. çŠ¶æ€å¯„å­˜å™¨-3 (Status Register-3)
+   - å½“å‰åœ°å€æ¨¡å¼ (ADS)ï¼šæŒ‡ç¤ºè®¾å¤‡å½“å‰ä½¿ç”¨çš„æ˜¯3å­—èŠ‚åœ°å€æ¨¡å¼è¿˜æ˜¯4å­—èŠ‚åœ°å€æ¨¡å¼ã€‚
+   - ä¸Šç”µåœ°å€æ¨¡å¼ (ADP)ï¼šç¡®å®šè®¾å¤‡ä¸Šç”µæˆ–å¤ä½åçš„åˆå§‹åœ°å€æ¨¡å¼ã€‚
+   - å†™ä¿æŠ¤é€‰æ‹© (WPS)ï¼šé€‰æ‹©ä½¿ç”¨å“ªç§å†™ä¿æŠ¤æ–¹æ¡ˆã€‚
+   - è¾“å‡ºé©±åŠ¨å™¨å¼ºåº¦ (DRV1, DRV0)ï¼šæ§åˆ¶è¯»æ“ä½œæ—¶çš„è¾“å‡ºé©±åŠ¨å™¨å¼ºåº¦ã€‚
  */
 
-#define W25X_WriteEnable 0x06 //Ğ´Ê¹ÄÜ
-#define W25X_ReadData 0x03 //ÆÕ¶Á_Êı¾İ
-#define W25X_FastRead 0x0B //¿ì¶Á_Êı¾İ
-#define W25X_ReadStatusRegister1 0x05 //¶Á×´Ì¬¼Ä´æÆ÷-1
-#define W25X_ReadStatusRegister2 0x35 //¶Á×´Ì¬¼Ä´æÆ÷-2
-#define W25X_ReadStatusRegister3 0x15 //¶Á×´Ì¬¼Ä´æÆ÷-3
-#define W25X_WriteStatusRegister1 0x01 //Ğ´×´Ì¬¼Ä´æÆ÷-1
-#define W25X_WriteStatusRegister2 0x31 //Ğ´×´Ì¬¼Ä´æÆ÷-2
-#define W25X_WriteStatusRegister3 0x11 //Ğ´×´Ì¬¼Ä´æÆ÷-3
-#define W25X_WriteEnableVolatileStatusRegister 0x50 //Ğ´Ê¹ÄÜÓÃÓÚÒ×Ê§ĞÔ×´Ì¬¼Ä´æÆ÷
-#define W25X_WriteDisable 0x04 //Ğ´½ûÖ¹
-#define W25X_ReadExtendedAddressRegister 0xC8 //¶ÁÀ©Õ¹µØÖ·¼Ä´æÆ÷
-#define W25X_WriteExtendedAddressRegister 0xC5 //Ğ´À©Õ¹µØÖ·¼Ä´æÆ÷
-#define W25X_Enter4ByteAddressMode 0xB7 //½øÈë4×Ö½ÚµØÖ·Ä£Ê½
-#define W25X_Exit4ByteAddressMode 0xE9 //ÍË³ö4×Ö½ÚµØÖ·Ä£Ê½
-#define W25X_ReadDataWith4ByteAddress 0x13 //¶ÁÊı¾İ´ø4×Ö½ÚµØÖ·
-#define W25X_FastReadWith4ByteAddress 0x0C //¿ì¶Á´ø4×Ö½ÚµØÖ·
-#define W25X_WritePage 0x02 //Ğ´_Êı¾İ_0¡«256×Ö½Ú
-#define W25X_WritePageWith4ByteAddress 0x12 //Ğ´_Êı¾İ´ø4×Ö½ÚµØÖ·
-#define W25X_SectorErase 0x20 //ÉÈÇø²Á³ı
-#define W25X_SectorEraseWith4ByteAddress 0x21 //ÉÈÇø²Á³ı´ø4×Ö½ÚµØÖ·
-#define W25X_32KBBlockErase 0x52 //32K¿é²Á³ı
-#define W25X_64KBBlockErase 0xD8 //64K¿é²Á³ı
-#define W25X_64KBBlockEraseWith4ByteAddress 0xDC //64K¿é²Á³ı´ø4×Ö½ÚµØÖ·
-#define W25X_ChipErase 0xC7 //Ğ¾Æ¬²Á³ı
-#define W25X_EraseProgramSuspend 0x75 //²Á³ı/±à³ÌÔİÍ£
-#define W25X_EraseProgramResume 0x7A //²Á³ı/±à³Ì»Ö¸´
-#define W25X_PowerDown 0xB9 //µôµç
-#define W25X_ReleasePowerDownDeviceID 0xAB //ÊÍ·Åµôµç/Éè±¸ID
-#define W25X_ReadManufacturerDeviceID 0x90 //¶ÁÖÆÔìÉÌ/Éè±¸ID
-#define W25X_ReadManufacturerDeviceIDDualIO 0x92 //¶ÁÖÆÔìÉÌ/Éè±¸IDË«IO
-#define W25X_ReadManufacturerDeviceIDQuadIO 0x94 //¶ÁÖÆÔìÉÌ/Éè±¸IDËÄIO
-#define W25X_ReadUniqueIDNumber 0x4B //¶ÁÎ¨Ò»IDºÅ
-#define W25X_ReadJEDECID 0x9F //¶ÁJEDEC ID
-#define W25X_ReadSFDPRegister 0x5A //¶ÁSFDP¼Ä´æÆ÷
-#define W25X_EraseSecurityRegister 0x44 //²Á³ı°²È«¼Ä´æÆ÷
-#define W25X_ProgramSecurityRegister 0x42 //±à³Ì°²È«¼Ä´æÆ÷
-#define W25X_ReadSecurityRegister 0x48 //¶Á°²È«¼Ä´æÆ÷
+#define W25X_WriteEnable 0x06 //å†™ä½¿èƒ½
+#define W25X_ReadData 0x03 //æ™®è¯»_æ•°æ®
+#define W25X_FastRead 0x0B //å¿«è¯»_æ•°æ®
+#define W25X_ReadStatusRegister1 0x05 //è¯»çŠ¶æ€å¯„å­˜å™¨-1
+#define W25X_ReadStatusRegister2 0x35 //è¯»çŠ¶æ€å¯„å­˜å™¨-2
+#define W25X_ReadStatusRegister3 0x15 //è¯»çŠ¶æ€å¯„å­˜å™¨-3
+#define W25X_WriteStatusRegister1 0x01 //å†™çŠ¶æ€å¯„å­˜å™¨-1
+#define W25X_WriteStatusRegister2 0x31 //å†™çŠ¶æ€å¯„å­˜å™¨-2
+#define W25X_WriteStatusRegister3 0x11 //å†™çŠ¶æ€å¯„å­˜å™¨-3
+#define W25X_WriteEnableVolatileStatusRegister 0x50 //å†™ä½¿èƒ½ç”¨äºæ˜“å¤±æ€§çŠ¶æ€å¯„å­˜å™¨
+#define W25X_WriteDisable 0x04 //å†™ç¦æ­¢
+#define W25X_ReadExtendedAddressRegister 0xC8 //è¯»æ‰©å±•åœ°å€å¯„å­˜å™¨
+#define W25X_WriteExtendedAddressRegister 0xC5 //å†™æ‰©å±•åœ°å€å¯„å­˜å™¨
+#define W25X_Enter4ByteAddressMode 0xB7 //è¿›å…¥4å­—èŠ‚åœ°å€æ¨¡å¼
+#define W25X_Exit4ByteAddressMode 0xE9 //é€€å‡º4å­—èŠ‚åœ°å€æ¨¡å¼
+#define W25X_ReadDataWith4ByteAddress 0x13 //è¯»æ•°æ®å¸¦4å­—èŠ‚åœ°å€
+#define W25X_FastReadWith4ByteAddress 0x0C //å¿«è¯»å¸¦4å­—èŠ‚åœ°å€
+#define W25X_WritePage 0x02 //å†™_æ•°æ®_0ï½256å­—èŠ‚
+#define W25X_WritePageWith4ByteAddress 0x12 //å†™_æ•°æ®å¸¦4å­—èŠ‚åœ°å€
+#define W25X_SectorErase 0x20 //æ‰‡åŒºæ“¦é™¤
+#define W25X_SectorEraseWith4ByteAddress 0x21 //æ‰‡åŒºæ“¦é™¤å¸¦4å­—èŠ‚åœ°å€
+#define W25X_32KBBlockErase 0x52 //32Kå—æ“¦é™¤
+#define W25X_64KBBlockErase 0xD8 //64Kå—æ“¦é™¤
+#define W25X_64KBBlockEraseWith4ByteAddress 0xDC //64Kå—æ“¦é™¤å¸¦4å­—èŠ‚åœ°å€
+#define W25X_ChipErase 0xC7 //èŠ¯ç‰‡æ“¦é™¤
+#define W25X_EraseProgramSuspend 0x75 //æ“¦é™¤/ç¼–ç¨‹æš‚åœ
+#define W25X_EraseProgramResume 0x7A //æ“¦é™¤/ç¼–ç¨‹æ¢å¤
+#define W25X_PowerDown 0xB9 //æ‰ç”µ
+#define W25X_ReleasePowerDownDeviceID 0xAB //é‡Šæ”¾æ‰ç”µ/è®¾å¤‡ID
+#define W25X_ReadManufacturerDeviceID 0x90 //è¯»åˆ¶é€ å•†/è®¾å¤‡ID
+#define W25X_ReadManufacturerDeviceIDDualIO 0x92 //è¯»åˆ¶é€ å•†/è®¾å¤‡IDåŒIO
+#define W25X_ReadManufacturerDeviceIDQuadIO 0x94 //è¯»åˆ¶é€ å•†/è®¾å¤‡IDå››IO
+#define W25X_ReadUniqueIDNumber 0x4B //è¯»å”¯ä¸€IDå·
+#define W25X_ReadJEDECID 0x9F //è¯»JEDEC ID
+#define W25X_ReadSFDPRegister 0x5A //è¯»SFDPå¯„å­˜å™¨
+#define W25X_EraseSecurityRegister 0x44 //æ“¦é™¤å®‰å…¨å¯„å­˜å™¨
+#define W25X_ProgramSecurityRegister 0x42 //ç¼–ç¨‹å®‰å…¨å¯„å­˜å™¨
+#define W25X_ReadSecurityRegister 0x48 //è¯»å®‰å…¨å¯„å­˜å™¨
 
 
-#define FLASH_CS_SET          (FLASH_CS_PORT->BSHR = FLASH_CS_PIN)//ÉèÖÃCSÒı½ÅÎª¸ßµçÆ½
-#define FLASH_CS_CLR          (FLASH_CS_PORT->BCR = FLASH_CS_PIN)//ÉèÖÃCSÒı½ÅÎªµÍµçÆ½
+#define FLASH_CS_SET          (FLASH_CS_PORT->BSHR = FLASH_CS_PIN)//è®¾ç½®CSå¼•è„šä¸ºé«˜ç”µå¹³
+#define FLASH_CS_CLR          (FLASH_CS_PORT->BCR = FLASH_CS_PIN)//è®¾ç½®CSå¼•è„šä¸ºä½ç”µå¹³
 
 void SPI_FLASH_Init(void);
 uint8_t SPI_Flash_ReadSR(void);
@@ -96,8 +96,8 @@ void SPI_Flash_PowerDown(void);
 void SPI_Flash_WAKEUP(void);
 void SPI_Flash_Read_dma_start(uint32_t ReadAddr);
 void SPI_Flash_Read_dma_end(void);
-void  FLASH_Write(uint8_t TxData);//Í¨¹ıSPI1Ö»Ğ´ÈëÊı¾İ£¨²»½ÓÊÕ£©
-uint8_t FLASH_Read(void);//Í¨¹ıSPI1Ö»¶ÁÈ¡Êı¾İ£¨·¢ËÍdummy£©
-uint8_t FLASH_NoWaiting_Read(void);//ÎŞµÈ´ı¶ÁÈ¡
+void  FLASH_Write(uint8_t TxData);//é€šè¿‡SPI1åªå†™å…¥æ•°æ®ï¼ˆä¸æ¥æ”¶ï¼‰
+uint8_t FLASH_Read(void);//é€šè¿‡SPI1åªè¯»å–æ•°æ®ï¼ˆå‘é€dummyï¼‰
+uint8_t FLASH_NoWaiting_Read(void);//æ— ç­‰å¾…è¯»å–
 
 #endif

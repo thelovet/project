@@ -50,6 +50,11 @@
 #define TOUCH_TOPX_Y      100
 #define TOUCH_TOPX_ADD    0
 
+/* 816 系列 X 轴镜像补偿: 由面板/IC 布线决定, 与屏幕方向无关。
+   816D 实测需要镜像(0° 下触摸才准); 换成 816S 后实测方向本来就是正的,
+   再镜像一次就变成"左右反"(踩过) → 哪颗 IC 就配哪个值: 816D=1 / 816S=0。 */
+#define TOUCH_816_X_MIRROR   0
+
 /**
  * @brief 全局状态变量
  * @note  g_touch_int_flag: INT触发标志, ISR置1, Touch_IsPressed清零
@@ -62,6 +67,9 @@ volatile uint8_t g_touch_int_flag = 0;
 #if TOUCH_DEBUG_SHOW
 static uint8_t g_dbg_point_buf[8];   /* 调试: 最近一次点报告原始字节(Byte0~) */
 static uint8_t g_dbg_cmd_stat = 0xFF; /* 调试: 初始化下发命令后 Query Buffer 的命令状态位 bit1-0 (0=Done,1=Busy,2=Error) */
+static uint16_t g_dbg_raw_x = 0;      /* 调试: 最近一次解析出的原始 12 位坐标(未映射) */
+static uint16_t g_dbg_raw_y = 0;
+static uint8_t  g_dbg_chip_id = 0xFF; /* 调试: 0xA7 读到的芯片 ID(换 IC 时确认贴的是哪颗) */
 #endif
 #if TOUCH_IC_IT7259
 static uint16_t g_med_raw_x[3] = {0, 0, 0};   /* IT7259: 3点中值滤波缓存(最新在[2]) */
@@ -653,6 +661,10 @@ static void Touch_ResetCoordFilter(void)
 
 static uint8_t Touch_TryApplyCoords(uint16_t raw_x, uint16_t raw_y)
 {
+#if TOUCH_DEBUG_SHOW
+    g_dbg_raw_x = raw_x;   /* 记在滤波之前: 被丢弃的样本也要能看到真实读数 */
+    g_dbg_raw_y = raw_y;
+#endif
     uint16_t dx;
     uint16_t dy;
 #if TOUCH_IC_IT7259
@@ -724,8 +736,8 @@ static uint8_t Touch_TryApplyCoords(uint16_t raw_x, uint16_t raw_y)
             mx = (nx > 239u) ? 239u : nx;
         }
 #endif
-        /* 816D: 触摸 X 轴与显示方向相反, 先镜像(硬件补偿, 与方向无关) */
-#if !TOUCH_IC_IT7259
+        /* 816 系列 X 轴镜像补偿(816D 需要, 816S 不需要; 见 TOUCH_816_X_MIRROR) */
+#if !TOUCH_IC_IT7259 && TOUCH_816_X_MIRROR
         mx = (uint16_t)(239u - mx);
 #endif
         /* 方向只有 0°/180°(90/270 在 ST77912 上做不到):
@@ -808,10 +820,13 @@ void Touch_Init(void)
 
     /* 3. 验证I2C通信: 读芯片ID, 失败重试 */
     {
-        uint8_t chip_id, retry = 0;
+        uint8_t chip_id = 0xFF, retry = 0;
         do {
             Delay_Ms(10);
         } while (!CST816S_ReadReg(CST816S_REG_CHIPID, &chip_id, 1) && ++retry < 5);
+#if TOUCH_DEBUG_SHOW
+        g_dbg_chip_id = chip_id;   /* 屏上显示, 换 IC 时确认贴的是哪颗(816D/816S/816T 值不同) */
+#endif
     }
 
 #if TOUCH_IC_IT7259
@@ -1091,6 +1106,13 @@ uint8_t Touch_IsPressed(void)
             }
             uint16_t raw_x = ((uint16_t)(buf[0] & 0x0F) << 8) | buf[1];
             uint16_t raw_y = ((uint16_t)(buf[2] & 0x0F) << 8) | buf[3];
+#if TOUCH_DEBUG_SHOW
+            /* 屏上调试显示用的原始字节: 816 分支原先没填, 打开调试会一直显示 0 */
+            {
+                uint8_t k;
+                for (k = 0; k < 5; k++) g_dbg_point_buf[k] = buf[k];
+            }
+#endif
             if (!Touch_TryApplyCoords(raw_x, raw_y))
                 return 0;
         }
@@ -1297,6 +1319,12 @@ void Touch_DebugShow(void)
     Touch_DebugNum3(205, 158, g_dbg_csel_min, LCD_CYAN);
     Touch_DebugNum3(205, 172, g_dbg_csel_max, LCD_BLUE);
     Touch_DebugNum3(205, 186, (uint16_t)g_dbg_csel_ok, LCD_WHITE);
+#else
+    /* 816: 行8=原始X(青) 行9=原始Y(蓝) 行10=芯片ID(白)
+       原始值是滤波前、未映射的读数 —— 判断"串轴/超范围被丢弃"就看这两行 */
+    Touch_DebugNum3(205, 158, g_dbg_raw_x, LCD_CYAN);
+    Touch_DebugNum3(205, 172, g_dbg_raw_y, LCD_BLUE);
+    Touch_DebugNum3(205, 186, (uint16_t)g_dbg_chip_id, LCD_WHITE);
 #endif
     LCD_CS_SET;
 }

@@ -77,7 +77,8 @@
 // 烧录模式:
 //   FLASH_DATA_STORE_MODE  = 全量自动烧录字库/图片资源到外部Flash末尾
 //   VIDEO_CHUNK_STORE_MODE = 烧录嵌入固件的视频数据块到外部Flash地址0(视频区域)
-//#define FLASH_DATA_STORE_MODE   /* 字库/图片烧录模式: 开机把内置资源写进外部Flash末尾, 完成后常驻100%; 烧完必须注释回来 */
+//#define FLASH_DATA_STORE_MODE
+//#define BURN_BRIDGE_MODE   /* 烧录助手(桥): PC 通过 SWD 灌数据写外部 Flash(平时保持注释) */
 //#define VIDEO_CHUNK_STORE_MODE
 /* 推箱子导航按钮图 + 撤销界面按钮图 + 菜单追加字模: 都放外部Flash的固定保留区,
    不进资源表/目录(内部Flash 装不下) → 用独立烧录模式单独烧一次, 不动字库:

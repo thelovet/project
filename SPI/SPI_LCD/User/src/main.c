@@ -1,16 +1,16 @@
 /**
- * @brief  ´ı»úµÍ¹¦ºÄÄ£Ê½ËµÃ÷£¨PA8 ´¥Ãş + PB5/PB6 ³äµç»½ĞÑ£©
- * @note   ²Î¿¼ EVT/EXAM/PWR/Standby_Mode
+ * @brief  å¾…æœºä½åŠŸè€—æ¨¡å¼è¯´æ˜ï¼ˆPA8 è§¦æ‘¸ + PB5/PB6 å……ç”µå”¤é†’ï¼‰
+ * @note   å‚è€ƒ EVT/EXAM/PWR/Standby_Mode
  *
- *    ¹Ü½Å·ÖÅä:
- *    FLASH_CS   -- PA2   (1½Å)
- *    FLASH_DO   -- PA6(SPI1_MISO)(2½Å)
- *    FLASH_WP   -- 3.3V (3½Å)
- *    FLASH_DI   -- PA7(SPI1_MOSI) (5½Å)
- *    FLASH_CLK  -- PA5(SPI1_SCK) (6½Å)
- *    FLASH_HOLD -- 3.3V (7½Å)
- *    VCC -- 3.3V (8½Å)
- *    GND -- GND (4½Å)
+ *    ç®¡è„šåˆ†é…:
+ *    FLASH_CS   -- PA2   (1è„š)
+ *    FLASH_DO   -- PA6(SPI1_MISO)(2è„š)
+ *    FLASH_WP   -- 3.3V (3è„š)
+ *    FLASH_DI   -- PA7(SPI1_MOSI) (5è„š)
+ *    FLASH_CLK  -- PA5(SPI1_SCK) (6è„š)
+ *    FLASH_HOLD -- 3.3V (7è„š)
+ *    VCC -- 3.3V (8è„š)
+ *    GND -- GND (4è„š)
  *
  * 
  *    LCD_LED    -- PB9
@@ -19,131 +19,131 @@
  *    LCD_CS     -- PB12
  *    LCD_SCK    -- PB13(SPI2_SCK)
  *    LCD_MOSI   -- PB15(SPI2_MOSI)
- *    LCD_PWR    -- PB4   (µÍ=ÉÏµç£¬¸ß=¶Ïµç)
+ *    LCD_PWR    -- PB4   (ä½=ä¸Šç”µï¼Œé«˜=æ–­ç”µ)
  *
- *    ´¥Ãş RST   -- PB8
- *    ´¥Ãş INT   -- PA8
- *    ´¥Ãş SDA   -- PB11 (I2C2_SDA)
- *    ´¥Ãş SCL   -- PB10 (I2C2_SCL)
+ *    è§¦æ‘¸ RST   -- PB8
+ *    è§¦æ‘¸ INT   -- PA8
+ *    è§¦æ‘¸ SDA   -- PB11 (I2C2_SDA)
+ *    è§¦æ‘¸ SCL   -- PB10 (I2C2_SCL)
  *
- *    KEY        -- PA0 (¾É°æÔ¤Áô£¬µ±Ç°¹Ì¼şÎ´ÆôÓÃ)
+ *    KEY        -- PA0 (æ—§ç‰ˆé¢„ç•™ï¼Œå½“å‰å›ºä»¶æœªå¯ç”¨)
  *
- *    µç³Ø¼ì²â£º
- *    CHRG       -- PB6 (µÍ=³äµçÖĞ)
- *    STDBY      -- PB5 (µÍ=³äÂú)
+ *    ç”µæ± æ£€æµ‹ï¼š
+ *    CHRG       -- PB6 (ä½=å……ç”µä¸­)
+ *    STDBY      -- PB5 (ä½=å……æ»¡)
  *
- *    µçÑ¹²âÁ¿¿ª¹Ø£º
- *    VOLT_SW    -- PA15 (µÍ=ÔÊĞí²âÁ¿, ¸ß=¹Ø±Õ)
+ *    ç”µå‹æµ‹é‡å¼€å…³ï¼š
+ *    VOLT_SW    -- PA15 (ä½=å…è®¸æµ‹é‡, é«˜=å…³é—­)
  *
- *    µç³ØµçÑ¹£º
- *    BAT_ADC    -- PA1 (ADC1_Channel_1, ·ÖÑ¹ÊäÈë, Îªµç³ØµçÑ¹µÄÒ»°ë)
- *                  4.2V Âúµç ¡ú 2.1V ADC ÊäÈë
- *                  ½öµ± VOLT_SW ÎªµÍÊ±²Å²âÁ¿
- *    ÓïÒô IC£º
- *    VOICE_SW   -- PB3 (µÍ=ÔÊĞíÓïÒô, ¸ß=¹Ø±Õ)
+ *    ç”µæ± ç”µå‹ï¼š
+ *    BAT_ADC    -- PA1 (ADC1_Channel_1, åˆ†å‹è¾“å…¥, ä¸ºç”µæ± ç”µå‹çš„ä¸€åŠ)
+ *                  4.2V æ»¡ç”µ â†’ 2.1V ADC è¾“å…¥
+ *                  ä»…å½“ VOLT_SW ä¸ºä½æ—¶æ‰æµ‹é‡
+ *    è¯­éŸ³ ICï¼š
+ *    VOICE_SW   -- PB3 (ä½=å…è®¸è¯­éŸ³, é«˜=å…³é—­)
  */
 
-//»Ö¸´Õı³£²¥·Å£¬ÔËĞĞ switch_mode.ps1 game
-//½øÈëÉÕÂ¼Ä£Ê½ÔËĞĞ burn_all.ps1
+//æ¢å¤æ­£å¸¸æ’­æ”¾ï¼Œè¿è¡Œ switch_mode.ps1 game
+//è¿›å…¥çƒ§å½•æ¨¡å¼è¿è¡Œ burn_all.ps1
 #include "debug.h"
 #include "string.h"
 #include "lcd.h"
 #include "flash.h"
 #include "config.h"
-#include "decompress.h"    // ÊÓÆµ½âÑ¹Ëõ¿â
-#include "timer.h"        // ¶¨Ê±Æ÷Çı¶¯
-#include "ch32v20x_pwr.h" // µçÔ´¿ØÖÆÏà¹Ø
-#include "ch32v20x_bkp.h" // ±¸·İ¼Ä´æÆ÷Ïà¹Ø
-#include "adc.h"          // µç³Ø¼ì²âADCÏà¹Ø
-#include "voice.h"        // ÓïÒôICÇı¶¯
-#include "display.h"       // ÏÔÊ¾Ïà¹Ø(ShowNum/ShowLowBattery)
-#include "battery.h"       // µç³Ø¹ÜÀí
-#include "touch.h"         // ´¥ÃşÆÁÇı¶¯
-#include "sokoban.h"       // ÍÆÏä×ÓÓÎÏ·
-#include "d2048.h"         // 2048ÓÎÏ·
-#include "tetris.h"         // ¶íÂŞË¹·½¿éÓÎÏ·
-#include "klotski.h"        // »ªÈİµÀÓÎÏ·
-#include "fish.h"           // ´óÓã³ÔĞ¡ÓãÓÎÏ·
-#include "menu.h"            // ²Ëµ¥½çÃæÏÔÊ¾
-#include "game_save.h"       // ÓÎÏ·×´Ì¬´æµµ
-#include "sok_img_win.h"    // 32x32ÖĞÎÄ×Ö¿â
-#include "settings.h"       // ÉèÖÃ½çÃæ
-#include "flash_store.h"    // FlashÊı¾İ´æ´¢³ÌĞò(×Ö¿â/Í¼Æ¬×ÊÔ´ÉÕÂ¼)
+#include "decompress.h"    // è§†é¢‘è§£å‹ç¼©åº“
+#include "timer.h"        // å®šæ—¶å™¨é©±åŠ¨
+#include "ch32v20x_pwr.h" // ç”µæºæ§åˆ¶ç›¸å…³
+#include "ch32v20x_bkp.h" // å¤‡ä»½å¯„å­˜å™¨ç›¸å…³
+#include "adc.h"          // ç”µæ± æ£€æµ‹ADCç›¸å…³
+#include "voice.h"        // è¯­éŸ³ICé©±åŠ¨
+#include "display.h"       // æ˜¾ç¤ºç›¸å…³(ShowNum/ShowLowBattery)
+#include "battery.h"       // ç”µæ± ç®¡ç†
+#include "touch.h"         // è§¦æ‘¸å±é©±åŠ¨
+#include "sokoban.h"       // æ¨ç®±å­æ¸¸æˆ
+#include "d2048.h"         // 2048æ¸¸æˆ
+#include "tetris.h"         // ä¿„ç½—æ–¯æ–¹å—æ¸¸æˆ
+#include "klotski.h"        // åå®¹é“æ¸¸æˆ
+#include "fish.h"           // å¤§é±¼åƒå°é±¼æ¸¸æˆ
+#include "menu.h"            // èœå•ç•Œé¢æ˜¾ç¤º
+#include "game_save.h"       // æ¸¸æˆçŠ¶æ€å­˜æ¡£
+#include "sok_img_win.h"    // 32x32ä¸­æ–‡å­—åº“
+#include "settings.h"       // è®¾ç½®ç•Œé¢
+#include "flash_store.h"    // Flashæ•°æ®å­˜å‚¨ç¨‹åº(å­—åº“/å›¾ç‰‡èµ„æºçƒ§å½•)
 
- // ====== µ÷ÊÔÅäÖÃ ======
- // µ÷ÊÔÄ£Ê½£º±£ÁôSWJµ÷ÊÔ½Ó¿Ú¡£Èç¹û²»ĞèÒªµ÷ÊÔ£¬×¢ÊÍµôÏÂÃæÕâĞĞ¼´¿ÉÊ¡µç
+ // ====== è°ƒè¯•é…ç½® ======
+ // è°ƒè¯•æ¨¡å¼ï¼šä¿ç•™SWJè°ƒè¯•æ¥å£ã€‚å¦‚æœä¸éœ€è¦è°ƒè¯•ï¼Œæ³¨é‡Šæ‰ä¸‹é¢è¿™è¡Œå³å¯çœç”µ
 #define DEBUG_SWJ_KEEP
-// ×¢Òâ£ºÆÁÄ»±³¹â¼«ĞÔÔÚ config.h ÖĞ¶¨Òå TEST_SCREEN_BACKLIGHT£¬´Ë´¦²»ĞŞ¸Ä±³¹âÏà¹Øºê
+// æ³¨æ„ï¼šå±å¹•èƒŒå…‰ææ€§åœ¨ config.h ä¸­å®šä¹‰ TEST_SCREEN_BACKLIGHTï¼Œæ­¤å¤„ä¸ä¿®æ”¹èƒŒå…‰ç›¸å…³å®
 
-// ÉÕÂ¼Ä£Ê½ºê¶¨ÒåÔÚ config.h ÖĞÇĞ»»:
-//   FLASH_DATA_STORE_MODE  = È«Á¿×Ô¶¯ÉÕÂ¼×Ö¿â/Í¼Æ¬µ½Íâ²¿FlashÄ©Î²(ÂÌÉ«100%)
-//   VIDEO_CHUNK_STORE_MODE = ÉÕÂ¼Ç¶Èë¹Ì¼şµÄÊÓÆµÊı¾İ¿éµ½Íâ²¿FlashµØÖ·0(ÊÓÆµÇøÓò)
-// Á½¸öºê¶¼×¢ÊÍ¼´»Ö¸´Õı³£ÓÎÏ·³ÌĞò¡£
+// çƒ§å½•æ¨¡å¼å®å®šä¹‰åœ¨ config.h ä¸­åˆ‡æ¢:
+//   FLASH_DATA_STORE_MODE  = å…¨é‡è‡ªåŠ¨çƒ§å½•å­—åº“/å›¾ç‰‡åˆ°å¤–éƒ¨Flashæœ«å°¾(ç»¿è‰²100%)
+//   VIDEO_CHUNK_STORE_MODE = çƒ§å½•åµŒå…¥å›ºä»¶çš„è§†é¢‘æ•°æ®å—åˆ°å¤–éƒ¨Flashåœ°å€0(è§†é¢‘åŒºåŸŸ)
+// ä¸¤ä¸ªå®éƒ½æ³¨é‡Šå³æ¢å¤æ­£å¸¸æ¸¸æˆç¨‹åºã€‚
 
-#define HOLD_THRESHOLD    40   /* ´¥Ãş°´×¡ÒÆ¶¯ãĞÖµ */
-#define RELEASE_THRESHOLD 15   /* ´¥ÃşÊÍ·ÅÒÆ¶¯ãĞÖµ */
+#define HOLD_THRESHOLD    40   /* è§¦æ‘¸æŒ‰ä½ç§»åŠ¨é˜ˆå€¼ */
+#define RELEASE_THRESHOLD 15   /* è§¦æ‘¸é‡Šæ”¾ç§»åŠ¨é˜ˆå€¼ */
 #define STANDBY_WAKE_ARMED_MAGIC  ((uint16_t)0xE817)
 #define STANDBY_TOUCH_WAKE_MAGIC  ((uint16_t)0xE818)
 #define STANDBY_CHARGE_WAKE_MAGIC ((uint16_t)0xE819)
-#define CHARGE_EXIT_CONFIRM_COUNT 5U  /* Á¬ĞøÔ¼500msÎ´³äµç²ÅÈ·ÈÏ°Î³ö */
+#define CHARGE_EXIT_CONFIRM_COUNT 5U  /* è¿ç»­çº¦500msæœªå……ç”µæ‰ç¡®è®¤æ‹”å‡º */
 #define CHARGE_EXIT_CHECK_MS     100U
 
-// ÇĞ»»ÊÓÆµÓÃµÄStandbyÄ£Ê½RAM±äÁ¿
+// åˆ‡æ¢è§†é¢‘ç”¨çš„Standbyæ¨¡å¼RAMå˜é‡
 uint8_t next_bank = 0x00;
 uint16_t next_higvh = 0x00;
 uint16_t next_high = 0x00;
 uint16_t next_low = 0x00;
 
-uint8_t current_state = 0;//²¥·Å×´Ì¬0:ÊÓÆµ²¥·Å1:²Ëµ¥ÏÔÊ¾
-uint8_t first_boot = 1;           // Ê×´ÎÆô¶¯±êÖ¾
+uint8_t current_state = 0;//æ’­æ”¾çŠ¶æ€0:è§†é¢‘æ’­æ”¾1:èœå•æ˜¾ç¤º
+uint8_t first_boot = 1;           // é¦–æ¬¡å¯åŠ¨æ ‡å¿—
 
 /* ================================================================
- *  ´¥ÃşÏà¹Ø±äÁ¿
+ *  è§¦æ‘¸ç›¸å…³å˜é‡
  * ================================================================ */
 MainMode s_main_mode = MAIN_MODE_VIDEO;
 static uint8_t  s_menu_drawn = 0;
 
 static uint8_t  s_touch_down = 0;
 static uint16_t s_touch_start_y = 0;
-static uint8_t  s_touch_started_top = 0;    /* ´¥ÃşÆğµãÊÇ·ñÔÚ¶¥²¿ÇøÓò */
-static uint8_t  s_touch_started_bottom = 0; /* ´¥ÃşÆğµãÊÇ·ñÔÚµ×²¿ÇøÓò */
-static uint8_t  s_game_inited = 0;         /* µ±Ç°ÓÎÏ·ÊÇ·ñÒÑ³õÊ¼»¯ */
-static uint8_t  s_menu_dragging = 0;        /* ÊÖÖ¸ÍÏ×§²Ëµ¥ÖĞ */
-static uint8_t  s_menu_sliding = 0;         /* ËÉÊÖºó²Ëµ¥×Ô¶¯ÏÂ»¬¶¯»­ÖĞ */
-static uint8_t  s_drag_rel_cnt = 0;         /* ÍÏ×§ÊÍ·Å·À¶¶: Á¬¶ª2Ö¡²ÅÈ·ÈÏ */
-static int16_t  s_menu_drag_y = -230;       /* ÍÏ×§/¶¯»­ÖĞ²Ëµ¥¶¥²¿Y×ø±ê (-MENU_H) */
-static int16_t  s_menu_drag_y_prev = -999;  /* ÉÏÒ»Ö¡ÒÑ»æÖÆµÄY (±ä»¯¼ì²â) */
-static uint16_t s_menu_drag_max_y = 0;     /* ±¾´ÎÍÏ×§ÊÖÖ¸µ½´ïµÄ×îÔ¶Y */
-static uint8_t  s_video_menu_dragging = 0;   /* ÊÓÆµÉÏ»®²Ëµ¥ÍÏ×§ÖĞ */
-uint8_t  g_lowbatt_showing = 0;   /* µÍµçÍ¼±êÕıÏÔÊ¾ÖĞ(ÁÁ¶Î), ¹©²Ëµ¥ÖØ»æÌø¹ıµç³ØÇø */
-int16_t  s_video_menu_slide_y = 240;  /* ÊÓÆµÉÏ»®²Ëµ¥¶¥²¿Y (³õÊ¼ÔÚÆÁÄ»µ×²¿Íâ) */
-static uint16_t s_video_menu_drag_start_y = 0; /* ÊÓÆµ²Ëµ¥ÍÏ×§ÆğÊ¼´¥ÃşY */
-uint8_t  s_video_menu_visible = 0;     /* ÊÓÆµÉÏ»®²Ëµ¥ÒÑÍêÈ«¿É¼û */
-static uint8_t  s_m2v_swipe = 0;              /* ÏÂ»®²Ëµ¥¡úÉÏ»®²Ëµ¥´ò¶ÏÖĞ */
-uint8_t  vm_touch_down = 0;            /* ÊÓÆµ¿éÉÏ»®¼ì²â´¥Ãş×·×Ù */
+static uint8_t  s_touch_started_top = 0;    /* è§¦æ‘¸èµ·ç‚¹æ˜¯å¦åœ¨é¡¶éƒ¨åŒºåŸŸ */
+static uint8_t  s_touch_started_bottom = 0; /* è§¦æ‘¸èµ·ç‚¹æ˜¯å¦åœ¨åº•éƒ¨åŒºåŸŸ */
+static uint8_t  s_game_inited = 0;         /* å½“å‰æ¸¸æˆæ˜¯å¦å·²åˆå§‹åŒ– */
+static uint8_t  s_menu_dragging = 0;        /* æ‰‹æŒ‡æ‹–æ‹½èœå•ä¸­ */
+static uint8_t  s_menu_sliding = 0;         /* æ¾æ‰‹åèœå•è‡ªåŠ¨ä¸‹æ»‘åŠ¨ç”»ä¸­ */
+static uint8_t  s_drag_rel_cnt = 0;         /* æ‹–æ‹½é‡Šæ”¾é˜²æŠ–: è¿ä¸¢2å¸§æ‰ç¡®è®¤ */
+static int16_t  s_menu_drag_y = -230;       /* æ‹–æ‹½/åŠ¨ç”»ä¸­èœå•é¡¶éƒ¨Yåæ ‡ (-MENU_H) */
+static int16_t  s_menu_drag_y_prev = -999;  /* ä¸Šä¸€å¸§å·²ç»˜åˆ¶çš„Y (å˜åŒ–æ£€æµ‹) */
+static uint16_t s_menu_drag_max_y = 0;     /* æœ¬æ¬¡æ‹–æ‹½æ‰‹æŒ‡åˆ°è¾¾çš„æœ€è¿œY */
+static uint8_t  s_video_menu_dragging = 0;   /* è§†é¢‘ä¸Šåˆ’èœå•æ‹–æ‹½ä¸­ */
+uint8_t  g_lowbatt_showing = 0;   /* ä½ç”µå›¾æ ‡æ­£æ˜¾ç¤ºä¸­(äº®æ®µ), ä¾›èœå•é‡ç»˜è·³è¿‡ç”µæ± åŒº */
+int16_t  s_video_menu_slide_y = 240;  /* è§†é¢‘ä¸Šåˆ’èœå•é¡¶éƒ¨Y (åˆå§‹åœ¨å±å¹•åº•éƒ¨å¤–) */
+static uint16_t s_video_menu_drag_start_y = 0; /* è§†é¢‘èœå•æ‹–æ‹½èµ·å§‹è§¦æ‘¸Y */
+uint8_t  s_video_menu_visible = 0;     /* è§†é¢‘ä¸Šåˆ’èœå•å·²å®Œå…¨å¯è§ */
+static uint8_t  s_m2v_swipe = 0;              /* ä¸‹åˆ’èœå•â†’ä¸Šåˆ’èœå•æ‰“æ–­ä¸­ */
+uint8_t  vm_touch_down = 0;            /* è§†é¢‘å—ä¸Šåˆ’æ£€æµ‹è§¦æ‘¸è¿½è¸ª */
 static uint16_t vm_start_x = 0, vm_start_y = 0;
-static uint8_t  vm_sliding = 0;               /* ÊÓÆµÉÏ»®²Ëµ¥ËÉÊÖ»Ø»¬¶¯»­ÖĞ */
-static uint8_t  s_vm_touch_void = 0;          /* ¶¯»­ÖĞ°´ÏÂµÄÄÇ¸ùÊÖÖ¸: Õû¶Î×÷·Ïµ½Ì§Æğ */
-static uint8_t  s_top_defer_clear = 0;        /* ¶¥²¿°´ÏÂÏÈ²»È¡ÏûÉÏ»®²Ëµ¥: ¿ÉÄÜÖ»ÊÇµãµÚÒ»ĞĞ */
-static SettingsMode s_settings_mode = SETTINGS_NONE; /* µ±Ç°ÉèÖÃ½çÃæ */
-static TouchState ts;                        /* ´¥Ãş×´Ì¬, Touch_GetXY()¸üĞÂ */
+static uint8_t  vm_sliding = 0;               /* è§†é¢‘ä¸Šåˆ’èœå•æ¾æ‰‹å›æ»‘åŠ¨ç”»ä¸­ */
+static uint8_t  s_vm_touch_void = 0;          /* åŠ¨ç”»ä¸­æŒ‰ä¸‹çš„é‚£æ ¹æ‰‹æŒ‡: æ•´æ®µä½œåºŸåˆ°æŠ¬èµ· */
+static uint8_t  s_top_defer_clear = 0;        /* é¡¶éƒ¨æŒ‰ä¸‹å…ˆä¸å–æ¶ˆä¸Šåˆ’èœå•: å¯èƒ½åªæ˜¯ç‚¹ç¬¬ä¸€è¡Œ */
+static SettingsMode s_settings_mode = SETTINGS_NONE; /* å½“å‰è®¾ç½®ç•Œé¢ */
+static TouchState ts;                        /* è§¦æ‘¸çŠ¶æ€, Touch_GetXY()æ›´æ–° */
 
-static uint8_t  g_charge_pending = 0;       /* ³äµçµ¹¼ÆÊ±ÖĞ */
-static uint32_t g_charge_pending_time = 0;   /* ³äµçµ¹¼ÆÊ±Æğµã */
+static uint8_t  g_charge_pending = 0;       /* å……ç”µå€’è®¡æ—¶ä¸­ */
+static uint32_t g_charge_pending_time = 0;   /* å……ç”µå€’è®¡æ—¶èµ·ç‚¹ */
 
-/* "°´×¡²»¶¯Ò²ÒªĞİÃß"µÄÅĞ¶¨ËÀÇø(ÏñËØ): ´¥ÃşIC¾²Ö¹Ê±»áÓĞ¡À1~2px¶¶¶¯, Ö±½ÓÖğÏñËØ±È½Ï»á°Ñ
-   ¶¶¶¯µ±³É"ÊÖÖ¸ÔÚ¶¯" ¡ú ¼ÆÊ±Æ÷Ã¿Ö¡±»Ë¢ĞÂ ¡ú ³¤°´Ê±ÓÀÔ¶µ½²»ÁËÏ¢ÆÁÊ±¼ä(±íÏÖ: ÎŞ·¨ĞİÃß)¡£
-   3px ÒÔÄÚÊÓÎªÃ»¶¯; ÕæÊµÍÏ¶¯Ã¿Ö¡Ô¶³¬ 3px, ²»ÊÜÓ°Ïì¡£ */
+/* "æŒ‰ä½ä¸åŠ¨ä¹Ÿè¦ä¼‘çœ "çš„åˆ¤å®šæ­»åŒº(åƒç´ ): è§¦æ‘¸ICé™æ­¢æ—¶ä¼šæœ‰Â±1~2pxæŠ–åŠ¨, ç›´æ¥é€åƒç´ æ¯”è¾ƒä¼šæŠŠ
+   æŠ–åŠ¨å½“æˆ"æ‰‹æŒ‡åœ¨åŠ¨" â†’ è®¡æ—¶å™¨æ¯å¸§è¢«åˆ·æ–° â†’ é•¿æŒ‰æ—¶æ°¸è¿œåˆ°ä¸äº†æ¯å±æ—¶é—´(è¡¨ç°: æ— æ³•ä¼‘çœ )ã€‚
+   3px ä»¥å†…è§†ä¸ºæ²¡åŠ¨; çœŸå®æ‹–åŠ¨æ¯å¸§è¿œè¶… 3px, ä¸å—å½±å“ã€‚ */
 #define GAME_SLEEP_MOVE_DEADZONE  3
 
 static uint32_t s_game_last_activity_us = 0;
 static MainMode s_game_sleep_mode = MAIN_MODE_VIDEO;
 static uint8_t s_game_wait_release = 0;
 static uint8_t s_game_release_count = 0;
-static uint8_t s_game_wait_frames = 0;   /* ¸ôÀëÒÑ³ÖĞøµÄÖ¡Êı(¶µµ×³¬Ê±ÓÃ) */
+static uint8_t s_game_wait_frames = 0;   /* éš”ç¦»å·²æŒç»­çš„å¸§æ•°(å…œåº•è¶…æ—¶ç”¨) */
 static uint8_t s_wake_wait_release = 0;
 static uint8_t s_wake_release_count = 0;
-static uint8_t s_wake_wait_frames = 0;   /* ¸ôÀëÒÑ³ÖĞøµÄÖ¡Êı(¶µµ×³¬Ê±ÓÃ) */
+static uint8_t s_wake_wait_frames = 0;   /* éš”ç¦»å·²æŒç»­çš„å¸§æ•°(å…œåº•è¶…æ—¶ç”¨) */
 static uint8_t s_standby_touch_wake = 0;
 static uint8_t s_standby_charge_wake = 0;
 static uint8_t s_standby_unknown_wake = 0;
@@ -151,13 +151,13 @@ static uint8_t s_standby_unknown_wake = 0;
 
 static void IWDG_Init(void);
 
-/* °Ñ·´¸´³öÏÖµÄ"»­³öÏÂÒ»Ö¡"ÊÕ³ÉÒ»¸öĞ¡º¯Êı, Ê¡ Flash(noinline ·ÀÄÚÁª»ØÈ¥) */
+/* æŠŠåå¤å‡ºç°çš„"ç”»å‡ºä¸‹ä¸€å¸§"æ”¶æˆä¸€ä¸ªå°å‡½æ•°, çœ Flash(noinline é˜²å†…è”å›å») */
 static void __attribute__((noinline)) flash_show_next_frame(void)
 {
     flash_decompress_and_show(&next_bank, &next_higvh, &next_high, &next_low);
 }
 
-/* Í¬ÉÏ: "»Øµ½ÊÓÆµ²¢»­ÏÂÒ»Ö¡" ³É¶Ô³öÏÖ¶à´Î, Ò²ÊÕ³ÉÒ»¸öº¯Êı */
+/* åŒä¸Š: "å›åˆ°è§†é¢‘å¹¶ç”»ä¸‹ä¸€å¸§" æˆå¯¹å‡ºç°å¤šæ¬¡, ä¹Ÿæ”¶æˆä¸€ä¸ªå‡½æ•° */
 static void __attribute__((noinline)) video_reload_show(void)
 {
     LoadVideoAddress();
@@ -165,7 +165,7 @@ static void __attribute__((noinline)) video_reload_show(void)
 }
 
 /**
- * @brief  »ñÈ¡´¥Ãş×ø±êµ½±äÁ¿ ts (µ÷ÓÃ Touch_Scan)
+ * @brief  è·å–è§¦æ‘¸åæ ‡åˆ°å˜é‡ ts (è°ƒç”¨ Touch_Scan)
  */
 static void Touch_GetXY(void)
 {
@@ -174,8 +174,8 @@ static void Touch_GetXY(void)
 
 
 /**
- * @brief  »Ö¸´´ı´¦ÀíµÄÓÎÏ·´æµµ
- * @return 1 ±íÊ¾»Ö¸´³É¹¦£¬0 ±íÊ¾Ã»ÓĞ´ı»Ö¸´´æµµ»ò´æµµÎŞĞ§
+ * @brief  æ¢å¤å¾…å¤„ç†çš„æ¸¸æˆå­˜æ¡£
+ * @return 1 è¡¨ç¤ºæ¢å¤æˆåŠŸï¼Œ0 è¡¨ç¤ºæ²¡æœ‰å¾…æ¢å¤å­˜æ¡£æˆ–å­˜æ¡£æ— æ•ˆ
  */
 static uint8_t GameRestore_ApplyPending(void)
 {
@@ -208,12 +208,12 @@ static uint8_t GameRestore_ApplyPending(void)
 
 
 /**
- * @brief  ±£´æµ±Ç°ÓÎÏ·²¢½øÈë´ı»úÁ÷³Ì
+ * @brief  ä¿å­˜å½“å‰æ¸¸æˆå¹¶è¿›å…¥å¾…æœºæµç¨‹
  */
 static void GameAutoSleep_Enter(void)
 {
 #ifdef TEST_NO_SLEEP
-    /* ²âÊÔÄ£Ê½: ²»½ø´ı»ú, ÆÁÄ»±£³Ö³£ÁÁ */
+    /* æµ‹è¯•æ¨¡å¼: ä¸è¿›å¾…æœº, å±å¹•ä¿æŒå¸¸äº® */
     s_game_last_activity_us = GetTimerCount();
     return;
 #endif
@@ -238,15 +238,15 @@ static void GameAutoSleep_Enter(void)
 }
 
 /**
- * @brief  Í³¼ÆÓÎÏ·ÎŞ´¥ÃşÊ±¼ä£¬²¢¸ôÀë»Ö¸´ÓÎÏ·Ê±µÄ»½ĞÑ´¥Ãş
- * @return 1 ±íÊ¾±¾ÂÖÌø¹ıÓÎÏ·¸üĞÂ£¬0 ±íÊ¾¿ÉÒÔ¼ÌĞø´¦ÀíÓÎÏ·
+ * @brief  ç»Ÿè®¡æ¸¸æˆæ— è§¦æ‘¸æ—¶é—´ï¼Œå¹¶éš”ç¦»æ¢å¤æ¸¸æˆæ—¶çš„å”¤é†’è§¦æ‘¸
+ * @return 1 è¡¨ç¤ºæœ¬è½®è·³è¿‡æ¸¸æˆæ›´æ–°ï¼Œ0 è¡¨ç¤ºå¯ä»¥ç»§ç»­å¤„ç†æ¸¸æˆ
  */
 static uint8_t GameAutoSleep_AfterTouch(void)
 {
     uint32_t now = GetTimerCount();
     uint8_t is_game = GameSave_IsSupportedMode(s_main_mode);
 
-    /* ´¿ÊÓÆµ²¥·Å²»ĞİÃß, ²Ëµ¥ÍÏ×§/µ¯³ö/ÉèÖÃ½çÃæ/ÓÎÏ·ÖĞÔÊĞíĞİÃß */
+    /* çº¯è§†é¢‘æ’­æ”¾ä¸ä¼‘çœ , èœå•æ‹–æ‹½/å¼¹å‡º/è®¾ç½®ç•Œé¢/æ¸¸æˆä¸­å…è®¸ä¼‘çœ  */
     if (s_main_mode == MAIN_MODE_VIDEO && s_settings_mode == SETTINGS_NONE
         && !s_video_menu_visible && !s_video_menu_dragging
         && !s_menu_dragging) {
@@ -265,10 +265,10 @@ static uint8_t GameAutoSleep_AfterTouch(void)
     if (is_game && s_game_wait_release) {
         if (ts.pressed) {
             s_game_release_count = 0;
-            /* ¡ï ¶µµ×³¬Ê±: ±¾·ÖÖ§Ö±½Ó return 1, »áÈÆ¹ıÏÂÃæµÄĞİÃß³¬Ê±¼ì²é ¡ª¡ª Ö»Òª´¥ÃşIC
-               ±¨"»¹°´×Å", ¸ôÀë¾ÍÓÀ²»½â³ı, µ½ÁËÏ¢ÆÁÊ±¼äÒ²²»ĞİÃß(Óë s_wake_wait_release
-               Í¬Ô´µÄ¿Ó)¡£¸ø¸ôÀëÒ»¸öÉÏÏŞ(Ô¼1Ãë), µ½µãÇ¿ÖÆ½â³ı,
-               ÈÃ"°´×¡²»¶¯Ò²ÒªĞİÃß"(ÏÂÃæµÄ"Ö»ÓĞ×ø±ê±ä»¯²Å±£»î")ÖØĞÂÉúĞ§¡£ */
+            /* â˜… å…œåº•è¶…æ—¶: æœ¬åˆ†æ”¯ç›´æ¥ return 1, ä¼šç»•è¿‡ä¸‹é¢çš„ä¼‘çœ è¶…æ—¶æ£€æŸ¥ â€”â€” åªè¦è§¦æ‘¸IC
+               æŠ¥"è¿˜æŒ‰ç€", éš”ç¦»å°±æ°¸ä¸è§£é™¤, åˆ°äº†æ¯å±æ—¶é—´ä¹Ÿä¸ä¼‘çœ (ä¸ s_wake_wait_release
+               åŒæºçš„å‘)ã€‚ç»™éš”ç¦»ä¸€ä¸ªä¸Šé™(çº¦1ç§’), åˆ°ç‚¹å¼ºåˆ¶è§£é™¤,
+               è®©"æŒ‰ä½ä¸åŠ¨ä¹Ÿè¦ä¼‘çœ "(ä¸‹é¢çš„"åªæœ‰åæ ‡å˜åŒ–æ‰ä¿æ´»")é‡æ–°ç”Ÿæ•ˆã€‚ */
             if (++s_game_wait_frames >= 60) {
                 s_game_wait_release = 0;
                 s_game_release_count = 0;
@@ -289,21 +289,21 @@ static uint8_t GameAutoSleep_AfterTouch(void)
         static uint8_t  s_last_pressed = 0;
         static uint16_t s_last_x = 0, s_last_y = 0;
         if (ts.pressed && (s_settings_mode != SETTINGS_NONE || is_game || s_video_menu_visible || s_video_menu_dragging || s_menu_dragging)) {
-            /* ¡ï ÓÃ 3px ËÀÇø¶ø²»ÊÇ"ÖğÏñËØ²»µÈ": ´¥ÃşIC¾²Ö¹ËÀÇøÖ»ÂËµô¡À1, ³¤°´Ê±¡À2µÄ¶¶¶¯
-               (»òÊÖÖ¸½Ó´¥×´Ì¬µÄ»ºÂıÎ¢µ÷)»á±»µ±³É"ÊÖÖ¸ÔÚ¶¯"¡ú Ã¿Ö¡Ë¢ĞÂ¼ÆÊ±Æ÷ ¡ú
-               "°´×¡²»¶¯Ò²ÒªĞİÃß"ÓÀÔ¶´¥·¢²»ÁË(µ½Ê±¼äÒ²²»ĞİÃß)¡£
-               3px ÒÔÄÚÊÓÎªÃ»¶¯, ¼È²»Ó°ÏìÍÏ¶¯(ÍÏ¶¯Ã¿Ö¡Ô¶³¬3px), ÓÖÄÜÈÃ³¤°´Õı³£ĞİÃß¡£ */
+            /* â˜… ç”¨ 3px æ­»åŒºè€Œä¸æ˜¯"é€åƒç´ ä¸ç­‰": è§¦æ‘¸ICé™æ­¢æ­»åŒºåªæ»¤æ‰Â±1, é•¿æŒ‰æ—¶Â±2çš„æŠ–åŠ¨
+               (æˆ–æ‰‹æŒ‡æ¥è§¦çŠ¶æ€çš„ç¼“æ…¢å¾®è°ƒ)ä¼šè¢«å½“æˆ"æ‰‹æŒ‡åœ¨åŠ¨"â†’ æ¯å¸§åˆ·æ–°è®¡æ—¶å™¨ â†’
+               "æŒ‰ä½ä¸åŠ¨ä¹Ÿè¦ä¼‘çœ "æ°¸è¿œè§¦å‘ä¸äº†(åˆ°æ—¶é—´ä¹Ÿä¸ä¼‘çœ )ã€‚
+               3px ä»¥å†…è§†ä¸ºæ²¡åŠ¨, æ—¢ä¸å½±å“æ‹–åŠ¨(æ‹–åŠ¨æ¯å¸§è¿œè¶…3px), åˆèƒ½è®©é•¿æŒ‰æ­£å¸¸ä¼‘çœ ã€‚ */
             uint16_t dx = (ts.x > s_last_x) ? (uint16_t)(ts.x - s_last_x)
                                             : (uint16_t)(s_last_x - ts.x);
             uint16_t dy = (ts.y > s_last_y) ? (uint16_t)(ts.y - s_last_y)
                                             : (uint16_t)(s_last_y - ts.y);
             if (dx >= GAME_SLEEP_MOVE_DEADZONE || dy >= GAME_SLEEP_MOVE_DEADZONE) {
-                s_game_last_activity_us = now;   /* ×ø±ê±ä»¯²Å±£»î */
+                s_game_last_activity_us = now;   /* åæ ‡å˜åŒ–æ‰ä¿æ´» */
             }
             s_last_x = ts.x;
             s_last_y = ts.y;
         } else if (!ts.pressed && s_last_pressed) {
-            s_game_last_activity_us = now;       /* ËÉ¿ªÊ±ÖØÖÃ */
+            s_game_last_activity_us = now;       /* æ¾å¼€æ—¶é‡ç½® */
         }
         s_last_pressed = ts.pressed;
     }
@@ -317,7 +317,7 @@ static uint8_t GameAutoSleep_AfterTouch(void)
 }
 
 /**
- * @brief  ÉèÖÃÒ³Ãæ/²Ëµ¥½»»¥ÖĞµ÷ÓÃ, ±£³Ö²»ĞİÃß
+ * @brief  è®¾ç½®é¡µé¢/èœå•äº¤äº’ä¸­è°ƒç”¨, ä¿æŒä¸ä¼‘çœ 
  */
 void GameAutoSleep_KeepAlive(void)
 {
@@ -325,8 +325,8 @@ void GameAutoSleep_KeepAlive(void)
 }
 
 /**
- * @brief  ³õÊ¼»¯ËùÓĞGPIOÎªÉÏÀ­Ä£Ê½£¨½µµÍ¹¦ºÄ£©
- * @return ÎŞ
+ * @brief  åˆå§‹åŒ–æ‰€æœ‰GPIOä¸ºä¸Šæ‹‰æ¨¡å¼ï¼ˆé™ä½åŠŸè€—ï¼‰
+ * @return æ— 
  */
 static void GPIO_ALL_IPU(void) {
     GPIO_InitTypeDef GPIO_InitStructure = { 0 };
@@ -341,70 +341,70 @@ static void GPIO_ALL_IPU(void) {
     GPIO_Init(GPIOD, &GPIO_InitStructure);
 }
 /**
- * @brief  LCD µçÔ´³õÊ¼»¯(±³¹â/¹©µç)¡£
+ * @brief  LCD ç”µæºåˆå§‹åŒ–(èƒŒå…‰/ä¾›ç”µ)ã€‚
  */
 static void LCD_PWR_Init(void) {
-    GPIO_InitTypeDef GPIO_InitStructure = { 0 };//GPIO³õÊ¼»¯½á¹¹Ìå
-    RCC_APB2PeriphClockCmd(LCD_PWR_RCC | LCD_LED_RCC, ENABLE);//Ê¹ÄÜLCD_PWR+±³¹âÊ±ÖÓ
+    GPIO_InitTypeDef GPIO_InitStructure = { 0 };//GPIOåˆå§‹åŒ–ç»“æ„ä½“
+    RCC_APB2PeriphClockCmd(LCD_PWR_RCC | LCD_LED_RCC, ENABLE);//ä½¿èƒ½LCD_PWR+èƒŒå…‰æ—¶é’Ÿ
 
-    /* PB4: LCDµçÔ´¿ØÖÆ, ÏÈÖÃODR¸ß(¹Ø)ÔÙÇĞÍÆÍìÊä³ö, ·ÀÖ¹ÉÏµçË²¼äÀ­µÍ */
-    LCD_PWR_PORT->BSHR = LCD_PWR_PIN;  // ODR=1 (ÇĞÊä³öÇ°)
+    /* PB4: LCDç”µæºæ§åˆ¶, å…ˆç½®ODRé«˜(å…³)å†åˆ‡æ¨æŒ½è¾“å‡º, é˜²æ­¢ä¸Šç”µç¬é—´æ‹‰ä½ */
+    LCD_PWR_PORT->BSHR = LCD_PWR_PIN;  // ODR=1 (åˆ‡è¾“å‡ºå‰)
     GPIO_InitStructure.GPIO_Pin = LCD_PWR_PIN;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(LCD_PWR_PORT, &GPIO_InitStructure);
 
-    /* PB9: ±³¹âÒı½Å£¬½öÖÃODR¸ß(¹Ø)·ÀÖ¹ÉÁÁÁ£¬GPIO³õÊ¼»¯ÓÉLCD_Backlight_PWM_InitÍê³É */
-    LCD_LED_SET;  // BSHR=ODRÖÃ1
+    /* PB9: èƒŒå…‰å¼•è„šï¼Œä»…ç½®ODRé«˜(å…³)é˜²æ­¢é—ªäº®ï¼ŒGPIOåˆå§‹åŒ–ç”±LCD_Backlight_PWM_Initå®Œæˆ */
+    LCD_LED_SET;  // BSHR=ODRç½®1
 }
 /**
- * @brief  ¶ÀÁ¢¿´ÃÅ¹·³õÊ¼»¯(³¬Ê±Ô¼1s)¡£
- * @note   ĞİÃßÇ°ÓÉµ÷ÓÃ·½½ûÓÃ, »½ĞÑºó»Ö¸´¡£
+ * @brief  ç‹¬ç«‹çœ‹é—¨ç‹—åˆå§‹åŒ–(è¶…æ—¶çº¦1s)ã€‚
+ * @note   ä¼‘çœ å‰ç”±è°ƒç”¨æ–¹ç¦ç”¨, å”¤é†’åæ¢å¤ã€‚
  */
 static void IWDG_Init(void)
 {
-    IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);//½âËø¼Ä´æÆ÷
-    IWDG_SetPrescaler(IWDG_Prescaler_256);//ÉèÖÃÔ¤·ÖÆµ256
-    IWDG_SetReload(155);//ÉèÖÃÖØÔØÖµ (~1s: (155+1)*256/40000¡Ö999ms)
-    //IWDG_ReloadCounter();//Î¹¹·
-    IWDG_Enable();//Æô¶¯¿´ÃÅ¹·
+    IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);//è§£é”å¯„å­˜å™¨
+    IWDG_SetPrescaler(IWDG_Prescaler_256);//è®¾ç½®é¢„åˆ†é¢‘256
+    IWDG_SetReload(155);//è®¾ç½®é‡è½½å€¼ (~1s: (155+1)*256/40000â‰ˆ999ms)
+    //IWDG_ReloadCounter();//å–‚ç‹—
+    IWDG_Enable();//å¯åŠ¨çœ‹é—¨ç‹—
 }
 
 /**
- * @brief  StandbyÄ£Ê½Òı½ÅÅäÖÃ
- *         PA0/PA1ÉèÎªÄ£ÄâÊäÈë£¬PA2ÉèÎªÍÆÍìÊä³ö(Flash CS)
- *         PB4ÉèÎªÍÆÍìÊä³ö(LCDµçÔ´), PB5/PB6ÉèÎªÉÏÀ­ÊäÈë(CHRG/STDBY)
- *         PB9ÉèÎªÍÆÍìÊä³ö(LED), PB12ÉèÎªÍÆÍìÊä³ö(LCD_CS)
- *         ÆäÓàÒı½ÅÈ«²¿ÉèÎªÄ£ÄâÊäÈë(½µµÍ¹¦ºÄ)
- * @return ÎŞ
+ * @brief  Standbyæ¨¡å¼å¼•è„šé…ç½®
+ *         PA0/PA1è®¾ä¸ºæ¨¡æ‹Ÿè¾“å…¥ï¼ŒPA2è®¾ä¸ºæ¨æŒ½è¾“å‡º(Flash CS)
+ *         PB4è®¾ä¸ºæ¨æŒ½è¾“å‡º(LCDç”µæº), PB5/PB6è®¾ä¸ºä¸Šæ‹‰è¾“å…¥(CHRG/STDBY)
+ *         PB9è®¾ä¸ºæ¨æŒ½è¾“å‡º(LED), PB12è®¾ä¸ºæ¨æŒ½è¾“å‡º(LCD_CS)
+ *         å…¶ä½™å¼•è„šå…¨éƒ¨è®¾ä¸ºæ¨¡æ‹Ÿè¾“å…¥(é™ä½åŠŸè€—)
+ * @return æ— 
  */
 static void Standby_PinConfig(void) {
     // GPIOA CFGLR: PA0/PA1=AIN(0x0) PA2=PP50(0x3) PA3~7=AIN(0x0)
     GPIOA->CFGLR = 0x00000300;
-    GPIOA->BSHR = GPIO_Pin_2;       // PA2ÖÃ¸ß(Flash CS)
+    GPIOA->BSHR = GPIO_Pin_2;       // PA2ç½®é«˜(Flash CS)
 
     // GPIOA CFGHR: PA8~15=AIN(0x0)
     GPIOA->CFGHR = 0x00000000;
 
-    // PB4ÉèÎªÍÆÍìÊä³ö(LCDµçÔ´), PB5/PB6=IPU(0x8), PB7=AIN(0x0)
+    // PB4è®¾ä¸ºæ¨æŒ½è¾“å‡º(LCDç”µæº), PB5/PB6=IPU(0x8), PB7=AIN(0x0)
     GPIOB->CFGLR = 0x08830000;
 #ifdef KEEP_LCD_POWER_IN_STANDBY
-    GPIOB->BCR = GPIO_Pin_4;       // PB4À­µÍ(±£³ÖLCD¹©µç, ·ÀÖ¹´¥ÃşÎó´¥·¢)
+    GPIOB->BCR = GPIO_Pin_4;       // PB4æ‹‰ä½(ä¿æŒLCDä¾›ç”µ, é˜²æ­¢è§¦æ‘¸è¯¯è§¦å‘)
 #else
-    GPIOB->BSHR = GPIO_Pin_4;       // PB4ÖÃ¸ß(LCD¶Ïµç)
+    GPIOB->BSHR = GPIO_Pin_4;       // PB4ç½®é«˜(LCDæ–­ç”µ)
 #endif
 
     // GPIOB CFGHR: PB8=AIN(0x0) PB9=PP50(0x3) PB10~11=AIN(0x0) PB12=PP50(0x3) PB13~15=AIN(0x0)
     GPIOB->CFGHR = 0x00030030;
-    /* ¡ï ´ı»úÊ±ÆÁÒÑ¶Ïµç: ±³¹â PB9 µÍµçÆ½ÓĞĞ§ -> ±£³Ö¸ßµçÆ½ = ¹Ø±³¹â;
-       Æ¬Ñ¡ PB12 À­µÍ¡£Á½¸ö½Å¶¼²»¸øÃæ°å"¹àµç", ±ÜÃâ¾­Ãæ°å IO ±£»¤¶ş¼«¹Üµ¹¹à¶ø¸ü·Ñµç */
-    GPIOB->BSHR = GPIO_Pin_9;                   // PB9ÖÃ¸ß(±³¹âµÍµçÆ½ÓĞĞ§ -> ¹Ø±³¹â; Ãæ°åÎŞµç, Í¬Ê±±ÜÃâ¹àµç)
-    GPIOB->BCR  = GPIO_Pin_12;                  // PB12À­µÍ(Æ¬Ñ¡µÍ; Í¬Ê±±ÜÃâ¹àµç)
+    /* â˜… å¾…æœºæ—¶å±å·²æ–­ç”µ: èƒŒå…‰ PB9 ä½ç”µå¹³æœ‰æ•ˆ -> ä¿æŒé«˜ç”µå¹³ = å…³èƒŒå…‰;
+       ç‰‡é€‰ PB12 æ‹‰ä½ã€‚ä¸¤ä¸ªè„šéƒ½ä¸ç»™é¢æ¿"çŒç”µ", é¿å…ç»é¢æ¿ IO ä¿æŠ¤äºŒæç®¡å€’çŒè€Œæ›´è´¹ç”µ */
+    GPIOB->BSHR = GPIO_Pin_9;                   // PB9ç½®é«˜(èƒŒå…‰ä½ç”µå¹³æœ‰æ•ˆ -> å…³èƒŒå…‰; é¢æ¿æ— ç”µ, åŒæ—¶é¿å…çŒç”µ)
+    GPIOB->BCR  = GPIO_Pin_12;                  // PB12æ‹‰ä½(ç‰‡é€‰ä½; åŒæ—¶é¿å…çŒç”µ)
 }
 
 /**
- * @brief  ¶ÁÈ¡EXTI±êÖ¾¼Ä´æÆ÷Ê¶±ğ»½ĞÑÔ´²¢Ğ´ÈëBKP
- * @note   ±ØĞëÔÚPWR_FLAG_WUÇåÁãÇ°µ÷ÓÃ£¬ÒòÎªºóĞø²Ù×÷¿ÉÄÜ¸Ä±äÒı½Å×´Ì¬
+ * @brief  è¯»å–EXTIæ ‡å¿—å¯„å­˜å™¨è¯†åˆ«å”¤é†’æºå¹¶å†™å…¥BKP
+ * @note   å¿…é¡»åœ¨PWR_FLAG_WUæ¸…é›¶å‰è°ƒç”¨ï¼Œå› ä¸ºåç»­æ“ä½œå¯èƒ½æ”¹å˜å¼•è„šçŠ¶æ€
  */
 static void Standby_RecordWakeSource(void)
 {
@@ -421,12 +421,12 @@ static void Standby_RecordWakeSource(void)
 }
 
 /**
- * @brief  ½øÈëStandbyÄ£Ê½£¬PA8´¥ÃşºÍPB6³äµç¾ù¿É»½ĞÑ
- *         »½ĞÑºó¸ù¾İ±¸·İ¼Ä´æÆ÷ÅĞ¶Ï»½ĞÑÔ´
- * @return ÎŞ
+ * @brief  è¿›å…¥Standbyæ¨¡å¼ï¼ŒPA8è§¦æ‘¸å’ŒPB6å……ç”µå‡å¯å”¤é†’
+ *         å”¤é†’åæ ¹æ®å¤‡ä»½å¯„å­˜å™¨åˆ¤æ–­å”¤é†’æº
+ * @return æ— 
  */
 void Enter_Standby(void) {
-    // ¹Ø¶¨Ê±Æ÷
+    // å…³å®šæ—¶å™¨
     TIM_ITConfig(TIM1, TIM_IT_Update, DISABLE);
     NVIC_DisableIRQ(TIM1_UP_IRQn);
     TIM_Cmd(TIM1, DISABLE);
@@ -435,42 +435,42 @@ void Enter_Standby(void) {
     SPI_Cmd(SPI1, DISABLE);
     SPI_Cmd(SPI2, DISABLE);
 
-    // ¹Ø±ÕPA8 INTÖĞ¶Ï(EXTI8)
+    // å…³é—­PA8 INTä¸­æ–­(EXTI8)
     NVIC_DisableIRQ(EXTI9_5_IRQn);
     EXTI->INTENR &= ~EXTI_Line8;
     EXTI_ClearFlag(EXTI_Line8);
 
-    // GPIOÈ«²¿ÉÏÀ­ÊäÈë£¬½µµÍStandby¹¦ºÄ£¬±ÜÃâÒı½Å¸¡¿Õ²úÉúÂ©µçÁ÷
+    // GPIOå…¨éƒ¨ä¸Šæ‹‰è¾“å…¥ï¼Œé™ä½StandbyåŠŸè€—ï¼Œé¿å…å¼•è„šæµ®ç©ºäº§ç”Ÿæ¼ç”µæµ
     GPIO_ALL_IPU();
 
-    Standby_PinConfig();//StandbyÄ£Ê½Òı½ÅÅäÖÃ
+    Standby_PinConfig();//Standbyæ¨¡å¼å¼•è„šé…ç½®
 
-    // GPIOC/DÒÑÔÚGPIO_ALL_IPUÖĞÉèÎªÉÏÀ­ÊäÈë£¬´Ë´¦È·±£CFGLR/CFGHRÒ²ÎªÁã
+    // GPIOC/Då·²åœ¨GPIO_ALL_IPUä¸­è®¾ä¸ºä¸Šæ‹‰è¾“å…¥ï¼Œæ­¤å¤„ç¡®ä¿CFGLR/CFGHRä¹Ÿä¸ºé›¶
     GPIOC->CFGLR = 0x00000000;
     GPIOC->CFGHR = 0x00000000;
     GPIOD->CFGLR = 0x00000000;
     GPIOD->CFGHR = 0x00000000;
 
-    // ½ûÓÃSWJµ÷ÊÔ½Ó¿ÚÒÔ½µµÍ¹¦ºÄ£¬¿ÉÍ¨¹ı DEBUG_SWJ_KEEP ºê±£Áô
+    // ç¦ç”¨SWJè°ƒè¯•æ¥å£ä»¥é™ä½åŠŸè€—ï¼Œå¯é€šè¿‡ DEBUG_SWJ_KEEP å®ä¿ç•™
 #ifndef DEBUG_SWJ_KEEP
     GPIO_PinRemapConfig(GPIO_Remap_SWJ_Disable, ENABLE);
 #endif
 
-    // Ê¹ÄÜPWRÊ±ÖÓ
+    // ä½¿èƒ½PWRæ—¶é’Ÿ
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);
-    PWR_WakeUpPinCmd(DISABLE);  // PA0×÷ÎªKEYÎ´ÆôÓÃ£¬½ûÓÃWKUPÒı½Å
+    PWR_WakeUpPinCmd(DISABLE);  // PA0ä½œä¸ºKEYæœªå¯ç”¨ï¼Œç¦ç”¨WKUPå¼•è„š
 
-    // ½ûÓÃPVD¼ì²â£¬±ÜÃâ½øÈë´ı»úÇ°´¥·¢PVD_CheckLowVoltageÖĞ¶Ï
+    // ç¦ç”¨PVDæ£€æµ‹ï¼Œé¿å…è¿›å…¥å¾…æœºå‰è§¦å‘PVD_CheckLowVoltageä¸­æ–­
     PWR_PVDCmd(DISABLE);
 
-    // Çå³ıWKUP±êÖ¾
+    // æ¸…é™¤WKUPæ ‡å¿—
     PWR_ClearFlag(PWR_FLAG_WU);
 
-    // Í£Ö¹SysTick²¢µÈ´ı´®¿Ú·¢ËÍÍê³É
+    // åœæ­¢SysTickå¹¶ç­‰å¾…ä¸²å£å‘é€å®Œæˆ
     SysTick->CTLR = 0;
     while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
 
-    // Çå³ıËùÓĞÖĞ¶Ï±êÖ¾, ×¼±¸WFI½øÈë
+    // æ¸…é™¤æ‰€æœ‰ä¸­æ–­æ ‡å¿—, å‡†å¤‡WFIè¿›å…¥
     NVIC_ClearPendingIRQ(SysTick_IRQn);
     NVIC_ClearPendingIRQ(USART1_IRQn);
     NVIC_ClearPendingIRQ(TIM1_UP_IRQn);
@@ -480,7 +480,7 @@ void Enter_Standby(void) {
     NVIC_ClearPendingIRQ(DMA1_Channel5_IRQn);  // SPI2_TX
 
     Battery_StandbyWakeupConfig();
-    /* ´¥Ãş»½ĞÑ: ´¥ÃşICÏÖÔÚÊÇ¶ÀÁ¢¹©µç(2026-10 Ó²¼ş¸Ä¶¯), ÓëLCDÊÇ·ñ¶ÏµçÎŞ¹Ø ¡ú ºã¶¨ÆôÓÃ */
+    /* è§¦æ‘¸å”¤é†’: è§¦æ‘¸ICç°åœ¨æ˜¯ç‹¬ç«‹ä¾›ç”µ(2026-10 ç¡¬ä»¶æ”¹åŠ¨), ä¸LCDæ˜¯å¦æ–­ç”µæ— å…³ â†’ æ’å®šå¯ç”¨ */
     Touch_WaitWakeInputsReleased();
     Touch_StandbyWakeupConfig();
 
@@ -497,19 +497,19 @@ void Enter_Standby(void) {
 }
 
 /**
- * @brief  ¼ì²é»½ĞÑÔ´²¢»Ö¸´StandbyÇ°µÄ×´Ì¬
- * @param  touch_confirmed PA8ÖĞ¶ÏÒÑÍ¨¹ıCST816S I2CÈ·ÈÏÓĞĞ§´¥Ãş
- * @return ÎŞ
+ * @brief  æ£€æŸ¥å”¤é†’æºå¹¶æ¢å¤Standbyå‰çš„çŠ¶æ€
+ * @param  touch_confirmed PA8ä¸­æ–­å·²é€šè¿‡CST816S I2Cç¡®è®¤æœ‰æ•ˆè§¦æ‘¸
+ * @return æ— 
  */
 static void CheckWakeupSource(uint8_t touch_confirmed) {
     GameSaveWakeType restore_type;
 
-    // ¼ì²éWKUP±êÖ¾(PWR_FLAG_WU)ÅĞ¶ÏÊÇ·ñÎªStandby»½ĞÑ
+    // æ£€æŸ¥WKUPæ ‡å¿—(PWR_FLAG_WU)åˆ¤æ–­æ˜¯å¦ä¸ºStandbyå”¤é†’
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);
     if (s_standby_unknown_wake) {
         /*
-         * EXTI Event´¥·¢»½ĞÑµ«Ô´²»Ã÷£¬»ØÍË¼ì²éDR1/DR2±êÖ¾
-         * °´ÉÏµç¸´Î»´¦Àí£¬²»ÇĞ»»ÊÓÆµ
+         * EXTI Eventè§¦å‘å”¤é†’ä½†æºä¸æ˜ï¼Œå›é€€æ£€æŸ¥DR1/DR2æ ‡å¿—
+         * æŒ‰ä¸Šç”µå¤ä½å¤„ç†ï¼Œä¸åˆ‡æ¢è§†é¢‘
          */
         first_boot = 0;
         PWR_ClearFlag(PWR_FLAG_WU);
@@ -518,8 +518,8 @@ static void CheckWakeupSource(uint8_t touch_confirmed) {
     }
     if (s_standby_charge_wake) {
         /*
-         * ³äµç»½ĞÑÊ±´ÓDR1/DR2ÖĞ»Ö¸´ÓÎÏ·/ÊÓÆµ×´Ì¬£¬Çå³ıBKP±êÖ¾
-         * ³äµç/ÂúµçÊ±ºöÂÔ´¥Ãş£¬·ÀÎó²Ù×÷£¬½ö»Ö¸´Ä£Ê½²»ÇĞ»»ÊÓÆµ
+         * å……ç”µå”¤é†’æ—¶ä»DR1/DR2ä¸­æ¢å¤æ¸¸æˆ/è§†é¢‘çŠ¶æ€ï¼Œæ¸…é™¤BKPæ ‡å¿—
+         * å……ç”µ/æ»¡ç”µæ—¶å¿½ç•¥è§¦æ‘¸ï¼Œé˜²è¯¯æ“ä½œï¼Œä»…æ¢å¤æ¨¡å¼ä¸åˆ‡æ¢è§†é¢‘
          */
         first_boot = 0;
         PWR_ClearFlag(PWR_FLAG_WU);
@@ -527,7 +527,7 @@ static void CheckWakeupSource(uint8_t touch_confirmed) {
         return;
     }
     if (s_standby_touch_wake && !touch_confirmed) {
-        /* PA8Îó´¥·¢µ«ICÎ´È·ÈÏÓĞĞ§´¥Ãş */
+        /* PA8è¯¯è§¦å‘ä½†ICæœªç¡®è®¤æœ‰æ•ˆè§¦æ‘¸ */
         PWR_ClearFlag(PWR_FLAG_WU);
         current_state = 0;
         return;
@@ -546,22 +546,22 @@ static void CheckWakeupSource(uint8_t touch_confirmed) {
     }
     if (PWR_GetFlagStatus(PWR_FLAG_WU) == SET) {
         // printf("\r\n Standby wake up reset \r\n");
-        // ¼ì²éBKP»½ĞÑ±ê¼Ç
+        // æ£€æŸ¥BKPå”¤é†’æ ‡è®°
         restore_type =
             GameSave_RestoreWakeState(&current_video_index, max_video_count);
         if (restore_type == GAME_SAVE_WAKE_VIDEO) {
-            current_video_index = (current_video_index + 1) % max_video_count;  // ÇĞ»»ÏÂÒ»¸öÊÓÆµ
+            current_video_index = (current_video_index + 1) % max_video_count;  // åˆ‡æ¢ä¸‹ä¸€ä¸ªè§†é¢‘
             // printf("Switch to video index: %d\r\n", current_video_index);
         }
-        first_boot = 0;          // ·ÇÊ×´ÎÆô¶¯
-        // Çå³ıWKUP±êÖ¾
+        first_boot = 0;          // éé¦–æ¬¡å¯åŠ¨
+        // æ¸…é™¤WKUPæ ‡å¿—
         PWR_ClearFlag(PWR_FLAG_WU);
-        // Standby»½ĞÑ¸´Î»
+        // Standbyå”¤é†’å¤ä½
         current_state = 1;
     }
     else {
-        // PWR_FLAG_WUÎ´ÖÃÎ»£¬µ«BKP¼ÇÂ¼±íÃ÷ÊÇStandby»½ĞÑ
-        // (EXTIÊÂ¼ş´¥·¢µ¼ÖÂPWR_FLAG_WUÎ´ÖÃÎ»£¬µ«BKPÒÑ¼ÇÂ¼Standby»½ĞÑ)
+        // PWR_FLAG_WUæœªç½®ä½ï¼Œä½†BKPè®°å½•è¡¨æ˜æ˜¯Standbyå”¤é†’
+        // (EXTIäº‹ä»¶è§¦å‘å¯¼è‡´PWR_FLAG_WUæœªç½®ä½ï¼Œä½†BKPå·²è®°å½•Standbyå”¤é†’)
         restore_type =
             GameSave_RestoreWakeState(&current_video_index, max_video_count);
         if (restore_type != GAME_SAVE_WAKE_NONE) {
@@ -573,14 +573,14 @@ static void CheckWakeupSource(uint8_t touch_confirmed) {
             current_state = 1;
         } else {
             // printf("\r\n Power on reset \r\n");
-            Delay_Ms(1000);          // ÉÏµç¸´Î»£¬ÑÓÊ±1ÃëÕ¹Ê¾Logo
+            Delay_Ms(1000);          // ä¸Šç”µå¤ä½ï¼Œå»¶æ—¶1ç§’å±•ç¤ºLogo
         }
     }
 }
 
 /**
- * @brief  ½ûÓÃ´¥ÃşÊäÈë£¬¹Ø±ÕPA8ÖĞ¶ÏºÍEvent
- * @note   ³äµç»ò´ı»ú»½ĞÑºó£¬StandbyÆÚ¼äPA8ÖĞ¶ÏÎ´Ê¹ÄÜĞèÒª´Ë²½Öè
+ * @brief  ç¦ç”¨è§¦æ‘¸è¾“å…¥ï¼Œå…³é—­PA8ä¸­æ–­å’ŒEvent
+ * @note   å……ç”µæˆ–å¾…æœºå”¤é†’åï¼ŒStandbyæœŸé—´PA8ä¸­æ–­æœªä½¿èƒ½éœ€è¦æ­¤æ­¥éª¤
  */
 static void Main_DisableTouchInput(void)
 {
@@ -595,10 +595,10 @@ static void Main_DisableTouchInput(void)
 
 #if !TOUCH_IC_IT7259
 /**
- * @brief  Í¨¹ıI2C´¥ÃşICÈ·ÈÏCST816SÓĞĞ§´¥Ãş»½ĞÑ
- * @return 1 È·ÈÏÓĞĞ§´¥Ãş, 0 Îó´¥·¢
- * @note   ½ö CST816S Ê¹ÓÃ¡£IT7259 ²»ÄÜ×ßÕâÀï: »½ĞÑÊ± IC ¸Õ¸´Î»¡¢ÓÃ»§ÍùÍùÖ»µãÒ»ÏÂ¾ÍËÉÊÖ,
- *         ÕâÖÖ"Á¬Ğø2´Î¶Áµ½°´ÏÂ"µÄÈ·ÈÏ±ØÈ»´í¹ı ¡ú »áÎóÅĞÎŞĞ§²¢¸´Î»»Ø´ı»ú(¼û¿ª·¢×¢ÒâÊÂÏî¡ì22.4)¡£
+ * @brief  é€šè¿‡I2Cè§¦æ‘¸ICç¡®è®¤CST816Sæœ‰æ•ˆè§¦æ‘¸å”¤é†’
+ * @return 1 ç¡®è®¤æœ‰æ•ˆè§¦æ‘¸, 0 è¯¯è§¦å‘
+ * @note   ä»… CST816S ä½¿ç”¨ã€‚IT7259 ä¸èƒ½èµ°è¿™é‡Œ: å”¤é†’æ—¶ IC åˆšå¤ä½ã€ç”¨æˆ·å¾€å¾€åªç‚¹ä¸€ä¸‹å°±æ¾æ‰‹,
+ *         è¿™ç§"è¿ç»­2æ¬¡è¯»åˆ°æŒ‰ä¸‹"çš„ç¡®è®¤å¿…ç„¶é”™è¿‡ â†’ ä¼šè¯¯åˆ¤æ— æ•ˆå¹¶å¤ä½å›å¾…æœº(è§å¼€å‘æ³¨æ„äº‹é¡¹Â§22.4)ã€‚
  */
 static uint8_t Main_ConfirmTouchWake(void)
 {
@@ -623,20 +623,20 @@ static uint8_t Main_ConfirmTouchWake(void)
 #endif
 
 /**
- * @brief  PVDµÍµçÑ¹¼ì²â
- *         < 2.5V: Ç¿ÖÆµÍµç¸´Î»
- *         2.5~2.6V: ÏÔÊ¾µÍµç²¢½ûÖ¹½øÈë´ı»ú
- *         >= 2.6V: Õı³£Æô¶¯
- * @return ÎŞ
+ * @brief  PVDä½ç”µå‹æ£€æµ‹
+ *         < 2.5V: å¼ºåˆ¶ä½ç”µå¤ä½
+ *         2.5~2.6V: æ˜¾ç¤ºä½ç”µå¹¶ç¦æ­¢è¿›å…¥å¾…æœº
+ *         >= 2.6V: æ­£å¸¸å¯åŠ¨
+ * @return æ— 
  */
 static void PVD_CheckLowVoltage(void) {
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);  // Ê¹ÄÜPWRÊ±ÖÓ
-    PWR_PVDLevelConfig(PWR_PVDLevel_2V5);  // ãĞÖµ2.5V
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);  // ä½¿èƒ½PWRæ—¶é’Ÿ
+    PWR_PVDLevelConfig(PWR_PVDLevel_2V5);  // é˜ˆå€¼2.5V
     PWR_PVDCmd(ENABLE);
     Delay_Ms(1);
 
-    // µ±VDD < 2.5VÊ±Ç¿ÖÆÏµÍ³¸´Î»
-    // ÉĞÎ´³õÊ¼»¯ÍâÉè£¬Ö±½Ó¸´Î»±ÜÃâÒì³£
+    // å½“VDD < 2.5Væ—¶å¼ºåˆ¶ç³»ç»Ÿå¤ä½
+    // å°šæœªåˆå§‹åŒ–å¤–è®¾ï¼Œç›´æ¥å¤ä½é¿å…å¼‚å¸¸
     if (PWR_GetFlagStatus(PWR_FLAG_PVDO) == SET
         && !Battery_IsCharging() && Battery_GetStatus() != BAT_FULL) {
         RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
@@ -644,26 +644,26 @@ static void PVD_CheckLowVoltage(void) {
         SPI_Flash_PowerDown();
         LCD_PWR_OFF;
         Touch_WaitWakeInputsReleased();
-        NVIC_SystemReset();    // Ç¿ÖÆÏµÍ³¸´Î» (mainÅĞ¶ÏSFTRSTºó½øÈëStandby)
+        NVIC_SystemReset();    // å¼ºåˆ¶ç³»ç»Ÿå¤ä½ (mainåˆ¤æ–­SFTRSTåè¿›å…¥Standby)
     }
-    // VDD >= 2.5VÕı³£Æô¶¯Á÷³Ì
-    CheckWakeupSource(0);    // PA8Î´È·ÈÏ£¬ÓÉTouch_InitºóÔÙ´ÎÅĞ¶Ï
-    LCD_Init();              // ³õÊ¼»¯LCD
-    //TFT_init();              // ³õÊ¼»¯TFT
+    // VDD >= 2.5Væ­£å¸¸å¯åŠ¨æµç¨‹
+    CheckWakeupSource(0);    // PA8æœªç¡®è®¤ï¼Œç”±Touch_Initåå†æ¬¡åˆ¤æ–­
+    LCD_Init();              // åˆå§‹åŒ–LCD
+    //TFT_init();              // åˆå§‹åŒ–TFT
 
-    LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);// È«ÆÁÌî³äºÚÉ«£¬±ÜÃâLCDÎ´³õÊ¼»¯²ĞÁô»¨ÆÁ
-    //LCD_LED_CLR;         // ¿ª±³¹â
-    LCD_LED_SET;             // ¹Ø±³¹â
+    LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);// å…¨å±å¡«å……é»‘è‰²ï¼Œé¿å…LCDæœªåˆå§‹åŒ–æ®‹ç•™èŠ±å±
+    //LCD_LED_CLR;         // å¼€èƒŒå…‰
+    LCD_LED_SET;             // å…³èƒŒå…‰
 
-    // ¼ì²â2.5V <= VDD < 2.6VµÍµçÏÔÊ¾
+    // æ£€æµ‹2.5V <= VDD < 2.6Vä½ç”µæ˜¾ç¤º
     CheckAndShowLowBattery();
 
-    // VDD >= 2.6V¼ÌĞøÕı³£Æô¶¯
+    // VDD >= 2.6Vç»§ç»­æ­£å¸¸å¯åŠ¨
 }
 
 /**
- * @brief  ¸ù¾İµ±Ç°ÊÓÆµË÷Òı¼ÓÔØÊÓÆµµØÖ·
- * @return ÎŞ
+ * @brief  æ ¹æ®å½“å‰è§†é¢‘ç´¢å¼•åŠ è½½è§†é¢‘åœ°å€
+ * @return æ— 
  */
 void LoadVideoAddress(void) {
     next_bank = video_ranges[current_video_index][0];
@@ -673,37 +673,37 @@ void LoadVideoAddress(void) {
 }
 
 /**
- * @brief  Ö÷²Ëµ¥¹Ø±Õ·µ»ØÊÓÆµ²¥·Å (µ×²¿/ÖĞ¼äÇøÓòÉÏ»®¹Ø±ÕÖ÷²Ëµ¥)
- * @note   ¸´Î»²Ëµ¥/ÓÎÏ·×´Ì¬, ÖØĞÂ¼ÓÔØÊÓÆµµÚÒ»Ö¡±ÜÃâºÚÆÁÉÁË¸,
- *         ÖÃ s_m2v_swipe ·ÀÖ¹ËÉÊÖÖ¡±»ÎóÅĞÎª"µã»÷ÇĞ»»ÏÂÒ»ÊÓÆµ"¡£
+ * @brief  ä¸»èœå•å…³é—­è¿”å›è§†é¢‘æ’­æ”¾ (åº•éƒ¨/ä¸­é—´åŒºåŸŸä¸Šåˆ’å…³é—­ä¸»èœå•)
+ * @note   å¤ä½èœå•/æ¸¸æˆçŠ¶æ€, é‡æ–°åŠ è½½è§†é¢‘ç¬¬ä¸€å¸§é¿å…é»‘å±é—ªçƒ,
+ *         ç½® s_m2v_swipe é˜²æ­¢æ¾æ‰‹å¸§è¢«è¯¯åˆ¤ä¸º"ç‚¹å‡»åˆ‡æ¢ä¸‹ä¸€è§†é¢‘"ã€‚
  */
 static void main_menu_close_to_video(void)
 {
     s_main_mode = MAIN_MODE_VIDEO;
     s_menu_drawn = 0;
     s_menu_drag_y_prev = -999;
-    s_touch_started_top = 0;  /* ¸´Î»¶¥²¿±êÖ¾, ·ÀÎó´¥ */
+    s_touch_started_top = 0;  /* å¤ä½é¡¶éƒ¨æ ‡å¿—, é˜²è¯¯è§¦ */
     s_game_inited = 0;
     s_game_sleep_mode = MAIN_MODE_VIDEO;
-    vm_touch_down = 0;      /* ÖØÖÃÉÏ»®¼ì²â, ±ÜÃâÊÓÆµÉÏ»®Îó´¥·¢ */
+    vm_touch_down = 0;      /* é‡ç½®ä¸Šåˆ’æ£€æµ‹, é¿å…è§†é¢‘ä¸Šåˆ’è¯¯è§¦å‘ */
     vm_sliding = 0;
-    /* ÊÓÆµµÚÒ»Ö¡ÎªÍêÕûÖ¡, Ö±½ÓÌî³ä±³¾°, ±ÜÃâºÚÆÁÉÁË¸ */
+    /* è§†é¢‘ç¬¬ä¸€å¸§ä¸ºå®Œæ•´å¸§, ç›´æ¥å¡«å……èƒŒæ™¯, é¿å…é»‘å±é—ªçƒ */
     video_reload_show();
     s_m2v_swipe = 1;
-    /* ±£Áô s_touch_down: ÔÚvideoÂÖÑ¯ÖĞvm_touch_downĞèÒªËüÀ´ÅĞ¶Ïswipe,
-       ²Ëµ¥·µ»ØÊÓÆµÊ±Ò»²¢ÖØÖÃswipe×´Ì¬; ´Ë´¦swipeÖ¡ÇåÆÁºóÒÑ±£Ö¤ÏÂÒ»Ö¡²»ÖØ¸´ */
+    /* ä¿ç•™ s_touch_down: åœ¨videoè½®è¯¢ä¸­vm_touch_downéœ€è¦å®ƒæ¥åˆ¤æ–­swipe,
+       èœå•è¿”å›è§†é¢‘æ—¶ä¸€å¹¶é‡ç½®swipeçŠ¶æ€; æ­¤å¤„swipeå¸§æ¸…å±åå·²ä¿è¯ä¸‹ä¸€å¸§ä¸é‡å¤ */
 }
 
 /**
- * @brief  ´¦Àí´¥ÃşÊäÈë£º²Ëµ¥ÍÏ×§¡¢»¬¶¯¡¢µã»÷¼°ÓÎÏ·´¥Ãş
- * @return 1 ´¥ÃşÒÑ´¦Àí(Ìø¹ı±¾Ö¡), 0 Õı³£´¦Àí
+ * @brief  å¤„ç†è§¦æ‘¸è¾“å…¥ï¼šèœå•æ‹–æ‹½ã€æ»‘åŠ¨ã€ç‚¹å‡»åŠæ¸¸æˆè§¦æ‘¸
+ * @return 1 è§¦æ‘¸å·²å¤„ç†(è·³è¿‡æœ¬å¸§), 0 æ­£å¸¸å¤„ç†
  */
 static uint8_t Main_HandleTouchInput(void)
 {
-    Touch_IsPressed();          /* ¶ÁÈ¡INTÒı½Å, ÓĞ´¥ÃşÔò¶Á×ø±ê */
-    Touch_GetXY();              /* »ñÈ¡´¥Ãş×ø±êµ½ ts (º¬ pressed) */
+    Touch_IsPressed();          /* è¯»å–INTå¼•è„š, æœ‰è§¦æ‘¸åˆ™è¯»åæ ‡ */
+    Touch_GetXY();              /* è·å–è§¦æ‘¸åæ ‡åˆ° ts (å« pressed) */
 
-    /* PA8´¥Ãş»½ĞÑºóµÈ´ıÊÍ·Å£¬±ÜÃâÎó´¥·¢ */
+    /* PA8è§¦æ‘¸å”¤é†’åç­‰å¾…é‡Šæ”¾ï¼Œé¿å…è¯¯è§¦å‘ */
     if (s_wake_wait_release) {
         if (ts.pressed) {
             s_wake_release_count = 0;
@@ -714,9 +714,9 @@ static uint8_t Main_HandleTouchInput(void)
             s_wake_wait_frames = 0;
             s_touch_down = 0;
         }
-        /* ¡ï ¶µµ×³¬Ê±: ½â³ı¸ôÀëµÄÎ¨Ò»Ìõ¼şÊÇ"Á¬Ğø2Ö¡¶Áµ½ËÉ¿ª", Èô´¥ÃşICÒì³£Ê±Ò»Ö±±¨"°´ÏÂ"
-           (²ĞÁô°ü/I2C¹ÊÕÏ), Õâ¸öÌõ¼şÓÀÔ¶²»³ÉÁ¢ ¡ú ¸ôÀëÓÀ²»½â³ı ¡ú ±¾º¯ÊıÃ¿Ö¡Ö±½Óreturn,
-           ËùÓĞ´¥Ãş±»ÍÌµô, ÆÁÄ»³¹µ×Ã»·´Ó¦¡£¹Ê¸ø¸ôÀëÒ»¸öÉÏÏŞ: ×î¶àÔ¼1Ãë(60Ö¡)ºóÎŞÌõ¼ş·Å¿ª¡£ */
+        /* â˜… å…œåº•è¶…æ—¶: è§£é™¤éš”ç¦»çš„å”¯ä¸€æ¡ä»¶æ˜¯"è¿ç»­2å¸§è¯»åˆ°æ¾å¼€", è‹¥è§¦æ‘¸ICå¼‚å¸¸æ—¶ä¸€ç›´æŠ¥"æŒ‰ä¸‹"
+           (æ®‹ç•™åŒ…/I2Cæ•…éšœ), è¿™ä¸ªæ¡ä»¶æ°¸è¿œä¸æˆç«‹ â†’ éš”ç¦»æ°¸ä¸è§£é™¤ â†’ æœ¬å‡½æ•°æ¯å¸§ç›´æ¥return,
+           æ‰€æœ‰è§¦æ‘¸è¢«åæ‰, å±å¹•å½»åº•æ²¡ååº”ã€‚æ•…ç»™éš”ç¦»ä¸€ä¸ªä¸Šé™: æœ€å¤šçº¦1ç§’(60å¸§)åæ— æ¡ä»¶æ”¾å¼€ã€‚ */
         if (s_wake_wait_release && ++s_wake_wait_frames >= 60) {
             s_wake_wait_release = 0;
             s_wake_release_count = 0;
@@ -732,16 +732,16 @@ static uint8_t Main_HandleTouchInput(void)
         return 1;
     }
 
-    /* »¬¶¯¶¯»­ÖĞÌø¹ı´¥Ãş¼ì²â */
+    /* æ»‘åŠ¨åŠ¨ç”»ä¸­è·³è¿‡è§¦æ‘¸æ£€æµ‹ */
     if (s_menu_sliding) {
         s_touch_down = 0;
         return 0;
     }
 
-    /* ÊÓÆµÉÏ»®²Ëµ¥"Ã»Í£ÎÈ"(ËÉÊÖºó»¬³ö/»Ø»¬¶¯»­ÖĞ)Ê±, ÓëÖ÷²Ëµ¥ÏÂ»¬¶¯»­Ò»ÖÂ:
-       ÕâÒ»¸ùÊÖÖ¸Õû¶Î×÷·Ï¡£¡ï ±ØĞëÓÃ s_vm_touch_void ¼Ç×¡"ËüÊÇÔÚ¶¯»­ÖĞ°´ÏÂµÄ",
-       Á¬ËüµÄ"Ì§Æğ"Ò²Ò»²¢×÷·Ï ¡ª¡ª ·ñÔò"¶¯»­ÖĞ°´ÏÂ¡¢»¬µ½Î»²ÅËÉÊÖ"»á±»µ±³ÉÂäÎ»ºó
-       µÄÒ»´ÎÕı³£µã»÷, Îó½øÉèÖÃ(ÓïÑÔ/ÁÁ¶È¡­)»òÎó¹Ø²Ëµ¥·µ»ØÊÓÆµ¡£ */
+    /* è§†é¢‘ä¸Šåˆ’èœå•"æ²¡åœç¨³"(æ¾æ‰‹åæ»‘å‡º/å›æ»‘åŠ¨ç”»ä¸­)æ—¶, ä¸ä¸»èœå•ä¸‹æ»‘åŠ¨ç”»ä¸€è‡´:
+       è¿™ä¸€æ ¹æ‰‹æŒ‡æ•´æ®µä½œåºŸã€‚â˜… å¿…é¡»ç”¨ s_vm_touch_void è®°ä½"å®ƒæ˜¯åœ¨åŠ¨ç”»ä¸­æŒ‰ä¸‹çš„",
+       è¿å®ƒçš„"æŠ¬èµ·"ä¹Ÿä¸€å¹¶ä½œåºŸ â€”â€” å¦åˆ™"åŠ¨ç”»ä¸­æŒ‰ä¸‹ã€æ»‘åˆ°ä½æ‰æ¾æ‰‹"ä¼šè¢«å½“æˆè½ä½å
+       çš„ä¸€æ¬¡æ­£å¸¸ç‚¹å‡», è¯¯è¿›è®¾ç½®(è¯­è¨€/äº®åº¦â€¦)æˆ–è¯¯å…³èœå•è¿”å›è§†é¢‘ã€‚ */
     if (vm_sliding && ts.pressed) s_vm_touch_void = 1;
     if (s_vm_touch_void) {
         s_touch_down = 0;
@@ -750,39 +750,39 @@ static uint8_t Main_HandleTouchInput(void)
     }
 
     if (ts.pressed && !s_touch_down) {
-        /* ´¥Ãş°´ÏÂ: ¼ÇÂ¼ÆğÊ¼Î»ÖÃ */
+        /* è§¦æ‘¸æŒ‰ä¸‹: è®°å½•èµ·å§‹ä½ç½® */
         s_touch_down = 1;
         s_touch_start_y = ts.y;
         s_touch_started_top =
             (ts.y < MENU_SWIPE_START_Y
-             && (s_settings_mode == SETTINGS_NONE || !g_settings_from_game)  /* ÊÓÆµÉèÖÃÒ³Ò²ÔÊĞí¶¥²¿ÏÂ»¬µ¯Ö÷²Ëµ¥ */
+             && (s_settings_mode == SETTINGS_NONE || !g_settings_from_game)  /* è§†é¢‘è®¾ç½®é¡µä¹Ÿå…è®¸é¡¶éƒ¨ä¸‹æ»‘å¼¹ä¸»èœå• */
              && s_main_mode == MAIN_MODE_VIDEO);
         s_touch_started_bottom =
-            (ts.y > 210);  /* >210 µ×²¿ÇøÓò, Óëvideo_menu_swipe_up_pollÒ»ÖÂ */
-        /* ¶¥²¿°´ÏÂ: ÈôÊÇ"µãÉÏ»®²Ëµ¥µÚÒ»ĞĞ"ÄØ? ÏÈ±ğÈ¡Ïû²Ëµ¥, Ö»¼ÇÒ»¸ö´ıÈ¡Ïû±ê¼Ç;
-           Ö»ÓĞÊÖÖ¸ÕæµÄÍùÏÂÍÏ(¼ûÏÂ·½"¶¥²¿ÍÏ×§"·ÖÖ§)²Åµ±"¶¥²¿ÏÂ»¬"°ÑËüÈ¡Ïûµô¡£ */
+            (ts.y > 210);  /* >210 åº•éƒ¨åŒºåŸŸ, ä¸video_menu_swipe_up_pollä¸€è‡´ */
+        /* é¡¶éƒ¨æŒ‰ä¸‹: è‹¥æ˜¯"ç‚¹ä¸Šåˆ’èœå•ç¬¬ä¸€è¡Œ"å‘¢? å…ˆåˆ«å–æ¶ˆèœå•, åªè®°ä¸€ä¸ªå¾…å–æ¶ˆæ ‡è®°;
+           åªæœ‰æ‰‹æŒ‡çœŸçš„å¾€ä¸‹æ‹–(è§ä¸‹æ–¹"é¡¶éƒ¨æ‹–æ‹½"åˆ†æ”¯)æ‰å½“"é¡¶éƒ¨ä¸‹æ»‘"æŠŠå®ƒå–æ¶ˆæ‰ã€‚ */
         s_top_defer_clear = (s_touch_started_top && s_video_menu_visible) ? 1 : 0;
         if (s_touch_started_top) {
-            s_menu_drag_max_y = ts.y;    /* ¼ÇÂ¼ÊÖÖ¸ÆğÊ¼Î»ÖÃ×÷Îª×îÔ¶Y */
-            s_video_menu_dragging = 0;   /* Í£Ö¹ÉÏ»®ÍÏ×§/»¬¶¯ */
+            s_menu_drag_max_y = ts.y;    /* è®°å½•æ‰‹æŒ‡èµ·å§‹ä½ç½®ä½œä¸ºæœ€è¿œY */
+            s_video_menu_dragging = 0;   /* åœæ­¢ä¸Šåˆ’æ‹–æ‹½/æ»‘åŠ¨ */
             vm_sliding = 0;
-            vm_touch_down = 0;           /* ÖØÖÃswipe¼ì²â, ·À¼Ù´¥·¢ */
+            vm_touch_down = 0;           /* é‡ç½®swipeæ£€æµ‹, é˜²å‡è§¦å‘ */
         }
-        s_menu_dragging = 0;  /* ÖØÖÃ: ¹Ø±ÕÍÏ×§ */
-        s_menu_sliding = 0;   /* ÖØÖÃ: ÖÕÖ¹»¬¶¯ */
-        s_menu_drag_y = -MENU_H;  /* ²Ëµ¥³õÊ¼Î»ÖÃ */
-        s_drag_rel_cnt = 0;   /* ¸´Î»ÊÍ·Å¼ÆÊı */
-        s_m2v_swipe = 0;      /* Çå³ı´ò¶Ï±êÖ¾ */
+        s_menu_dragging = 0;  /* é‡ç½®: å…³é—­æ‹–æ‹½ */
+        s_menu_sliding = 0;   /* é‡ç½®: ç»ˆæ­¢æ»‘åŠ¨ */
+        s_menu_drag_y = -MENU_H;  /* èœå•åˆå§‹ä½ç½® */
+        s_drag_rel_cnt = 0;   /* å¤ä½é‡Šæ”¾è®¡æ•° */
+        s_m2v_swipe = 0;      /* æ¸…é™¤æ‰“æ–­æ ‡å¿— */
     }
     else if (ts.pressed && s_touch_down && s_touch_started_top
              && s_main_mode == MAIN_MODE_VIDEO
              && (int16_t)ts.y - (int16_t)s_touch_start_y
                 > (s_top_defer_clear ? MENU_SWIPE_COMMIT_DIST : MENU_SWIPE_TRIGGER_DIST)) {
-        /* ¶¥²¿ÍÏ×§: ¸ù¾İÊÖÖ¸×ÜÎ»ÒÆËãÄ¿±êÎ»ÖÃ, ÖğÖ¡×·¹ıÈ¥ */
+        /* é¡¶éƒ¨æ‹–æ‹½: æ ¹æ®æ‰‹æŒ‡æ€»ä½ç§»ç®—ç›®æ ‡ä½ç½®, é€å¸§è¿½è¿‡å» */
         {
             int16_t total_dy = (int16_t)ts.y - (int16_t)s_touch_start_y;
             int16_t target_y = (int16_t)(-MENU_H) + total_dy;
-            /* È·ÈÏÊÇ"¶¥²¿ÏÂ»¬"(¶ø·ÇµãÉÏµÚÒ»ĞĞ): ´Ë¿Ì²ÅÈ¡ÏûÉÏ»®²Ëµ¥¡¢ÖØ»æÊÓÆµ±³¾° */
+            /* ç¡®è®¤æ˜¯"é¡¶éƒ¨ä¸‹æ»‘"(è€Œéç‚¹ä¸Šç¬¬ä¸€è¡Œ): æ­¤åˆ»æ‰å–æ¶ˆä¸Šåˆ’èœå•ã€é‡ç»˜è§†é¢‘èƒŒæ™¯ */
             if (s_top_defer_clear) {
                 s_top_defer_clear = 0;
                 s_video_menu_visible = 0;
@@ -792,83 +792,83 @@ static uint8_t Main_HandleTouchInput(void)
                 target_y = MENU_Y - MENU_RELEASE_GAP;
             if (target_y > s_menu_drag_y) {
                 int16_t diff = target_y - s_menu_drag_y;
-                /* Ö»×öµ¥Ö¡Î»ÒÆÉÏÏŞ(Í¬ game_menu_drag_poll): ±£³Ö"ÖğÏñËØ×·ÉÏÀ´"µÄ´ÓÈİ¸Ğ¡£
-                   Ôø¼Ó¹ı"×î´óÖÍºó"ÈÃ¿ì»¬¸ü¸úÊÖ, µ«²Ëµ¥¹Û¸Ğ±ä²î, ÒÑ»ØÍË¡£ */
+                /* åªåšå•å¸§ä½ç§»ä¸Šé™(åŒ game_menu_drag_poll): ä¿æŒ"é€åƒç´ è¿½ä¸Šæ¥"çš„ä»å®¹æ„Ÿã€‚
+                   æ›¾åŠ è¿‡"æœ€å¤§æ»å"è®©å¿«æ»‘æ›´è·Ÿæ‰‹, ä½†èœå•è§‚æ„Ÿå˜å·®, å·²å›é€€ã€‚ */
                 if (diff > MENU_DRAG_MAX_STEP)
                     diff = MENU_DRAG_MAX_STEP;
                 s_menu_drag_y += diff;
                 s_menu_dragging = 1;
-                /* ÊÓÆµÉèÖÃÒ³¶¥²¿ÏÂ»¬ÍÏÖ÷²Ëµ¥¼´ÍË³öÉèÖÃÒ³, ±³¾°ÖØÔØÊÓÆµµÚÒ»Ö¡(Í¬ÊÓÆµ²Ëµ¥Çå±³¾°) */
+                /* è§†é¢‘è®¾ç½®é¡µé¡¶éƒ¨ä¸‹æ»‘æ‹–ä¸»èœå•å³é€€å‡ºè®¾ç½®é¡µ, èƒŒæ™¯é‡è½½è§†é¢‘ç¬¬ä¸€å¸§(åŒè§†é¢‘èœå•æ¸…èƒŒæ™¯) */
                 if (s_settings_mode != SETTINGS_NONE && !g_settings_from_game) {
                     s_settings_mode = SETTINGS_NONE;
                     video_reload_show();
                 }
             }
             if (ts.y > s_menu_drag_max_y)
-                s_menu_drag_max_y = ts.y;  /* ¸üĞÂÊÖÖ¸×îÔ¶Î»ÖÃ */
+                s_menu_drag_max_y = ts.y;  /* æ›´æ–°æ‰‹æŒ‡æœ€è¿œä½ç½® */
         }
     }
     else if (ts.pressed && s_touch_down && s_main_mode == MAIN_MODE_MENU
              && (int16_t)s_touch_start_y - (int16_t)ts.y > MENU_SWIPE_TRIGGER_DIST) {
-        /* Ö÷²Ëµ¥ÏÔÊ¾Ê±ÉÏ»®¹Ø±Õ·µ»ØÊÓÆµ (ÈÎÒâÆğµã, ÓÃÖ÷²Ëµ¥×ÔÉí°´ÏÂÆğµã¼ì²â¸ü¿É¿¿) */
+        /* ä¸»èœå•æ˜¾ç¤ºæ—¶ä¸Šåˆ’å…³é—­è¿”å›è§†é¢‘ (ä»»æ„èµ·ç‚¹, ç”¨ä¸»èœå•è‡ªèº«æŒ‰ä¸‹èµ·ç‚¹æ£€æµ‹æ›´å¯é ) */
         main_menu_close_to_video();
         g_menu_cooldown = 15;
     }
     else if (ts.pressed && s_touch_down && s_main_mode == MAIN_MODE_VIDEO
              && s_video_menu_visible && s_settings_mode == SETTINGS_NONE
              && game_menu_swipe_mid_down_close(MENU_SWIPE_START_Y, MENU_SWIPE_TRIGGER_DIST)) {
-        /* ÊÓÆµÉÏ»¬²Ëµ¥ÏÔÊ¾Ê±, ÖĞ¼ä/µ×²¿ÏÂ»¬¹Ø±Õ·µ»ØÊÓÆµ; ¶¥²¿(Æğµã<40)ÏÂ»¬±£Áô¸ø´ò¿ªÖ÷²Ëµ¥(ÉÏÏÂ¿É´ò¶Ï) */
+        /* è§†é¢‘ä¸Šæ»‘èœå•æ˜¾ç¤ºæ—¶, ä¸­é—´/åº•éƒ¨ä¸‹æ»‘å…³é—­è¿”å›è§†é¢‘; é¡¶éƒ¨(èµ·ç‚¹<40)ä¸‹æ»‘ä¿ç•™ç»™æ‰“å¼€ä¸»èœå•(ä¸Šä¸‹å¯æ‰“æ–­) */
         s_video_menu_visible = 0;
         vm_touch_down = 0;
         video_reload_show();
         s_m2v_swipe = 1;
     }
     else if (!ts.pressed && s_touch_down) {
-        /* ´¥ÃşÊÍ·Å: ´¦ÀíÂß¼­ */
+        /* è§¦æ‘¸é‡Šæ”¾: å¤„ç†é€»è¾‘ */
         uint8_t handled = 0;
 
-        /* ÍÏ×§ÊÍ·Å: Á¬¶ª2Ö¡È·ÈÏ (·À´¥ÃşIC¶¶¶¯) */
+        /* æ‹–æ‹½é‡Šæ”¾: è¿ä¸¢2å¸§ç¡®è®¤ (é˜²è§¦æ‘¸ICæŠ–åŠ¨) */
         if (s_menu_dragging && ++s_drag_rel_cnt < 2) {
             return 0;
         }
 
-        /* ²Ëµ¥ÍÏ×§: ÅĞ¶Ï»¬¶¯¾àÀë, ¾ö¶¨ÊÇ·ñµ¯³ö²Ëµ¥ */
+        /* èœå•æ‹–æ‹½: åˆ¤æ–­æ»‘åŠ¨è·ç¦», å†³å®šæ˜¯å¦å¼¹å‡ºèœå• */
         if (s_menu_dragging) {
             int16_t drag_dist;
 
             s_menu_dragging = 0;
             drag_dist = (int16_t)ts.y - (int16_t)s_touch_start_y;
-            /* ÉÏ»®»ØÍË³¬¹ı10ÏñËØ: Ç¿ÖÆÒş²Ø²Ëµ¥ */
+            /* ä¸Šåˆ’å›é€€è¶…è¿‡10åƒç´ : å¼ºåˆ¶éšè—èœå• */
             if ((int16_t)s_menu_drag_max_y - (int16_t)ts.y > 10)
                 drag_dist = 0;
             if (drag_dist >= MENU_SWIPE_COMMIT_DIST) {
-                /* »¬¶¯Ìá½»: ²Ëµ¥µ¯³ö¶¯»­ */
+                /* æ»‘åŠ¨æäº¤: èœå•å¼¹å‡ºåŠ¨ç”» */
                 s_menu_sliding = 1;
             } else {
-                /* ¾àÀë²»×ã: »Øµ¯µ½³õÊ¼Î»ÖÃ, ¼ÌĞø²¥·ÅÊÓÆµ */
+                /* è·ç¦»ä¸è¶³: å›å¼¹åˆ°åˆå§‹ä½ç½®, ç»§ç»­æ’­æ”¾è§†é¢‘ */
                 LoadVideoAddress();
                 s_menu_drag_y_prev = -999;
             }
             handled = 1;
         }
 
-        /* 1. ÊÓÆµ²¥·Å»òÓÎÏ·Ä£Ê½¶¥²¿¿ìËÙÏÂ»® ¡ú µ¯³ö²Ëµ¥ (ÎŞĞèÍÏ×§, ¾²Ä¬ÍÏ¶¯¾àÀëÒÑ´ï±ê) */
+        /* 1. è§†é¢‘æ’­æ”¾æˆ–æ¸¸æˆæ¨¡å¼é¡¶éƒ¨å¿«é€Ÿä¸‹åˆ’ â†’ å¼¹å‡ºèœå• (æ— éœ€æ‹–æ‹½, é™é»˜æ‹–åŠ¨è·ç¦»å·²è¾¾æ ‡) */
         if (!handled && s_touch_started_top
             && !s_top_defer_clear
             && (int16_t)ts.y - (int16_t)s_touch_start_y
                >= MENU_SWIPE_COMMIT_DIST
             && (int16_t)s_menu_drag_max_y - (int16_t)ts.y <= 10) {
             if (s_main_mode == MAIN_MODE_VIDEO) {
-                /* ¶¥²¿ÏÂ»®, ÇĞ»»²Ëµ¥Ä£Ê½ (µ¯³ö¶¯»­) */
+                /* é¡¶éƒ¨ä¸‹åˆ’, åˆ‡æ¢èœå•æ¨¡å¼ (å¼¹å‡ºåŠ¨ç”») */
                 s_menu_sliding = 1;
-                /* ÇĞ»»ÓÎÏ·¸´Î»²ÎÊı, Çå³ıÓÎÏ·³õÊ¼»¯±êÖ¾ */
+                /* åˆ‡æ¢æ¸¸æˆå¤ä½å‚æ•°, æ¸…é™¤æ¸¸æˆåˆå§‹åŒ–æ ‡å¿— */
                 handled = 1;
             }
         }
 
-        /* ²Ëµ¥5ĞĞµã»÷ (2048 / ÍÆÏä×Ó / ¶íÂŞË¹·½¿é / »ªÈİµÀ / ÉèÖÃ) */
+        /* èœå•5è¡Œç‚¹å‡» (2048 / æ¨ç®±å­ / ä¿„ç½—æ–¯æ–¹å— / åå®¹é“ / è®¾ç½®) */
         if (!handled && s_main_mode == MAIN_MODE_MENU) {
-            /* ²Ëµ¥Àï¡°»¬¶¯ÎŞĞ§¡±(Í¬ÓÎÏ·²Ëµ¥µÄÅĞ·¨): Î»ÒÆ³¬¹ı MENU_SWIPE_COMMIT_DIST ¾Í²»Ëãµã»÷ */
+            /* èœå•é‡Œâ€œæ»‘åŠ¨æ— æ•ˆâ€(åŒæ¸¸æˆèœå•çš„åˆ¤æ³•): ä½ç§»è¶…è¿‡ MENU_SWIPE_COMMIT_DIST å°±ä¸ç®—ç‚¹å‡» */
             if ((int16_t)((int16_t)ts.y - (int16_t)s_touch_start_y) <= MENU_SWIPE_COMMIT_DIST
                 && (int16_t)((int16_t)s_touch_start_y - (int16_t)ts.y) <= MENU_SWIPE_COMMIT_DIST)
                 handled = main_menu_handle(ts.x, s_touch_start_y,
@@ -877,7 +877,7 @@ static uint8_t Main_HandleTouchInput(void)
                                        &key_response);
         }
 
-        /* ÉèÖÃ½çÃæBACK¼ü¡ú»ØÊÓÆµ/ÓÎÏ· (ÈÎÒâÎ»ÖÃÉúĞ§) */
+        /* è®¾ç½®ç•Œé¢BACKé”®â†’å›è§†é¢‘/æ¸¸æˆ (ä»»æ„ä½ç½®ç”Ÿæ•ˆ) */
         if (!handled && s_settings_mode != SETTINGS_NONE
             && ts.x >= BACK_X && ts.x <= BACK_X + BACK_W
             && ts.y >= BACK_Y && ts.y <= BACK_Y + BACK_H) {
@@ -890,40 +890,40 @@ static uint8_t Main_HandleTouchInput(void)
             end_flag = 0;
         }
 
-        /* µÍµçÉÁÆÁÊ±µã»÷, ²»×öÈÎºÎ´¦ÀíÖ±½ÓÊÍ·Å */
+        /* ä½ç”µé—ªå±æ—¶ç‚¹å‡», ä¸åšä»»ä½•å¤„ç†ç›´æ¥é‡Šæ”¾ */
         if (!handled && blink_touched) {
             blink_touched = 0;
             s_touch_down = 0;
             return 0;
         }
 
-        /* 4. ÌØÊâÇé¿öÊÍ·Å: ²»×öÈÎºÎÄ£Ê½ÇĞ»» / ÇåÆÁ+ÖØÔØÊÓÆµ */
+        /* 4. ç‰¹æ®Šæƒ…å†µé‡Šæ”¾: ä¸åšä»»ä½•æ¨¡å¼åˆ‡æ¢ / æ¸…å±+é‡è½½è§†é¢‘ */
         if (!handled && s_m2v_swipe) {
-            handled = 1;              /* ²Ëµ¥¡úÊÓÆµ´ò¶Ï±ê¼Ç, ÒÑ¾­´¦Àí */
+            handled = 1;              /* èœå•â†’è§†é¢‘æ‰“æ–­æ ‡è®°, å·²ç»å¤„ç† */
             s_m2v_swipe = 0;
         }
         if (!handled && (s_video_menu_dragging || vm_sliding)) {
-            /* ²Ëµ¥¸úÊÖÍÏ×§ »ò ËÉÊÖºóµÄ»¬³ö/»Ø»¬¶¯»­ÖĞ: ÊÍ·ÅÒ»ÂÉ²»Ïû·Ñ¸øÊÓÆµ¡£
-               ¡ï ±ØĞëº¬ vm_sliding: »¬³ö¶¯»­ÆÚ¼ä s_video_menu_visible »¹ÊÇ 0,
-               ÉÙÁËÕâÒ»Ìõ, ÔÚ²Ëµ¥"ÕıÔÚ»¬³ö"Ê±µãÒ»ÏÂ»áÂäµ½ÏÂ·½"µã»÷ÇĞ»»ÏÂÒ»ÊÓÆµ"
-               (»­Ãæ±ä³ÉÏÂÒ»¸öÊÓÆµ, ¿´×ÅÏñ"·µ»ØÊÓÆµ"), ÒªµãµÚ¶ş´Î(µÈ»¬Íê)²Å½øÉèÖÃÒ³¡£ */
+            /* èœå•è·Ÿæ‰‹æ‹–æ‹½ æˆ– æ¾æ‰‹åçš„æ»‘å‡º/å›æ»‘åŠ¨ç”»ä¸­: é‡Šæ”¾ä¸€å¾‹ä¸æ¶ˆè´¹ç»™è§†é¢‘ã€‚
+               â˜… å¿…é¡»å« vm_sliding: æ»‘å‡ºåŠ¨ç”»æœŸé—´ s_video_menu_visible è¿˜æ˜¯ 0,
+               å°‘äº†è¿™ä¸€æ¡, åœ¨èœå•"æ­£åœ¨æ»‘å‡º"æ—¶ç‚¹ä¸€ä¸‹ä¼šè½åˆ°ä¸‹æ–¹"ç‚¹å‡»åˆ‡æ¢ä¸‹ä¸€è§†é¢‘"
+               (ç”»é¢å˜æˆä¸‹ä¸€ä¸ªè§†é¢‘, çœ‹ç€åƒ"è¿”å›è§†é¢‘"), è¦ç‚¹ç¬¬äºŒæ¬¡(ç­‰æ»‘å®Œ)æ‰è¿›è®¾ç½®é¡µã€‚ */
             handled = 1;
         }
         if (!handled && s_video_menu_visible) {
             int8_t hit = -1;
-            /* ĞĞ¹éÊôÓë»æÖÆÓÃÍ¬Ò»Ì×ĞĞ¼¸ºÎ(menu_row_from_y): ´¥ÃşÇøÎŞ·ìÏ¶¡¢±ß½çÂäÔÚÏàÁÚ
-               Á½ĞĞÎÄ×ÖµÄÊÓ¾õÖĞÏßÉÏ ¡ú µãÁ½ĞĞÖ®¼äµÄ¿ÕÏ¶²»»áµô¿Õ¡¢Ò²²»»áÕû¶ÎËã¸øÏÂÒ»ĞĞ¡£
-               ĞĞÊı=5, ¿ò¶¥=VIDEO_MENU_Y5¡£ */
-            /* Ö»ÏìÓ¦"µã»÷"(Í¬Ö÷²Ëµ¥/ÓÎÏ·²Ëµ¥): °´ÏÂĞĞÓëËÉÊÖĞĞ±ØĞëÊÇÍ¬Ò»ĞĞ¡£
-               ÊÖÖ¸ÔÚÌõ´øÉÏ»¬¶¯(ÉÏÏÂ»®, ËÉÊÖ»»ÁËĞĞ)Ò»ÂÉ²»Ñ¡ÖĞ ¡ª¡ª ·ñÔò"»¬Ò»ÏÂÔÙËÉ¿ª"
-               ¾Í»áÎó½øÈëÉèÖÃÒ³; ´ËÊ±Ìõ´ø±£³ÖÏÔÊ¾, Ã»±»Ïû·ÑµÄÊÖÊÆÒ²²»»á´«¸øÊÓÆµ/ÓÎÏ·¡£
-               ĞĞÈ¡ÖµÓÃ°´ÏÂÎ»ÖÃ(»¬¶¯Ê±ËÉÊÖ×ø±ê»áÆ¯, Æğµã¸ü×¼)¡£ */
+            /* è¡Œå½’å±ä¸ç»˜åˆ¶ç”¨åŒä¸€å¥—è¡Œå‡ ä½•(menu_row_from_y): è§¦æ‘¸åŒºæ— ç¼éš™ã€è¾¹ç•Œè½åœ¨ç›¸é‚»
+               ä¸¤è¡Œæ–‡å­—çš„è§†è§‰ä¸­çº¿ä¸Š â†’ ç‚¹ä¸¤è¡Œä¹‹é—´çš„ç©ºéš™ä¸ä¼šæ‰ç©ºã€ä¹Ÿä¸ä¼šæ•´æ®µç®—ç»™ä¸‹ä¸€è¡Œã€‚
+               è¡Œæ•°=5, æ¡†é¡¶=VIDEO_MENU_Y5ã€‚ */
+            /* åªå“åº”"ç‚¹å‡»"(åŒä¸»èœå•/æ¸¸æˆèœå•): æŒ‰ä¸‹è¡Œä¸æ¾æ‰‹è¡Œå¿…é¡»æ˜¯åŒä¸€è¡Œã€‚
+               æ‰‹æŒ‡åœ¨æ¡å¸¦ä¸Šæ»‘åŠ¨(ä¸Šä¸‹åˆ’, æ¾æ‰‹æ¢äº†è¡Œ)ä¸€å¾‹ä¸é€‰ä¸­ â€”â€” å¦åˆ™"æ»‘ä¸€ä¸‹å†æ¾å¼€"
+               å°±ä¼šè¯¯è¿›å…¥è®¾ç½®é¡µ; æ­¤æ—¶æ¡å¸¦ä¿æŒæ˜¾ç¤º, æ²¡è¢«æ¶ˆè´¹çš„æ‰‹åŠ¿ä¹Ÿä¸ä¼šä¼ ç»™è§†é¢‘/æ¸¸æˆã€‚
+               è¡Œå–å€¼ç”¨æŒ‰ä¸‹ä½ç½®(æ»‘åŠ¨æ—¶æ¾æ‰‹åæ ‡ä¼šæ¼‚, èµ·ç‚¹æ›´å‡†)ã€‚ */
             int8_t pr = menu_row_from_y(VIDEO_MENU_Y5, s_touch_start_y, 5);
             int8_t rl = menu_row_from_y(VIDEO_MENU_Y5, ts.y, 5);
-            uint8_t is_tap = (pr == rl   /* »¬¶¯²»Ëãµã»÷ */
+            uint8_t is_tap = (pr == rl   /* æ»‘åŠ¨ä¸ç®—ç‚¹å‡» */
                 && (int16_t)((int16_t)ts.y - (int16_t)s_touch_start_y) <= MENU_SWIPE_COMMIT_DIST
                 && (int16_t)((int16_t)s_touch_start_y - (int16_t)ts.y) <= MENU_SWIPE_COMMIT_DIST);
-            /* ²Ëµ¥¿òÉÏ·½(y<VIDEO_MENU_Y5)Ò²Ëã²Ëµ¥ÄÚ: ¾Í½ü¹éµ½µÚÒ»ĞĞ(´Ë´¦ pr=-1)¡£ */
+            /* èœå•æ¡†ä¸Šæ–¹(y<VIDEO_MENU_Y5)ä¹Ÿç®—èœå•å†…: å°±è¿‘å½’åˆ°ç¬¬ä¸€è¡Œ(æ­¤å¤„ pr=-1)ã€‚ */
             if (is_tap && pr < 0) pr = 0;
 
             if (is_tap
@@ -951,7 +951,7 @@ static uint8_t Main_HandleTouchInput(void)
             }
         }
 
-        /* 5. ÆÕÍ¨´¥ÃşÊÍ·Å, µã»÷ÇĞ»»ÏÂÒ»ÊÓÆµ (ÉèÖÃ/²Ëµ¥¿É¼ûÊ±²»´¥·¢) */
+        /* 5. æ™®é€šè§¦æ‘¸é‡Šæ”¾, ç‚¹å‡»åˆ‡æ¢ä¸‹ä¸€è§†é¢‘ (è®¾ç½®/èœå•å¯è§æ—¶ä¸è§¦å‘) */
         if (!handled && s_main_mode == MAIN_MODE_VIDEO
             && s_settings_mode == SETTINGS_NONE && !s_video_menu_visible) {
             current_video_index =
@@ -967,12 +967,12 @@ static uint8_t Main_HandleTouchInput(void)
 }
 
 /**
- * @brief  µÍµçÍ¼±êÃğ¶Î(On->Off)ºó, »Ö¸´±»Æä¸²¸ÇµÄµ×²ãÄÚÈİ(ÓÎÏ·³¡¾°+µ±Ç°²Ëµ¥¿ò)
- * @note   ²»ÓÃ LCD_ClearLowBatteryOverlay °ÑÍ¼±êÂÖÀªË¢ºÚ(»áÔÚ²ÊÉ«²Ëµ¥/³¡¾°ÁôÏÂºÚ/ºì¿é),
- *         ¸ÄÎªÖÃÔàÓÉ¸÷ÓÎÏ·×ÔÉíÖØ»æ¸²¸Ç: ÍË³ö/ÖØ¿ª²Ëµ¥ÓÃ *_menu_mark_dirty(ÖÃ
- *         game_menu_command µÄ bg_redraw Ëù¶ÁµÄÔà, Ê¹ÆäÏÂÖ¡ÖØ»æ³¡¾°+²Ëµ¥¿ò), ´¿ÓÎÏ·ÓÃ
- *         *_full_redraw; fish ÓÃ¾Ö²¿Çå³ı¡£×¢Òâ²Ëµ¥Ì¬²»ÄÜÓÃ *_full_redraw(d2048/klotski
- *         Ö»ÖÃ g_full_redraw ¶ø bg_redraw ¶Á g_grid_dirty, »áÂ©ÖØ»æµ¼ÖÂºìÉ«²ĞÁô)¡£
+ * @brief  ä½ç”µå›¾æ ‡ç­æ®µ(On->Off)å, æ¢å¤è¢«å…¶è¦†ç›–çš„åº•å±‚å†…å®¹(æ¸¸æˆåœºæ™¯+å½“å‰èœå•æ¡†)
+ * @note   ä¸ç”¨ LCD_ClearLowBatteryOverlay æŠŠå›¾æ ‡è½®å»“åˆ·é»‘(ä¼šåœ¨å½©è‰²èœå•/åœºæ™¯ç•™ä¸‹é»‘/çº¢å—),
+ *         æ”¹ä¸ºç½®è„ç”±å„æ¸¸æˆè‡ªèº«é‡ç»˜è¦†ç›–: é€€å‡º/é‡å¼€èœå•ç”¨ *_menu_mark_dirty(ç½®
+ *         game_menu_command çš„ bg_redraw æ‰€è¯»çš„è„, ä½¿å…¶ä¸‹å¸§é‡ç»˜åœºæ™¯+èœå•æ¡†), çº¯æ¸¸æˆç”¨
+ *         *_full_redraw; fish ç”¨å±€éƒ¨æ¸…é™¤ã€‚æ³¨æ„èœå•æ€ä¸èƒ½ç”¨ *_full_redraw(d2048/klotski
+ *         åªç½® g_full_redraw è€Œ bg_redraw è¯» g_grid_dirty, ä¼šæ¼é‡ç»˜å¯¼è‡´çº¢è‰²æ®‹ç•™)ã€‚
  */
 static void main_restore_game_under_icon(void)
 {
@@ -986,16 +986,16 @@ static void main_restore_game_under_icon(void)
     }
 }
 /**
- * @brief  µÍµçÍ¼±êÃğ¶Îºó»Ö¸´ÆäÏÂ·½µ×²ãÄÚÈİ(°´Ä£Ê½/²Ëµ¥¸²¸Ç·ÖÅÉ)¡£
- * @note   °´ s_main_mode ·ÖÅÉ¸÷ÓÎÏ·/ÉèÖÃ»Ö¸´º¯Êı, Í¼±êÏÔÊ¾Ê±¸²¸ÇµÄ³¡¾°ĞèÓÉµ×²ãÖØ»æ»Ö¸´, ·ñÔòÁôºÚ/ºì²ĞÁô¡£
+ * @brief  ä½ç”µå›¾æ ‡ç­æ®µåæ¢å¤å…¶ä¸‹æ–¹åº•å±‚å†…å®¹(æŒ‰æ¨¡å¼/èœå•è¦†ç›–åˆ†æ´¾)ã€‚
+ * @note   æŒ‰ s_main_mode åˆ†æ´¾å„æ¸¸æˆ/è®¾ç½®æ¢å¤å‡½æ•°, å›¾æ ‡æ˜¾ç¤ºæ—¶è¦†ç›–çš„åœºæ™¯éœ€ç”±åº•å±‚é‡ç»˜æ¢å¤, å¦åˆ™ç•™é»‘/çº¢æ®‹ç•™ã€‚
  */
 static void main_lowbatt_restore_under_icon(void)
 {
     if (g_settings_from_game) {
-        /* ÉèÖÃÄ£Ê½(´ÓÓÎÏ·½øÈë): ÆÁÄ»ÏÔÊ¾ÉèÖÃ½çÃæ¶ø·ÇÓÎÏ·, »Ö¸´Ê±Ó¦ÖØ»æÉèÖÃ½çÃæ.
-           - ¶ş¼¶"ÉèÖÃÑ¡Ïî"Ìõ´ø¿É¼û, ÇÒÒÑ´ò¿ªÉèÖÃÒ³: ÏÈÖØ»æÉèÖÃÒ³ÔÙ»­Ìõ´ø(Ìõ´øÑ¹ÔÚÒ³ÉÏ);
-           - Ìõ´ø¿É¼ûµ«Î´´ò¿ªÉèÖÃÒ³: »Ö¸´ÓÎÏ·³¡¾°ÔÙ»­Ìõ´ø(Ìõ´øÑ¹ÔÚÓÎÏ·ÉÏ);
-           - ÉèÖÃÒ³ÏÔÊ¾: ÖØ»æÉèÖÃÒ³(ÕûÆÁÌî³ä, ¸²¸Çµç³ØÇø). */
+        /* è®¾ç½®æ¨¡å¼(ä»æ¸¸æˆè¿›å…¥): å±å¹•æ˜¾ç¤ºè®¾ç½®ç•Œé¢è€Œéæ¸¸æˆ, æ¢å¤æ—¶åº”é‡ç»˜è®¾ç½®ç•Œé¢.
+           - äºŒçº§"è®¾ç½®é€‰é¡¹"æ¡å¸¦å¯è§, ä¸”å·²æ‰“å¼€è®¾ç½®é¡µ: å…ˆé‡ç»˜è®¾ç½®é¡µå†ç”»æ¡å¸¦(æ¡å¸¦å‹åœ¨é¡µä¸Š);
+           - æ¡å¸¦å¯è§ä½†æœªæ‰“å¼€è®¾ç½®é¡µ: æ¢å¤æ¸¸æˆåœºæ™¯å†ç”»æ¡å¸¦(æ¡å¸¦å‹åœ¨æ¸¸æˆä¸Š);
+           - è®¾ç½®é¡µæ˜¾ç¤º: é‡ç»˜è®¾ç½®é¡µ(æ•´å±å¡«å……, è¦†ç›–ç”µæ± åŒº). */
         if (s_video_menu_visible) {
             if (s_settings_mode != SETTINGS_NONE) Settings_RedrawRegion();
             else main_restore_game_under_icon();
@@ -1004,8 +1004,8 @@ static void main_lowbatt_restore_under_icon(void)
         } else if (s_settings_mode != SETTINGS_NONE) {
             Settings_RedrawRegion();
         } else {
-            /* ÍÆÏä×Ó¶ş¼¶²Ëµ¥¸úÊÖ»¬³öÆÚ¼ä(s_video_menu_visible=0, ÎŞÉèÖÃÒ³):
-               ÆÁÄ»ÏÔÊ¾ÉèÖÃÌõ´ø+ÓÎÏ·, Í¹µãÔÚÌõ´øÍâ, ĞëÓÉÓÎÏ·»Ö¸´ */
+            /* æ¨ç®±å­äºŒçº§èœå•è·Ÿæ‰‹æ»‘å‡ºæœŸé—´(s_video_menu_visible=0, æ— è®¾ç½®é¡µ):
+               å±å¹•æ˜¾ç¤ºè®¾ç½®æ¡å¸¦+æ¸¸æˆ, å‡¸ç‚¹åœ¨æ¡å¸¦å¤–, é¡»ç”±æ¸¸æˆæ¢å¤ */
             main_restore_game_under_icon();
         }
         return;
@@ -1013,16 +1013,16 @@ static void main_lowbatt_restore_under_icon(void)
     main_restore_game_under_icon();
 }
 /**
- * @brief  µçÁ¿0¼¶Ê±µÍÆµÉÁË¸µÍµçÍ¼±ê: Ãğ2ÃëÁÁ1Ãë
- * @note   ½ö4ÖÖÓÎÏ·Ä£Ê½ÓĞĞ§, BAT_LEVEL_0Ê±´¥·¢
- *         ÉÁË¸Ê±µş¼ÓLowBatteryÍ¼±ê, SPIÕ¼ÓÃÊ±¿ÉÄÜ²úÉúËºÁÑ
+ * @brief  ç”µé‡0çº§æ—¶ä½é¢‘é—ªçƒä½ç”µå›¾æ ‡: ç­2ç§’äº®1ç§’
+ * @note   ä»…4ç§æ¸¸æˆæ¨¡å¼æœ‰æ•ˆ, BAT_LEVEL_0æ—¶è§¦å‘
+ *         é—ªçƒæ—¶å åŠ LowBatteryå›¾æ ‡, SPIå ç”¨æ—¶å¯èƒ½äº§ç”Ÿæ’•è£‚
  */
 
-/* ÁÁÆÁ¶ÎÀï²¹»­µÍµçÍ¼±êµÄ×îĞ¡¼ä¸ô(us)¡£
-   Ô­À´ÁÁ¶ÎÄÚ"Ã¿Ö¡"¶¼ÖØ»­, ¶øÒ»´Î overlay ÊÇ 7 ´ÎÌî³ä(Ô¼ 2.2K ÏñËØ¡¢´¿ CPU ÖğÏñËØĞ´),
-   60fps ÏÂÃ¿ÃëÒª³ÔµôÔ¼ 36ms Ö¡Ê±¼ä ¡ª¡ª ²Ëµ¥»¬¶¯(Ã¿Ö¡2px)¡¢·½¿éÈí½µ(Ã¿Ö¡1¸ñ)ÕâÀà
-   "°´Ö¡¼ÆËÙ¶È"µÄ¶¯»­»áÃ÷ÏÔ±äÂı¡£ÓÎÏ·»­ÃæÖ»ÔÚ×´Ì¬±ä»¯Ê±ÖØ»æ, 100ms(Ô¼6Ö¡)²¹Ò»´Î×ã¹»¸úÉÏ¡£
-   ¡ï ²Ëµ¥³¡¾°²»ĞèÒªÕâÀï²¹: Ìõ´øäÖÈ¾»á°´ g_lowbatt_showing ÓÃ lmbat_strip °Ñµç³ØĞĞ»­½øÈ¥¡£ */
+/* äº®å±æ®µé‡Œè¡¥ç”»ä½ç”µå›¾æ ‡çš„æœ€å°é—´éš”(us)ã€‚
+   åŸæ¥äº®æ®µå†…"æ¯å¸§"éƒ½é‡ç”», è€Œä¸€æ¬¡ overlay æ˜¯ 7 æ¬¡å¡«å……(çº¦ 2.2K åƒç´ ã€çº¯ CPU é€åƒç´ å†™),
+   60fps ä¸‹æ¯ç§’è¦åƒæ‰çº¦ 36ms å¸§æ—¶é—´ â€”â€” èœå•æ»‘åŠ¨(æ¯å¸§2px)ã€æ–¹å—è½¯é™(æ¯å¸§1æ ¼)è¿™ç±»
+   "æŒ‰å¸§è®¡é€Ÿåº¦"çš„åŠ¨ç”»ä¼šæ˜æ˜¾å˜æ…¢ã€‚æ¸¸æˆç”»é¢åªåœ¨çŠ¶æ€å˜åŒ–æ—¶é‡ç»˜, 100ms(çº¦6å¸§)è¡¥ä¸€æ¬¡è¶³å¤Ÿè·Ÿä¸Šã€‚
+   â˜… èœå•åœºæ™¯ä¸éœ€è¦è¿™é‡Œè¡¥: æ¡å¸¦æ¸²æŸ“ä¼šæŒ‰ g_lowbatt_showing ç”¨ lmbat_strip æŠŠç”µæ± è¡Œç”»è¿›å»ã€‚ */
 #define LOWBATT_OVERLAY_REDRAW_US  100000UL
 
 static void Main_FlashLowBattery(void)
@@ -1031,7 +1031,7 @@ static void Main_FlashLowBattery(void)
     static uint32_t s_flash_tick = 0;
     static uint32_t s_overlay_tick = 0;
 
-    /* ·ÇÓÎÏ·Ä£Ê½¹Ø±ÕÉÁË¸ */
+    /* éæ¸¸æˆæ¨¡å¼å…³é—­é—ªçƒ */
     if (s_main_mode == MAIN_MODE_VIDEO || s_main_mode == MAIN_MODE_MENU) {
         s_flash_on = 0;
         g_lowbatt_showing = 0;
@@ -1047,16 +1047,16 @@ static void Main_FlashLowBattery(void)
     uint32_t now = GetTimerCount();
 
     if (s_flash_on) {
-        /* ÁÁÆÁ¶Î£¬³ÖĞø1Ãë */
+        /* äº®å±æ®µï¼ŒæŒç»­1ç§’ */
         if ((uint32_t)(now - s_flash_tick) >= 1000000UL) {
             s_flash_on = 0;
             s_flash_tick = now;
-            /* ÃğÆÁÊ±¶Î(On->Off): »Ö¸´±»µÍµçÍ¼±ê¸²¸ÇµÄµ×²ãÄÚÈİ(³¡¾°+µ±Ç°²Ëµ¥¿ò) */
+            /* ç­å±æ—¶æ®µ(On->Off): æ¢å¤è¢«ä½ç”µå›¾æ ‡è¦†ç›–çš„åº•å±‚å†…å®¹(åœºæ™¯+å½“å‰èœå•æ¡†) */
             g_lowbatt_showing = 0;
             main_lowbatt_restore_under_icon();
         } else {
-            /* "Í¼±êÔÚÏÔÊ¾"Õâ¸ö±ê¼Ç±ØĞëÃ¿Ö¡Î¬³Ö(²Ëµ¥Ìõ´ø¾İ´Ë²¹»­µç³ØĞĞ),
-               µ«ÖØ»­±¾Éí°´¼ä¸ô×ö: ÓÎÏ·ÖØ»æ»á¸ÇµôÍ¼±ê, ²¹Ì«¶àÖ¡¾Í°×³ÔÖ¡Ê±¼ä */
+            /* "å›¾æ ‡åœ¨æ˜¾ç¤º"è¿™ä¸ªæ ‡è®°å¿…é¡»æ¯å¸§ç»´æŒ(èœå•æ¡å¸¦æ®æ­¤è¡¥ç”»ç”µæ± è¡Œ),
+               ä½†é‡ç”»æœ¬èº«æŒ‰é—´éš”åš: æ¸¸æˆé‡ç»˜ä¼šç›–æ‰å›¾æ ‡, è¡¥å¤ªå¤šå¸§å°±ç™½åƒå¸§æ—¶é—´ */
             g_lowbatt_showing = 1;
             if ((uint32_t)(now - s_overlay_tick) >= LOWBATT_OVERLAY_REDRAW_US) {
                 LCD_ShowLowBatteryOverlay();
@@ -1064,12 +1064,12 @@ static void Main_FlashLowBattery(void)
             }
         }
     } else {
-        /* ÃğÆÁ¶Î£¬³ÖĞø2Ãë */
+        /* ç­å±æ®µï¼ŒæŒç»­2ç§’ */
         g_lowbatt_showing = 0;
         if ((uint32_t)(now - s_flash_tick) >= 2000000UL) {
             s_flash_on = 1;
             s_flash_tick = now;
-            /* ¸Õ½øÁÁ¶ÎÁ¢¼´»­Ò»´Î, ²»ÓÃµÈ¼ä¸ôµ½ÆÚ */
+            /* åˆšè¿›äº®æ®µç«‹å³ç”»ä¸€æ¬¡, ä¸ç”¨ç­‰é—´éš”åˆ°æœŸ */
             LCD_ShowLowBatteryOverlay();
             s_overlay_tick = now;
         }
@@ -1077,20 +1077,20 @@ static void Main_FlashLowBattery(void)
 }
 
 /**
- * @brief  ÊÓÆµÉÏ»®²Ëµ¥ÊÇ·ñ»îÔ¾
+ * @brief  è§†é¢‘ä¸Šåˆ’èœå•æ˜¯å¦æ´»è·ƒ
  */
 static uint8_t VideoMenu_IsActive(void) {
     return s_video_menu_dragging || vm_sliding || s_video_menu_visible;
 }
 
 /**
- * @brief  ÊÓÆµÉÏ»®²Ëµ¥Í³Ò»ÂÖÑ¯+»æÖÆ (ÊÓÆµÄ£Ê½ºÍÓÎÏ·Ä£Ê½¹²ÓÃ)
- * @param  ts             µ±Ç°´¥Ãş×´Ì¬
- * @param  is_video_mode  ÊÇ·ñÎªÊÓÆµÄ£Ê½ (¾ö¶¨need_clearÊ±ÊÇ·ñ²¥Ö¡)
+ * @brief  è§†é¢‘ä¸Šåˆ’èœå•ç»Ÿä¸€è½®è¯¢+ç»˜åˆ¶ (è§†é¢‘æ¨¡å¼å’Œæ¸¸æˆæ¨¡å¼å…±ç”¨)
+ * @param  ts             å½“å‰è§¦æ‘¸çŠ¶æ€
+ * @param  is_video_mode  æ˜¯å¦ä¸ºè§†é¢‘æ¨¡å¼ (å†³å®šneed_clearæ—¶æ˜¯å¦æ’­å¸§)
  */
 static void VideoMenu_Update(const TouchState *ts, uint8_t is_video_mode)
 {
-    /* ¼ì²âÉÏ»®ÊÖÊÆ´¥·¢ (ÉèÖÃÄ£Ê½ÏÂ½öµ×²¿ÔÊĞí) */
+    /* æ£€æµ‹ä¸Šåˆ’æ‰‹åŠ¿è§¦å‘ (è®¾ç½®æ¨¡å¼ä¸‹ä»…åº•éƒ¨å…è®¸) */
     if (!s_video_menu_dragging && !vm_sliding && !s_video_menu_visible
         && (s_settings_mode == SETTINGS_NONE || s_touch_started_bottom)) {
         if (video_menu_swipe_up_poll(ts, &vm_touch_down,
@@ -1100,7 +1100,7 @@ static void VideoMenu_Update(const TouchState *ts, uint8_t is_video_mode)
             s_video_menu_drag_start_y = vm_start_y;
             vm_touch_down = 0;
             if (is_video_mode && (s_menu_dragging || s_menu_sliding)) {
-                /* ÓĞÖ÷²Ëµ¥¸²¸ÇĞèÖØ»æ, ÊÓÆµÖ¡Ìî³ä±³¾°(±ÜÃâºÚÆÁ) */
+                /* æœ‰ä¸»èœå•è¦†ç›–éœ€é‡ç»˜, è§†é¢‘å¸§å¡«å……èƒŒæ™¯(é¿å…é»‘å±) */
                 uint8_t  save_bank  = next_bank;
                 uint16_t save_higvh = next_higvh;
                 uint16_t save_high  = next_high;
@@ -1115,7 +1115,7 @@ static void VideoMenu_Update(const TouchState *ts, uint8_t is_video_mode)
             s_menu_sliding = 0;
         }
     }
-    /* ÍÏ×§¸úÊÖ, È¡ÏûÊ±ÖØĞÂ¼ÓÔØÊÓÆµµÚÒ»Ö¡ÍêÕû¸²¸Ç */
+    /* æ‹–æ‹½è·Ÿæ‰‹, å–æ¶ˆæ—¶é‡æ–°åŠ è½½è§†é¢‘ç¬¬ä¸€å¸§å®Œæ•´è¦†ç›– */
     if (s_video_menu_dragging) {
         uint8_t poll_ret = video_menu_drag_poll(&s_video_menu_slide_y,
                                                  s_video_menu_drag_start_y,
@@ -1130,7 +1130,7 @@ static void VideoMenu_Update(const TouchState *ts, uint8_t is_video_mode)
             }
         }
     }
-    /* ËÉÊÖºó»Øµ¯µ½×îÖÕÎ»ÖÃ */
+    /* æ¾æ‰‹åå›å¼¹åˆ°æœ€ç»ˆä½ç½® */
     else if (vm_sliding) {
         s_video_menu_slide_y -= MENU_SLIDE_SPEED;
         if (s_video_menu_slide_y <= VIDEO_MENU_Y5) {
@@ -1144,12 +1144,12 @@ static void VideoMenu_Update(const TouchState *ts, uint8_t is_video_mode)
 }
 
 /**
- * @brief  ´ÓÓÎÏ·"¶ş´ÎÉÏ»®"½øÈëÉèÖÃ²Ëµ¥²¢¸úÊÖ»¬³ö (ÍÆÏä×ÓÓÃ)
- * @param  start_y  ´¥ÃşÆğµãY (ÉÏ»®ÊÖÊÆµÄ°´ÏÂÆğÊ¼Î»ÖÃ)
- * @note   ¸´ÓÃ VideoMenu_Update µÄ¸úÊÖÍÏ×§×´Ì¬»ú: ÖÃ s_video_menu_dragging=1,
- *         s_video_menu_slide_y ´Óµ×²¿(VIDEO_MENU_Y5+VIDEO_MENU_H5)¿ªÊ¼, Ëæºó
- *         Ã¿Ö¡ÓÉ video_menu_drag_poll ÒÀ¾İÊÖÖ¸Î»ÒÆÍùÉÏ¸úÊÖ»¬³ö, ËÉÊÖ»¬µ½¶¥²¿¡£
- *         Óë¾²Ö¹µÄ menu_enter_game_settings() Çø±ğ: ºóÕßÖ±½ÓÏÔÊ¾, ÎŞ¸úÊÖ¶¯»­¡£
+ * @brief  ä»æ¸¸æˆ"äºŒæ¬¡ä¸Šåˆ’"è¿›å…¥è®¾ç½®èœå•å¹¶è·Ÿæ‰‹æ»‘å‡º (æ¨ç®±å­ç”¨)
+ * @param  start_y  è§¦æ‘¸èµ·ç‚¹Y (ä¸Šåˆ’æ‰‹åŠ¿çš„æŒ‰ä¸‹èµ·å§‹ä½ç½®)
+ * @note   å¤ç”¨ VideoMenu_Update çš„è·Ÿæ‰‹æ‹–æ‹½çŠ¶æ€æœº: ç½® s_video_menu_dragging=1,
+ *         s_video_menu_slide_y ä»åº•éƒ¨(VIDEO_MENU_Y5+VIDEO_MENU_H5)å¼€å§‹, éšå
+ *         æ¯å¸§ç”± video_menu_drag_poll ä¾æ®æ‰‹æŒ‡ä½ç§»å¾€ä¸Šè·Ÿæ‰‹æ»‘å‡º, æ¾æ‰‹æ»‘åˆ°é¡¶éƒ¨ã€‚
+ *         ä¸é™æ­¢çš„ menu_enter_game_settings() åŒºåˆ«: åè€…ç›´æ¥æ˜¾ç¤º, æ— è·Ÿæ‰‹åŠ¨ç”»ã€‚
  */
 void menu_enter_game_settings_swipe(uint16_t start_y)
 {
@@ -1162,19 +1162,19 @@ void menu_enter_game_settings_swipe(uint16_t start_y)
 }
 
 /**
- * @brief  ´ÓÓÎÏ·½øÈëÉèÖÃµÄÍ¨ÓÃ´¦Àí: ²Ëµ¥»æÖÆ/ÉèÖÃÒ³Ãæ¸üĞÂ/·µ»ØÓÎÏ·
- * @note   ½öÔÚ g_settings_from_game != MAIN_MODE_VIDEO Ê±ÉúĞ§
+ * @brief  ä»æ¸¸æˆè¿›å…¥è®¾ç½®çš„é€šç”¨å¤„ç†: èœå•ç»˜åˆ¶/è®¾ç½®é¡µé¢æ›´æ–°/è¿”å›æ¸¸æˆ
+ * @note   ä»…åœ¨ g_settings_from_game != MAIN_MODE_VIDEO æ—¶ç”Ÿæ•ˆ
  */
 static void GameSettings_Update(void)
 {
-    /* Ìõ´ø¾²Ö¹Ì¬È¥¶¶: ½öÔÚ»¬¶¯¶¯»­(Î»ÖÃ±ä»¯)»ò¸Õ±ä¿É¼ûÊ±ÖØ»æ, ±ÜÃâÃ¿Ö¡È«·ùÖØ»æ
-       ÓëµÍµçÍ¼±êÉÁË¸Õù¶á(µ¼ÖÂ²Ëµ¥ÓëºìÉ«Í¼±ê·É¿ì½»ÌæÉÁË¸)¡£ÓëÓÎÏ·²Ëµ¥±£³Ö¾²Ì¬,
-       µÍµçÍ¼±ê²ÅÄÜÕı³£¼¸ÃëÉÁÒ»´Î¡£Àë¿ªÉèÖÃÊ±¸´Î», ±£Ö¤ÏÂ´Î½øÈëÇ¿ÖÆÊ×¸öÖØ»æ¡£ */
+    /* æ¡å¸¦é™æ­¢æ€å»æŠ–: ä»…åœ¨æ»‘åŠ¨åŠ¨ç”»(ä½ç½®å˜åŒ–)æˆ–åˆšå˜å¯è§æ—¶é‡ç»˜, é¿å…æ¯å¸§å…¨å¹…é‡ç»˜
+       ä¸ä½ç”µå›¾æ ‡é—ªçƒäº‰å¤º(å¯¼è‡´èœå•ä¸çº¢è‰²å›¾æ ‡é£å¿«äº¤æ›¿é—ªçƒ)ã€‚ä¸æ¸¸æˆèœå•ä¿æŒé™æ€,
+       ä½ç”µå›¾æ ‡æ‰èƒ½æ­£å¸¸å‡ ç§’é—ªä¸€æ¬¡ã€‚ç¦»å¼€è®¾ç½®æ—¶å¤ä½, ä¿è¯ä¸‹æ¬¡è¿›å…¥å¼ºåˆ¶é¦–ä¸ªé‡ç»˜ã€‚ */
     static int16_t s_strip_prev_y = -1;
     static uint8_t s_strip_prev_vis = 0;
-    /* ÉÏÒ»Ö¡ÊÇ·ñÔÚÏÔÊ¾"ÉèÖÃÒ³"(ÕûÆÁ»æÖÆ; ¶ş¼¶²Ëµ¥Ìõ´øÑ¹ÔÚËüÉÏÃæÊ±Ò²Ëã):
-       Àë¿ªÊ±ÓÃËüÔÚ"ÕûÆÁ»Ö¸´"ºÍ"Ö»ÇåÌõ´øÇø"Ö®¼ä¶şÑ¡Ò» ¡ª¡ª ±¾Ö¡µã"·µ»Ø"Ê±
-       s_settings_mode ÒÑ¾­±»Çå³É NONE, ËùÒÔÖ»ÄÜÓÃÉÏÒ»Ö¡µÄ×´Ì¬ÅĞ¶Ï¡£ */
+    /* ä¸Šä¸€å¸§æ˜¯å¦åœ¨æ˜¾ç¤º"è®¾ç½®é¡µ"(æ•´å±ç»˜åˆ¶; äºŒçº§èœå•æ¡å¸¦å‹åœ¨å®ƒä¸Šé¢æ—¶ä¹Ÿç®—):
+       ç¦»å¼€æ—¶ç”¨å®ƒåœ¨"æ•´å±æ¢å¤"å’Œ"åªæ¸…æ¡å¸¦åŒº"ä¹‹é—´äºŒé€‰ä¸€ â€”â€” æœ¬å¸§ç‚¹"è¿”å›"æ—¶
+       s_settings_mode å·²ç»è¢«æ¸…æˆ NONE, æ‰€ä»¥åªèƒ½ç”¨ä¸Šä¸€å¸§çš„çŠ¶æ€åˆ¤æ–­ã€‚ */
     static uint8_t s_page_open = 0;
 
     if (!g_settings_from_game) {
@@ -1183,20 +1183,20 @@ static void GameSettings_Update(void)
         return;
     }
 
-    if (g_menu_cooldown > 0) g_menu_cooldown--;  /* ÉèÖÃ²Ëµ¥ÏÂ»¬¹Ø±Õ·ÀÖØ¸´´¥·¢ÀäÈ´ */
+    if (g_menu_cooldown > 0) g_menu_cooldown--;  /* è®¾ç½®èœå•ä¸‹æ»‘å…³é—­é˜²é‡å¤è§¦å‘å†·å´ */
 
     VideoMenu_Update(&ts, 0);
 
-    /* ÉèÖÃÒ³Ãæ: ¶¥²¿ÏÂ»¬´¥·¢ÍË³ö²Ëµ¥(ÓÎÏ·ÇĞ»») */
+    /* è®¾ç½®é¡µé¢: é¡¶éƒ¨ä¸‹æ»‘è§¦å‘é€€å‡ºèœå•(æ¸¸æˆåˆ‡æ¢) */
     {
         static uint8_t  gs_t_dn;
         static uint16_t gs_sy;
-        static uint8_t  gs_rel_db;  /* ÊÍ·Å·À¶¶: ±ÜÃâµ¥Ö¡¶ª´¥ÃşÖØÖÃ×·×Ù */
+        static uint8_t  gs_rel_db;  /* é‡Šæ”¾é˜²æŠ–: é¿å…å•å¸§ä¸¢è§¦æ‘¸é‡ç½®è¿½è¸ª */
         if (!s_video_menu_dragging && !vm_sliding
             && (s_video_menu_visible || s_settings_mode != SETTINGS_NONE)) {
             if (!ts.pressed) {
                 if (gs_t_dn && ++gs_rel_db < 2) {
-                    /* ·À¶¶: µ¥Ö¡¶ª´¥Ãş²»ÖØÖÃ, µÈ´ıÏÂÒ»Ö¡È·ÈÏ */
+                    /* é˜²æŠ–: å•å¸§ä¸¢è§¦æ‘¸ä¸é‡ç½®, ç­‰å¾…ä¸‹ä¸€å¸§ç¡®è®¤ */
                 } else {
                     gs_t_dn = 0;
                     gs_rel_db = 0;
@@ -1212,12 +1212,12 @@ static void GameSettings_Update(void)
                     s_video_menu_visible = 0;
                     s_settings_mode = SETTINGS_NONE;
                     if (was_strip) {
-                        /* ¶ş¼¶ÉèÖÃÌõ´øÑ¹ÔÚÓÎÏ·ÉÏ: Ö»ÇåÌõ´øÇø(Ìõ´øÇøÍâÓÎÏ·³¡¾°±£Áô),
-                           ²Î¿¼Ò»¼¶²Ëµ¥ÇĞ»»/·µ»ØÓÎÏ·×ö·¨, ²»ÕûÆÁË¢ºÚ(·ñÔòÓÎÏ·³¡¾°¶ªÊ§¡úºÚÉÁÒ»Ö¡) */
+                        /* äºŒçº§è®¾ç½®æ¡å¸¦å‹åœ¨æ¸¸æˆä¸Š: åªæ¸…æ¡å¸¦åŒº(æ¡å¸¦åŒºå¤–æ¸¸æˆåœºæ™¯ä¿ç•™),
+                           å‚è€ƒä¸€çº§èœå•åˆ‡æ¢/è¿”å›æ¸¸æˆåšæ³•, ä¸æ•´å±åˆ·é»‘(å¦åˆ™æ¸¸æˆåœºæ™¯ä¸¢å¤±â†’é»‘é—ªä¸€å¸§) */
                         LCD_Fill_DMA(VIDEO_MENU_X, VIDEO_MENU_Y5,
                                      VIDEO_MENU_X + VIDEO_MENU_W, 240, g_menu_clear_color);
                     } else {
-                        LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);  /* ÉèÖÃÒ³ÕûÆÁ: ĞèÇåÆÁ */
+                        LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);  /* è®¾ç½®é¡µæ•´å±: éœ€æ¸…å± */
                     }
                     g_settings_from_game = 0;
                     g_game_enter_exit_menu = 1;
@@ -1232,13 +1232,13 @@ static void GameSettings_Update(void)
         }
     }
 
-    /* ÖĞ¼ä/µ×²¿ÇøÓòÏÂ»¬ ¡ú ¹Ø±Õ¶ş¼¶"ÉèÖÃÑ¡Ïî"²Ëµ¥·µ»ØÓÎÏ· (ÓëËÄÓÎÏ·ÖØ²ËÏÂ»¬·µ»ØÒ»ÖÂ)
-       ½ö×÷ÓÃÓÚÉèÖÃÑ¡Ïî²Ëµ¥(·ÇÉèÖÃÒ³); ÖÃ s_video_menu_visible=0 ºó²» return,
-       Á¢¼´ÂäÈëÏÂ·½»æÖÆ·ÖÖ§ÇåÌõ´ø+ÖØ»æÓÎÏ·, ±ÜÃâÉÁÆÁ¡£ */
+    /* ä¸­é—´/åº•éƒ¨åŒºåŸŸä¸‹æ»‘ â†’ å…³é—­äºŒçº§"è®¾ç½®é€‰é¡¹"èœå•è¿”å›æ¸¸æˆ (ä¸å››æ¸¸æˆé‡èœä¸‹æ»‘è¿”å›ä¸€è‡´)
+       ä»…ä½œç”¨äºè®¾ç½®é€‰é¡¹èœå•(éè®¾ç½®é¡µ); ç½® s_video_menu_visible=0 åä¸ return,
+       ç«‹å³è½å…¥ä¸‹æ–¹ç»˜åˆ¶åˆ†æ”¯æ¸…æ¡å¸¦+é‡ç»˜æ¸¸æˆ, é¿å…é—ªå±ã€‚ */
     if (s_video_menu_visible && s_settings_mode == SETTINGS_NONE
         && !s_video_menu_dragging && !vm_sliding
         && game_menu_swipe_mid_down_close(MENU_SWIPE_START_Y, MENU_SWIPE_TRIGGER_DIST)) {
-        game_menu_fix_release_after_close();  /* ÏÂ»¬¹Ø±Õ»ØÓÎÏ·, ËÉÊÖ²»´«ÈëÓÎÏ· */
+        game_menu_fix_release_after_close();  /* ä¸‹æ»‘å…³é—­å›æ¸¸æˆ, æ¾æ‰‹ä¸ä¼ å…¥æ¸¸æˆ */
         s_video_menu_visible = 0;
         s_settings_mode = SETTINGS_NONE;
     }
@@ -1246,19 +1246,19 @@ static void GameSettings_Update(void)
     int16_t strip_now_y = s_video_menu_slide_y;
 
     if (s_video_menu_visible) {
-        if (!s_strip_prev_vis) s_strip_prev_y = -1;  /* ¸Õ±ä¿É¼û: Ç¿ÖÆÊ×¸öÖØ»æ */
+        if (!s_strip_prev_vis) s_strip_prev_y = -1;  /* åˆšå˜å¯è§: å¼ºåˆ¶é¦–ä¸ªé‡ç»˜ */
         if (s_settings_mode == SETTINGS_NONE
             && s_strip_prev_y != strip_now_y) {
             s_strip_prev_y = strip_now_y;
             menu_draw_nrow_frame_only(strip_now_y,
                                        g_video_menu_row_types, 5);
         }
-        if (s_settings_mode != SETTINGS_NONE) s_page_open = 1;  /* ÉèÖÃÒ³ÈÔÔÚÌõ´øÏÂ(ÕûÆÁÄÚÈİ) */
+        if (s_settings_mode != SETTINGS_NONE) s_page_open = 1;  /* è®¾ç½®é¡µä»åœ¨æ¡å¸¦ä¸‹(æ•´å±å†…å®¹) */
         s_strip_prev_vis = 1;
     } else {
         s_strip_prev_vis = 0;
         s_strip_prev_y = -1;
-        /* ¸úÊÖÍÏ×§/»Ø»¬ÆÚ¼äÓÉ VideoMenu_Update »æÖÆ, ²»µÃÎóÅĞÎª"ÍË³öÉèÖÃ" */
+        /* è·Ÿæ‰‹æ‹–æ‹½/å›æ»‘æœŸé—´ç”± VideoMenu_Update ç»˜åˆ¶, ä¸å¾—è¯¯åˆ¤ä¸º"é€€å‡ºè®¾ç½®" */
         if (s_video_menu_dragging || vm_sliding)
             return;
 
@@ -1267,23 +1267,23 @@ static void GameSettings_Update(void)
             IWDG_ReloadCounter();
             Settings_Update();
         } else {
-            uint8_t page_closed = s_page_open;   /* 1=¸Õ´ÓÉèÖÃÒ³·µ»Ø(²»Ö»ÊÇÍË³ö¶ş¼¶²Ëµ¥) */
+            uint8_t page_closed = s_page_open;   /* 1=åˆšä»è®¾ç½®é¡µè¿”å›(ä¸åªæ˜¯é€€å‡ºäºŒçº§èœå•) */
             s_page_open = 0;
             g_settings_from_game = 0;
             if (page_closed) {
-                /* ´Ó"ÉèÖÃÒ³"·µ»ØÓÎÏ·: ÉèÖÃÒ³ÊÇÕûÆÁ»æÖÆµÄ, Ò³ÃæÉÏÓĞĞ©ÔªËØ»­ÔÚ¶ş¼¶²Ëµ¥Ìõ´øÇø
-                   ÒÔÍâ(ÈçÓïÑÔÒ³×ó²àÄÇ¸öÂÌÉ«Ñ¡ÖĞ·½¿é x=28~40, »¹ÓĞ·µ»Ø¼ü), Ö»ÇåÌõ´øÇø»áÁôÏÂ
-                   ²ĞÓ° ¡ú ÕûÆÁÓÃÓÎÏ·±³¾°É«ÇåÒ»´Î, ÔÙÓÉÏÂ·½¸÷ÓÎÏ·Õû·ù»Ö¸´¡£
-                   ·µ»Ø¼üÔÚ´Ë´¦ËÉ¿ª(ts.pressed==0), Òò´Ë update() ÔÚÊÖÊÆ²ãÃæÊÇ°²È«µÄÎŞ²Ù×÷¡£ */
+                /* ä»"è®¾ç½®é¡µ"è¿”å›æ¸¸æˆ: è®¾ç½®é¡µæ˜¯æ•´å±ç»˜åˆ¶çš„, é¡µé¢ä¸Šæœ‰äº›å…ƒç´ ç”»åœ¨äºŒçº§èœå•æ¡å¸¦åŒº
+                   ä»¥å¤–(å¦‚è¯­è¨€é¡µå·¦ä¾§é‚£ä¸ªç»¿è‰²é€‰ä¸­æ–¹å— x=28~40, è¿˜æœ‰è¿”å›é”®), åªæ¸…æ¡å¸¦åŒºä¼šç•™ä¸‹
+                   æ®‹å½± â†’ æ•´å±ç”¨æ¸¸æˆèƒŒæ™¯è‰²æ¸…ä¸€æ¬¡, å†ç”±ä¸‹æ–¹å„æ¸¸æˆæ•´å¹…æ¢å¤ã€‚
+                   è¿”å›é”®åœ¨æ­¤å¤„æ¾å¼€(ts.pressed==0), å› æ­¤ update() åœ¨æ‰‹åŠ¿å±‚é¢æ˜¯å®‰å…¨çš„æ— æ“ä½œã€‚ */
                 LCD_Fill(0, 0, LCD_W, LCD_H, g_menu_clear_color);
             } else {
-                /* Ö»ÊÇ¶ş¼¶"ÉèÖÃÑ¡Ïî"²Ëµ¥·µ»ØÓÎÏ·: ³¡¾°¾ÍÔÚÌõ´øºóÃæ, Ö»ÇåÌõ´øÇø,
-                   ²»ÕûÆÁË¢ºÚ(ÄÇ»áÔì³ÉÒ»Ö¡ºÚÉÁ)¡£ */
+                /* åªæ˜¯äºŒçº§"è®¾ç½®é€‰é¡¹"èœå•è¿”å›æ¸¸æˆ: åœºæ™¯å°±åœ¨æ¡å¸¦åé¢, åªæ¸…æ¡å¸¦åŒº,
+                   ä¸æ•´å±åˆ·é»‘(é‚£ä¼šé€ æˆä¸€å¸§é»‘é—ª)ã€‚ */
                 LCD_Fill_DMA(VIDEO_MENU_X, VIDEO_MENU_Y5,
                              VIDEO_MENU_X + VIDEO_MENU_W, 240, g_menu_clear_color);
             }
             if (s_main_mode == MAIN_MODE_SOKOBAN) {
-                /* ÍÆÏä×ÓµÄµØÍ¼¿ÉÄÜ¿çµ½Ìõ´øÇøÉÏ·½, ÕûÆÁÇå¹ıÖ®ºó±ØĞëÕû·ùÖØ»­ */
+                /* æ¨ç®±å­çš„åœ°å›¾å¯èƒ½è·¨åˆ°æ¡å¸¦åŒºä¸Šæ–¹, æ•´å±æ¸…è¿‡ä¹‹åå¿…é¡»æ•´å¹…é‡ç”» */
                 if (page_closed) sokoban_menu_settings_restore_full();
                 else sokoban_menu_settings_restore();
             }
@@ -1296,15 +1296,15 @@ static void GameSettings_Update(void)
 }
 
 /**
- * @brief  »î¶¯Ä£Ê½¸üĞÂ: ²Ëµ¥/ÓÎÏ·/ÊÓÆµÖ÷Ñ­»·´¦Àí
- * @param  charging_game_saved ³äµçÊ±ÓÎÏ·ÒÑ´æµµ±êÖ¾
+ * @brief  æ´»åŠ¨æ¨¡å¼æ›´æ–°: èœå•/æ¸¸æˆ/è§†é¢‘ä¸»å¾ªç¯å¤„ç†
+ * @param  charging_game_saved å……ç”µæ—¶æ¸¸æˆå·²å­˜æ¡£æ ‡å¿—
  */
-/* Í³Ò»ÓÎÏ·Ö÷Ñ­»··ÖÖ§: Ê×´Î½øÈëÉèÖÃ±³¹â+init, ½øÉèÖÃ(g_settings_from_game)Ê±Ìø¹ıË¢ĞÂ
-   (ÓÉ GameSettings_Update ´¦ÀíÉèÖÃ½çÃæ); update ·µ»ØµÄÇĞ»»ÃüÁî½»¸ø game_handle_ret */
+/* ç»Ÿä¸€æ¸¸æˆä¸»å¾ªç¯åˆ†æ”¯: é¦–æ¬¡è¿›å…¥è®¾ç½®èƒŒå…‰+init, è¿›è®¾ç½®(g_settings_from_game)æ—¶è·³è¿‡åˆ·æ–°
+   (ç”± GameSettings_Update å¤„ç†è®¾ç½®ç•Œé¢); update è¿”å›çš„åˆ‡æ¢å‘½ä»¤äº¤ç»™ game_handle_ret */
 /**
- * @brief  Í³Ò»ÓÎÏ·Ö÷Ñ­»··ÖÖ§: Ê×´Î½øÈëÉè±³¹â+init, ÉèÖÃÄ£Ê½(g_settings_from_game)Ìø¹ıË¢ĞÂ, ¸üĞÂÃüÁî½» game_handle_ret¡£
- * @param  init_fn   ÓÎÏ·³õÊ¼»¯º¯Êı
- * @param  update_fn ÓÎÏ·Ã¿Ö¡¸üĞÂº¯Êı
+ * @brief  ç»Ÿä¸€æ¸¸æˆä¸»å¾ªç¯åˆ†æ”¯: é¦–æ¬¡è¿›å…¥è®¾èƒŒå…‰+init, è®¾ç½®æ¨¡å¼(g_settings_from_game)è·³è¿‡åˆ·æ–°, æ›´æ–°å‘½ä»¤äº¤ game_handle_retã€‚
+ * @param  init_fn   æ¸¸æˆåˆå§‹åŒ–å‡½æ•°
+ * @param  update_fn æ¸¸æˆæ¯å¸§æ›´æ–°å‡½æ•°
  */
 static void main_run_game(void (*init_fn)(void), uint8_t (*update_fn)(void))
 {
@@ -1312,9 +1312,9 @@ static void main_run_game(void (*init_fn)(void), uint8_t (*update_fn)(void))
         LCD_Backlight_PWM_SetDuty(g_brightness);
         init_fn();
         s_game_inited = 1;
-        /* ´Ó²Ëµ¥µã½øÓÎÏ·Ê±, ÊÖÖ¸ÍùÍù»¹°´ÔÚÆÁÉÏ(²Ëµ¥Ïî¶àÔÚÖĞÏÂ²¿, ÕıºÃÂäÔÚ"ÉÏ»®ÖØ¿ª²Ëµ¥"
-           µÄÅĞ¶¨Çø)¡£Èô²»ÀäÈ´, ÕâÍ¬Ò»´Î´¥Ãş»á±»µ±³ÉÓÎÏ·ÄÚµÄÆğÊÖ ¡ú Ò»½øÓÎÏ·¾Íµ¯³öÉÏ»®²Ëµ¥¡£
-           ÕâÀï¸ø²Ëµ¥ÊÖÊÆÒ»µãÀäÈ´Ê±¼ä, µÈÕâÒ»´Î´¥Ãş½áÊø¡£ */
+        /* ä»èœå•ç‚¹è¿›æ¸¸æˆæ—¶, æ‰‹æŒ‡å¾€å¾€è¿˜æŒ‰åœ¨å±ä¸Š(èœå•é¡¹å¤šåœ¨ä¸­ä¸‹éƒ¨, æ­£å¥½è½åœ¨"ä¸Šåˆ’é‡å¼€èœå•"
+           çš„åˆ¤å®šåŒº)ã€‚è‹¥ä¸å†·å´, è¿™åŒä¸€æ¬¡è§¦æ‘¸ä¼šè¢«å½“æˆæ¸¸æˆå†…çš„èµ·æ‰‹ â†’ ä¸€è¿›æ¸¸æˆå°±å¼¹å‡ºä¸Šåˆ’èœå•ã€‚
+           è¿™é‡Œç»™èœå•æ‰‹åŠ¿ä¸€ç‚¹å†·å´æ—¶é—´, ç­‰è¿™ä¸€æ¬¡è§¦æ‘¸ç»“æŸã€‚ */
         g_menu_cooldown = 30;
     }
     if (!g_settings_from_game)
@@ -1322,21 +1322,21 @@ static void main_run_game(void (*init_fn)(void), uint8_t (*update_fn)(void))
                         &s_touch_down, &key_response);
 }
 /**
- * @brief  Ö÷Ñ­»·°´µ±Ç°Ä£Ê½·ÖÅÉ¸÷Ä£¿é¸üĞÂ(ÊÓÆµ/ÉèÖÃ/ÓÎÏ·/Ö÷²Ëµ¥)¡£
- * @param  charging_game_saved ³äµçÊ±±£´æÓÎÏ·×´Ì¬±êÖ¾
+ * @brief  ä¸»å¾ªç¯æŒ‰å½“å‰æ¨¡å¼åˆ†æ´¾å„æ¨¡å—æ›´æ–°(è§†é¢‘/è®¾ç½®/æ¸¸æˆ/ä¸»èœå•)ã€‚
+ * @param  charging_game_saved å……ç”µæ—¶ä¿å­˜æ¸¸æˆçŠ¶æ€æ ‡å¿—
  */
 static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
 {
     BatteryStatus active_bat = Battery_GetStatus();
 
-    /* ³äµç/ÂúµçÊ±10ÃëÎŞ´¥ÃşÔò×Ô¶¯´æµµ´ı»ú */
+    /* å……ç”µ/æ»¡ç”µæ—¶10ç§’æ— è§¦æ‘¸åˆ™è‡ªåŠ¨å­˜æ¡£å¾…æœº */
     if (active_bat == BAT_CHARGING || active_bat == BAT_FULL) {
         if (!g_charge_pending) {
             g_charge_pending = 1;
             g_charge_pending_time = GetTimerCount();
-            s_game_last_activity_us = g_charge_pending_time;  /* ³äµçÊ±ÖØÖÃÓÎÏ·ÎŞ´¥Ãş¼ÆÊ± */
+            s_game_last_activity_us = g_charge_pending_time;  /* å……ç”µæ—¶é‡ç½®æ¸¸æˆæ— è§¦æ‘¸è®¡æ—¶ */
             game_battery_set_charge_flash(1);
-            Battery_GameLevelAllowIncrease();  /* È·±£<10s²»»áÖØ¸´ÔÊĞí */
+            Battery_GameLevelAllowIncrease();  /* ç¡®ä¿<10sä¸ä¼šé‡å¤å…è®¸ */
         }
         if ((uint32_t)(GetTimerCount() - g_charge_pending_time)
             >= ((uint32_t)g_sleep_times[g_sleep_time_index] * 1000000UL)) {
@@ -1352,7 +1352,7 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
             game_battery_set_charge_flash(0);
             return;
         }
-        /* ³äµçÖĞ³ÖĞøË¢ĞÂ10Ãë¼ÆÊ± */
+        /* å……ç”µä¸­æŒç»­åˆ·æ–°10ç§’è®¡æ—¶ */
         {
             TouchState charge_ts;
             Touch_Scan(&charge_ts);
@@ -1360,29 +1360,29 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
                 g_charge_pending_time = GetTimerCount();
             }
         }
-        /* ³äµçÖĞI2C¿ÉÄÜ±»ÔİÍ££¬Í¨¹ıTouch_IsPressedÖØÖÃ´¥Ãş×´Ì¬ */
+        /* å……ç”µä¸­I2Cå¯èƒ½è¢«æš‚åœï¼Œé€šè¿‡Touch_IsPressedé‡ç½®è§¦æ‘¸çŠ¶æ€ */
         Touch_IsPressed();
-        /* ³äµç×´Ì¬Î´±ä£¬¼ÌĞø³äµçÁ÷³Ì */
+        /* å……ç”µçŠ¶æ€æœªå˜ï¼Œç»§ç»­å……ç”µæµç¨‹ */
     } else {
-        /* ·Ç³äµç×´Ì¬£¬Çå³ı³äµçÏà¹Ø±êÖ¾ */
+        /* éå……ç”µçŠ¶æ€ï¼Œæ¸…é™¤å……ç”µç›¸å…³æ ‡å¿— */
         if (g_charge_pending) {
             g_charge_pending = 0;
-            s_game_last_activity_us = GetTimerCount();  /* °ÎµçÊ±ÖØÖÃÓÎÏ·ÎŞ´¥Ãş¼ÆÊ± */
+            s_game_last_activity_us = GetTimerCount();  /* æ‹”ç”µæ—¶é‡ç½®æ¸¸æˆæ— è§¦æ‘¸è®¡æ—¶ */
             game_battery_set_charge_flash(0);
         }
     }
 
     if (s_main_mode == MAIN_MODE_MENU) {
-        /* ²Ëµ¥Ä£Ê½: Ê×´Î»æÖÆ²Ëµ¥ */
+        /* èœå•æ¨¡å¼: é¦–æ¬¡ç»˜åˆ¶èœå• */
         if (!s_menu_drawn) {
             main_menu_draw();
             s_menu_drawn = 1;
         }
-        /* ²Ëµ¥ÒÑ»æÖÆÎŞĞèÖØ¸´»æÖÆ */
-        if (g_menu_cooldown > 0) g_menu_cooldown--;  /* Ö÷²Ëµ¥ÉÏ»®¹Ø±Õ·ÀÖØ¸´´¥·¢ÀäÈ´ */
+        /* èœå•å·²ç»˜åˆ¶æ— éœ€é‡å¤ç»˜åˆ¶ */
+        if (g_menu_cooldown > 0) g_menu_cooldown--;  /* ä¸»èœå•ä¸Šåˆ’å…³é—­é˜²é‡å¤è§¦å‘å†·å´ */
     }
     else if (s_main_mode == MAIN_MODE_SOKOBAN) {
-        /* ÍÆÏä×ÓÓÎÏ· */
+        /* æ¨ç®±å­æ¸¸æˆ */
         if (!s_game_inited) {
             LCD_Backlight_PWM_SetDuty(g_brightness);
             sokoban_init_level(0);
@@ -1405,12 +1405,12 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
         main_run_game(fish_init, fish_update);
     }
     else {
-        /* ÊÓÆµÄ£Ê½: ÉÏ»®²Ëµ¥ + ÊÓÆµÖ÷Ñ­»· */
-        if (g_menu_cooldown > 0) g_menu_cooldown--;  /* ²Ëµ¥/ÉÏ»¬²Ëµ¥·ÀÖØ¸´´¥·¢ÀäÈ´ */
+        /* è§†é¢‘æ¨¡å¼: ä¸Šåˆ’èœå• + è§†é¢‘ä¸»å¾ªç¯ */
+        if (g_menu_cooldown > 0) g_menu_cooldown--;  /* èœå•/ä¸Šæ»‘èœå•é˜²é‡å¤è§¦å‘å†·å´ */
         VideoMenu_Update(&ts, 1);
 
-        /* ÉèÖÃ½çÃæ: ÓÅÏÈ´¦Àí(·µ»Ø¼üÓÉ´¥ÃşÊÍ·Å´¦Àí)
-         * ÊÓÆµ²Ëµ¥¸²¸ÇÊ±ÔİÍ£ÉèÖÃ¸üĞÂ, ·ÀÖ¹»¬¿éµÈÖØ»æÆÆ»µ²Ëµ¥ÏÔÊ¾ */
+        /* è®¾ç½®ç•Œé¢: ä¼˜å…ˆå¤„ç†(è¿”å›é”®ç”±è§¦æ‘¸é‡Šæ”¾å¤„ç†)
+         * è§†é¢‘èœå•è¦†ç›–æ—¶æš‚åœè®¾ç½®æ›´æ–°, é˜²æ­¢æ»‘å—ç­‰é‡ç»˜ç ´åèœå•æ˜¾ç¤º */
         if (s_settings_mode != SETTINGS_NONE && !s_video_menu_visible) {
             IWDG_ReloadCounter();
             Settings_Update();
@@ -1420,13 +1420,13 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
             flash_show_next_frame();
         }
 
-        /* Ö÷²Ëµ¥ÍÏ×§ÖĞ: Î»ÖÃ±ä»¯Ê±»æÖÆ, ±ÜÃâÖØ¸´»æÖÆ */
+        /* ä¸»èœå•æ‹–æ‹½ä¸­: ä½ç½®å˜åŒ–æ—¶ç»˜åˆ¶, é¿å…é‡å¤ç»˜åˆ¶ */
         if (s_menu_dragging && s_menu_drag_y != s_menu_drag_y_prev) {
             main_menu_draw_frame_only(s_menu_drag_y);
             s_menu_drag_y_prev = s_menu_drag_y;
         }
 
-        /* Ö÷²Ëµ¥ÏÂ»¬¶¯»­: delta=1ÖğÖ¡ÏÂ»¬, µ½´ïÄ¿±êÎ»ÖÃ, ÇĞ»»µ½²Ëµ¥Ä£Ê½ */
+        /* ä¸»èœå•ä¸‹æ»‘åŠ¨ç”»: delta=1é€å¸§ä¸‹æ»‘, åˆ°è¾¾ç›®æ ‡ä½ç½®, åˆ‡æ¢åˆ°èœå•æ¨¡å¼ */
         if (s_menu_sliding) {
             s_menu_drag_y += MENU_SLIDE_SPEED;
             if (s_menu_drag_y >= MENU_Y) {
@@ -1434,25 +1434,76 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
                 s_menu_sliding = 0;
                 s_menu_drag_y_prev = -999;
                 s_main_mode = MAIN_MODE_MENU;
-                /* ²Ëµ¥ÒÑµ½´ïÎ»ÖÃÎŞĞèÖØ»æ, ÏÂ´ÎÖ±½Ó»æÖÆ */
+                /* èœå•å·²åˆ°è¾¾ä½ç½®æ— éœ€é‡ç»˜, ä¸‹æ¬¡ç›´æ¥ç»˜åˆ¶ */
                 s_menu_drawn = 1;
             }
             main_menu_draw_frame_only(s_menu_drag_y);
             s_menu_drag_y_prev = s_menu_drag_y;
         }
     }
-    /* ´ÓÓÎÏ·½øÈëÉèÖÃ: Í¨ÓÃ´¦Àí (ËùÓĞÄ£Ê½Î²²¿µ÷ÓÃ, ÊÓÆµÄ£Ê½ÏÂÎªno-op) */
+    /* ä»æ¸¸æˆè¿›å…¥è®¾ç½®: é€šç”¨å¤„ç† (æ‰€æœ‰æ¨¡å¼å°¾éƒ¨è°ƒç”¨, è§†é¢‘æ¨¡å¼ä¸‹ä¸ºno-op) */
     GameSettings_Update();
 }
 /**
- * @brief  Ö÷³ÌĞòÈë¿Ú: ³õÊ¼»¯ÍâÉè²¢½øÈëÖ÷Ñ­»·¡£
+ * @brief  ä¸»ç¨‹åºå…¥å£: åˆå§‹åŒ–å¤–è®¾å¹¶è¿›å…¥ä¸»å¾ªç¯ã€‚
  */
+
+/* ==================== çƒ§å½•åŠ©æ‰‹(æ¡¥) ====================
+   PC ç«¯(å†…éƒ¨\burn_bridge.ps1) é€šè¿‡ SWD æŠŠä¸€å—æ•°æ®å†™è¿› g_burn_buf, å†æŠŠç›®æ ‡åœ°å€/é•¿åº¦/cmd
+   å†™è¿›ä¸‹é¢è¿™äº›å˜é‡; æœ¬å‡½æ•°æŠŠç¼“å†²åŒºå†…å®¹å†™è¿›å¤–éƒ¨ SPI Flash, å®Œæˆåç½® g_burn_statusã€‚
+   â˜… å˜é‡åä¸è¦æ”¹: PC ç«¯æ˜¯æŒ‰ç¬¦å·å(nm)æŸ¥åœ°å€çš„ã€‚
+   â˜… æ•´å—ç”¨ BURN_BRIDGE_MODE åŒ…ä½: åªæœ‰æ¡¥å›ºä»¶æ‰å è¿™ 8KB RAM, æ¸¸æˆå›ºä»¶ä¸å¸¦ã€‚ */
+#if defined(BURN_BRIDGE_MODE)
+#define BURN_BUF_SIZE   8192
+volatile uint8_t  g_burn_buf[BURN_BUF_SIZE];
+volatile uint32_t g_burn_addr   = 0;   /* ç›®æ ‡åœ°å€(å¤–éƒ¨ Flash åç§») */
+volatile uint32_t g_burn_len    = 0;   /* æœ¬å—å­—èŠ‚æ•° */
+volatile uint32_t g_burn_cmd    = 0;   /* 1=å†™ä¸€å—, 2=æ“¦é™¤æ®µ, 3=è¯»ä¸€å—, 9=ç»“æŸ */
+volatile uint32_t g_burn_status = 0;   /* 0=å¿™, 0xA5=æˆåŠŸ, 0xEE=å¤±è´¥ */
+
+static void BurnBridge_Run(void)
+{
+    g_burn_status = 0xA5;
+    while (1) {
+        uint32_t cmd = g_burn_cmd;
+        if (cmd == 1) {
+            g_burn_status = 0;
+            SPI_Flash_Write((uint8_t *)g_burn_buf, g_burn_addr, (uint16_t)g_burn_len);
+            g_burn_cmd = 0;
+            g_burn_status = 0xA5;
+        } else if (cmd == 2) {
+            /* æ•´æ®µæ“¦é™¤: æŒ‰ 4KB æ‰‡åŒºæ“¦ [addr, addr+len) â€”â€” è¿ç»­å†™è§†é¢‘æ—¶ç”¨, çœæ‰é€æ‰‡åŒºè¯»æ”¹å†™ */
+            uint32_t a = g_burn_addr & ~0xFFFUL;
+            uint32_t e = (g_burn_addr + g_burn_len + 0xFFFUL) & ~0xFFFUL;
+            g_burn_status = 0;
+            while (a < e) { SPI_Flash_Erase_Sector(a); a += 4096; }
+            g_burn_cmd = 0;
+            g_burn_status = 0xA5;
+        } else if (cmd == 3) {
+            /* è¯»ä¸€å—: å¤–éƒ¨ Flash -> g_burn_buf, PC å†ç”¨ dump_image æŠŠç¼“å†²åŒºå–èµ° */
+            g_burn_status = 0;
+            SPI_Flash_Read((uint8_t *)g_burn_buf, g_burn_addr, (uint16_t)g_burn_len);
+            g_burn_cmd = 0;
+            g_burn_status = 0xA5;
+        } else if (cmd == 9) {
+            g_burn_cmd = 0;
+            g_burn_status = 0x5A;
+        }
+        IWDG_ReloadCounter();
+    }
+}
+#endif
 
 int main(void) {
     /* FAST STANDBY PATH -- must run before any peripheral init (verified on hardware).
        Only leave standby when a real wake source was recorded in BKP; anything else
        (no magic / stale ARMED) goes straight back to standby. This avoids the old
-       "unknown wake -> full boot -> reset -> ..." 1s reboot loop. */
+       "unknown wake -> full boot -> reset -> ..." 1s reboot loop.
+       â˜… çƒ§å½•å›ºä»¶(è§†é¢‘/å­—åº“/æŒ‰é’®å›¾/æ¡¥)ä¸å‚ä¸è¿™æ®µ: å®ƒä»¬ç”± PC ç«¯æ¯å— SWD å¤ä½åç«‹åˆ»è¿è¡Œ,
+         SFTRST ç½®ä½æ—¶è‹¥èµ°è¿™é‡Œä¼šç›´æ¥è¿› Standby -> ä¸‹ä¸€å— SWD è¿ä¸ä¸Š(HANDSHAKE TIMEOUT),
+         å¿…é¡»ç‚¹å±å”¤é†’æ‰èƒ½ç»§ç»­ã€‚ */
+#if !defined(VIDEO_CHUNK_STORE_MODE) && !defined(FLASH_DATA_STORE_MODE) \
+    && !defined(BTN_IMG_STORE_MODE) && !defined(BURN_BRIDGE_MODE)
     if (RCC_GetFlagStatus(RCC_FLAG_SFTRST) != RESET) {
         uint16_t magic;
         RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);
@@ -1496,75 +1547,87 @@ int main(void) {
             while (1);
         }
     }
+#endif /* éçƒ§å½•æ¨¡å¼æ‰èµ°"å¤ä½åç›´æ¥å›å¾…æœº"çš„å¿«é€Ÿè·¯å¾„ */
+
     #ifdef VIDEO_CHUNK_STORE_MODE
-    /* ====== ÊÓÆµÊı¾İ¿éÉÕÂ¼Ä£Ê½ ======
-     * ½«Ç¶Èë¹Ì¼şµÄÊÓÆµÊı¾İ¿é(g_video_chunk)ÉÕÂ¼µ½Íâ²¿FlashµØÖ·0(ÊÓÆµÇøÓò),
-     * ¿éÄÚÈİÓÉ gen_video_chunk.py Éú³É; ×¢ÊÍµôºê¼´»Ö¸´Õı³£³ÌĞò */
-    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);//ÉèÖÃÖĞ¶ÏÓÅÏÈ¼¶·Ö×é1
-    SystemCoreClockUpdate();//¸üĞÂÏµÍ³Ê±ÖÓ
-    Delay_Init();//³õÊ¼»¯ÑÓÊ±º¯Êı
+    /* ====== è§†é¢‘æ•°æ®å—çƒ§å½•æ¨¡å¼ ======
+     * å°†åµŒå…¥å›ºä»¶çš„è§†é¢‘æ•°æ®å—(g_video_chunk)çƒ§å½•åˆ°å¤–éƒ¨Flashåœ°å€0(è§†é¢‘åŒºåŸŸ),
+     * å—å†…å®¹ç”± gen_video_chunk.py ç”Ÿæˆ; æ³¨é‡Šæ‰å®å³æ¢å¤æ­£å¸¸ç¨‹åº */
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);//è®¾ç½®ä¸­æ–­ä¼˜å…ˆçº§åˆ†ç»„1
+    SystemCoreClockUpdate();//æ›´æ–°ç³»ç»Ÿæ—¶é’Ÿ
+    Delay_Init();//åˆå§‹åŒ–å»¶æ—¶å‡½æ•°
 
-    LCD_PWR_Init();          // LCDµçÔ´+±³¹âÒı½Å³õÊ¼»¯
-    LCD_PWR_ON;              // LCD ´ÓOFFÇĞON
-    Delay_Ms(20);            // µÈ´ıLCD¸´Î»Íê³ÉºÍSPIÎÈ¶¨
-    SPI_FLASH_Init();        // ³õÊ¼»¯Íâ²¿Flash SPI
-    SPI_Flash_WAKEUP();      // ´ÓPowerDownÖĞ»½ĞÑFlash
-    LCD_Init();              // ³õÊ¼»¯LCD
+    LCD_PWR_Init();          // LCDç”µæº+èƒŒå…‰å¼•è„šåˆå§‹åŒ–
+    LCD_PWR_ON;              // LCD ä»OFFåˆ‡ON
+    Delay_Ms(20);            // ç­‰å¾…LCDå¤ä½å®Œæˆå’ŒSPIç¨³å®š
+    SPI_FLASH_Init();        // åˆå§‹åŒ–å¤–éƒ¨Flash SPI
+    SPI_Flash_WAKEUP();      // ä»PowerDownä¸­å”¤é†’Flash
+    LCD_Init();              // åˆå§‹åŒ–LCD
 
-    LCD_Backlight_PWM_Stop();// PB9»ØGPIOÄ£Ê½, Í£PWM
-    LCD_LED_CLR;             // ´ò¿ª±³¹â
+    LCD_Backlight_PWM_Stop();// PB9å›GPIOæ¨¡å¼, åœPWM
+    LCD_LED_CLR;             // æ‰“å¼€èƒŒå…‰
 
-    VideoChunkStore_BurnAll();  // ÉÕÂ¼Ç¶ÈëµÄÊÓÆµÊı¾İ¿éµ½Íâ²¿Flash, Íê³Éºó³£×¤ÏÔÊ¾100%
+    VideoChunkStore_BurnAll();  // çƒ§å½•åµŒå…¥çš„è§†é¢‘æ•°æ®å—åˆ°å¤–éƒ¨Flash, å®Œæˆåå¸¸é©»æ˜¾ç¤º100%
     while (1) {
         Delay_Ms(1000);
     }
 #elif defined(FLASH_DATA_STORE_MODE)
-    /* ====== FlashÊı¾İ´æ´¢Ä£Ê½ ======
-     * ½öÖ´ĞĞ×Ö¿â/Í¼Æ¬×ÊÔ´ÉÕÂ¼, ²»½øÈëÈÎºÎÓÎÏ·Âß¼­;
-     * ×¢ÊÍµômain.c¶¥²¿µÄ FLASH_DATA_STORE_MODE ºê¼´»Ö¸´Õı³£ÓÎÏ·³ÌĞò */
-    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);//ÉèÖÃÖĞ¶ÏÓÅÏÈ¼¶·Ö×é1
-    SystemCoreClockUpdate();//¸üĞÂÏµÍ³Ê±ÖÓ
-    Delay_Init();//³õÊ¼»¯ÑÓÊ±º¯Êı
+    /* ====== Flashæ•°æ®å­˜å‚¨æ¨¡å¼ ======
+     * ä»…æ‰§è¡Œå­—åº“/å›¾ç‰‡èµ„æºçƒ§å½•, ä¸è¿›å…¥ä»»ä½•æ¸¸æˆé€»è¾‘;
+     * æ³¨é‡Šæ‰main.cé¡¶éƒ¨çš„ FLASH_DATA_STORE_MODE å®å³æ¢å¤æ­£å¸¸æ¸¸æˆç¨‹åº */
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);//è®¾ç½®ä¸­æ–­ä¼˜å…ˆçº§åˆ†ç»„1
+    SystemCoreClockUpdate();//æ›´æ–°ç³»ç»Ÿæ—¶é’Ÿ
+    Delay_Init();//åˆå§‹åŒ–å»¶æ—¶å‡½æ•°
 
-    LCD_PWR_Init();          // LCDµçÔ´+±³¹âÒı½Å³õÊ¼»¯
-    LCD_PWR_ON;              // LCD ´ÓOFFÇĞON
-    Delay_Ms(20);            // µÈ´ıLCD¸´Î»Íê³ÉºÍSPIÎÈ¶¨
-    SPI_FLASH_Init();        // ³õÊ¼»¯Íâ²¿Flash SPI
-    SPI_Flash_WAKEUP();      // ´ÓPowerDownÖĞ»½ĞÑFlash
-    LCD_Init();              // ³õÊ¼»¯LCD
+    LCD_PWR_Init();          // LCDç”µæº+èƒŒå…‰å¼•è„šåˆå§‹åŒ–
+    LCD_PWR_ON;              // LCD ä»OFFåˆ‡ON
+    Delay_Ms(20);            // ç­‰å¾…LCDå¤ä½å®Œæˆå’ŒSPIç¨³å®š
+    SPI_FLASH_Init();        // åˆå§‹åŒ–å¤–éƒ¨Flash SPI
+    SPI_Flash_WAKEUP();      // ä»PowerDownä¸­å”¤é†’Flash
+    LCD_Init();              // åˆå§‹åŒ–LCD
 
-    LCD_Backlight_PWM_Stop();// PB9»ØGPIOÄ£Ê½, Í£PWM
-    LCD_LED_CLR;             // ´ò¿ª±³¹â
+    LCD_Backlight_PWM_Stop();// PB9å›GPIOæ¨¡å¼, åœPWM
+    LCD_LED_CLR;             // æ‰“å¼€èƒŒå…‰
 
-    FlashStore_BurnAll();    // ÉÕÂ¼+CRCĞ£Ñé, Íê³Éºó³£×¤ÏÔÊ¾100%
+    FlashStore_BurnAll();    // çƒ§å½•+CRCæ ¡éªŒ, å®Œæˆåå¸¸é©»æ˜¾ç¤º100%
     while (1) {
         Delay_Ms(1000);
     }
+#elif defined(BURN_BRIDGE_MODE)
+    /* ====== çƒ§å½•åŠ©æ‰‹(æ¡¥) ======
+       å›ºä»¶å›ºå®šä¸å˜: PC æŠŠæ•°æ®åˆ†å—å†™è¿› g_burn_buf, è¿™é‡Œè½¬å†™åˆ°å¤–éƒ¨ Flashã€‚
+       å­—åº“/æŒ‰é’®/è§†é¢‘éƒ½ä» PC ç›´æ¥è¯»æ–‡ä»¶, ä¸å†å—å†…éƒ¨ Flash 64KB é™åˆ¶ã€‚ */
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
+    SystemCoreClockUpdate();
+    Delay_Init();
+    SPI_FLASH_Init();
+    SPI_Flash_WAKEUP();
+    BurnBridge_Run();        /* ä¸è¿”å› */
 #elif defined(BTN_IMG_STORE_MODE)
-    /* ====== Ó¢ÎÄ°æ°´Å¥Í¼ÉÕÂ¼Ä£Ê½ (BTN_IMG_STORE_MODE) ======
-     * Ö»°Ñ g_btn_img_en[5580] Ğ´µ½Íâ²¿FlashµÄ¹Ì¶¨±£ÁôÇø BTN_IMG_EN_ADDR
-     * (Ó¢ÎÄ°æ"ÉÏÒ»¹Ø/ÏÂÒ»¹Ø/ÖØĞÂ¿ªÊ¼"ÈıÕÅ), ²»Åö×Ö¿â×ÊÔ´ÇøÓëÄ¿Â¼ ¡ú ×Ö¿â²»ÓÃÖØÉÕ;
-     * ÖĞÎÄÄÇÌ×ÈÔÔÚ×Ö¿â×ÊÔ´Àï(ID 71~73), ÔËĞĞÊ±°´ÓïÑÔÑ¡Ôñ¶ÁÄÄÒ»Ì× */
-    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);//ÉèÖÃÖĞ¶ÏÓÅÏÈ¼¶·Ö×é1
-    SystemCoreClockUpdate();//¸üĞÂÏµÍ³Ê±ÖÓ
-    Delay_Init();//³õÊ¼»¯ÑÓÊ±º¯Êı
+    /* ====== è‹±æ–‡ç‰ˆæŒ‰é’®å›¾çƒ§å½•æ¨¡å¼ (BTN_IMG_STORE_MODE) ======
+     * åªæŠŠ g_btn_img_en[5580] å†™åˆ°å¤–éƒ¨Flashçš„å›ºå®šä¿ç•™åŒº BTN_IMG_EN_ADDR
+     * (è‹±æ–‡ç‰ˆ"ä¸Šä¸€å…³/ä¸‹ä¸€å…³/é‡æ–°å¼€å§‹"ä¸‰å¼ ), ä¸ç¢°å­—åº“èµ„æºåŒºä¸ç›®å½• â†’ å­—åº“ä¸ç”¨é‡çƒ§;
+     * ä¸­æ–‡é‚£å¥—ä»åœ¨å­—åº“èµ„æºé‡Œ(ID 71~73), è¿è¡Œæ—¶æŒ‰è¯­è¨€é€‰æ‹©è¯»å“ªä¸€å¥— */
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);//è®¾ç½®ä¸­æ–­ä¼˜å…ˆçº§åˆ†ç»„1
+    SystemCoreClockUpdate();//æ›´æ–°ç³»ç»Ÿæ—¶é’Ÿ
+    Delay_Init();//åˆå§‹åŒ–å»¶æ—¶å‡½æ•°
 
-    LCD_PWR_Init();          // LCDµçÔ´+±³¹âÒı½Å³õÊ¼»¯
-    LCD_PWR_ON;              // LCD ´ÓOFFÇĞON
-    Delay_Ms(20);            // µÈ´ıLCD¸´Î»Íê³ÉºÍSPIÎÈ¶¨
-    SPI_FLASH_Init();        // ³õÊ¼»¯Íâ²¿Flash SPI
-    SPI_Flash_WAKEUP();      // ´ÓPowerDownÖĞ»½ĞÑFlash
-    LCD_Init();              // ³õÊ¼»¯LCD
+    LCD_PWR_Init();          // LCDç”µæº+èƒŒå…‰å¼•è„šåˆå§‹åŒ–
+    LCD_PWR_ON;              // LCD ä»OFFåˆ‡ON
+    Delay_Ms(20);            // ç­‰å¾…LCDå¤ä½å®Œæˆå’ŒSPIç¨³å®š
+    SPI_FLASH_Init();        // åˆå§‹åŒ–å¤–éƒ¨Flash SPI
+    SPI_Flash_WAKEUP();      // ä»PowerDownä¸­å”¤é†’Flash
+    LCD_Init();              // åˆå§‹åŒ–LCD
 
-    LCD_Backlight_PWM_Stop();// PB9»ØGPIOÄ£Ê½, Í£PWM
-    LCD_LED_CLR;             // ´ò¿ª±³¹â
+    LCD_Backlight_PWM_Stop();// PB9å›GPIOæ¨¡å¼, åœPWM
+    LCD_LED_CLR;             // æ‰“å¼€èƒŒå…‰
 
-    BtnImgStore_BurnAll();   // ÉÕÂ¼+CRCĞ£Ñé, Íê³Éºó³£×¤ÏÔÊ¾100%
+    BtnImgStore_BurnAll();   // çƒ§å½•+CRCæ ¡éªŒ, å®Œæˆåå¸¸é©»æ˜¾ç¤º100%
     while (1) {
         Delay_Ms(1000);
     }
 #else
-    // Ö÷Ñ­»·¾Ö²¿±äÁ¿
+    // ä¸»å¾ªç¯å±€éƒ¨å˜é‡
     uint16_t peak_voltage = 0;
     uint8_t  was_charging = 0;
     uint8_t  charge_exit_count = 0;
@@ -1572,27 +1635,27 @@ int main(void) {
     uint8_t  charging_game_saved = 0;
     uint8_t  wake_touch_confirmed = 0;
     uint16_t standby_wake_magic = 0;
-    // ====== µ÷ÊÔÄ£Ê½£ºÈÆ¹ıStandby£¬Ö±½ÓµÈ´ıPA8´¥Ãş ======
-//#define DEBUG_NO_STANDBY   /* µ÷ÊÔÓÃ: ´ò¿ª=²»½ø´ı»ú/²»Ï¨ÆÁ; ÕıÊ½°æ±ØĞë×¢ÊÍµô */
+    // ====== è°ƒè¯•æ¨¡å¼ï¼šç»•è¿‡Standbyï¼Œç›´æ¥ç­‰å¾…PA8è§¦æ‘¸ ======
+//#define DEBUG_NO_STANDBY   /* è°ƒè¯•ç”¨: æ‰“å¼€=ä¸è¿›å¾…æœº/ä¸ç†„å±; æ­£å¼ç‰ˆå¿…é¡»æ³¨é‡Šæ‰ */
 #ifdef DEBUG_NO_STANDBY
-    // µ÷ÊÔÄ£Ê½£ºPA8´¥ÃşÖ±½Ó´¥·¢Ö÷Ñ­»·£¬ÈÆ¹ıStandby
+    // è°ƒè¯•æ¨¡å¼ï¼šPA8è§¦æ‘¸ç›´æ¥è§¦å‘ä¸»å¾ªç¯ï¼Œç»•è¿‡Standby
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB |
         RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD | RCC_APB2Periph_AFIO, ENABLE);
 
-    /* PA8: ´¥ÃşINTÊäÈë(ÉÏÀ­), CST816SÓĞ´¥ÃşÊ±»áÀ­µÍ´ËÒı½Å */
-    GPIOA->CFGHR = (GPIOA->CFGHR & ~0xF) | 0x8;  // PA8=ÉÏÀ­/¸¡¿ÕÊäÈë
-    GPIOA->BSHR = GPIO_Pin_8;  // PA8 ODR=1, Ê¹ÄÜÉÏÀ­
+    /* PA8: è§¦æ‘¸INTè¾“å…¥(ä¸Šæ‹‰), CST816Sæœ‰è§¦æ‘¸æ—¶ä¼šæ‹‰ä½æ­¤å¼•è„š */
+    GPIOA->CFGHR = (GPIOA->CFGHR & ~0xF) | 0x8;  // PA8=ä¸Šæ‹‰/æµ®ç©ºè¾“å…¥
+    GPIOA->BSHR = GPIO_Pin_8;  // PA8 ODR=1, ä½¿èƒ½ä¸Šæ‹‰
     while (1) {
         if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_8) == Bit_RESET) {
-            // ¼ì²âµ½PA8´¥Ãş»½ĞÑ
+            // æ£€æµ‹åˆ°PA8è§¦æ‘¸å”¤é†’
             current_state = 1;
             end_flag = 0;
-            // ³õÊ¼»¯ÏµÍ³Ê±ÖÓºÍÍâÉè
+            // åˆå§‹åŒ–ç³»ç»Ÿæ—¶é’Ÿå’Œå¤–è®¾
             NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
             SystemCoreClockUpdate();
             Delay_Init();
 
-            // PVDµÍµçÑ¹¼ì²â: VDD < 2.5V Ç¿ÖÆ ¡ú ÏµÍ³¸´Î»½øÈëStandby
+            // PVDä½ç”µå‹æ£€æµ‹: VDD < 2.5V å¼ºåˆ¶ â†’ ç³»ç»Ÿå¤ä½è¿›å…¥Standby
             Battery_Init();
             RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);
             PWR_PVDLevelConfig(PWR_PVDLevel_2V5);
@@ -1604,7 +1667,7 @@ int main(void) {
                 RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
                 SPI_Flash_PowerDown();
                 Touch_WaitWakeInputsReleased();
-                NVIC_SystemReset();  // Ç¿ÖÆÏµÍ³¸´Î» -> main()ÅĞ¶ÏSFTRST -> Standby
+                NVIC_SystemReset();  // å¼ºåˆ¶ç³»ç»Ÿå¤ä½ -> main()åˆ¤æ–­SFTRST -> Standby
             }
 
             LCD_PWR_Init();
@@ -1616,19 +1679,19 @@ int main(void) {
             //TFT_init();
             LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
             LCD_LED_SET;
-            CheckAndShowLowBattery();  // 2.5V~2.6VµÍµçÏÔÊ¾
+            CheckAndShowLowBattery();  // 2.5V~2.6Vä½ç”µæ˜¾ç¤º
 
-            LCD_Backlight_PWM_Stop();  // Í£PWMÊ¹PB9»ØGPIOÄ£Ê½£¬È·±£LCD_LED_SET/CLRÓĞĞ§
-            LCD_LED_CLR;              // ¿ªLCD±³¹â(GPIO LOW=ON)
+            LCD_Backlight_PWM_Stop();  // åœPWMä½¿PB9å›GPIOæ¨¡å¼ï¼Œç¡®ä¿LCD_LED_SET/CLRæœ‰æ•ˆ
+            LCD_LED_CLR;              // å¼€LCDèƒŒå…‰(GPIO LOW=ON)
             TIMER2_Init();
             LCD_DMA_Interrupt_Init();
-            Touch_Init();           // ³õÊ¼»¯´¥Ãş¿ØÖÆÆ÷(CST816S I2CÍ¨ĞÅ)
+            Touch_Init();           // åˆå§‹åŒ–è§¦æ‘¸æ§åˆ¶å™¨(CST816S I2Cé€šä¿¡)
             LoadVideoAddress();
-            goto MAIN_LOOP;  // Ìø×ªµ½Ö÷Ñ­»·
+            goto MAIN_LOOP;  // è·³è½¬åˆ°ä¸»å¾ªç¯
         }
     }
 #else
-    // ====== ÕıÊ½°æ±¾£ºÍ¨¹ıBKP±¸·İ¼Ä´æÆ÷ÅĞ¶Ï¸´Î»ÀàĞÍºÍStandby»½ĞÑÔ´ ======
+    // ====== æ­£å¼ç‰ˆæœ¬ï¼šé€šè¿‡BKPå¤‡ä»½å¯„å­˜å™¨åˆ¤æ–­å¤ä½ç±»å‹å’ŒStandbyå”¤é†’æº ======
     RCC_APB1PeriphClockCmd(
         RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);
     PWR_BackupAccessCmd(ENABLE);
@@ -1646,35 +1709,35 @@ int main(void) {
         BKP_WriteBackupRegister(BKP_DR9, 0);
     }
 
-    /* »Ö¸´ÉèÖÃ */
+    /* æ¢å¤è®¾ç½® */
     if (BKP_ReadBackupRegister(BKP_DR6) == 0xB071) {
         uint16_t idx = BKP_ReadBackupRegister(BKP_DR7);
         if (idx <= 5) g_sleep_time_index = (uint8_t)idx;
         uint16_t br = BKP_ReadBackupRegister(BKP_DR8);
-        if (br >= 1 && br <= 100) g_brightness = (uint8_t)br;  /* br=0±íÊ¾Î´±£´æ, ±£³ÖÄ¬ÈÏ100% */
+        if (br >= 1 && br <= 100) g_brightness = (uint8_t)br;  /* br=0è¡¨ç¤ºæœªä¿å­˜, ä¿æŒé»˜è®¤100% */
         uint16_t orient = BKP_ReadBackupRegister(BKP_DR10);
-        g_orientation_index = (uint8_t)(orient & 0x0003u);   /* µÍ2Î»=·½Ïò */
-        g_language_index = (uint8_t)((orient >> 2) & 0x0001u); /* bit2=ÓïÑÔ(DR11 ³¬³ö BKP ·¶Î§, ²»ÓÃ) */
+        g_orientation_index = (uint8_t)(orient & 0x0003u);   /* ä½2ä½=æ–¹å‘ */
+        g_language_index = (uint8_t)((orient >> 2) & 0x0001u); /* bit2=è¯­è¨€(DR11 è¶…å‡º BKP èŒƒå›´, ä¸ç”¨) */
     }
 
     RCC_ClearFlag();
 #endif
 
-    // ====== ÏµÍ³³õÊ¼»¯ ======
-    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);//ÉèÖÃÖĞ¶ÏÓÅÏÈ¼¶·Ö×é1
-    SystemCoreClockUpdate();//¸üĞÂÏµÍ³Ê±ÖÓ
-    Delay_Init();//³õÊ¼»¯ÑÓÊ±º¯Êı
+    // ====== ç³»ç»Ÿåˆå§‹åŒ– ======
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);//è®¾ç½®ä¸­æ–­ä¼˜å…ˆçº§åˆ†ç»„1
+    SystemCoreClockUpdate();//æ›´æ–°ç³»ç»Ÿæ—¶é’Ÿ
+    Delay_Init();//åˆå§‹åŒ–å»¶æ—¶å‡½æ•°
 
-    // USART_Printf_Init(115200);//³õÊ¼»¯´®¿Ú,USART1¸´ÓÃÓïÒôIC
+    // USART_Printf_Init(115200);//åˆå§‹åŒ–ä¸²å£,USART1å¤ç”¨è¯­éŸ³IC
     // printf("SystemClk:%d\r\n", SystemCoreClock);
 
-    LCD_PWR_Init();          // LCDµçÔ´+±³¹âÒı½Å³õÊ¼»¯
-    LCD_PWR_ON;  // LCD ´ÓOFFÇĞON
-    Battery_Init();          // ÅäÖÃPB5/PB6Îª³äµç¼ì²âÉÏÀ­ÊäÈë
+    LCD_PWR_Init();          // LCDç”µæº+èƒŒå…‰å¼•è„šåˆå§‹åŒ–
+    LCD_PWR_ON;  // LCD ä»OFFåˆ‡ON
+    Battery_Init();          // é…ç½®PB5/PB6ä¸ºå……ç”µæ£€æµ‹ä¸Šæ‹‰è¾“å…¥
     if (s_standby_unknown_wake) {
         /*
-         * PB5/PB6µçÆ½¿ÉÄÜ±ä»¯£¬ÍË»¯Îª¼ì²é³äµç×´Ì¬»ØÍËµ½´¥Ãş/³äµç
-         * ¸ù¾İ³äµç×´Ì¬ÔÙÅĞ¶Ï»½ĞÑÔ´
+         * PB5/PB6ç”µå¹³å¯èƒ½å˜åŒ–ï¼Œé€€åŒ–ä¸ºæ£€æŸ¥å……ç”µçŠ¶æ€å›é€€åˆ°è§¦æ‘¸/å……ç”µ
+         * æ ¹æ®å……ç”µçŠ¶æ€å†åˆ¤æ–­å”¤é†’æº
          */
         s_standby_unknown_wake = 0;
         if (Battery_GetStatus() != BAT_NORMAL) {
@@ -1687,32 +1750,32 @@ int main(void) {
     }
     if (s_standby_touch_wake) {
         /*
-         * ÏÈLCD/Flash³õÊ¼»¯Íê±ÏÔÙÈ·ÈÏ´¥Ãş£¬½µµÍÈ·ÈÏÑÓ³ÙÌá¸ßÏìÓ¦
-         * Í¨¹ıÀ­µÍPB8¸´Î»CST816S
+         * å…ˆLCD/Flashåˆå§‹åŒ–å®Œæ¯•å†ç¡®è®¤è§¦æ‘¸ï¼Œé™ä½ç¡®è®¤å»¶è¿Ÿæé«˜å“åº”
+         * é€šè¿‡æ‹‰ä½PB8å¤ä½CST816S
          */
         Touch_WakeResumeInit();
 #if TOUCH_IC_IT7259
-        /* IT7259: »½ĞÑĞÅºÅ±¾ÉíÀ´×Ô´¥ÃşICµÄINT(Ğ¾Æ¬ÄÚ²¿ÓĞÂË²¨, ¿ÉĞÅ), ÇÒ»½ĞÑºó IC ĞèÆô¶¯¡¢
-           ÓÃ»§Í¨³£Ö»µãÒ»ÏÂ¾ÍËÉÊÖ(Êµ²â INT µÍ½ö7.7ms), ÓÃ"Á¬Ğø2´Î¶Áµ½°´ÏÂ"µÄÑÏ¸ñÈ·ÈÏ±ØÈ»
-           ´í¹ı ¡ú ÅĞÎŞĞ§´¥Ãş ¡ú ¸´Î»»Ø´ı»ú(ÏÖÏó: µãÆÁÄ»²»ÁÁ)¡£¹ÊÖ±½ÓÈÏ¶¨ÓĞĞ§¡£ */
+        /* IT7259: å”¤é†’ä¿¡å·æœ¬èº«æ¥è‡ªè§¦æ‘¸ICçš„INT(èŠ¯ç‰‡å†…éƒ¨æœ‰æ»¤æ³¢, å¯ä¿¡), ä¸”å”¤é†’å IC éœ€å¯åŠ¨ã€
+           ç”¨æˆ·é€šå¸¸åªç‚¹ä¸€ä¸‹å°±æ¾æ‰‹(å®æµ‹ INT ä½ä»…7.7ms), ç”¨"è¿ç»­2æ¬¡è¯»åˆ°æŒ‰ä¸‹"çš„ä¸¥æ ¼ç¡®è®¤å¿…ç„¶
+           é”™è¿‡ â†’ åˆ¤æ— æ•ˆè§¦æ‘¸ â†’ å¤ä½å›å¾…æœº(ç°è±¡: ç‚¹å±å¹•ä¸äº®)ã€‚æ•…ç›´æ¥è®¤å®šæœ‰æ•ˆã€‚ */
         wake_touch_confirmed = 1;
 #else
         wake_touch_confirmed = Main_ConfirmTouchWake();
 #endif
-        /* ¡ï ´¥Ãş³õÊ¼»¯ÌáÇ°µ½´Ë´¦(Ô­ÏÈÔÚ LCD/Flash/¶¨Ê±Æ÷³õÊ¼»¯Ö®ºó) ¡ª¡ª Êµ²â»½ĞÑºóÔ¼ 500ms
-           ´¥Ãş²Å¿ÉÓÃ, ÓÃ»§"µ¥»÷»½ĞÑºóÂíÉÏÏÂ»¬"¾Í»áÃ»·´Ó¦¡£ÕâÀïÏÈ×ö, ´¥Ãş¿ÉÓÃÊ±¼äÌáÇ°Ô¼ 400ms,
-           ×ÜºÄÊ±²»±ä(Ö»ÊÇ°Ñ Touch_Init ÀïµÄ 100ms µÈ´ıÅ²µ½Ç°Ãæ)¡£Touch_Init Ö»ÓÃ GPIOB/PA8
-           ºÍ SysTick ÑÓÊ±, ²»ÒÀÀµ LCD/Flash/TIMER2; Ë³´ø»¹±ÜÃâËüµÄ 100us ¸´Î»Âö³å±»
-           LCD DMA/TIMER2 ÖĞ¶ÏÀ­³¤µ½ >1ms(¡ì6/¡ì7 ¼ÇÂ¼¹ıµÄ¿Ó)¡£ */
+        /* â˜… è§¦æ‘¸åˆå§‹åŒ–æå‰åˆ°æ­¤å¤„(åŸå…ˆåœ¨ LCD/Flash/å®šæ—¶å™¨åˆå§‹åŒ–ä¹‹å) â€”â€” å®æµ‹å”¤é†’åçº¦ 500ms
+           è§¦æ‘¸æ‰å¯ç”¨, ç”¨æˆ·"å•å‡»å”¤é†’åé©¬ä¸Šä¸‹æ»‘"å°±ä¼šæ²¡ååº”ã€‚è¿™é‡Œå…ˆåš, è§¦æ‘¸å¯ç”¨æ—¶é—´æå‰çº¦ 400ms,
+           æ€»è€—æ—¶ä¸å˜(åªæ˜¯æŠŠ Touch_Init é‡Œçš„ 100ms ç­‰å¾…æŒªåˆ°å‰é¢)ã€‚Touch_Init åªç”¨ GPIOB/PA8
+           å’Œ SysTick å»¶æ—¶, ä¸ä¾èµ– LCD/Flash/TIMER2; é¡ºå¸¦è¿˜é¿å…å®ƒçš„ 100us å¤ä½è„‰å†²è¢«
+           LCD DMA/TIMER2 ä¸­æ–­æ‹‰é•¿åˆ° >1ms(Â§6/Â§7 è®°å½•è¿‡çš„å‘)ã€‚ */
         Touch_Init();
     }
 
-    Delay_Ms(20);            // µÈ´ıLCD¸´Î»Íê³ÉºÍSPIÎÈ¶¨
-    SPI_FLASH_Init();//³õÊ¼»¯Flash SPI 
-    SPI_Flash_WAKEUP();      // ´ÓPowerDown»òStandbyÖĞ»½ĞÑFlash
-    FlashStore_ResInit();    // ¶ÁÈ¡Íâ²¿Flash×ÊÔ´Ä¿Â¼(×Ö¿â/Í¼Æ¬Êı¾İÒÑÉÕÂ¼)
+    Delay_Ms(20);            // ç­‰å¾…LCDå¤ä½å®Œæˆå’ŒSPIç¨³å®š
+    SPI_FLASH_Init();//åˆå§‹åŒ–Flash SPI 
+    SPI_Flash_WAKEUP();      // ä»PowerDownæˆ–Standbyä¸­å”¤é†’Flash
+    FlashStore_ResInit();    // è¯»å–å¤–éƒ¨Flashèµ„æºç›®å½•(å­—åº“/å›¾ç‰‡æ•°æ®å·²çƒ§å½•)
 
-    PVD_CheckLowVoltage(); // µÍµçÑ¹¼ì²â<2.7V¸´Î»,>= 2.7VÕı³£
+    PVD_CheckLowVoltage(); // ä½ç”µå‹æ£€æµ‹<2.7Vå¤ä½,>= 2.7Væ­£å¸¸
 #ifdef LCD_TEST_WHITE
     LCD_Backlight_PWM_Stop();
     LCD_LED_CLR;
@@ -1720,12 +1783,12 @@ int main(void) {
     while (1) { IWDG_ReloadCounter(); Delay_Ms(100); }
 #endif
 
-    TIMER2_Init();           // ³õÊ¼»¯¶¨Ê±Æ÷2
-    LCD_DMA_Interrupt_Init();//LCD DMAÖĞ¶ÏÅäÖÃ
-    BAT_ADC_Init();          // ³õÊ¼»¯ADCµç³Ø¼ì²â
-    //    VOICE_SW_Init();         // ÓïÒôIC ÒÑÍ£ÓÃ(ÓÃ»§È·ÈÏ²»ÓÃÁË): ×¢ÊÍµôÊ¡ Flash, º¯ÊıËæ --gc-sections »ØÊÕ
+    TIMER2_Init();           // åˆå§‹åŒ–å®šæ—¶å™¨2
+    LCD_DMA_Interrupt_Init();//LCD DMAä¸­æ–­é…ç½®
+    BAT_ADC_Init();          // åˆå§‹åŒ–ADCç”µæ± æ£€æµ‹
+    //    VOICE_SW_Init();         // è¯­éŸ³IC å·²åœç”¨(ç”¨æˆ·ç¡®è®¤ä¸ç”¨äº†): æ³¨é‡Šæ‰çœ Flash, å‡½æ•°éš --gc-sections å›æ”¶
 //#if 0
-//    /* ÓïÒôIC UART1: PA9 AF_PP, 9600 8N1, Ö±½ÓĞ´BRR±ÜÃâ__udivdi3(Ê¡~1.2K Flash) */
+//    /* è¯­éŸ³IC UART1: PA9 AF_PP, 9600 8N1, ç›´æ¥å†™BRRé¿å…__udivdi3(çœ~1.2K Flash) */
 //    {
 //        RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA, ENABLE);
 //        GPIO_InitTypeDef g = {0};
@@ -1740,20 +1803,20 @@ int main(void) {
 //        USART1->CTLR3 = 0;
 //    }
 //#endif
-    LCD_LED_SET;             // ÔÚAF_ODÄ£Ê½ÏÂODRÎŞ·¨¿ØÖÆ£¬´Ë´¦ÎŞĞ§µ«±£Áô
-    LCD_Backlight_PWM_Init();// ³õÊ¼»¯±³¹âPWM(TIM4_CH4, Ä¬ÈÏ0%)
+    LCD_LED_SET;             // åœ¨AF_ODæ¨¡å¼ä¸‹ODRæ— æ³•æ§åˆ¶ï¼Œæ­¤å¤„æ— æ•ˆä½†ä¿ç•™
+    LCD_Backlight_PWM_Init();// åˆå§‹åŒ–èƒŒå…‰PWM(TIM4_CH4, é»˜è®¤0%)
     if (!s_standby_touch_wake) {
         Touch_Init();
     }
     if (s_standby_charge_wake) {
-        /* ³äµç»½ĞÑÊ±²»ÏìÓ¦´¥Ãş£¬Ö±½Ó½ûÓÃÒÔ·À¸ÉÈÅ */
+        /* å……ç”µå”¤é†’æ—¶ä¸å“åº”è§¦æ‘¸ï¼Œç›´æ¥ç¦ç”¨ä»¥é˜²å¹²æ‰° */
         Main_DisableTouchInput();
     }
     else if (s_standby_touch_wake) {
         if (!wake_touch_confirmed) {
             /*
-             * PA8ÖĞ¶Ïµ«Î´È·ÈÏÓĞĞ§´¥Ãş£¬¿ÉÄÜÊÇ¸ÉÈÅÎó´¥·¢
-             * ÖØĞÂÅäÖÃINTÒı½Å²¢ÏµÍ³¸´Î»½øÈëStandby
+             * PA8ä¸­æ–­ä½†æœªç¡®è®¤æœ‰æ•ˆè§¦æ‘¸ï¼Œå¯èƒ½æ˜¯å¹²æ‰°è¯¯è§¦å‘
+             * é‡æ–°é…ç½®INTå¼•è„šå¹¶ç³»ç»Ÿå¤ä½è¿›å…¥Standby
              */
             Main_DisableTouchInput();
             Touch_WaitWakeInputsReleased();
@@ -1761,17 +1824,17 @@ int main(void) {
             while (1);
         }
         CheckWakeupSource(1);
-        /* Touch_Init() ÒÑÌáÇ°µ½ÉÏÃæ s_standby_touch_wake ·ÖÖ§ÀïÖ´ĞĞ(¼ûÄÇÀïµÄ×¢ÊÍ) */
+        /* Touch_Init() å·²æå‰åˆ°ä¸Šé¢ s_standby_touch_wake åˆ†æ”¯é‡Œæ‰§è¡Œ(è§é‚£é‡Œçš„æ³¨é‡Š) */
     }
-    // if (current_state == 1) {//²Ëµ¥Ä£Ê½
-    //     VOICE_SW_ON;//´ò¿ªÓïÒôIC
-    //     Delay_Ms(150);//µÈ´ıÓïÒôICÆô¶¯
+    // if (current_state == 1) {//èœå•æ¨¡å¼
+    //     VOICE_SW_ON;//æ‰“å¼€è¯­éŸ³IC
+    //     Delay_Ms(150);//ç­‰å¾…è¯­éŸ³ICå¯åŠ¨
     //     while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
-    //     VOICE_PlayTrack(current_video_index+1);  // ²¥·Å¶ÔÓ¦ÊÓÆµÇúÄ¿
+    //     VOICE_PlayTrack(current_video_index+1);  // æ’­æ”¾å¯¹åº”è§†é¢‘æ›²ç›®
     // }
 
     Settings_ApplyOrientation(g_orientation_index);
-    game_restored = GameRestore_ApplyPending();//³¢ÊÔ»Ö¸´´ı´¦ÀíµÄÓÎÏ·´æµµ
+    game_restored = GameRestore_ApplyPending();//å°è¯•æ¢å¤å¾…å¤„ç†çš„æ¸¸æˆå­˜æ¡£
 
 #ifndef DEBUG_NO_STANDBY
     if (s_standby_touch_wake) {
@@ -1781,10 +1844,10 @@ int main(void) {
         s_wake_release_count = 0;
         s_wake_wait_frames = 0;
     }
-    IWDG_Init();//³õÊ¼»¯¶ÀÁ¢¿´ÃÅ¹·
+    IWDG_Init();//åˆå§‹åŒ–ç‹¬ç«‹çœ‹é—¨ç‹—
 #endif
 
-    // Standby»½ĞÑºó¼ÓÔØÊÓÆµµØÖ·
+    // Standbyå”¤é†’ååŠ è½½è§†é¢‘åœ°å€
     if (!game_restored && (!first_boot || current_state == 1)) {
         LoadVideoAddress();
     }
@@ -1792,18 +1855,18 @@ int main(void) {
 #ifdef DEBUG_NO_STANDBY
     MAIN_LOOP :
 #endif
-    // Ö÷Ñ­»·
+    // ä¸»å¾ªç¯
     while (1) {
         
 #ifndef DEBUG_NO_STANDBY
-        IWDG_ReloadCounter();//Î¹¹·
+        IWDG_ReloadCounter();//å–‚ç‹—
 #endif
-        /* ¶¨Ê±Æ÷TIM2ÖĞ¶ÏÖÃÎ»±êÖ¾£¬whileÖĞCheckAndShowLowBatteryË¢ĞÂLCD */
+        /* å®šæ—¶å™¨TIM2ä¸­æ–­ç½®ä½æ ‡å¿—ï¼Œwhileä¸­CheckAndShowLowBatteryåˆ·æ–°LCD */
         if (TIMER2_TakeLowBatteryPending()) {
             CheckAndShowLowBattery();
         }
-        /* ÓĞ´¥ÃşÊ±ÏÈ´¦Àí´¥ÃşÊäÈëÔÙÅĞ¶Ï(¿ÉÄÜ¸Ä±äÄ£Ê½)
-         * ³äµçÊ±½ö²Ëµ¥/ÉèÖÃ¿É½»»¥, ·ÀÖ¹Îó´¥ÊÓÆµ/ÓÎÏ· */
+        /* æœ‰è§¦æ‘¸æ—¶å…ˆå¤„ç†è§¦æ‘¸è¾“å…¥å†åˆ¤æ–­(å¯èƒ½æ”¹å˜æ¨¡å¼)
+         * å……ç”µæ—¶ä»…èœå•/è®¾ç½®å¯äº¤äº’, é˜²æ­¢è¯¯è§¦è§†é¢‘/æ¸¸æˆ */
         if (current_state == 1 && end_flag == 0
             && (Battery_GetStatus() == BAT_NORMAL
                 || s_video_menu_visible
@@ -1812,44 +1875,44 @@ int main(void) {
                 || s_settings_mode != SETTINGS_NONE
                 || g_settings_from_game)
             && Main_HandleTouchInput()) {
-            TOUCH_DEBUG_FRAME(); MENU_DEBUG_FRAME();   /* µ÷ÊÔ: ´¥Ãş×ø±êÏÔÊ¾ÔÚ×îÉÏ²ã */
+            TOUCH_DEBUG_FRAME(); MENU_DEBUG_FRAME();   /* è°ƒè¯•: è§¦æ‘¸åæ ‡æ˜¾ç¤ºåœ¨æœ€ä¸Šå±‚ */
             continue;
         }
 
-        /* »î¶¯×´Ì¬: ´¦ÀíÓÎÏ·/²Ëµ¥/ÊÓÆµ¸üĞÂ(Ö÷Âß¼­) */
+        /* æ´»åŠ¨çŠ¶æ€: å¤„ç†æ¸¸æˆ/èœå•/è§†é¢‘æ›´æ–°(ä¸»é€»è¾‘) */
         if (current_state == 1 && end_flag == 0) {
-            Main_UpdateActiveMode(&charging_game_saved);//»î¶¯Ä£Ê½¸üĞÂ: ²Ëµ¥/ÓÎÏ·/ÊÓÆµÖ÷Ñ­»·´¦Àí
-            Main_FlashLowBattery();  /* µçÁ¿0¼¶Ê±µÍÆµÉÁË¸µÍµçÍ¼±ê */
-            TOUCH_DEBUG_FRAME(); MENU_DEBUG_FRAME();   /* µ÷ÊÔ: ´¥Ãş×ø±êÏÔÊ¾ÔÚ×îÉÏ²ã */
+            Main_UpdateActiveMode(&charging_game_saved);//æ´»åŠ¨æ¨¡å¼æ›´æ–°: èœå•/æ¸¸æˆ/è§†é¢‘ä¸»å¾ªç¯å¤„ç†
+            Main_FlashLowBattery();  /* ç”µé‡0çº§æ—¶ä½é¢‘é—ªçƒä½ç”µå›¾æ ‡ */
+            TOUCH_DEBUG_FRAME(); MENU_DEBUG_FRAME();   /* è°ƒè¯•: è§¦æ‘¸åæ ‡æ˜¾ç¤ºåœ¨æœ€ä¸Šå±‚ */
         }
         else {
-            // ´ı»ú/³äµçÄ£Ê½
-            // STDBYºÍCHRGµçÆ½¼ì²â
+            // å¾…æœº/å……ç”µæ¨¡å¼
+            // STDBYå’ŒCHRGç”µå¹³æ£€æµ‹
             BatteryStatus bat = Battery_GetStatus();
-            // VOICE_SW_OFF;      // ÓïÒôIC ÒÑÍ£ÓÃ(Í¬ÉÏ)
-            if (bat == BAT_CHARGING || bat == BAT_FULL) {//³äµç/ÂúµçÄ£Ê½
+            // VOICE_SW_OFF;      // è¯­éŸ³IC å·²åœç”¨(åŒä¸Š)
+            if (bat == BAT_CHARGING || bat == BAT_FULL) {//å……ç”µ/æ»¡ç”µæ¨¡å¼
                 uint16_t voltage = BAT_ADC_ReadVoltage();
                 Main_DisableTouchInput();
                 charge_exit_count = 0;
-                // È·ÈÏ³äµçÖĞ£¬¿ªÊ¼³äµçÁ÷³Ì
+                // ç¡®è®¤å……ç”µä¸­ï¼Œå¼€å§‹å……ç”µæµç¨‹
                 if (!was_charging) {
-                    LCD_Backlight_PWM_SetDuty(1);  // 5%ÁÁ¶È(Ê¡µç)£¬PWMÕ¼¿Õ±È¼«µÍÊµÏÖÎ¢ÁÁ
-                    peak_voltage = voltage;       // ³äµç³õÊ¼·åÖµÎªµ±Ç°µçÑ¹
+                    LCD_Backlight_PWM_SetDuty(1);  // 5%äº®åº¦(çœç”µ)ï¼ŒPWMå ç©ºæ¯”æä½å®ç°å¾®äº®
+                    peak_voltage = voltage;       // å……ç”µåˆå§‹å³°å€¼ä¸ºå½“å‰ç”µå‹
                     Battery_GameLevelAllowIncrease();
                     was_charging = 1;
-                    Battery_ResetDisplay();       // ¸´Î»³äµçÏÔÊ¾
+                    Battery_ResetDisplay();       // å¤ä½å……ç”µæ˜¾ç¤º
                 }
                 else if (voltage > peak_voltage) {
-                    peak_voltage = voltage;       // ¸üĞÂ·åÖµ
+                    peak_voltage = voltage;       // æ›´æ–°å³°å€¼
                 }
                 BatteryLevel level = Battery_ChargeVoltageToLevel(peak_voltage);
-                Battery_DrawIcon(bat, level);   // »æÖÆ³äµçÍ¼±êºÍµçÁ¿
-                Delay_Ms(100);           // PWMË¢ĞÂÖÜÆÚÔ¼Îª100ms
-                continue;//¼ÌĞø³äµçÑ­»·
+                Battery_DrawIcon(bat, level);   // ç»˜åˆ¶å……ç”µå›¾æ ‡å’Œç”µé‡
+                Delay_Ms(100);           // PWMåˆ·æ–°å‘¨æœŸçº¦ä¸º100ms
+                continue;//ç»§ç»­å……ç”µå¾ªç¯
             }
             /*
-             * PB5/PB6µçÆ½¿ÉÄÜË²Ê±±ä»¯£¬ĞèÈ·ÈÏ
-             * ³äµç»½ĞÑºó¼ì²âPA8Ô¼500msÈ·ÈÏÊÇ·ñÕæÕı°Î³ö
+             * PB5/PB6ç”µå¹³å¯èƒ½ç¬æ—¶å˜åŒ–ï¼Œéœ€ç¡®è®¤
+             * å……ç”µå”¤é†’åæ£€æµ‹PA8çº¦500msç¡®è®¤æ˜¯å¦çœŸæ­£æ‹”å‡º
              */
             if (s_standby_charge_wake && !was_charging) {
                 Main_DisableTouchInput();
@@ -1862,8 +1925,8 @@ int main(void) {
                 charge_exit_count = 0;
             }
             /*
-             * ¸Õ°ÎµçÊ±Ò²¿ÉÄÜ²¨¶¯
-             * Ğè500msÁ¬Ğø¼ì²âÈ·ÈÏÕæÕı°Î³ö
+             * åˆšæ‹”ç”µæ—¶ä¹Ÿå¯èƒ½æ³¢åŠ¨
+             * éœ€500msè¿ç»­æ£€æµ‹ç¡®è®¤çœŸæ­£æ‹”å‡º
              */
             if (was_charging
                 && charge_exit_count < CHARGE_EXIT_CONFIRM_COUNT) {
@@ -1871,16 +1934,16 @@ int main(void) {
                 Delay_Ms(CHARGE_EXIT_CHECK_MS);
                 continue;
             }
-            // È·ÈÏ°Î³ö
+            // ç¡®è®¤æ‹”å‡º
             charge_exit_count = 0;
             was_charging = 0;
-            // ½øÈë´ı»úÁ÷³Ì
+            // è¿›å…¥å¾…æœºæµç¨‹
             IWDG_Disable();
             end_flag = 0;
             current_state = 0;
-            LCD_Backlight_PWM_Stop();//Í£PWMÄ£Ê½(Ê¡µç)
-            LCD_LED_SET;  // ÇĞ»»GPIOÄ£Ê½ÓÃODRÈ·±£³ÖĞø¹Ø±Õ
-            LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);// È«ÆÁÌî³äºÚÉ«£¬È·±£´ı»úÇ°ÎŞ²ĞÁô»­Ãæ
+            LCD_Backlight_PWM_Stop();//åœPWMæ¨¡å¼(çœç”µ)
+            LCD_LED_SET;  // åˆ‡æ¢GPIOæ¨¡å¼ç”¨ODRç¡®ä¿æŒç»­å…³é—­
+            LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);// å…¨å±å¡«å……é»‘è‰²ï¼Œç¡®ä¿å¾…æœºå‰æ— æ®‹ç•™ç”»é¢
             next_bank = 0x00;
             next_higvh = 0x00;
             next_high = 0x00;
@@ -1897,12 +1960,12 @@ int main(void) {
             }
             else if (BKP_ReadBackupRegister(BKP_DR1) != 0x5A5A) {
                 /*
-                 * BKP_DR1ÎŞÓĞĞ§´æµµ(0x5A5A)Ê±Ä¬ÈÏ»Ö¸´ÊÓÆµÄ£Ê½
-                 * ´æ´¢ÊÓÆµ»½ĞÑ×´Ì¬ÒÔ±¸ÏÂ´Î»½ĞÑÇĞ»»ÊÓÆµ
+                 * BKP_DR1æ— æœ‰æ•ˆå­˜æ¡£(0x5A5A)æ—¶é»˜è®¤æ¢å¤è§†é¢‘æ¨¡å¼
+                 * å­˜å‚¨è§†é¢‘å”¤é†’çŠ¶æ€ä»¥å¤‡ä¸‹æ¬¡å”¤é†’åˆ‡æ¢è§†é¢‘
                  */
                 GameSave_SaveVideoWakeState(current_video_index);
             }
-            NVIC_SystemReset();//ÏµÍ³¸´Î»(¾­IWDG¸´Î»)½øÈëStandby
+            NVIC_SystemReset();//ç³»ç»Ÿå¤ä½(ç»IWDGå¤ä½)è¿›å…¥Standby
         }
     }
 #endif

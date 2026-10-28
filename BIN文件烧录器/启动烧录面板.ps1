@@ -28,9 +28,23 @@ if (Test-Port $port) {
     exit 0
 }
 
-$pyExe = (Get-Command python -ErrorAction SilentlyContinue).Source
+# 找真正的 python: Get-Command 可能解析到 WindowsApps 的应用商店占位 exe(运行返回 9009)
+function Find-Python {
+    $cands = @(
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python313\python.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'),
+        'C:\Python313\python.exe',
+        'C:\Python312\python.exe'
+    )
+    foreach ($c in $cands) { if (Test-Path -LiteralPath $c) { return $c } }
+    $g = Get-Command python -ErrorAction SilentlyContinue
+    if ($g -and $g.Source -and ($g.Source -notmatch 'WindowsApps')) { return $g.Source }
+    return $null
+}
+
+$pyExe = Find-Python
 if (-not $pyExe) {
-    Write-Host 'PATH 里找不到 python, 无法起服务'
+    Write-Host '找不到可用的 python(WindowsApps 那个占位 exe 不能用), 无法起服务'
     Read-Host '按回车关闭'
     exit 1
 }
@@ -39,14 +53,24 @@ $pyw = Join-Path (Split-Path $pyExe -Parent) 'pythonw.exe'
 if (Test-Path -LiteralPath $pyw) { $pyExe = $pyw }
 
 # 起服务(普通子进程; 不等它, 本脚本随即退出)
+$servePy = Join-Path $PSScriptRoot '内部\burn_web.py'
+if (-not (Test-Path -LiteralPath $servePy)) {
+    Write-Host ("找不到服务脚本: {0}" -f $servePy)
+    Read-Host '按回车关闭'
+    exit 1
+}
 try {
-    $p = Start-Process -FilePath $pyExe -ArgumentList @(('"{0}"' -f $py), "$port") -PassThru -WindowStyle Hidden
+    # 用 WMI 创建进程: 不走 Start-Process 的子进程树, 本脚本/Trae 运行会话结束时
+    # 服务不会被一起回收(否则页面就会"服务不可用")
+    $cmdline = ('"{0}" "{1}" {2}' -f $pyExe, $servePy, $port)
+    $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdline }
+    if ($r.ReturnValue -ne 0) { throw ("Win32_Process.Create 返回 {0}" -f $r.ReturnValue) }
+    $srvPid = $r.ProcessId
 } catch {
     Write-Host ('起服务失败: {0}' -f $_.Exception.Message)
     Read-Host '按回车关闭'
     exit 1
 }
-$srvPid = $p.Id
 
 # 等端口真的开始监听
 $ok = $false

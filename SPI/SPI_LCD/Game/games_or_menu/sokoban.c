@@ -1,8 +1,8 @@
 /**
  * @file    sokoban.c
- * @brief   ÍÆÏä×ÓÓÎÏ·Ä£¿é
- * @note    µØÍ¼ÔªËØ: 0=¿ÕµØ 1=Ç½ 2=Ä¿µÄµØ 3=Ïä×Ó 4=Íæ¼Ò 5=Ïä×ÓÔÚÄ¿µÄµØÉÏ
- *          µØÍ¼¹ö¶¯, ´¥ÃşÊÖÊÆ¿ØÖÆ, ÍÏ×§´°¿Ú
+ * @brief   æ¨ç®±å­æ¸¸æˆæ¨¡å—
+ * @note    åœ°å›¾å…ƒç´ : 0=ç©ºåœ° 1=å¢™ 2=ç›®çš„åœ° 3=ç®±å­ 4=ç©å®¶ 5=ç®±å­åœ¨ç›®çš„åœ°ä¸Š
+ *          åœ°å›¾æ»šåŠ¨, è§¦æ‘¸æ‰‹åŠ¿æ§åˆ¶, æ‹–æ‹½çª—å£
  */
 
 #include "sokoban.h"
@@ -16,144 +16,144 @@
 #include "sok_img_prev.h"
 #include "sok_img_restart.h"
 #include "sok_img_next.h"
-#include "sok_img_undo.h"  /* ³·Ïú½çÃæ°´Å¥Í¼(Íâ²¿Flash±£ÁôÇø, 1:1 ÏÔÊ¾) */
-#include "flash_store.h"   /* Í¼Ïñ×ÊÔ´´ÓÍâ²¿Flash¶ÁÈ¡ */
+#include "sok_img_undo.h"  /* æ’¤é”€ç•Œé¢æŒ‰é’®å›¾(å¤–éƒ¨Flashä¿ç•™åŒº, 1:1 æ˜¾ç¤º) */
+#include "flash_store.h"   /* å›¾åƒèµ„æºä»å¤–éƒ¨Flashè¯»å– */
 #include "settings.h"    /* g_language_index: pick button set by language */
 
 #define SOK_BATTERY_X  108
 #define SOK_BATTERY_Y    2
 
- /* µØÍ¼Êı¾İ½á¹¹ */
+ /* åœ°å›¾æ•°æ®ç»“æ„ */
 static uint8_t  g_runtime_map[SOK_MAX_CELLS];
 
-/* µ±Ç°¹Ø¿¨µÄµØÍ¼ BCD Ô­Êı¾İ(RAM »º³å): µØÍ¼"ÕæÉí"ÔÚÍâ²¿ Flash(×ÊÔ´Çø), Ñ¡¹ØÊ±¶Á½øÀ´ ¡ª¡ª
-   Ö»¸ø is_orig_target() ÅĞ¶ÏÔ­Ê¼Ä¿±êµãÓÃ; ÓÎÏ·¹ı³ÌÓÃµÄÊÇÉÏÃæ½âÑ¹ºóµÄ g_runtime_map¡£
-   ×î´óµÄÒ»¹ØÊÇ 14x15 ¡ú 105 ×Ö½Ú, 128 ×ã¹»¡£ */
+/* å½“å‰å…³å¡çš„åœ°å›¾ BCD åŸæ•°æ®(RAM ç¼“å†²): åœ°å›¾"çœŸèº«"åœ¨å¤–éƒ¨ Flash(èµ„æºåŒº), é€‰å…³æ—¶è¯»è¿›æ¥ â€”â€”
+   åªç»™ is_orig_target() åˆ¤æ–­åŸå§‹ç›®æ ‡ç‚¹ç”¨; æ¸¸æˆè¿‡ç¨‹ç”¨çš„æ˜¯ä¸Šé¢è§£å‹åçš„ g_runtime_mapã€‚
+   æœ€å¤§çš„ä¸€å…³æ˜¯ 14x15 â†’ 105 å­—èŠ‚, 128 è¶³å¤Ÿã€‚ */
 static uint8_t  g_level_bcd[128];
-static uint8_t  s_bcd_level = 0xFF;   /* »º³åÀï×°µÄÊÇµÚ¼¸¹Ø(0xFF=»¹Ã»×°) */
+static uint8_t  s_bcd_level = 0xFF;   /* ç¼“å†²é‡Œè£…çš„æ˜¯ç¬¬å‡ å…³(0xFF=è¿˜æ²¡è£…) */
 static uint8_t  g_level_rows, g_level_cols;
 static int16_t  g_ox, g_oy;
 static uint16_t g_move_count;
-static uint16_t g_tile_size;              /* Ã¿¸ñ³ß´ç (¶¯Ì¬Ëõ·Å¼ÆËã) */
-static const SokobanLevel* g_cur_level;   /* µ±Ç°¹Ø¿¨ (Ö»¶Á, Ö¸Ïò¹Ø¿¨Êı×é) */
+static uint16_t g_tile_size;              /* æ¯æ ¼å°ºå¯¸ (åŠ¨æ€ç¼©æ”¾è®¡ç®—) */
+static const SokobanLevel* g_cur_level;   /* å½“å‰å…³å¡ (åªè¯», æŒ‡å‘å…³å¡æ•°ç»„) */
 
-/* ÏÂ·½3¸ö²Ù×÷°´Å¥: ÉÏÒ»¹Ø/ÖØĞÂ¿ªÊ¼/ÏÂÒ»¹Ø */
-#define SOK_BTN1_X      15     // ÉÏÒ»¹Ø X
-#define SOK_BTN2_X      90     // ÖØĞÂ¿ªÊ¼ X
-#define SOK_BTN3_X     165     // ÏÂÒ»¹Ø X
-#define SOK_BTN_W       60     // °´Å¥¿í¶È
-#define SOK_BTN_H       60     // °´Å¥¸ß¶È
-#define SOK_BTN_Y      160     // °´Å¥ÆğÊ¼Y
-#define SOK_BTN_HIT_Y0 140     // °´Å¥ÃüÖĞÇøYÆğµã (°´Å¥ÉÏ±ß 160 - 20)
-#define SOK_BTN_HIT_Y1 240     // °´Å¥ÃüÖĞÇøYÖÕµã: ÅĞ¶¨ÊÇ y>=´ËÖµÔò²»Ëã, ËùÒÔ 240 = Ö±µ½ y=239(ÆÁÄ»×îµ×)
-/* ºáÏò·Ö½ç = ÏàÁÚ°´Å¥ÖĞÏß, ÈÃÈı¸öÃüÖĞÇø"ÎŞ·ì"(²»ÁôËÀÇø)¡¢ÇÒ¶¼ÒÔ°´Å¥ÎªÖĞĞÄ(Óë³·Ïú×é×ö·¨Ò»ÖÂ) */
-#define SOK_BTN_HIT_SPLIT1  82   // (75+90)/2  = 82.5 -> ÉÏÒ»¹Ø/ÖØĞÂ¿ªÊ¼ µÄ·Ö½ç
-#define SOK_BTN_HIT_SPLIT2 157   // (150+165)/2 = 157.5 -> ÖØĞÂ¿ªÊ¼/ÏÂÒ»¹Ø µÄ·Ö½ç
-#define SOK_SWIPE_Y    230     // »¬¶¯¼ì²â: ÏÂ·½ÇøÓòYãĞÖµ (µ±Y>´ËÖµÏÔÊ¾²Ëµ¥)
-#define SOK_SLIDE_MAX_STEP   2  // ¸úÊÖÍÏ×§Ã¿Ö¡×î´ó²½½ø(·ÀÌø±ä)
-#define SOK_SLIDE_SPEED      2  // ËÉÊÖºó×Ô¶¯»¬¶¯ËÙ¶È(px/Ö¡)
+/* ä¸‹æ–¹3ä¸ªæ“ä½œæŒ‰é’®: ä¸Šä¸€å…³/é‡æ–°å¼€å§‹/ä¸‹ä¸€å…³ */
+#define SOK_BTN1_X      15     // ä¸Šä¸€å…³ X
+#define SOK_BTN2_X      90     // é‡æ–°å¼€å§‹ X
+#define SOK_BTN3_X     165     // ä¸‹ä¸€å…³ X
+#define SOK_BTN_W       60     // æŒ‰é’®å®½åº¦
+#define SOK_BTN_H       60     // æŒ‰é’®é«˜åº¦
+#define SOK_BTN_Y      160     // æŒ‰é’®èµ·å§‹Y
+#define SOK_BTN_HIT_Y0 140     // æŒ‰é’®å‘½ä¸­åŒºYèµ·ç‚¹ (æŒ‰é’®ä¸Šè¾¹ 160 - 20)
+#define SOK_BTN_HIT_Y1 240     // æŒ‰é’®å‘½ä¸­åŒºYç»ˆç‚¹: åˆ¤å®šæ˜¯ y>=æ­¤å€¼åˆ™ä¸ç®—, æ‰€ä»¥ 240 = ç›´åˆ° y=239(å±å¹•æœ€åº•)
+/* æ¨ªå‘åˆ†ç•Œ = ç›¸é‚»æŒ‰é’®ä¸­çº¿, è®©ä¸‰ä¸ªå‘½ä¸­åŒº"æ— ç¼"(ä¸ç•™æ­»åŒº)ã€ä¸”éƒ½ä»¥æŒ‰é’®ä¸ºä¸­å¿ƒ(ä¸æ’¤é”€ç»„åšæ³•ä¸€è‡´) */
+#define SOK_BTN_HIT_SPLIT1  82   // (75+90)/2  = 82.5 -> ä¸Šä¸€å…³/é‡æ–°å¼€å§‹ çš„åˆ†ç•Œ
+#define SOK_BTN_HIT_SPLIT2 157   // (150+165)/2 = 157.5 -> é‡æ–°å¼€å§‹/ä¸‹ä¸€å…³ çš„åˆ†ç•Œ
+#define SOK_SWIPE_Y    230     // æ»‘åŠ¨æ£€æµ‹: ä¸‹æ–¹åŒºåŸŸYé˜ˆå€¼ (å½“Y>æ­¤å€¼æ˜¾ç¤ºèœå•)
+#define SOK_SLIDE_MAX_STEP   2  // è·Ÿæ‰‹æ‹–æ‹½æ¯å¸§æœ€å¤§æ­¥è¿›(é˜²è·³å˜)
+#define SOK_SLIDE_SPEED      2  // æ¾æ‰‹åè‡ªåŠ¨æ»‘åŠ¨é€Ÿåº¦(px/å¸§)
 
-/* ³¤°´Óë»¬¶¯ãĞÖµ */
-#define SOK_HOLD_THRESHOLD    50 // ³¤°´ÒÆ¶¯ãĞÖµ(ÏñËØ)
-#define SOK_RELEASE_THRESHOLD 10 // ËÉÊÖ»¬¶¯ãĞÖµ(ÏñËØ)
+/* é•¿æŒ‰ä¸æ»‘åŠ¨é˜ˆå€¼ */
+#define SOK_HOLD_THRESHOLD    50 // é•¿æŒ‰ç§»åŠ¨é˜ˆå€¼(åƒç´ )
+#define SOK_RELEASE_THRESHOLD 10 // æ¾æ‰‹æ»‘åŠ¨é˜ˆå€¼(åƒç´ )
 
-/*¹Ø¿¨ÇĞ»»ãĞÖµ*/
-#define HOLD_START_US      200000UL   /* ³¤°´Æô¶¯ãĞÖµ (~200ms, Î¢Ãë) */
-#define HOLD_REPEAT_US     130000UL    /* ³¤°´ÖØ¸´¼ä¸ô (~130ms, Î¢Ãë) */
-#define HOLD_COOLDOWN_FRAMES 100       /* ³¤°´×Ô¶¯ÇĞ¹Øºó²Ëµ¥ÀäÈ´Ö¡Êı(·ÀÖØ¸´´¥·¢) */
+/*å…³å¡åˆ‡æ¢é˜ˆå€¼*/
+#define HOLD_START_US      200000UL   /* é•¿æŒ‰å¯åŠ¨é˜ˆå€¼ (~200ms, å¾®ç§’) */
+#define HOLD_REPEAT_US     130000UL    /* é•¿æŒ‰é‡å¤é—´éš” (~130ms, å¾®ç§’) */
+#define HOLD_COOLDOWN_FRAMES 100       /* é•¿æŒ‰è‡ªåŠ¨åˆ‡å…³åèœå•å†·å´å¸§æ•°(é˜²é‡å¤è§¦å‘) */
 
-/* ÍË³ö²Ëµ¥×´Ì¬ (MENU_* ¶¨ÒåÔÚ sokoban.h) */
+/* é€€å‡ºèœå•çŠ¶æ€ (MENU_* å®šä¹‰åœ¨ sokoban.h) */
 static uint8_t  s_exit_menu_visible = 0;
-static uint8_t  s_exit_sliding;       /* »¬¶¯¶¯»­½øĞĞÖĞ */
-static int16_t  s_exit_drag_y;        /* ÍË³ö²Ëµ¥Y×ø±ê */
-static uint8_t  s_exit_dragging;      /* ÍÏ×§ÖĞ±êÖ¾ */
-static uint16_t s_exit_drag_start_y;  /* ÍÏ×§ÆğµãY */
+static uint8_t  s_exit_sliding;       /* æ»‘åŠ¨åŠ¨ç”»è¿›è¡Œä¸­ */
+static int16_t  s_exit_drag_y;        /* é€€å‡ºèœå•Yåæ ‡ */
+static uint8_t  s_exit_dragging;      /* æ‹–æ‹½ä¸­æ ‡å¿— */
+static uint16_t s_exit_drag_start_y;  /* æ‹–æ‹½èµ·ç‚¹Y */
 
-/* ÍË³ö²Ëµ¥ (ÊÓÆµ/2048/¶íÂŞË¹·½¿é/»ªÈİµÀ/·µ»Ø, ¼õµ±Ç°=ÍÆÏä×Ó) */
+/* é€€å‡ºèœå• (è§†é¢‘/2048/ä¿„ç½—æ–¯æ–¹å—/åå®¹é“/è¿”å›, å‡å½“å‰=æ¨ç®±å­) */
 static const uint8_t sokoban_exit_map[5] = {
     EXIT_RET_VIDEO, EXIT_RET_D2048, EXIT_RET_TETRIS, EXIT_RET_KLOTSKI, EXIT_RET_FISH
 };
 
-/* ÓÎÏ·×´Ì¬Óë²Ëµ¥×´Ì¬ */
+/* æ¸¸æˆçŠ¶æ€ä¸èœå•çŠ¶æ€ */
 static uint8_t  s_won = 0;
 static uint8_t  s_menu_visible = 0;
-static uint8_t  s_menu_sliding = 0;    /* ¸úÊÖ»¬¶¯ÖĞ */
-static int16_t  s_menu_slide_y = 240;  /* ¸úÊÖ»¬¶¯: °´Å¥Ãæ°å¶¥²¿Y */
-static uint8_t  s_menu_slide_anim = 0;    /* ËÉÊÖºó×Ô¶¯»¬¶¯¶¯»­ÖĞ */
-static uint8_t  s_menu_from_swipe = 0;    /* ²Ëµ¥ÊÇ·ñÓÉÉÏ»®ÊÖÊÆ½øÈë(Çø·Ölevel_init) */
+static uint8_t  s_menu_sliding = 0;    /* è·Ÿæ‰‹æ»‘åŠ¨ä¸­ */
+static int16_t  s_menu_slide_y = 240;  /* è·Ÿæ‰‹æ»‘åŠ¨: æŒ‰é’®é¢æ¿é¡¶éƒ¨Y */
+static uint8_t  s_menu_slide_anim = 0;    /* æ¾æ‰‹åè‡ªåŠ¨æ»‘åŠ¨åŠ¨ç”»ä¸­ */
+static uint8_t  s_menu_from_swipe = 0;    /* èœå•æ˜¯å¦ç”±ä¸Šåˆ’æ‰‹åŠ¿è¿›å…¥(åŒºåˆ†level_init) */
 static uint8_t  s_current_level = 0;
-static uint8_t  s_level_num = 0;  /* µ±Ç°¹Ø¿¨ºÅ (1-based) */
-static uint8_t  g_sok_dirty = 0;  /* 0=¸É¾», 1=È«ÆÁÖØ»æ, 2=µç³ØÉÁÃğ½ö¾Ö²¿ */
+static uint8_t  s_level_num = 0;  /* å½“å‰å…³å¡å· (1-based) */
+static uint8_t  g_sok_dirty = 0;  /* 0=å¹²å‡€, 1=å…¨å±é‡ç»˜, 2=ç”µæ± é—ªç­ä»…å±€éƒ¨ */
 
-/* ÍË³ö²Ëµ¥ĞĞÀàĞÍ (ÊÓÆµ/2048/¶íÂŞË¹·½¿é/»ªÈİµÀ/·µ»Ø) */
+/* é€€å‡ºèœå•è¡Œç±»å‹ (è§†é¢‘/2048/ä¿„ç½—æ–¯æ–¹å—/åå®¹é“/è¿”å›) */
 static const uint8_t sok_row_types[5] = {
     MENU_ROW_SHIPIN, MENU_ROW_2048, MENU_ROW_TETRIS, MENU_ROW_KLOTSKI, MENU_ROW_FISH
 };
 
-/* ´¥ÃşÊäÈë×´Ì¬ */
+/* è§¦æ‘¸è¾“å…¥çŠ¶æ€ */
 static uint8_t  s_prev_pressed = 0;
 static uint16_t s_touch_start_x, s_touch_start_y;
-static uint16_t s_swipe_origin_y;   // »¬¶¯ÆğÊ¼Y×ø±ê(ÓÃÓÚÍË³ö²Ëµ¥ÊÖÊÆ¼ì²â)
-static uint8_t  s_menu_cooldown = 0; // ²Ëµ¥ÀäÈ´¼ÆÊı, ·ÀÖ¹Îó´¥ÖØ¸´´ò¿ª
-static uint8_t  s_hold_button = 0;  // ³¤°´°´Å¥: 0=ÎŞ, 1=ÉÏÒ»¹Ø, 3=ÏÂÒ»¹Ø
-static uint32_t s_hold_us = 0;  // ³¤°´ÀÛ¼ÆÊ±¼ä(us)
-static uint32_t s_hold_last_us = 0;  // ³¤°´ÉÏ´Î¼ÆÊ±»ù×¼(us)
-static uint8_t  s_drag_btn = 0;  // ÍÏ×§×·×Ù: 0=ÎŞ, 1=ÉÏÒ»¹Ø, 2=ÖØĞÂ¿ªÊ¼, 3=ÏÂÒ»¹Ø
-static uint8_t  s_won_transition = 0;  // WONÇĞ¹Øºó½øÈëmenu_visibleµÄ±ê¼Ç, ·ÀËÉÊÖÔÙÇĞ
-static uint8_t  s_btn_max_y = 0;  // °´Å¥À¸ÍÏ×§×îÔ¶Y, ËÉÊÖ»ØÍË>5pxÈ¡Ïû
-static int16_t  s_slide_max_dy = 0;  // ÉÏ»®ÍÏ×§×îÔ¶Î»ÒÆ, ËÉÊÖ»ØÍË>2pxÈ¡Ïû
+static uint16_t s_swipe_origin_y;   // æ»‘åŠ¨èµ·å§‹Yåæ ‡(ç”¨äºé€€å‡ºèœå•æ‰‹åŠ¿æ£€æµ‹)
+static uint8_t  s_menu_cooldown = 0; // èœå•å†·å´è®¡æ•°, é˜²æ­¢è¯¯è§¦é‡å¤æ‰“å¼€
+static uint8_t  s_hold_button = 0;  // é•¿æŒ‰æŒ‰é’®: 0=æ— , 1=ä¸Šä¸€å…³, 3=ä¸‹ä¸€å…³
+static uint32_t s_hold_us = 0;  // é•¿æŒ‰ç´¯è®¡æ—¶é—´(us)
+static uint32_t s_hold_last_us = 0;  // é•¿æŒ‰ä¸Šæ¬¡è®¡æ—¶åŸºå‡†(us)
+static uint8_t  s_drag_btn = 0;  // æ‹–æ‹½è¿½è¸ª: 0=æ— , 1=ä¸Šä¸€å…³, 2=é‡æ–°å¼€å§‹, 3=ä¸‹ä¸€å…³
+static uint8_t  s_won_transition = 0;  // WONåˆ‡å…³åè¿›å…¥menu_visibleçš„æ ‡è®°, é˜²æ¾æ‰‹å†åˆ‡
+static uint8_t  s_btn_max_y = 0;  // æŒ‰é’®æ æ‹–æ‹½æœ€è¿œY, æ¾æ‰‹å›é€€>5pxå–æ¶ˆ
+static int16_t  s_slide_max_dy = 0;  // ä¸Šåˆ’æ‹–æ‹½æœ€è¿œä½ç§», æ¾æ‰‹å›é€€>2pxå–æ¶ˆ
 
-/* ---- ¶ş¼¶²Ëµ¥(3ĞĞ: ³·Ïú/ÉèÖÃ/·µ»Ø), ÓÉÒ»¼¶°´Å¥Ãæ°å"¶ş´ÎÉÏ»®"¸úÊÖÀ­³ö ---- */
+/* ---- äºŒçº§èœå•(3è¡Œ: æ’¤é”€/è®¾ç½®/è¿”å›), ç”±ä¸€çº§æŒ‰é’®é¢æ¿"äºŒæ¬¡ä¸Šåˆ’"è·Ÿæ‰‹æ‹‰å‡º ---- */
 static uint8_t  s_lvl2_visible = 0;
-/* ---- ¸úÊÖÉÏ»®À­³öµÄÃæ°åÖÖÀà: 0=µ¼º½°´Å¥×é(Í£ y=SOK_BTN_Y), 1=¶ş¼¶²Ëµ¥(Í£ y=RESTART_MENU_Y) ----
-   Á½Õß¹²ÓÃÍ¬Ò»Ì×¸úÊÖ»¬¶¯×´Ì¬(s_menu_sliding/s_menu_slide_y), ¿¿ s_panel_kind Çø·Ö»­Ê²Ã´ */
+/* ---- è·Ÿæ‰‹ä¸Šåˆ’æ‹‰å‡ºçš„é¢æ¿ç§ç±»: 0=å¯¼èˆªæŒ‰é’®ç»„(åœ y=SOK_BTN_Y), 1=äºŒçº§èœå•(åœ y=RESTART_MENU_Y) ----
+   ä¸¤è€…å…±ç”¨åŒä¸€å¥—è·Ÿæ‰‹æ»‘åŠ¨çŠ¶æ€(s_menu_sliding/s_menu_slide_y), é  s_panel_kind åŒºåˆ†ç”»ä»€ä¹ˆ */
 static uint8_t  s_panel_kind = 0;
-static int16_t  s_panel_rest = SOK_BTN_Y;   /* µ±Ç°Ãæ°åÍ£×¡Ê±µÄ¶¥²¿Y */
+static int16_t  s_panel_rest = SOK_BTN_Y;   /* å½“å‰é¢æ¿åœä½æ—¶çš„é¡¶éƒ¨Y */
 static const uint8_t sok_lvl2_row_types[3] = {
     MENU_ROW_CHEXIAO, MENU_ROW_SHEZHI, MENU_ROW_FANHUI
 };
 
-/* ---- ³·Ïú½çÃæ: 1:1(30x31) Èı¸ö°´Å¥ ÉÏÒ»²½/·µ»Ø/ÏÂÒ»²½ ----
-   Î»ÖÃ°´"µ×±ß 220 ²»±ä¡¢×óÅ¥ÓÒÔµ 75 ²»±ä¡¢ÓÒÅ¥×óÔµ 165 ²»±ä"ÅÅ:
-   Ò»¼¶°´Å¥ (2x, 60x62) ÔÚ x=15/90/165, y=160; ³·Ïú°´Å¥ (1x, 30x31) ÔÚÏÂÃæÕâÈı¸öÎ»ÖÃ¡£
-   ´¥ÃşÅĞ¶¨: ºáÏò°´"ÏàÁÚ°´Å¥ÖĞÏß"(90/150, ¼û SOK_UNDO_HIT_SPLIT1/2) ·Ö, ÈÃÈı¸öÇø¶¼ÒÔ°´Å¥ÎªÖĞĞÄ
-   (¾ÉĞ´·¨Ö±½ÓÄÃ X2/X3 µ±·Ö½ç ¡ª¡ª ÄÇÁ©ÊÇ°´Å¥×óÔµ, ÖĞ¼äµÄ"·µ»Ø"»áÕûÌåÓÒÆ« 15px)¡£ */
+/* ---- æ’¤é”€ç•Œé¢: 1:1(30x31) ä¸‰ä¸ªæŒ‰é’® ä¸Šä¸€æ­¥/è¿”å›/ä¸‹ä¸€æ­¥ ----
+   ä½ç½®æŒ‰"åº•è¾¹ 220 ä¸å˜ã€å·¦é’®å³ç¼˜ 75 ä¸å˜ã€å³é’®å·¦ç¼˜ 165 ä¸å˜"æ’:
+   ä¸€çº§æŒ‰é’® (2x, 60x62) åœ¨ x=15/90/165, y=160; æ’¤é”€æŒ‰é’® (1x, 30x31) åœ¨ä¸‹é¢è¿™ä¸‰ä¸ªä½ç½®ã€‚
+   è§¦æ‘¸åˆ¤å®š: æ¨ªå‘æŒ‰"ç›¸é‚»æŒ‰é’®ä¸­çº¿"(90/150, è§ SOK_UNDO_HIT_SPLIT1/2) åˆ†, è®©ä¸‰ä¸ªåŒºéƒ½ä»¥æŒ‰é’®ä¸ºä¸­å¿ƒ
+   (æ—§å†™æ³•ç›´æ¥æ‹¿ X2/X3 å½“åˆ†ç•Œ â€”â€” é‚£ä¿©æ˜¯æŒ‰é’®å·¦ç¼˜, ä¸­é—´çš„"è¿”å›"ä¼šæ•´ä½“å³å 15px)ã€‚ */
 #define SOK_UNDO_X1     45
 #define SOK_UNDO_X2     105
 #define SOK_UNDO_X3     165
 #define SOK_UNDO_Y      189            /* = 220 - 31 */
-/* ³·Ïú°´Å¥µÄ´¥ÃşÅĞ¶¨: µ¥¶ÀÒ»Ì× ¡ª¡ª °´Å¥Ö»ÓĞ 31px ¸ß, ÈôÑØÓÃÒ»¼¶°´Å¥ÄÇÖÖ"ÉÏ·½¶à·Å¿í
-   ¼¸Ê®ÏñËØ"µÄ´ø, ÉÏÃæÒ»´óÆ¬¿Õ°×¶¼»áËã³Éµã°´Å¥(ÖĞ¼äµÄ"·µ»Ø"ÓÈÆäÈİÒ×Îó´¥)¡£
-   ÕâÀïÖ»ÔÚÉÏ·½·Å¿í 10px, ÏÂ·½Ò»Ö±µ½µ×±ß(ÓëÒ»¼¶°´Å¥Ò»ÖÂ)¡£ */
+/* æ’¤é”€æŒ‰é’®çš„è§¦æ‘¸åˆ¤å®š: å•ç‹¬ä¸€å¥— â€”â€” æŒ‰é’®åªæœ‰ 31px é«˜, è‹¥æ²¿ç”¨ä¸€çº§æŒ‰é’®é‚£ç§"ä¸Šæ–¹å¤šæ”¾å®½
+   å‡ ååƒç´ "çš„å¸¦, ä¸Šé¢ä¸€å¤§ç‰‡ç©ºç™½éƒ½ä¼šç®—æˆç‚¹æŒ‰é’®(ä¸­é—´çš„"è¿”å›"å°¤å…¶å®¹æ˜“è¯¯è§¦)ã€‚
+   è¿™é‡Œåªåœ¨ä¸Šæ–¹æ”¾å®½ 10px, ä¸‹æ–¹ä¸€ç›´åˆ°åº•è¾¹(ä¸ä¸€çº§æŒ‰é’®ä¸€è‡´)ã€‚ */
 #define SOK_UNDO_HIT_Y0 179            /* = 189 - 10 */
-#define SOK_UNDO_HIT_SPLIT1  90   /* ºáÏò·Ö½ç: ÏàÁÚ°´Å¥ÖĞÏß (75+105)/2, Ê¹Èı¸öÇø¶¼ÒÔ°´Å¥ÎªÖĞĞÄ */
-#define SOK_UNDO_HIT_SPLIT2 150   /* ºáÏò·Ö½ç: (135+165)/2 (»­Í¼×ø±ê 105/165 ÊÇ°´Å¥×óÔµ, Ö±½ÓÓÃ»áÈÃ
-                                     ÖĞ¼ä<·µ»Ø>µÄÇøÕûÌåÓÒÆ«15px) */
-#define SOK_UNDO_HIT_Y1 240            /* µ½µ×±ß(ÅĞ¶¨ y>=´ËÖµ²»Ëã, 240 = º¬ y=239) */
-static uint8_t  s_undo_group = 0;      /* 1 = ³·ÏúÄ£Ê½: ÉÏ»®ÏÔÊ¾³·Ïú°´Å¥×é(¶ø²»ÊÇµ¼º½°´Å¥) */
-static uint8_t  s_undo_visible = 0;    /* ³·Ïú°´Å¥×éµ±Ç°ÏÔÊ¾ÖĞ */
+#define SOK_UNDO_HIT_SPLIT1  90   /* æ¨ªå‘åˆ†ç•Œ: ç›¸é‚»æŒ‰é’®ä¸­çº¿ (75+105)/2, ä½¿ä¸‰ä¸ªåŒºéƒ½ä»¥æŒ‰é’®ä¸ºä¸­å¿ƒ */
+#define SOK_UNDO_HIT_SPLIT2 150   /* æ¨ªå‘åˆ†ç•Œ: (135+165)/2 (ç”»å›¾åæ ‡ 105/165 æ˜¯æŒ‰é’®å·¦ç¼˜, ç›´æ¥ç”¨ä¼šè®©
+                                     ä¸­é—´<è¿”å›>çš„åŒºæ•´ä½“å³å15px) */
+#define SOK_UNDO_HIT_Y1 240            /* åˆ°åº•è¾¹(åˆ¤å®š y>=æ­¤å€¼ä¸ç®—, 240 = å« y=239) */
+static uint8_t  s_undo_group = 0;      /* 1 = æ’¤é”€æ¨¡å¼: ä¸Šåˆ’æ˜¾ç¤ºæ’¤é”€æŒ‰é’®ç»„(è€Œä¸æ˜¯å¯¼èˆªæŒ‰é’®) */
+static uint8_t  s_undo_visible = 0;    /* æ’¤é”€æŒ‰é’®ç»„å½“å‰æ˜¾ç¤ºä¸­ */
 
-/* ---- ³·Ïú/ÖØ×öÀúÊ·: Ã¿²½ 1 ×Ö½Ú(µÍ2Î»=·½Ïò, bit2=Õâ²½ÍÆÁËÏä×Ó), »·ĞÎ»º³å 64 ²½ ----
-   ·½ÏòÓë SokobanDir Í¬Ğò(ÉÏ0/ÏÂ1/×ó2/ÓÒ3); ³·»Ø/ÖØ×ö¶¼¿¿"µ±Ç°Íæ¼ÒÎ»ÖÃ + Õâ 1 ×Ö½Ú"·´ÍÆ/ÕıÍÆ,
-   ËùÒÔ³ıÁËÕâ 64 ×Ö½Ú²»ĞèÒªÔÙ´æ±ğµÄ×´Ì¬(¼û¿ª·¢×¢ÒâÊÂÏî ¡ì38)¡£
-   »·ĞÎ: ÂúÁË¸²¸Ç×î¾ÉÒ»Ìõ(²»ÓÃ°áÊı¾İ), ±£Ö¤ÓÀÔ¶ÄÜ³·×î½ü 64 ²½ */
+/* ---- æ’¤é”€/é‡åšå†å²: æ¯æ­¥ 1 å­—èŠ‚(ä½2ä½=æ–¹å‘, bit2=è¿™æ­¥æ¨äº†ç®±å­), ç¯å½¢ç¼“å†² 64 æ­¥ ----
+   æ–¹å‘ä¸ SokobanDir åŒåº(ä¸Š0/ä¸‹1/å·¦2/å³3); æ’¤å›/é‡åšéƒ½é "å½“å‰ç©å®¶ä½ç½® + è¿™ 1 å­—èŠ‚"åæ¨/æ­£æ¨,
+   æ‰€ä»¥é™¤äº†è¿™ 64 å­—èŠ‚ä¸éœ€è¦å†å­˜åˆ«çš„çŠ¶æ€(è§å¼€å‘æ³¨æ„äº‹é¡¹ Â§38)ã€‚
+   ç¯å½¢: æ»¡äº†è¦†ç›–æœ€æ—§ä¸€æ¡(ä¸ç”¨æ¬æ•°æ®), ä¿è¯æ°¸è¿œèƒ½æ’¤æœ€è¿‘ 64 æ­¥ */
 #define SOK_HIST_MAX    64
 static uint8_t  s_hist[SOK_HIST_MAX];
-static uint8_t  s_hist_cnt = 0;        /* ÓĞĞ§²½Êı(<=64) */
-static uint8_t  s_hist_head = 0;       /* ×î¾ÉÒ»ÌõµÄÏÂ±ê */
-static uint8_t  s_hist_pos = 0;        /* µ±Ç°½ø¶È(0..cnt); cnt-pos = ¿ÉÖØ×ö²½Êı */
+static uint8_t  s_hist_cnt = 0;        /* æœ‰æ•ˆæ­¥æ•°(<=64) */
+static uint8_t  s_hist_head = 0;       /* æœ€æ—§ä¸€æ¡çš„ä¸‹æ ‡ */
+static uint8_t  s_hist_pos = 0;        /* å½“å‰è¿›åº¦(0..cnt); cnt-pos = å¯é‡åšæ­¥æ•° */
 
 static void sokoban_draw_cell_at(uint8_t row, uint8_t col);
-static void sok_draw_undo_buttons(void);      /* ³·Ïú°´Å¥×é(¶¨ÒåÔÚÏÂ·½) */
-static void sok_show_nav_group(void);         /* ÏÔÊ¾Ò»¼¶µ¼º½°´Å¥×é(¶¨ÒåÔÚÏÂ·½) */
-static void sok_redraw_cell_ui(uint8_t r, uint8_t c);  /* ÖØ»æÒ»¸ñ(Ìø¹ı±»³·Ïú°´Å¥¸Ç×¡µÄ) */
-static void sok_redraw_nav_group(void);       /* ÖØ»æÒ»¼¶µ¼º½°´Å¥×é+¹Ø¿¨±àºÅ(¶¨ÒåÔÚÏÂ·½) */
-static void sok_draw_nav_buttons_at(int16_t y);   /* µ¼º½°´Å¥×é»æÖÆ(¶¨ÒåÔÚÏÂ·½) */
-static void sok_redraw_battery_tiles(int16_t x0, int16_t y0, int16_t x1, int16_t y1); /* °´¾ØĞÎÖØ»æµØÍ¼ÍßÆ¬(¶¨ÒåÔÚÏÂ·½) */
-static void sok_hist_push(uint8_t step);      /* ¼ÇÂ¼Ò»²½³·ÏúÀúÊ·(¶¨ÒåÔÚÏÂ·½) */
-static uint8_t sok_try_open_exit_menu(uint16_t y);  /* ÉÏ·½ÇøÓòÏÂ»¬´ò¿ªÍË³ö²Ëµ¥(ÓÎÏ·ÄÚ/¶ş¼¶²Ëµ¥/³·Ïú½çÃæ¹²ÓÃ) */
+static void sok_draw_undo_buttons(void);      /* æ’¤é”€æŒ‰é’®ç»„(å®šä¹‰åœ¨ä¸‹æ–¹) */
+static void sok_show_nav_group(void);         /* æ˜¾ç¤ºä¸€çº§å¯¼èˆªæŒ‰é’®ç»„(å®šä¹‰åœ¨ä¸‹æ–¹) */
+static void sok_redraw_cell_ui(uint8_t r, uint8_t c);  /* é‡ç»˜ä¸€æ ¼(è·³è¿‡è¢«æ’¤é”€æŒ‰é’®ç›–ä½çš„) */
+static void sok_redraw_nav_group(void);       /* é‡ç»˜ä¸€çº§å¯¼èˆªæŒ‰é’®ç»„+å…³å¡ç¼–å·(å®šä¹‰åœ¨ä¸‹æ–¹) */
+static void sok_draw_nav_buttons_at(int16_t y);   /* å¯¼èˆªæŒ‰é’®ç»„ç»˜åˆ¶(å®šä¹‰åœ¨ä¸‹æ–¹) */
+static void sok_redraw_battery_tiles(int16_t x0, int16_t y0, int16_t x1, int16_t y1); /* æŒ‰çŸ©å½¢é‡ç»˜åœ°å›¾ç“¦ç‰‡(å®šä¹‰åœ¨ä¸‹æ–¹) */
+static void sok_hist_push(uint8_t step);      /* è®°å½•ä¸€æ­¥æ’¤é”€å†å²(å®šä¹‰åœ¨ä¸‹æ–¹) */
+static uint8_t sok_try_open_exit_menu(uint16_t y);  /* ä¸Šæ–¹åŒºåŸŸä¸‹æ»‘æ‰“å¼€é€€å‡ºèœå•(æ¸¸æˆå†…/äºŒçº§èœå•/æ’¤é”€ç•Œé¢å…±ç”¨) */
 
-/** @brief  ÖØ»æ skip_y ÒÔÏÂµÄÓÎÏ·¸ñ×Ó (0~239), º¬CS¿ØÖÆ */
+/** @brief  é‡ç»˜ skip_y ä»¥ä¸‹çš„æ¸¸æˆæ ¼å­ (0~239), å«CSæ§åˆ¶ */
 static void sok_redraw_grid_below(int16_t y_skip) {
     uint8_t br, bc;
     LCD_CS_CLR;
@@ -168,25 +168,25 @@ static void sok_redraw_grid_below(int16_t y_skip) {
 }
 
 /**
- * @brief  ÅĞ¶ÏÄ³¸ñÊÇ·ñÔ­Ê¼Ä¿±êµã
+ * @brief  åˆ¤æ–­æŸæ ¼æ˜¯å¦åŸå§‹ç›®æ ‡ç‚¹
  */
 static uint8_t is_orig_target(uint8_t row, uint8_t col) {
     uint16_t idx = row * g_level_cols + col;
-    uint8_t b = g_level_bcd[idx / 2];      /* µØÍ¼Êı¾İÒÑ°áµ½Íâ²¿ Flash, ´æÔÚ RAM »º³åÀï */
+    uint8_t b = g_level_bcd[idx / 2];      /* åœ°å›¾æ•°æ®å·²æ¬åˆ°å¤–éƒ¨ Flash, å­˜åœ¨ RAM ç¼“å†²é‡Œ */
     uint8_t v = (idx & 1) ? (b % 10) : (b / 10);
     return (v == SOK_TARGET || v == SOK_BOX_ON_TARGET || v == SOK_PLAYER_ON_TARGET);
 }
 
 /**
- * @brief  Ëõ·Å»æÖÆ30x30Í¼Æ¬µ½ g_tile_size x g_tile_size (º¬µ÷É«°å)
- * @note   Ô­ÊµÏÖ**Ã¿¸öÏñËØ**¶¼×öÒ»´Î `(c*30)/g_tile_size` ¡ª¡ª CH32V203 Ã»ÓĞÓ²¼ş³ı·¨,
- *         Ò»´Î 32 Î»ÎŞ·ûºÅ³ı·¨Òª¼¸Ê®ÉÏ°ÙÖÜÆÚ, Ò»¹Ø ~80 ¸ñ ¡Á 900 ÏñËØ¾ÍÊÇ¼¸Ê®ºÁÃë,
- *         ³¤°´Á¬ÌøÇĞ¹ØÊ±Ã÷ÏÔ¿¨¡£ÕâÀï¸Ä³É: Ã¿´ÎÖØ»æÖ»ËãÒ»ÕÅ"ÁĞ¡úÔ´ÁĞ"Ó³Éä±í(30 Ïî)ÔÙ²é±í¡£
+ * @brief  ç¼©æ”¾ç»˜åˆ¶30x30å›¾ç‰‡åˆ° g_tile_size x g_tile_size (å«è°ƒè‰²æ¿)
+ * @note   åŸå®ç°**æ¯ä¸ªåƒç´ **éƒ½åšä¸€æ¬¡ `(c*30)/g_tile_size` â€”â€” CH32V203 æ²¡æœ‰ç¡¬ä»¶é™¤æ³•,
+ *         ä¸€æ¬¡ 32 ä½æ— ç¬¦å·é™¤æ³•è¦å‡ åä¸Šç™¾å‘¨æœŸ, ä¸€å…³ ~80 æ ¼ Ã— 900 åƒç´ å°±æ˜¯å‡ åæ¯«ç§’,
+ *         é•¿æŒ‰è¿è·³åˆ‡å…³æ—¶æ˜æ˜¾å¡ã€‚è¿™é‡Œæ”¹æˆ: æ¯æ¬¡é‡ç»˜åªç®—ä¸€å¼ "åˆ—â†’æºåˆ—"æ˜ å°„è¡¨(30 é¡¹)å†æŸ¥è¡¨ã€‚
  */
 static void sok_draw_scaled_tile(uint16_t dx, uint16_t dy, const void* img,
     const uint16_t* palette) {
     uint16_t r, c;
-    /* ÁĞÓ³Éä±í(Óë g_tile_size °ó¶¨, Í¬Ò»¹ØÄÚÖ»ËãÒ»´Î) */
+    /* åˆ—æ˜ å°„è¡¨(ä¸ g_tile_size ç»‘å®š, åŒä¸€å…³å†…åªç®—ä¸€æ¬¡) */
     static uint8_t  col_src[SOK_TILE_SIZE];
     static uint16_t col_src_for = 0;
     if (col_src_for != g_tile_size) {
@@ -210,7 +210,7 @@ static void sok_draw_scaled_tile(uint16_t dx, uint16_t dy, const void* img,
 }
 
 /**
- * @brief  Ëõ·Å»æÖÆ¾«ÁéÍ¼Æ¬ (src_size x src_size Ëõ·Åºó¾ÓÖĞÓÚ30x30¸ñÄÚ)
+ * @brief  ç¼©æ”¾ç»˜åˆ¶ç²¾çµå›¾ç‰‡ (src_size x src_size ç¼©æ”¾åå±…ä¸­äº30x30æ ¼å†…)
  */
 static void sok_draw_scaled_sprite(uint16_t dx, uint16_t dy,
     const void* img, uint16_t src_size, uint16_t transp,
@@ -252,16 +252,16 @@ static void sok_draw_scaled_sprite(uint16_t dx, uint16_t dy,
     }
 }
 
-/* Íâ²¿FlashÍ¼Ïñ¼ÓÔØ¸¨Öú (Í¼Ïñ+µ÷É«°åÒÑÉÕÂ¼µ½Íâ²¿Flash, ¶ÁÈë¹²Ïíscratch) */
+/* å¤–éƒ¨Flashå›¾åƒåŠ è½½è¾…åŠ© (å›¾åƒ+è°ƒè‰²æ¿å·²çƒ§å½•åˆ°å¤–éƒ¨Flash, è¯»å…¥å…±äº«scratch) */
 
 /**
- * @brief  ¼ÓÔØ"µ÷É«°å+Í¼Ïñ"µ½¹²Ïíscratch
- * @param  pal_id   µ÷É«°å×ÊÔ´ID
- * @param  pal_bytes µ÷É«°å×Ö½ÚÊı
- * @param  img_id   Í¼Ïñ×ÊÔ´ID
- * @param  img_bytes Í¼Ïñ×Ö½ÚÊı
- * @param  pal      Êä³ö: µ÷É«°åÖ¸Õë(Î»ÓÚscratchÆğÊ¼)
- * @return Í¼ÏñÊı¾İÖ¸Õë(Î»ÓÚµ÷É«°åÖ®ºó); Ê§°Ü·µ»Ø0
+ * @brief  åŠ è½½"è°ƒè‰²æ¿+å›¾åƒ"åˆ°å…±äº«scratch
+ * @param  pal_id   è°ƒè‰²æ¿èµ„æºID
+ * @param  pal_bytes è°ƒè‰²æ¿å­—èŠ‚æ•°
+ * @param  img_id   å›¾åƒèµ„æºID
+ * @param  img_bytes å›¾åƒå­—èŠ‚æ•°
+ * @param  pal      è¾“å‡º: è°ƒè‰²æ¿æŒ‡é’ˆ(ä½äºscratchèµ·å§‹)
+ * @return å›¾åƒæ•°æ®æŒ‡é’ˆ(ä½äºè°ƒè‰²æ¿ä¹‹å); å¤±è´¥è¿”å›0
  */
 static const void* sok_load_pal_img(FlashStoreId pal_id, uint16_t pal_bytes,
     FlashStoreId img_id, uint16_t img_bytes,
@@ -274,8 +274,8 @@ static const void* sok_load_pal_img(FlashStoreId pal_id, uint16_t pal_bytes,
 }
 
 /**
- * @brief  ¼ÓÔØ´¿RGB565Í¼Ïñ(ÎŞµ÷É«°å)µ½¹²Ïíscratch
- * @return Í¼ÏñÊı¾İÖ¸Õë; Ê§°Ü·µ»Ø0
+ * @brief  åŠ è½½çº¯RGB565å›¾åƒ(æ— è°ƒè‰²æ¿)åˆ°å…±äº«scratch
+ * @return å›¾åƒæ•°æ®æŒ‡é’ˆ; å¤±è´¥è¿”å›0
  */
 static const void* sok_load_img(FlashStoreId img_id, uint16_t img_bytes) {
     uint8_t* s = FlashStore_Scratch();
@@ -283,10 +283,10 @@ static const void* sok_load_img(FlashStoreId img_id, uint16_t img_bytes) {
 }
 
 /**
- * @brief  °´Ğè¼ÓÔØ´¿RGB565Í¼ÏñµÄÇ°vis_rowsĞĞµ½¹²Ïíscratch (²Ã¼ô»æÖÆÓÃ)
- * @note   Ô´Í¼Ã¿ĞĞsrc_w¸öÏñËØ(2×Ö½Ú/ÏñËØ)Á¬Ğø´æ·Å, Òò´ËÖ»¶Á¿É¼ûĞĞ¼´¿É,
- *         ¼õÉÙÍÏ×§½×¶ÎÃ¿Ö¡µÄÍâ²¿Flash¶ÁÈ¡Á¿(ÓÉÕûÍ¼½µÎª¿É¼ûĞĞ)
- * @return Í¼ÏñÊı¾İÖ¸Õë(Ç°vis_rowsĞĞ); Ê§°Ü·µ»Ø0
+ * @brief  æŒ‰éœ€åŠ è½½çº¯RGB565å›¾åƒçš„å‰vis_rowsè¡Œåˆ°å…±äº«scratch (è£å‰ªç»˜åˆ¶ç”¨)
+ * @note   æºå›¾æ¯è¡Œsrc_wä¸ªåƒç´ (2å­—èŠ‚/åƒç´ )è¿ç»­å­˜æ”¾, å› æ­¤åªè¯»å¯è§è¡Œå³å¯,
+ *         å‡å°‘æ‹–æ‹½é˜¶æ®µæ¯å¸§çš„å¤–éƒ¨Flashè¯»å–é‡(ç”±æ•´å›¾é™ä¸ºå¯è§è¡Œ)
+ * @return å›¾åƒæ•°æ®æŒ‡é’ˆ(å‰vis_rowsè¡Œ); å¤±è´¥è¿”å›0
  */
 static const void* sok_load_img_rows(FlashStoreId img_id, uint16_t src_w, int16_t vis_rows) {
     uint8_t* s = FlashStore_Scratch();
@@ -295,14 +295,14 @@ static const void* sok_load_img_rows(FlashStoreId img_id, uint16_t src_w, int16_
 }
 
 /**
- * @brief  °´µ±Ç°ÓïÑÔÈ¡Ò»ÕÅµ¼º½°´Å¥Í¼µÄÇ° vis_rows ĞĞ (ÕûÍ¼»æÖÆ/²Ã¼ô»æÖÆ¹²ÓÃ)
- * @param  which    0=ÉÏÒ»¹Ø 1=ÏÂÒ»¹Ø 2=ÖØĞÂ¿ªÊ¼
- * @param  vis_rows ĞèÒªµÄĞĞÊı (ÕûÍ¼=31)
- * @param  src_w    Ô´Í¼¿í (ÈıÖÖ°´Å¥¶¼ÊÇ 30)
- * @return scratch ÀïµÄÍ¼ÏñÊı¾İÖ¸Õë; Ê§°Ü/Ã»ÉÕ·µ»Ø 0
- * @note   ÖĞÎÄÄÇÌ×ÔÚ×Ö¿â×ÊÔ´Àï(ID 71~73); Ó¢ÎÄÄÇÌ×ÔÚÍâ²¿ Flash µÄ¹Ì¶¨±£ÁôÇø
- *         BTN_IMG_EN_ADDR(¼û flash_store.h), ÓÉ¶ÀÁ¢Ä£Ê½ BTN_IMG_STORE_MODE ÉÕ½øÈ¥ ¡ª¡ª
- *         ÄÚ²¿ Flash ×°²»ÏÂÁ½Ì×°´Å¥Í¼, ËùÒÔÓ¢ÎÄÕâÌ×²»½ø×ÊÔ´±í/Ä¿Â¼, µ¥¶ÀÕ¼Ò»¿é±£ÁôÇø
+ * @brief  æŒ‰å½“å‰è¯­è¨€å–ä¸€å¼ å¯¼èˆªæŒ‰é’®å›¾çš„å‰ vis_rows è¡Œ (æ•´å›¾ç»˜åˆ¶/è£å‰ªç»˜åˆ¶å…±ç”¨)
+ * @param  which    0=ä¸Šä¸€å…³ 1=ä¸‹ä¸€å…³ 2=é‡æ–°å¼€å§‹
+ * @param  vis_rows éœ€è¦çš„è¡Œæ•° (æ•´å›¾=31)
+ * @param  src_w    æºå›¾å®½ (ä¸‰ç§æŒ‰é’®éƒ½æ˜¯ 30)
+ * @return scratch é‡Œçš„å›¾åƒæ•°æ®æŒ‡é’ˆ; å¤±è´¥/æ²¡çƒ§è¿”å› 0
+ * @note   ä¸­æ–‡é‚£å¥—åœ¨å­—åº“èµ„æºé‡Œ(ID 71~73); è‹±æ–‡é‚£å¥—åœ¨å¤–éƒ¨ Flash çš„å›ºå®šä¿ç•™åŒº
+ *         BTN_IMG_EN_ADDR(è§ flash_store.h), ç”±ç‹¬ç«‹æ¨¡å¼ BTN_IMG_STORE_MODE çƒ§è¿›å» â€”â€”
+ *         å†…éƒ¨ Flash è£…ä¸ä¸‹ä¸¤å¥—æŒ‰é’®å›¾, æ‰€ä»¥è‹±æ–‡è¿™å¥—ä¸è¿›èµ„æºè¡¨/ç›®å½•, å•ç‹¬å ä¸€å—ä¿ç•™åŒº
  */
 static const void* sok_btn_img_rows(uint8_t which, int16_t vis_rows, uint16_t src_w)
 {
@@ -323,7 +323,7 @@ static const void* sok_btn_img_rows(uint8_t which, int16_t vis_rows, uint16_t sr
 }
 
 /**
- * @brief  ÕûÍ¼»æÖÆÒ»ÕÅµ¼º½°´Å¥ (°´µ±Ç°ÓïÑÔÑ¡Í¼)
+ * @brief  æ•´å›¾ç»˜åˆ¶ä¸€å¼ å¯¼èˆªæŒ‰é’® (æŒ‰å½“å‰è¯­è¨€é€‰å›¾)
  */
 static void sok_draw_btn(uint16_t x, uint16_t y, uint8_t which, uint16_t src_w)
 {
@@ -333,23 +333,23 @@ static void sok_draw_btn(uint16_t x, uint16_t y, uint8_t which, uint16_t src_w)
 
 
 
-/* ·ÖÌË»æÖÆÓÃµÄ¸ñ×ÓÀàĞÍÎ»ÑÚÂë (bit = SOK_xxx µÄÖµ) */
+/* åˆ†è¶Ÿç»˜åˆ¶ç”¨çš„æ ¼å­ç±»å‹ä½æ©ç  (bit = SOK_xxx çš„å€¼) */
 #define SOK_M_BG     ((1u << SOK_FLOOR) | (1u << SOK_TARGET) \
                     | (1u << SOK_PLAYER) | (1u << SOK_PLAYER_ON_TARGET))
 #define SOK_M_TARGET ((1u << SOK_TARGET) | (1u << SOK_PLAYER_ON_TARGET))
 #define SOK_M_PLAYER ((1u << SOK_PLAYER) | (1u << SOK_PLAYER_ON_TARGET))
 
 /**
- * @brief  °´"Í¼¿éÀàĞÍ"·ÖÌË»æÖÆ: °Ñ±¾¹ØÊôÓÚ mask µÄ¸ñ×ÓÈ«»­Ò»±é
- * @param  mask  ±¾ÌËÒª»­µÄ¸ñ×ÓÀàĞÍÎ»ÑÚÂë
- * @param  img   ±¾ÌËµÄÍ¼ (ÒÑÔÚscratchÀï, ÓÉµ÷ÓÃÕß´ÓÍâ²¿Flash¶ÁÒ»´Î)
- * @param  pal   µ÷É«°å (0=´¿RGB565Í¼)
- * @param  sprite_size  0=°´30x30ÍßÆ¬ÆÌÂúÕû¸ñ; ·Ç0=¾«ÁéÔ´³ß´ç(25), ÓÃtransp×öÍ¸Ã÷É«
- * @param  transp ¾«ÁéµÄÍ¸Ã÷É« (½ö sprite_size ·Ç0Ê±ÓĞĞ§)
- * @note   Ò»ÕÅÍ¼Ò»´ÎÖØ»æÖ»´ÓÍâ²¿ Flash ¶ÁÒ»´Î, ¶ø²»ÊÇ"Ã¿¸ñ¶ÁÒ»´Î"¡£Ô­À´Ã¿¸ñÒª¶Á
- *         µ÷É«°å+Í¼(Ô¼1.1KB), Ò»¹ØÔ¼200¸ñ¾ÍÊÇ ~400 ´Î SPI ¶Á/~230KB, ÕıÊÇ"³¤°´Á¬Ìø
- *         ÇĞ¹ØºÜÂı¡¢¶øÇÒ¿ìÂı²»¶¨"µÄÔ­Òò(¸ñ×ÓÊı/Í¼ÖÖÃ¿¹Ø²»Í¬, ¶ÁµÄÁ¿¾Í²»Í¬)¡£
- *         Õû¹Ø×î¶à 16x16 ¸ñ, ËùÒÔÃ¿ÌËÉ¨Ò»±éµØÍ¼µÄ¿ªÏú¿ÉÒÔºöÂÔ¡£
+ * @brief  æŒ‰"å›¾å—ç±»å‹"åˆ†è¶Ÿç»˜åˆ¶: æŠŠæœ¬å…³å±äº mask çš„æ ¼å­å…¨ç”»ä¸€é
+ * @param  mask  æœ¬è¶Ÿè¦ç”»çš„æ ¼å­ç±»å‹ä½æ©ç 
+ * @param  img   æœ¬è¶Ÿçš„å›¾ (å·²åœ¨scratché‡Œ, ç”±è°ƒç”¨è€…ä»å¤–éƒ¨Flashè¯»ä¸€æ¬¡)
+ * @param  pal   è°ƒè‰²æ¿ (0=çº¯RGB565å›¾)
+ * @param  sprite_size  0=æŒ‰30x30ç“¦ç‰‡é“ºæ»¡æ•´æ ¼; é0=ç²¾çµæºå°ºå¯¸(25), ç”¨transpåšé€æ˜è‰²
+ * @param  transp ç²¾çµçš„é€æ˜è‰² (ä»… sprite_size é0æ—¶æœ‰æ•ˆ)
+ * @note   ä¸€å¼ å›¾ä¸€æ¬¡é‡ç»˜åªä»å¤–éƒ¨ Flash è¯»ä¸€æ¬¡, è€Œä¸æ˜¯"æ¯æ ¼è¯»ä¸€æ¬¡"ã€‚åŸæ¥æ¯æ ¼è¦è¯»
+ *         è°ƒè‰²æ¿+å›¾(çº¦1.1KB), ä¸€å…³çº¦200æ ¼å°±æ˜¯ ~400 æ¬¡ SPI è¯»/~230KB, æ­£æ˜¯"é•¿æŒ‰è¿è·³
+ *         åˆ‡å…³å¾ˆæ…¢ã€è€Œä¸”å¿«æ…¢ä¸å®š"çš„åŸå› (æ ¼å­æ•°/å›¾ç§æ¯å…³ä¸åŒ, è¯»çš„é‡å°±ä¸åŒ)ã€‚
+ *         æ•´å…³æœ€å¤š 16x16 æ ¼, æ‰€ä»¥æ¯è¶Ÿæ‰«ä¸€éåœ°å›¾çš„å¼€é”€å¯ä»¥å¿½ç•¥ã€‚
  */
 static void sok_draw_pass(uint8_t mask, const void* img, const uint16_t* pal,
     uint16_t sprite_size, uint16_t transp) {
@@ -368,11 +368,11 @@ static void sok_draw_pass(uint8_t mask, const void* img, const uint16_t* pal,
 }
 
 /**
- * @brief  È«ÆÁ»æÖÆ¹Ø¿¨µ½LCD, ×Ô¶¯¼ÆËãËõ·ÅºÍ¾ÓÖĞ
- * @param  level_index  ¹Ø¿¨Ë÷Òı (0 ~ SOKOBAN_LEVEL_COUNT-1)
- * @note   ·Ö 6 ÌË»­: µ×É« ¡ú Ç½ ¡ú Ïä×Ó ¡ú Ïä×ÓÔÚÄ¿±êÉÏ ¡ú Ä¿±êµã ¡ú Íæ¼Ò¡£
- *         Ç° 4 ÌËÊÇ²»Í¸Ã÷µÄ¡¢¸ñ×Ó»¥²»ÖØµş, ÏÈºóÎŞËùÎ½; ºó 2 ÌËÊÇÍ¸Ã÷¾«Áé,
- *         ±ØĞë°´"ÏÈÄ¿±êµãºóÍæ¼Ò"µşÔÚµ×É«Ö®ÉÏ(ÓëÖğ¸ñ»æÖÆµÄ²ã´ÎÒ»ÖÂ)¡£
+ * @brief  å…¨å±ç»˜åˆ¶å…³å¡åˆ°LCD, è‡ªåŠ¨è®¡ç®—ç¼©æ”¾å’Œå±…ä¸­
+ * @param  level_index  å…³å¡ç´¢å¼• (0 ~ SOKOBAN_LEVEL_COUNT-1)
+ * @note   åˆ† 6 è¶Ÿç”»: åº•è‰² â†’ å¢™ â†’ ç®±å­ â†’ ç®±å­åœ¨ç›®æ ‡ä¸Š â†’ ç›®æ ‡ç‚¹ â†’ ç©å®¶ã€‚
+ *         å‰ 4 è¶Ÿæ˜¯ä¸é€æ˜çš„ã€æ ¼å­äº’ä¸é‡å , å…ˆåæ— æ‰€è°“; å 2 è¶Ÿæ˜¯é€æ˜ç²¾çµ,
+ *         å¿…é¡»æŒ‰"å…ˆç›®æ ‡ç‚¹åç©å®¶"å åœ¨åº•è‰²ä¹‹ä¸Š(ä¸é€æ ¼ç»˜åˆ¶çš„å±‚æ¬¡ä¸€è‡´)ã€‚
  */
 void sokoban_draw_level(uint8_t level_index) {
     if (level_index >= SOKOBAN_LEVEL_COUNT) return;
@@ -380,11 +380,11 @@ void sokoban_draw_level(uint8_t level_index) {
     const uint16_t* pal;
     const void* img;
 
-    /* ÇåÆÁ²¢»æÖÆ (ÇåºÚ×ßDMA: ÖğÏñËØĞ´ 240x240 Òª ~50ms, ÊÇ³¤°´ÇĞ¹Ø¿¨¶ÙµÄ´óÍ·) */
+    /* æ¸…å±å¹¶ç»˜åˆ¶ (æ¸…é»‘èµ°DMA: é€åƒç´ å†™ 240x240 è¦ ~50ms, æ˜¯é•¿æŒ‰åˆ‡å…³å¡é¡¿çš„å¤§å¤´) */
     LCD_Fill_DMA(0, 0, LCD_W, LCD_H, LCD_BLACK);
 
     LCD_CS_CLR;
-    /* µ×É«: ¿ÕµØ/Ä¿±êµã/Íæ¼Ò(º¬Íæ¼ÒÔÚÄ¿±êÉÏ)µÄµ×¶¼ÊÇÍ¬Ò»ÕÅµØ°åÍ¼ */
+    /* åº•è‰²: ç©ºåœ°/ç›®æ ‡ç‚¹/ç©å®¶(å«ç©å®¶åœ¨ç›®æ ‡ä¸Š)çš„åº•éƒ½æ˜¯åŒä¸€å¼ åœ°æ¿å›¾ */
     img = sok_load_pal_img(FLASH_STORE_ID_BG_PALETTE, 206,
         FLASH_STORE_ID_BG_IMG, 900, &pal);
     sok_draw_pass(SOK_M_BG, img, pal, 0, 0);
@@ -413,7 +413,7 @@ void sokoban_draw_level(uint8_t level_index) {
 }
 
 /**
- * @brief  »æÖÆµØÍ¼ÖĞµ¥¸öµ¥Ôª¸ñ (Óë draw_level Ò»ÖÂ, µ«½öÒ»¸ñµÄ°æ±¾)
+ * @brief  ç»˜åˆ¶åœ°å›¾ä¸­å•ä¸ªå•å…ƒæ ¼ (ä¸ draw_level ä¸€è‡´, ä½†ä»…ä¸€æ ¼çš„ç‰ˆæœ¬)
  */
 static void sokoban_draw_cell_at(uint8_t row, uint8_t col) {
     uint16_t ux = (uint16_t)(g_ox + (int16_t)col * (int16_t)g_tile_size);
@@ -485,9 +485,9 @@ static void sokoban_draw_cell_at(uint8_t row, uint8_t col) {
 }
 
 /**
- * @brief  ÔÚµØÍ¼ÖĞ²éÕÒÍæ¼Òµ±Ç°Î»ÖÃ
- * @param  p_row  Êä³ö: Íæ¼ÒËùÔÚĞĞ
- * @param  p_col  Êä³ö: Íæ¼ÒËùÔÚÁĞ
+ * @brief  åœ¨åœ°å›¾ä¸­æŸ¥æ‰¾ç©å®¶å½“å‰ä½ç½®
+ * @param  p_row  è¾“å‡º: ç©å®¶æ‰€åœ¨è¡Œ
+ * @param  p_col  è¾“å‡º: ç©å®¶æ‰€åœ¨åˆ—
  */
 static void sokoban_find_player(uint8_t* p_row, uint8_t* p_col) {
     uint8_t r, c;
@@ -504,8 +504,8 @@ static void sokoban_find_player(uint8_t* p_row, uint8_t* p_col) {
 }
 
 /**
- * @brief  ÅĞ¶ÏÊÇ·ñÍ¨¹Ø (ËùÓĞÄ¿±êµã¾ùÓĞÏä×Ó)
- * @retval 1=Í¨¹Ø, 0=Î´Í¨¹Ø
+ * @brief  åˆ¤æ–­æ˜¯å¦é€šå…³ (æ‰€æœ‰ç›®æ ‡ç‚¹å‡æœ‰ç®±å­)
+ * @retval 1=é€šå…³, 0=æœªé€šå…³
  */
 uint8_t sokoban_is_won(void) {
     uint8_t r, c;
@@ -521,18 +521,18 @@ uint8_t sokoban_is_won(void) {
 }
 
 /**
- * @brief  Çå³ı¹Ø¿¨ÎÄ×Ö"¹Ø¿¨N"µÄ±³¾° (Ö»ÇåÎÄ×Ö±¾Éí¾ÓÖĞ¿í¶È, ²»È«¿í, ±ÜÃâ×óÓÒºÚ¿é)
- * @note   y=(240-32)/2-20=84, ×Ö¸ß32; ÎÄ×Ö¿í total_w=64+4+digit_w (¹Ø32+¿¨32+Êı×Ö)
- *         Óë sok_level_draw µÄ²¼¾Ö¹«Ê½Ò»ÖÂ
+ * @brief  æ¸…é™¤å…³å¡æ–‡å­—"å…³å¡N"çš„èƒŒæ™¯ (åªæ¸…æ–‡å­—æœ¬èº«å±…ä¸­å®½åº¦, ä¸å…¨å®½, é¿å…å·¦å³é»‘å—)
+ * @note   y=(240-32)/2-20=84, å­—é«˜32; æ–‡å­—å®½ total_w=64+4+digit_w (å…³32+å¡32+æ•°å­—)
+ *         ä¸ sok_level_draw çš„å¸ƒå±€å…¬å¼ä¸€è‡´
  */
 static void sok_level_clear(void) {
     uint8_t lv = s_level_num;
     uint8_t dc = (lv / 10 > 0) ? 2 : 1;
     uint16_t dw = dc * 16 + (dc - 1) * 2;
-    /* ÖĞÓ¢Á½Ì×²¼¾Ö¿í¶È/Æğµã²»Í¬: ÖĞÎÄ "¹Ø"+¡°¿¨¡±+Êı×Ö = 64+4+dw; Ó¢ÎÄ "Level"+Êı×Ö = 5*16+6+dw
-       (Ó¢ÎÄ±ÈÖĞÎÄ¿í 18px, ¾ÓÖĞºó×ó±ß½ç»¹ÒªÍù×ó 9px)¡£Ö»°´µ±Ç°ÓïÑÔÇå»áÂ©µôÁíÒ»Ì×µÄ±ßÔµ ¡ª¡ª 
-       ±íÏÖÎªÇĞ³ÉÓ¢ÎÄºó, "Level" ×î×ó±ßµÄ L ²ĞÁôÔÚÆÁÉÏ¡£Á½Ì×¶¼¾ÓÖĞ, Õ­µÄ±Ø±»¿íµÄ°üº¬,
-       ¹Ê°´½Ï¿íÄÇÌ×Õû´øÇåÒ»´Î¼´¿É¡£*/
+    /* ä¸­è‹±ä¸¤å¥—å¸ƒå±€å®½åº¦/èµ·ç‚¹ä¸åŒ: ä¸­æ–‡ "å…³"+â€œå¡â€+æ•°å­— = 64+4+dw; è‹±æ–‡ "Level"+æ•°å­— = 5*16+6+dw
+       (è‹±æ–‡æ¯”ä¸­æ–‡å®½ 18px, å±…ä¸­åå·¦è¾¹ç•Œè¿˜è¦å¾€å·¦ 9px)ã€‚åªæŒ‰å½“å‰è¯­è¨€æ¸…ä¼šæ¼æ‰å¦ä¸€å¥—çš„è¾¹ç¼˜ â€”â€” 
+       è¡¨ç°ä¸ºåˆ‡æˆè‹±æ–‡å, "Level" æœ€å·¦è¾¹çš„ L æ®‹ç•™åœ¨å±ä¸Šã€‚ä¸¤å¥—éƒ½å±…ä¸­, çª„çš„å¿…è¢«å®½çš„åŒ…å«,
+       æ•…æŒ‰è¾ƒå®½é‚£å¥—æ•´å¸¦æ¸…ä¸€æ¬¡å³å¯ã€‚*/
     uint16_t w_cn = 64 + 4 + dw;
     uint16_t w_en = 5 * 16 + 6 + dw;
     uint16_t w_wide = (w_cn > w_en) ? w_cn : w_en;
@@ -541,33 +541,33 @@ static void sok_level_clear(void) {
 }
 
 /**
- * @brief  °ÑµÚ level_index ¹ØµÄµØÍ¼(Bcd Ô­Êı¾İ)´ÓÍâ²¿ Flash ¶Á½ø g_level_bcd
- * @note   ×ÊÔ´ ID = FLASH_STORE_ID_SOK_MAP_0 + ¹Ø¿¨ĞòºÅ; ×Ö½ÚÊı = ceil(rows*cols/2)
- *         (µ÷ÓÃÇ° g_level_rows/g_level_cols ±ØĞëÒÑÌîºÃ)
- * @retval 1=»º³å¿ÉÓÃ, 0=¶ÁÈ¡Ê§°Ü(Ã»ÉÕ×ÊÔ´/³¤¶È²»·û)
+ * @brief  æŠŠç¬¬ level_index å…³çš„åœ°å›¾(Bcd åŸæ•°æ®)ä»å¤–éƒ¨ Flash è¯»è¿› g_level_bcd
+ * @note   èµ„æº ID = FLASH_STORE_ID_SOK_MAP_0 + å…³å¡åºå·; å­—èŠ‚æ•° = ceil(rows*cols/2)
+ *         (è°ƒç”¨å‰ g_level_rows/g_level_cols å¿…é¡»å·²å¡«å¥½)
+ * @retval 1=ç¼“å†²å¯ç”¨, 0=è¯»å–å¤±è´¥(æ²¡çƒ§èµ„æº/é•¿åº¦ä¸ç¬¦)
  */
 static uint8_t sok_load_level_bcd(uint8_t level_index) {
     if (level_index >= SOKOBAN_LEVEL_COUNT) return 0;
-    if (s_bcd_level == level_index) return 1;          /* ÒÑ¾­ÊÇÕâÒ»¹Ø, ²»ÖØ¸´¶Á */
+    if (s_bcd_level == level_index) return 1;          /* å·²ç»æ˜¯è¿™ä¸€å…³, ä¸é‡å¤è¯» */
 
     uint16_t need = ((uint16_t)g_level_rows * g_level_cols + 1) / 2;
     if (need > sizeof(g_level_bcd)) need = sizeof(g_level_bcd);
     uint16_t got = FlashStore_ResRead(
         (FlashStoreId)(FLASH_STORE_ID_SOK_MAP_0 + level_index), 0, g_level_bcd, need);
-    if (got != need) { s_bcd_level = 0xFF; return 0; } /* Ã÷È·Ê§°Ü, ÃâµÃ½âÑ¹³öÂÒÂëµØÍ¼ */
+    if (got != need) { s_bcd_level = 0xFF; return 0; } /* æ˜ç¡®å¤±è´¥, å…å¾—è§£å‹å‡ºä¹±ç åœ°å›¾ */
     s_bcd_level = level_index;
     return 1;
 }
 
 /**
- * @brief  ×¼±¸¹Ø¿¨Êı¾İ½á¹¹, ²»Éæ¼°LCDË¢ĞÂ
- * @param  level_index  ¹Ø¿¨Ë÷Òı
- * @retval 1=³É¹¦, 0=¹Ø¿¨Ë÷ÒıÎŞĞ§
+ * @brief  å‡†å¤‡å…³å¡æ•°æ®ç»“æ„, ä¸æ¶‰åŠLCDåˆ·æ–°
+ * @param  level_index  å…³å¡ç´¢å¼•
+ * @retval 1=æˆåŠŸ, 0=å…³å¡ç´¢å¼•æ— æ•ˆ
  */
 static uint8_t sokoban_prepare_level(uint8_t level_index) {
     if (level_index >= SOKOBAN_LEVEL_COUNT) return 0;
 
-    /* »»¹Ø/ÖØ¿ª: Çå¿Õ³·Ïú/ÖØ×öÀúÊ·(ÕâÀï±¾À´¾ÍÊÇ¸´Î»µã) */
+    /* æ¢å…³/é‡å¼€: æ¸…ç©ºæ’¤é”€/é‡åšå†å²(è¿™é‡Œæœ¬æ¥å°±æ˜¯å¤ä½ç‚¹) */
     s_hist_cnt = 0;
     s_hist_head = 0;
     s_hist_pos = 0;
@@ -584,15 +584,15 @@ static uint8_t sokoban_prepare_level(uint8_t level_index) {
         if (g_tile_size > SOK_TILE_SIZE) g_tile_size = SOK_TILE_SIZE;
     }
 
-    /* µØÍ¼±¾ÌåÔÚÍâ²¿ Flash(×ÊÔ´Çø): ¶Á½ø RAM »º³å; ¶Á²»µ½¾ÍÌî¿Õ"Íâ½ç"¸ñ×Ó(»­³öÀ´ÊÇ¿Õ°×),
-       ÖÁÉÙ²»»áË¢³öÂÒÂëµØÍ¼, Ò²±ãÓÚÒ»ÑÛ¿´³ö"Õâ¿é°å»¹Ã»ÉÕĞÂ×Ö¿â" */
+    /* åœ°å›¾æœ¬ä½“åœ¨å¤–éƒ¨ Flash(èµ„æºåŒº): è¯»è¿› RAM ç¼“å†²; è¯»ä¸åˆ°å°±å¡«ç©º"å¤–ç•Œ"æ ¼å­(ç”»å‡ºæ¥æ˜¯ç©ºç™½),
+       è‡³å°‘ä¸ä¼šåˆ·å‡ºä¹±ç åœ°å›¾, ä¹Ÿä¾¿äºä¸€çœ¼çœ‹å‡º"è¿™å—æ¿è¿˜æ²¡çƒ§æ–°å­—åº“" */
     if (!sok_load_level_bcd(level_index)) {
         uint16_t k;
         for (k = 0; k < sizeof(g_level_bcd); k++) g_level_bcd[k] = 0x66;
         s_bcd_level = level_index;
     }
 
-    /* BCD½âÑ¹: Ã¿×Ö½Ú=Ê®Î»*10+¸öÎ», ´æ2¸ötile */
+    /* BCDè§£å‹: æ¯å­—èŠ‚=åä½*10+ä¸ªä½, å­˜2ä¸ªtile */
     {
         const uint8_t* src = g_level_bcd;
         uint16_t i;
@@ -620,44 +620,44 @@ static uint8_t sokoban_prepare_level(uint8_t level_index) {
     s_menu_slide_anim = 0;
     s_menu_from_swipe = 0;
     s_level_num = level_index + 1;
-    s_drag_btn = 0;   /* ·À¾ÉÖµµ¼ÖÂËÉÊÖÎó´¥·¢ÇĞ¹Ø */
-    s_hold_button = 0;   /* ·À¾ÉÖµµ¼ÖÂmenu_visibleÎóÈë³¤°´ */
+    s_drag_btn = 0;   /* é˜²æ—§å€¼å¯¼è‡´æ¾æ‰‹è¯¯è§¦å‘åˆ‡å…³ */
+    s_hold_button = 0;   /* é˜²æ—§å€¼å¯¼è‡´menu_visibleè¯¯å…¥é•¿æŒ‰ */
     s_hold_us = 0;
     return 1;
 }
 
 /**
- * @brief  ³õÊ¼»¯²¢»æÖÆÖ¸¶¨¹Ø¿¨, Í¬Ê±ÏÔÊ¾µ¼º½²Ëµ¥
- * @param  level_index  ¹Ø¿¨Ë÷Òı
+ * @brief  åˆå§‹åŒ–å¹¶ç»˜åˆ¶æŒ‡å®šå…³å¡, åŒæ—¶æ˜¾ç¤ºå¯¼èˆªèœå•
+ * @param  level_index  å…³å¡ç´¢å¼•
  */
 void sokoban_init_level(uint8_t level_index) {
     if (!sokoban_prepare_level(level_index)) return;
 
-    /* ÇåÆÁ²¢È«²¿ÖØ»æ */
+    /* æ¸…å±å¹¶å…¨éƒ¨é‡ç»˜ */
     sokoban_draw_level(level_index);
 
-    /* µ¼º½°´Å¥(3¸ö) + ¹Ø¿¨±àºÅÏÔÊ¾ */
+    /* å¯¼èˆªæŒ‰é’®(3ä¸ª) + å…³å¡ç¼–å·æ˜¾ç¤º */
     s_menu_visible = 1;
-    s_prev_pressed = 0;  /* ÖØÖÃ´¥Ãş, ·ÀÖ¹´ÓÆäËûÓÎÏ·½øÈëÊ±²Ëµ¥±»Îó¹Ø */
+    s_prev_pressed = 0;  /* é‡ç½®è§¦æ‘¸, é˜²æ­¢ä»å…¶ä»–æ¸¸æˆè¿›å…¥æ—¶èœå•è¢«è¯¯å…³ */
     sok_redraw_nav_group();
 }
 
 /**
- * @brief  µç³ØÉÁÃğ»Ö¸´£¬ÉèÖÃÔà±ê¼ÇÓÉ update() ¾Ö²¿ÖØ»æ
- * @note   ±ÜÃâÈ«ÆÁ LCD_Fill Ôì³ÉÉÁË¸£¬½öÖØ»æµç³Ø¸²¸ÇµÄÍßÆ¬
+ * @brief  ç”µæ± é—ªç­æ¢å¤ï¼Œè®¾ç½®è„æ ‡è®°ç”± update() å±€éƒ¨é‡ç»˜
+ * @note   é¿å…å…¨å± LCD_Fill é€ æˆé—ªçƒï¼Œä»…é‡ç»˜ç”µæ± è¦†ç›–çš„ç“¦ç‰‡
  */
 void sokoban_full_redraw(void) {
-    g_sok_dirty = 2;  /* µç³ØÉÁÃğÖØ»æ£¬Ìø¹ıÈ«ÆÁ´óÌî³ä */
+    g_sok_dirty = 2;  /* ç”µæ± é—ªç­é‡ç»˜ï¼Œè·³è¿‡å…¨å±å¤§å¡«å…… */
 }
 
 /**
- * @brief  ´ÓÉèÖÃ·µ»ØÓÎÏ·Ê±»Ö¸´ÓÎÏ·ÄÚÃæ°å: ³·ÏúÄ£Ê½»Ø³·Ïú°´Å¥×é, ·ñÔò»ØÒ»¼¶°´Å¥×é
- * @note   s_undo_group ÔÚ½øÉèÖÃÇ°¾Í±»ÖÃ 1(³·Ïú½çÃæ->ÉÏ»®¶ş¼¶²Ëµ¥->ÉèÖÃ), ÆÚ¼äÃ»±»Çå¹ı,
- *         ËùÒÔÕâÀï°´ËüÅĞ¶Ï¸Ã»ØÄÄ¸ö½çÃæ
+ * @brief  ä»è®¾ç½®è¿”å›æ¸¸æˆæ—¶æ¢å¤æ¸¸æˆå†…é¢æ¿: æ’¤é”€æ¨¡å¼å›æ’¤é”€æŒ‰é’®ç»„, å¦åˆ™å›ä¸€çº§æŒ‰é’®ç»„
+ * @note   s_undo_group åœ¨è¿›è®¾ç½®å‰å°±è¢«ç½® 1(æ’¤é”€ç•Œé¢->ä¸Šåˆ’äºŒçº§èœå•->è®¾ç½®), æœŸé—´æ²¡è¢«æ¸…è¿‡,
+ *         æ‰€ä»¥è¿™é‡ŒæŒ‰å®ƒåˆ¤æ–­è¯¥å›å“ªä¸ªç•Œé¢
  */
 static void sok_restore_panel_by_mode(void) {
     if (s_undo_group) {
-        s_menu_slide_y = SOK_BTN_Y;   /* µç³Ø»Ö¸´°´Õâ¸öÉÏÔµ²Ã¼ô, ±ğÁô¶ş¼¶²Ëµ¥µÄ¾ÉÖµ */
+        s_menu_slide_y = SOK_BTN_Y;   /* ç”µæ± æ¢å¤æŒ‰è¿™ä¸ªä¸Šç¼˜è£å‰ª, åˆ«ç•™äºŒçº§èœå•çš„æ—§å€¼ */
         s_undo_visible = 1;
         sok_draw_undo_buttons();
     }
@@ -667,8 +667,8 @@ static void sok_restore_panel_by_mode(void) {
 }
 
 /**
- * @brief  ´ÓÉèÖÃ²Ëµ¥·µ»Øµ½°´Å¥Ãæ°å (main.c GameSettings_Update ·µ»Ø·ÖÖ§µ÷ÓÃ)
- * @note   ¾Ö²¿»Ö¸´: Ö»ÇåÉèÖÃÌõ´ø¸²¸ÇÇø(y>=VIDEO_MENU_Y)ÖØ»æÍ¼¸ñ, ÔÙ²¹Ãæ°å, ²»È«ÆÁÖØ»æ(»áÉÁ)
+ * @brief  ä»è®¾ç½®èœå•è¿”å›åˆ°æŒ‰é’®é¢æ¿ (main.c GameSettings_Update è¿”å›åˆ†æ”¯è°ƒç”¨)
+ * @note   å±€éƒ¨æ¢å¤: åªæ¸…è®¾ç½®æ¡å¸¦è¦†ç›–åŒº(y>=VIDEO_MENU_Y)é‡ç»˜å›¾æ ¼, å†è¡¥é¢æ¿, ä¸å…¨å±é‡ç»˜(ä¼šé—ª)
  */
 void sokoban_menu_settings_restore(void) {
     LCD_Fill(0, VIDEO_MENU_Y, 239, 239, LCD_BLACK);
@@ -677,10 +677,10 @@ void sokoban_menu_settings_restore(void) {
 }
 
 /**
- * @brief  ´Ó"ÉèÖÃÒ³"(ÕûÆÁ»æÖÆ)·µ»ØÓÎÏ·: Õû·ù»Ö¸´µØÍ¼ + °´Å¥Ãæ°å + ¹Ø¿¨±àºÅ
- * @note   ÉèÖÃÒ³ÊÇÕûÆÁ»æÖÆµÄ, Ò³ÃæÉÏÓĞĞ©ÔªËØÂäÔÚ¶ş¼¶²Ëµ¥Ìõ´øÇøÒÔÍâ(ÈçÓïÑÔÒ³×ó²àµÄÂÌÉ«
- *         Ñ¡ÖĞ·½¿é), Ö»ÇåÌõ´øÇø»áÁôÏÂ²ĞÓ°¡£ÕâÀïÕûÆÁÇåºÚÖØ»­ÕûÕÅµØÍ¼(Óë"ÉèÖÃÒ³ÏÂ»¬½ø
- *         ÍË³ö²Ëµ¥"Í¬Ò»×ö·¨), ÔÙ²¹°´Å¥Ãæ°åÓë¹Ø¿¨±àºÅ¡£
+ * @brief  ä»"è®¾ç½®é¡µ"(æ•´å±ç»˜åˆ¶)è¿”å›æ¸¸æˆ: æ•´å¹…æ¢å¤åœ°å›¾ + æŒ‰é’®é¢æ¿ + å…³å¡ç¼–å·
+ * @note   è®¾ç½®é¡µæ˜¯æ•´å±ç»˜åˆ¶çš„, é¡µé¢ä¸Šæœ‰äº›å…ƒç´ è½åœ¨äºŒçº§èœå•æ¡å¸¦åŒºä»¥å¤–(å¦‚è¯­è¨€é¡µå·¦ä¾§çš„ç»¿è‰²
+ *         é€‰ä¸­æ–¹å—), åªæ¸…æ¡å¸¦åŒºä¼šç•™ä¸‹æ®‹å½±ã€‚è¿™é‡Œæ•´å±æ¸…é»‘é‡ç”»æ•´å¼ åœ°å›¾(ä¸"è®¾ç½®é¡µä¸‹æ»‘è¿›
+ *         é€€å‡ºèœå•"åŒä¸€åšæ³•), å†è¡¥æŒ‰é’®é¢æ¿ä¸å…³å¡ç¼–å·ã€‚
  */
 void sokoban_menu_settings_restore_full(void) {
     sokoban_draw_level(s_current_level);
@@ -689,9 +689,9 @@ void sokoban_menu_settings_restore_full(void) {
 
 
 /**
- * @brief  ÒÆ¶¯Íæ¼Ò (º¬ÍÆÏä×ÓÂß¼­)
- * @param  dir  ÒÆ¶¯·½Ïò
- * @retval 1=ÒÆ¶¯³É¹¦, 0=ÎŞ·¨ÒÆ¶¯
+ * @brief  ç§»åŠ¨ç©å®¶ (å«æ¨ç®±å­é€»è¾‘)
+ * @param  dir  ç§»åŠ¨æ–¹å‘
+ * @retval 1=ç§»åŠ¨æˆåŠŸ, 0=æ— æ³•ç§»åŠ¨
  */
 uint8_t sokoban_move(SokobanDir dir) {
     if (dir == SOK_DIR_NONE) return 0;
@@ -704,17 +704,17 @@ uint8_t sokoban_move(SokobanDir dir) {
     int8_t nr = (int8_t)pr + dr[dir];
     int8_t nc = (int8_t)pc + dc[dir];
 
-    /* ±ß½ç¼ì²é */
+    /* è¾¹ç•Œæ£€æŸ¥ */
     if (nr < 0 || nr >= (int8_t)g_level_rows || nc < 0 || nc >= (int8_t)g_level_cols)
         return 0;
 
     uint8_t target_cell = g_runtime_map[nr * g_level_cols + nc];
 
-    /* ×²Ç½»ò±ß½ç */
+    /* æ’å¢™æˆ–è¾¹ç•Œ */
     if (target_cell == SOK_WALL || target_cell == SOK_OUTER)
         return 0;
 
-    /* ÍÆÏä×ÓÂß¼­ */
+    /* æ¨ç®±å­é€»è¾‘ */
     if (target_cell == SOK_BOX || target_cell == SOK_BOX_ON_TARGET) {
         int8_t br = nr + dr[dir];
         int8_t bc = nc + dc[dir];
@@ -725,51 +725,51 @@ uint8_t sokoban_move(SokobanDir dir) {
             beyond == SOK_BOX || beyond == SOK_BOX_ON_TARGET)
             return 0;
 
-        /* ÒÆ¶¯Ïä×Ó */
+        /* ç§»åŠ¨ç®±å­ */
         g_runtime_map[br * g_level_cols + bc] =
             is_orig_target((uint8_t)br, (uint8_t)bc) ? SOK_BOX_ON_TARGET : SOK_BOX;
-        /* Ô­Ïä×ÓÎ»ÖÃ»Ö¸´ÎªµØ°å/Ä¿±ê */
+        /* åŸç®±å­ä½ç½®æ¢å¤ä¸ºåœ°æ¿/ç›®æ ‡ */
         g_runtime_map[nr * g_level_cols + nc] =
             is_orig_target((uint8_t)nr, (uint8_t)nc) ? SOK_TARGET : SOK_FLOOR;
     }
 
-    /* ÒÆ¶¯Íæ¼Ò */
+    /* ç§»åŠ¨ç©å®¶ */
     g_runtime_map[pr * g_level_cols + pc] =
         is_orig_target(pr, pc) ? SOK_TARGET : SOK_FLOOR;
     g_runtime_map[nr * g_level_cols + nc] =
         is_orig_target((uint8_t)nr, (uint8_t)nc) ? SOK_PLAYER_ON_TARGET : SOK_PLAYER;
 
     g_move_count++;
-    Main_ClearLowBattSaveFlag();  /* ÒÆ¶¯/²Ëµ¥²Ù×÷Çå³ıµÍµçÁ¿±£´æ±êÖ¾ */
+    Main_ClearLowBattSaveFlag();  /* ç§»åŠ¨/èœå•æ“ä½œæ¸…é™¤ä½ç”µé‡ä¿å­˜æ ‡å¿— */
 
-    /* ¼ÇÂ¼Ò»²½³·ÏúÀúÊ·(µÍ2Î»=·½Ïò, bit2=ÕâÒ»²½ÍÆÁËÏä×Ó) */
+    /* è®°å½•ä¸€æ­¥æ’¤é”€å†å²(ä½2ä½=æ–¹å‘, bit2=è¿™ä¸€æ­¥æ¨äº†ç®±å­) */
     sok_hist_push((uint8_t)((uint8_t)dir
         | (uint8_t)(((target_cell == SOK_BOX || target_cell == SOK_BOX_ON_TARGET) ? 1u : 0u) << 2)));
 
-    /* ¾Ö²¿Ë¢ĞÂ (Èı¸ö±ä»¯µÄ¸ñ×Ó; ÓÃ sok_redraw_cell_ui(): Ìø¹ı±»³·Ïú°´Å¥¸Ç×¡µÄ¸ñ×Ó,
-       ·ñÔòÏä×Ó´Óµ×²¿ÄÇÅÅÒÆ×ßÊ±ÕâÒ»¸ñÖØ»æ»á°ÑÖĞ¼ä°´Å¥¿Ù³öÈ±¿Ú) */
+    /* å±€éƒ¨åˆ·æ–° (ä¸‰ä¸ªå˜åŒ–çš„æ ¼å­; ç”¨ sok_redraw_cell_ui(): è·³è¿‡è¢«æ’¤é”€æŒ‰é’®ç›–ä½çš„æ ¼å­,
+       å¦åˆ™ç®±å­ä»åº•éƒ¨é‚£æ’ç§»èµ°æ—¶è¿™ä¸€æ ¼é‡ç»˜ä¼šæŠŠä¸­é—´æŒ‰é’®æŠ å‡ºç¼ºå£) */
     LCD_CS_CLR;
-    sok_redraw_cell_ui(pr, pc);   /* Íæ¼ÒÔ­Î»ÖÃ */
-    sok_redraw_cell_ui((uint8_t)nr, (uint8_t)nc);   /* Íæ¼ÒĞÂÎ»ÖÃ */
+    sok_redraw_cell_ui(pr, pc);   /* ç©å®¶åŸä½ç½® */
+    sok_redraw_cell_ui((uint8_t)nr, (uint8_t)nc);   /* ç©å®¶æ–°ä½ç½® */
     if (target_cell == SOK_BOX || target_cell == SOK_BOX_ON_TARGET) {
         int8_t br = nr + dr[dir];
         int8_t bc = nc + dc[dir];
-        sok_redraw_cell_ui((uint8_t)br, (uint8_t)bc); /* Ïä×ÓĞÂÎ»ÖÃ */
+        sok_redraw_cell_ui((uint8_t)br, (uint8_t)bc); /* ç®±å­æ–°ä½ç½® */
     }
     LCD_CS_SET;
-    /* ³·ÏúÃæ°åÊÇ²»Í¸Ã÷°å: ¿çÔÚËüÉÏ±ßÔµµÄ¸ñ×Ó»á¸Ç×¡°´Å¥, ²¹»­Ò»´Î(·ñÔòÖĞ¼ä°´Å¥±»¿Ù³öÈ±¿Ú) */
+    /* æ’¤é”€é¢æ¿æ˜¯ä¸é€æ˜æ¿: è·¨åœ¨å®ƒä¸Šè¾¹ç¼˜çš„æ ¼å­ä¼šç›–ä½æŒ‰é’®, è¡¥ç”»ä¸€æ¬¡(å¦åˆ™ä¸­é—´æŒ‰é’®è¢«æŠ å‡ºç¼ºå£) */
     if (s_undo_visible) sok_draw_undo_buttons();
     game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 1);
 
     return 1;
 }
 
-/* ´¥ÃşÊäÈë (³¤°´ÒÆ¶¯ºÍ²Ëµ¥ÊÖÊÆ) */
+/* è§¦æ‘¸è¾“å…¥ (é•¿æŒ‰ç§»åŠ¨å’Œèœå•æ‰‹åŠ¿) */
 
 /**
- * @brief  °´Å¥ÃüÖĞ¼ì²â: ·µ»Ø 0=Î´ÃüÖĞ(Y ÔÚÃüÖĞ´øÍâ), 1=ÉÏÒ»¹Ø, 2=ÖØĞÂ¿ªÊ¼, 3=ÏÂÒ»¹Ø
- * @note   ºáÏò°´"ÏàÁÚ°´Å¥ÖĞÏß"(82/157)·Ö, Èı¸öÇøÎŞ·ì [0,82)/[82,157)/[157,240) ¡ª¡ª
- *         Ô­ÏÈÖ±½ÓÄÃ°´Å¥×óÓÒÔµ(75/90, 150/165)ÅĞ, °´Å¥Ö®¼ä»áÁô 15px ËÀÇø(µãÁËµ±"µã¿Õ°×")
+ * @brief  æŒ‰é’®å‘½ä¸­æ£€æµ‹: è¿”å› 0=æœªå‘½ä¸­(Y åœ¨å‘½ä¸­å¸¦å¤–), 1=ä¸Šä¸€å…³, 2=é‡æ–°å¼€å§‹, 3=ä¸‹ä¸€å…³
+ * @note   æ¨ªå‘æŒ‰"ç›¸é‚»æŒ‰é’®ä¸­çº¿"(82/157)åˆ†, ä¸‰ä¸ªåŒºæ— ç¼ [0,82)/[82,157)/[157,240) â€”â€”
+ *         åŸå…ˆç›´æ¥æ‹¿æŒ‰é’®å·¦å³ç¼˜(75/90, 150/165)åˆ¤, æŒ‰é’®ä¹‹é—´ä¼šç•™ 15px æ­»åŒº(ç‚¹äº†å½“"ç‚¹ç©ºç™½")
  */
 static uint8_t sok_btn_hit_test(uint16_t x, uint16_t y) {
     if (y < SOK_BTN_HIT_Y0 || y >= SOK_BTN_HIT_Y1) return 0;
@@ -779,12 +779,12 @@ static uint8_t sok_btn_hit_test(uint16_t x, uint16_t y) {
 }
 
 /**
- * @brief  ²Ã¼ô»æÖÆµ¥¸ö°´Å¥µÄ¿É¼ûĞĞ
+ * @brief  è£å‰ªç»˜åˆ¶å•ä¸ªæŒ‰é’®çš„å¯è§è¡Œ
  */
 static void sok_draw_btn_clipped(uint16_t x, int16_t y, const uint16_t* img, int16_t vis_rows) {
     int16_t r, c, start, sr;
     for (r = 0; r < vis_rows; r++) {
-        uint8_t is_last = (r == 30);  /* ×îºóÒ»ĞĞ(r=30)Îª´¿ºÚ, ²»Ìø¹ı0x0000 */
+        uint8_t is_last = (r == 30);  /* æœ€åä¸€è¡Œ(r=30)ä¸ºçº¯é»‘, ä¸è·³è¿‡0x0000 */
         for (sr = 0; sr < 2; sr++) {
             int16_t sy = y + r * 2 + sr;
             if (sy > 239) continue;
@@ -814,19 +814,19 @@ static void sok_draw_btn_clipped(uint16_t x, int16_t y, const uint16_t* img, int
 }
 
 /**
- * @brief  ¼ÇÂ¼ÍË³ö²Ëµ¥ÊÇ·ñÓÉ"³·ÏúµÄ3¸ö°´Å¥"´ò¿ª: ÊÇÔòÉÏ»®¹Ø±Õºó»Ö¸´Õâ×é°´Å¥
- * @note   ÓÉ sok_try_open_exit_menu() ÇåÁã; ³·Ïú½çÃæ´ò¿ªÍË³ö²Ëµ¥Ê±ÖÃ 1
+ * @brief  è®°å½•é€€å‡ºèœå•æ˜¯å¦ç”±"æ’¤é”€çš„3ä¸ªæŒ‰é’®"æ‰“å¼€: æ˜¯åˆ™ä¸Šåˆ’å…³é—­åæ¢å¤è¿™ç»„æŒ‰é’®
+ * @note   ç”± sok_try_open_exit_menu() æ¸…é›¶; æ’¤é”€ç•Œé¢æ‰“å¼€é€€å‡ºèœå•æ—¶ç½® 1
  */
 static uint8_t  s_exit_from_undo = 0;
 
 /**
- * @brief  ÍË³ö²Ëµ¥ÉÏ»®¹Ø±Õºó»Ö¸´³·Ïú°´Å¥(½öµ±ËüÊÇÓÉ³·Ïú°´Å¥´ò¿ªµÄ)
- * @retval 1=ÒÑ»Ö¸´(µ÷ÓÃ·½²»ÔÙ»¬ÈëÃæ°å), 0=²»ÊÇ, ×ß³£¹æ»¬»Ø°´Å¥Ãæ°å
+ * @brief  é€€å‡ºèœå•ä¸Šåˆ’å…³é—­åæ¢å¤æ’¤é”€æŒ‰é’®(ä»…å½“å®ƒæ˜¯ç”±æ’¤é”€æŒ‰é’®æ‰“å¼€çš„)
+ * @retval 1=å·²æ¢å¤(è°ƒç”¨æ–¹ä¸å†æ»‘å…¥é¢æ¿), 0=ä¸æ˜¯, èµ°å¸¸è§„æ»‘å›æŒ‰é’®é¢æ¿
  */
 static uint8_t sok_exit_restore_undo(void) {
     if (!s_exit_from_undo) return 0;
     s_undo_visible = 1;
-    s_menu_from_swipe = 1;   /* ÎüÊÕ±¾´ÎÊÖÊÆ: ËÉÊÖ²»ÔÙÃüÖĞ°´Å¥, ·ñÔò°´Å¥»á±»¹Øµô */
+    s_menu_from_swipe = 1;   /* å¸æ”¶æœ¬æ¬¡æ‰‹åŠ¿: æ¾æ‰‹ä¸å†å‘½ä¸­æŒ‰é’®, å¦åˆ™æŒ‰é’®ä¼šè¢«å…³æ‰ */
     s_prev_pressed = 1;
     sok_draw_undo_buttons();
     return 1;
@@ -836,7 +836,7 @@ static uint8_t sok_exit_swipe_cancel(void) {
     int16_t cancel_dy = 0;
     uint8_t poll_ret = game_menu_swipe_up_poll(SOK_SWIPE_Y, MENU_SWIPE_TRIGGER_DIST, &cancel_dy);
     if (!poll_ret) {
-        /* ÖĞ¼äÇøÓòÉÏ»®Ö»ÔÚ¾²Ö¹Ì¬ÉúĞ§: ÍÏ×§/»¬ÈëÆÚ¼ä»áÎó¹Ø¸Õ´ò¿ªµÄÍË³ö²Ëµ¥(¼û±¸ÍüÂ¼ ¡ì437) */
+        /* ä¸­é—´åŒºåŸŸä¸Šåˆ’åªåœ¨é™æ­¢æ€ç”Ÿæ•ˆ: æ‹–æ‹½/æ»‘å…¥æœŸé—´ä¼šè¯¯å…³åˆšæ‰“å¼€çš„é€€å‡ºèœå•(è§å¤‡å¿˜å½• Â§437) */
         if (s_exit_dragging || s_exit_sliding) return 0;
         if (!game_menu_swipe_mid_up_close(SOK_SWIPE_Y, MENU_SWIPE_TRIGGER_DIST)) return 0;
     }
@@ -848,25 +848,25 @@ static uint8_t sok_exit_swipe_cancel(void) {
     s_exit_dragging = 0;
     s_prev_pressed = 0;
     s_menu_cooldown = 15;
-    g_touch_down = 0;   /* Çå³ıÈ«¾Ö´¥Ãş×´Ì¬(ËÉÊÖÓÉ°´Å¥Ãæ°å´¦Àí, ²»ÉèÎüÊÕ±êÖ¾·À¿çÓÎÏ·²ĞÁô) */
-    LCD_CLEAR_MENU_AREA();           /* ÇåÍË³ö²Ëµ¥Çø(º¬±ß¿ò), ·ÀºÚÉ«/²ĞÁô */
+    g_touch_down = 0;   /* æ¸…é™¤å…¨å±€è§¦æ‘¸çŠ¶æ€(æ¾æ‰‹ç”±æŒ‰é’®é¢æ¿å¤„ç†, ä¸è®¾å¸æ”¶æ ‡å¿—é˜²è·¨æ¸¸æˆæ®‹ç•™) */
+    LCD_CLEAR_MENU_AREA();           /* æ¸…é€€å‡ºèœå•åŒº(å«è¾¹æ¡†), é˜²é»‘è‰²/æ®‹ç•™ */
     sok_redraw_grid_below(MENU_Y);
     if (sok_exit_restore_undo()) {
     }
     else if (poll_ret == 2) {
-        /* ËÉÊÖ´ò¶Ï: ÊÖÖ¸ÒÑÌ§Æğ, ×Ô¶¯¶¯»­»¬Èë */
+        /* æ¾æ‰‹æ‰“æ–­: æ‰‹æŒ‡å·²æŠ¬èµ·, è‡ªåŠ¨åŠ¨ç”»æ»‘å…¥ */
         s_menu_slide_anim = 1;
         s_menu_slide_y = 240;
     }
     else {
-        /* ÍÏ×§´ò¶Ï: ÊÖÖ¸»¹ÔÚÆÁÄ»ÉÏ, ¸úÊÖ»¬Èë */
+        /* æ‹–æ‹½æ‰“æ–­: æ‰‹æŒ‡è¿˜åœ¨å±å¹•ä¸Š, è·Ÿæ‰‹æ»‘å…¥ */
         TouchState ts_now;
         Touch_UpdateCoords();
         Touch_Scan(&ts_now);
-        s_swipe_origin_y = g_touch_start_y; /* ÉÏ»®Æğµã, ÓÃÓÚ¼ÆËã×ÜÎ»ÒÆ */
+        s_swipe_origin_y = g_touch_start_y; /* ä¸Šåˆ’èµ·ç‚¹, ç”¨äºè®¡ç®—æ€»ä½ç§» */
         s_menu_slide_y = 240;
         s_menu_sliding = 1;
-        s_slide_max_dy = 0;   /* ¸´Î»×îÔ¶Î»ÒÆ, ·À¾ÉÖµµ¼ÖÂ»ØÍË>2ÎóÈ¡Ïû */
+        s_slide_max_dy = 0;   /* å¤ä½æœ€è¿œä½ç§», é˜²æ—§å€¼å¯¼è‡´å›é€€>2è¯¯å–æ¶ˆ */
         s_drag_btn = sok_btn_hit_test(ts_now.x, ts_now.y);
     }
     game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 1);
@@ -874,14 +874,14 @@ static uint8_t sok_exit_swipe_cancel(void) {
 }
 
 /**
- * @brief  ÔÚÖ¸¶¨Y»æÖÆµ¼º½°´Å¥(ÆÁÄ»Íâ²¿·Ö²Ã¼ô, ´Óµ×²¿Öğ½¥³öÏÖ)
+ * @brief  åœ¨æŒ‡å®šYç»˜åˆ¶å¯¼èˆªæŒ‰é’®(å±å¹•å¤–éƒ¨åˆ†è£å‰ª, ä»åº•éƒ¨é€æ¸å‡ºç°)
  */
 static void sok_draw_nav_buttons_at(int16_t y) {
     if (y > 239) return;
 
     LCD_CS_CLR;
 
-    /* °´Å¥ÍêÈ«ÔÚÆÁÄ»ÄÚ(y<=180)¸´ÓÃÒÑÓĞ»æÖÆº¯Êı, ½ÚÊ¡flash */
+    /* æŒ‰é’®å®Œå…¨åœ¨å±å¹•å†…(y<=180)å¤ç”¨å·²æœ‰ç»˜åˆ¶å‡½æ•°, èŠ‚çœflash */
     if (y <= 180) {
         if (s_current_level > 0) sok_draw_btn(SOK_BTN1_X, (uint16_t)y, 0, PREV_IMG_W);
         sok_draw_btn(SOK_BTN2_X, (uint16_t)y, 2, RESTART_IMG_W);
@@ -891,7 +891,7 @@ static void sok_draw_nav_buttons_at(int16_t y) {
         return;
     }
 
-    /* ²¿·ÖÔÚÆÁÄ»Íâ: ÖğĞĞ²Ã¼ô, ±ÜÃâLCDµØÖ·»ØÈÆ */
+    /* éƒ¨åˆ†åœ¨å±å¹•å¤–: é€è¡Œè£å‰ª, é¿å…LCDåœ°å€å›ç»• */
     int16_t max_vis_row = (239 - y) / 2;
     if (max_vis_row < 0) { LCD_CS_SET; return; }
     int16_t vis_rows = max_vis_row + 1;
@@ -912,14 +912,14 @@ static void sok_draw_nav_buttons_at(int16_t y) {
     LCD_CS_SET;
 }
 
-/* ================= ¶ş¼¶²Ëµ¥(3ĞĞ: ³·Ïú/ÉèÖÃ/·µ»Ø) ================= */
+/* ================= äºŒçº§èœå•(3è¡Œ: æ’¤é”€/è®¾ç½®/è¿”å›) ================= */
 
 /**
- * @brief  ¸ÕÓÉÉÏ»®À­³öÃæ°åÊ±ÎüÊÕ±¾´ÎÊÖÊÆ: Ö»¿´ÊÖÖ¸ËÉ¿ª, ²»°ÑËÉÊÖµ±µã»÷
- * @param  pressed ±¾Ö¡ÊÇ·ñ°´ÏÂ
- * @retval 1=±¾Ö¡ÒÑÎüÊÕ(µ÷ÓÃ·½Ö±½Ó·µ»Ø) 0=Õı³£´¦Àí
- * @note   ¶ş¼¶²Ëµ¥ºÍ³·Ïú°´Å¥×é¶¼ÊÇÉÏ»®À­³öÀ´µÄ, À­³öÊ±ÊÖÖ¸»¹°´×Å; Èô²»¹ÜÕâ´ÎËÉÊÖ,
- *         ËÉ¿ªµÄÎ»ÖÃ³£³£ÂäÔÚ²Ëµ¥ĞĞ/°´Å¥ÉÏ -> Á¢¿ÌÎó´¥·¢(±íÏÖÎª"µãÁËÃ»·´Ó¦/ÉÁÒ»ÏÂ")
+ * @brief  åˆšç”±ä¸Šåˆ’æ‹‰å‡ºé¢æ¿æ—¶å¸æ”¶æœ¬æ¬¡æ‰‹åŠ¿: åªçœ‹æ‰‹æŒ‡æ¾å¼€, ä¸æŠŠæ¾æ‰‹å½“ç‚¹å‡»
+ * @param  pressed æœ¬å¸§æ˜¯å¦æŒ‰ä¸‹
+ * @retval 1=æœ¬å¸§å·²å¸æ”¶(è°ƒç”¨æ–¹ç›´æ¥è¿”å›) 0=æ­£å¸¸å¤„ç†
+ * @note   äºŒçº§èœå•å’Œæ’¤é”€æŒ‰é’®ç»„éƒ½æ˜¯ä¸Šåˆ’æ‹‰å‡ºæ¥çš„, æ‹‰å‡ºæ—¶æ‰‹æŒ‡è¿˜æŒ‰ç€; è‹¥ä¸ç®¡è¿™æ¬¡æ¾æ‰‹,
+ *         æ¾å¼€çš„ä½ç½®å¸¸å¸¸è½åœ¨èœå•è¡Œ/æŒ‰é’®ä¸Š -> ç«‹åˆ»è¯¯è§¦å‘(è¡¨ç°ä¸º"ç‚¹äº†æ²¡ååº”/é—ªä¸€ä¸‹")
  */
 static uint8_t sok_swipe_enter(uint8_t pressed) {
     if (!s_menu_from_swipe) return 0;
@@ -930,10 +930,10 @@ static uint8_t sok_swipe_enter(uint8_t pressed) {
 }
 
 /**
- * @brief  °´µ±Ç°Ãæ°åÖÖÀà»­ÔÚ y ´¦(¸úÊÖ»¬¶¯ÓÃ)
- * @note   ÖÖÀà1(¶ş¼¶²Ëµ¥): ²Ëµ¥ÊÇÍùÉÏ³¤µÄ, ĞÂÎ»ÖÃ±ØÈ»¸Ç×¡ÉÏÒ»Ö¡µÄ¾ÉÎ»ÖÃ, ËùÒÔ°´ y
- *         Ö±½Ó»­Ò»´Î¼´¿É ¡ª¡ª ²»±Ø²¹µØÍ¼, ¸ü²»ÄÜÄÃÕû¸ñÍßÆ¬È¥²¹(¸ñ×ÓÁ£¶È»áÈÃ²Ëµ¥ÉÏ±ßÔµ
- *         Ò»¸ñÒ»ÌøµØÉÁ)¡£²Ëµ¥ÉÏ·½±¾À´¾ÍÊÇÓÎÏ·»­Ãæ, ²»ÓÃ¶¯¡£
+ * @brief  æŒ‰å½“å‰é¢æ¿ç§ç±»ç”»åœ¨ y å¤„(è·Ÿæ‰‹æ»‘åŠ¨ç”¨)
+ * @note   ç§ç±»1(äºŒçº§èœå•): èœå•æ˜¯å¾€ä¸Šé•¿çš„, æ–°ä½ç½®å¿…ç„¶ç›–ä½ä¸Šä¸€å¸§çš„æ—§ä½ç½®, æ‰€ä»¥æŒ‰ y
+ *         ç›´æ¥ç”»ä¸€æ¬¡å³å¯ â€”â€” ä¸å¿…è¡¥åœ°å›¾, æ›´ä¸èƒ½æ‹¿æ•´æ ¼ç“¦ç‰‡å»è¡¥(æ ¼å­ç²’åº¦ä¼šè®©èœå•ä¸Šè¾¹ç¼˜
+ *         ä¸€æ ¼ä¸€è·³åœ°é—ª)ã€‚èœå•ä¸Šæ–¹æœ¬æ¥å°±æ˜¯æ¸¸æˆç”»é¢, ä¸ç”¨åŠ¨ã€‚
  */
 static void sok_panel_draw_at(int16_t y) {
     if (s_panel_kind == 1) {
@@ -944,24 +944,24 @@ static void sok_panel_draw_at(int16_t y) {
 }
 
 /**
- * @brief  Çå³ı y ÒÔÏÂµÄÃæ°å²ĞÁô(È¡ÏûÍÏ×§ÓÃ)
- * @note   ¶ş¼¶²Ëµ¥²»ÓÃÇå: µ÷ÓÃ·½Ëæºó sok_redraw_grid_below() ¾Í°ÑÕâÒ»´ø²¹»ØµØÍ¼ÁË;
- *         µ¼º½°´Å¥×éÏÈË¢ºÚÔÙÖØ»æÍßÆ¬(°´Å¥·Ö²¼¹ã, Ö»ÖØ»æÍßÆ¬¿ÉÄÜÁô±ß)
+ * @brief  æ¸…é™¤ y ä»¥ä¸‹çš„é¢æ¿æ®‹ç•™(å–æ¶ˆæ‹–æ‹½ç”¨)
+ * @note   äºŒçº§èœå•ä¸ç”¨æ¸…: è°ƒç”¨æ–¹éšå sok_redraw_grid_below() å°±æŠŠè¿™ä¸€å¸¦è¡¥å›åœ°å›¾äº†;
+ *         å¯¼èˆªæŒ‰é’®ç»„å…ˆåˆ·é»‘å†é‡ç»˜ç“¦ç‰‡(æŒ‰é’®åˆ†å¸ƒå¹¿, åªé‡ç»˜ç“¦ç‰‡å¯èƒ½ç•™è¾¹)
  */
 static void sok_panel_clear_from(int16_t y) {
     LCD_Fill(0, (uint16_t)y, 240, 240, LCD_BLACK);
 }
 
 /**
- * @brief  Æô¶¯¸úÊÖÉÏ»®(µ¼º½°´Å¥×é »ò ¶ş¼¶²Ëµ¥, Èı´¦¹²ÓÃ: ÓÎÏ·ÄÚÉÏ»®/Ò»¼¶Ãæ°åÉÏ»®/³·Ïú½çÃæÉÏ»®)
- * @param  kind    0=µ¼º½°´Å¥×é(Í£ÔÚ SOK_BTN_Y), 1=¶ş¼¶²Ëµ¥(Í£ÔÚ RESTART_MENU_Y-1)
- * @param  up_move ±¾´ÎÉÏ»®µÄÎ»ÒÆ(px)
- * @note   ÓëÒ»¼¶°´Å¥Ãæ°å¹²ÓÃÍ¬Ò»Ì×»¬¶¯×´Ì¬(s_menu_sliding/s_menu_slide_y), ¿¿ s_panel_kind Çø·Ö»­Ê²Ã´
+ * @brief  å¯åŠ¨è·Ÿæ‰‹ä¸Šåˆ’(å¯¼èˆªæŒ‰é’®ç»„ æˆ– äºŒçº§èœå•, ä¸‰å¤„å…±ç”¨: æ¸¸æˆå†…ä¸Šåˆ’/ä¸€çº§é¢æ¿ä¸Šåˆ’/æ’¤é”€ç•Œé¢ä¸Šåˆ’)
+ * @param  kind    0=å¯¼èˆªæŒ‰é’®ç»„(åœåœ¨ SOK_BTN_Y), 1=äºŒçº§èœå•(åœåœ¨ RESTART_MENU_Y-1)
+ * @param  up_move æœ¬æ¬¡ä¸Šåˆ’çš„ä½ç§»(px)
+ * @note   ä¸ä¸€çº§æŒ‰é’®é¢æ¿å…±ç”¨åŒä¸€å¥—æ»‘åŠ¨çŠ¶æ€(s_menu_sliding/s_menu_slide_y), é  s_panel_kind åŒºåˆ†ç”»ä»€ä¹ˆ
  */
 static void sok_panel_drag_start(uint8_t kind, int16_t up_move) {
     int16_t y0 = (int16_t)(240 - up_move);
     s_panel_kind = kind;
-    /* ¶ş¼¶²Ëµ¥Í£ÔÚ RESTART_MENU_Y-1: ¶¥±ßÉÏÒÆ1px, ÕıºÃ¸ÇµôµÍµçÍ¼±êÉÏ±ß¿òÂ¶ÔÚ²Ëµ¥¿òÍâµÄµÚ79ĞĞ */
+    /* äºŒçº§èœå•åœåœ¨ RESTART_MENU_Y-1: é¡¶è¾¹ä¸Šç§»1px, æ­£å¥½ç›–æ‰ä½ç”µå›¾æ ‡ä¸Šè¾¹æ¡†éœ²åœ¨èœå•æ¡†å¤–çš„ç¬¬79è¡Œ */
     s_panel_rest = (kind == 1) ? (RESTART_MENU_Y - 1) : SOK_BTN_Y;
 
     s_slide_max_dy = up_move;
@@ -971,12 +971,12 @@ static void sok_panel_drag_start(uint8_t kind, int16_t up_move) {
 }
 
 /**
- * @brief  ²Áµô¶ş¼¶²Ëµ¥¿ò + »Ö¸´ÆäÏÂµØÍ¼
+ * @brief  æ“¦æ‰äºŒçº§èœå•æ¡† + æ¢å¤å…¶ä¸‹åœ°å›¾
  */
 static void sok_lvl2_clear_frame(void) {
     s_lvl2_visible = 0;
-    /* »¬¶¯Î»ÖÃ¸´Î»µ½°´Å¥Ãæ°åÍ£¿¿Î»: µç³Ø»Ö¸´°´Õâ¸öÉÏÔµ²Ã¼ô, ÓÃ 240 »áÒ»Ö±²¹µ½ y=219,
-       °Ñ³·Ïú½çÃæµÄÈı¸ö°´Å¥(189 Æğ)¸ÇÔÚµØÍ¼ÏÂÃæ */
+    /* æ»‘åŠ¨ä½ç½®å¤ä½åˆ°æŒ‰é’®é¢æ¿åœé ä½: ç”µæ± æ¢å¤æŒ‰è¿™ä¸ªä¸Šç¼˜è£å‰ª, ç”¨ 240 ä¼šä¸€ç›´è¡¥åˆ° y=219,
+       æŠŠæ’¤é”€ç•Œé¢çš„ä¸‰ä¸ªæŒ‰é’®(189 èµ·)ç›–åœ¨åœ°å›¾ä¸‹é¢ */
     s_menu_slide_y = SOK_BTN_Y;
     LCD_Fill_DMA(RESTART_MENU_X, RESTART_MENU_Y - 1,
                  RESTART_MENU_X + RESTART_MENU_W, 240, LCD_BLACK);
@@ -984,9 +984,9 @@ static void sok_lvl2_clear_frame(void) {
 }
 
 /**
- * @brief  ¶ş¼¶²Ëµ¥Ã¿Ö¡´¦Àí: °´ÏÂ¼ÇÂ¼¡úËÉÊÖÍ¬Î»ÖÃ´¥·¢
- * @retval 0=ÒÑ´¦Àí(¼ÌĞøÓÎÏ·) EXIT_RET_SETTINGS=Òª½øÉèÖÃ²Ëµ¥
- * @note   ĞĞ0=³·Ïú(½ø³·Ïú½çÃæ) ĞĞ1=ÉèÖÃ ĞĞ2=·µ»Ø(»»»ØÒ»¼¶°´Å¥×é); µã¿òÍâ¿Õ°×=¹Ø±Õ»ØÓÎÏ·
+ * @brief  äºŒçº§èœå•æ¯å¸§å¤„ç†: æŒ‰ä¸‹è®°å½•â†’æ¾æ‰‹åŒä½ç½®è§¦å‘
+ * @retval 0=å·²å¤„ç†(ç»§ç»­æ¸¸æˆ) EXIT_RET_SETTINGS=è¦è¿›è®¾ç½®èœå•
+ * @note   è¡Œ0=æ’¤é”€(è¿›æ’¤é”€ç•Œé¢) è¡Œ1=è®¾ç½® è¡Œ2=è¿”å›(æ¢å›ä¸€çº§æŒ‰é’®ç»„); ç‚¹æ¡†å¤–ç©ºç™½=å…³é—­å›æ¸¸æˆ
  */
 static uint8_t sok_lvl2_update(void) {
     TouchState ts;
@@ -994,15 +994,15 @@ static uint8_t sok_lvl2_update(void) {
 
     Touch_Scan(&ts);
 
-    /* ¸ÕÓÉÉÏ»®À­³ö: ±¾´ÎÊÖÊÆÖ»¿´ËÉ¿ª, ²»µ±µã»÷ */
+    /* åˆšç”±ä¸Šåˆ’æ‹‰å‡º: æœ¬æ¬¡æ‰‹åŠ¿åªçœ‹æ¾å¼€, ä¸å½“ç‚¹å‡» */
     if (sok_swipe_enter(ts.pressed)) return 0;
 
     if (ts.pressed) {
-        if (!s_prev_pressed) {         /* °´ÏÂ: ¼ÇÂ¼ÆğÊÖY(ËÉÊÖºó²ÅÅĞ¶¨) */
+        if (!s_prev_pressed) {         /* æŒ‰ä¸‹: è®°å½•èµ·æ‰‹Y(æ¾æ‰‹åæ‰åˆ¤å®š) */
             s_prev_pressed = 1;
             s_swipe_origin_y = ts.y;
         }
-        /* °´×¡ÖĞ: ÉÏ·½ÇøÓò(y<40)ÏÂ»¬ -> ÊÕÆğ¶ş¼¶²Ëµ¥, ´ò¿ªÍË³ö²Ëµ¥(ÓëÓÎÏ·ÄÚÒ»ÖÂ) */
+        /* æŒ‰ä½ä¸­: ä¸Šæ–¹åŒºåŸŸ(y<40)ä¸‹æ»‘ -> æ”¶èµ·äºŒçº§èœå•, æ‰“å¼€é€€å‡ºèœå•(ä¸æ¸¸æˆå†…ä¸€è‡´) */
         else if (sok_try_open_exit_menu(ts.y)) {
             sok_lvl2_clear_frame();
             s_menu_cooldown = 15;
@@ -1012,7 +1012,7 @@ static uint8_t sok_lvl2_update(void) {
     if (!s_prev_pressed) return 0;
 
     s_prev_pressed = 0;
-    /* »®¶¯¹ı(Î»ÒÆ>ãĞÖµ)ÔÙËÉÊÖ²»Ëãµã»÷: Õû¶ÎÊÖÊÆ×÷·Ï, ²»´¥·¢ĞĞ */
+    /* åˆ’åŠ¨è¿‡(ä½ç§»>é˜ˆå€¼)å†æ¾æ‰‹ä¸ç®—ç‚¹å‡»: æ•´æ®µæ‰‹åŠ¿ä½œåºŸ, ä¸è§¦å‘è¡Œ */
     {
         int16_t dy = (int16_t)ts.y - (int16_t)s_swipe_origin_y;
         if (dy < 0) dy = -dy;
@@ -1022,30 +1022,30 @@ static uint8_t sok_lvl2_update(void) {
         && ts.y >= RESTART_MENU_Y) {
         row = menu_row_from_y(RESTART_MENU_Y, ts.y, 3);
     } else {
-        row = -1;                          /* ¿òÍâ/ÉÏ·½¿Õ°× */
+        row = -1;                          /* æ¡†å¤–/ä¸Šæ–¹ç©ºç™½ */
     }
-    if (row == 1) {                        /* ÉèÖÃ: Ë²¼äµ¯³öÕûÆÁÉèÖÃÒ³(²»×ö¸úÊÖ¶¯»­, Ê¡¿Õ¼ä) */
+    if (row == 1) {                        /* è®¾ç½®: ç¬é—´å¼¹å‡ºæ•´å±è®¾ç½®é¡µ(ä¸åšè·Ÿæ‰‹åŠ¨ç”», çœç©ºé—´) */
         s_lvl2_visible = 0;
         menu_enter_game_settings();
         return EXIT_RET_SETTINGS;
     }
 
     sok_lvl2_clear_frame();
-    if (row == 0) {                        /* ³·Ïú½çÃæ: µ×²¿»»³É ÉÏÒ»²½/·µ»Ø/ÏÂÒ»²½ */
+    if (row == 0) {                        /* æ’¤é”€ç•Œé¢: åº•éƒ¨æ¢æˆ ä¸Šä¸€æ­¥/è¿”å›/ä¸‹ä¸€æ­¥ */
         s_undo_group = 1;
         s_undo_visible = 1;
         sok_draw_undo_buttons();
-    } else if (row == 2) {                 /* ·µ»Ø: °´Ä£Ê½»Øµ½³·ÏúµÄ3¸ö°´Å¥ / Ò»¼¶°´Å¥×é */
+    } else if (row == 2) {                 /* è¿”å›: æŒ‰æ¨¡å¼å›åˆ°æ’¤é”€çš„3ä¸ªæŒ‰é’® / ä¸€çº§æŒ‰é’®ç»„ */
         sok_restore_panel_by_mode();
     }
     s_menu_cooldown = 15;
     return 0;
 }
 
-/* ================= ³·Ïú½çÃæ(ÉÏÒ»²½/·µ»Ø/ÏÂÒ»²½) ================= */
+/* ================= æ’¤é”€ç•Œé¢(ä¸Šä¸€æ­¥/è¿”å›/ä¸‹ä¸€æ­¥) ================= */
 
 /**
- * @brief  È¡³·Ïú°´Å¥Í¼ (0=ÉÏÒ»²½ 1=·µ»Ø 2=ÏÂÒ»²½; °´ÓïÑÔÑ¡±£ÁôÇø, ÕûÍ¼)
+ * @brief  å–æ’¤é”€æŒ‰é’®å›¾ (0=ä¸Šä¸€æ­¥ 1=è¿”å› 2=ä¸‹ä¸€æ­¥; æŒ‰è¯­è¨€é€‰ä¿ç•™åŒº, æ•´å›¾)
  */
 static const void* sok_undo_img_rows(uint8_t which) {
     uint32_t base  = (g_language_index == 1) ? BTN_IMG_UNDO_EN_ADDR : BTN_IMG_UNDO_CN_ADDR;
@@ -1056,7 +1056,7 @@ static const void* sok_undo_img_rows(uint8_t which) {
 }
 
 /**
- * @brief  »­Õû×é³·Ïú°´Å¥(1:1 ÏÔÊ¾, 30x31)
+ * @brief  ç”»æ•´ç»„æ’¤é”€æŒ‰é’®(1:1 æ˜¾ç¤º, 30x31)
  */
 static void sok_draw_undo_buttons(void) {
     uint8_t i;
@@ -1068,8 +1068,8 @@ static void sok_draw_undo_buttons(void) {
 }
 
 /**
- * @brief  ÖØ»æÒ»¼¶µ¼º½°´Å¥×é + ¹Ø¿¨±àºÅ(²»¸Ä¿É¼û×´Ì¬)
- * @note   Ô­ÏÈ"°´Å¥×é+¹Ø¿¨±àºÅ"Õâ¶Ôµ÷ÓÃÔÚÎÄ¼şÀïĞ´ÁË 7 ´¦, ºÏ²¢³ÉÕâÒ»·İ
+ * @brief  é‡ç»˜ä¸€çº§å¯¼èˆªæŒ‰é’®ç»„ + å…³å¡ç¼–å·(ä¸æ”¹å¯è§çŠ¶æ€)
+ * @note   åŸå…ˆ"æŒ‰é’®ç»„+å…³å¡ç¼–å·"è¿™å¯¹è°ƒç”¨åœ¨æ–‡ä»¶é‡Œå†™äº† 7 å¤„, åˆå¹¶æˆè¿™ä¸€ä»½
  */
 static void sok_redraw_nav_group(void) {
     sok_draw_nav_buttons_at(SOK_BTN_Y);
@@ -1077,17 +1077,17 @@ static void sok_redraw_nav_group(void) {
 }
 
 /**
- * @brief  ÏÔÊ¾Ò»¼¶µ¼º½°´Å¥×é(ÉÏÒ»¹Ø/ÖØĞÂ¿ªÊ¼/ÏÂÒ»¹Ø) + ¹Ø¿¨±àºÅ
+ * @brief  æ˜¾ç¤ºä¸€çº§å¯¼èˆªæŒ‰é’®ç»„(ä¸Šä¸€å…³/é‡æ–°å¼€å§‹/ä¸‹ä¸€å…³) + å…³å¡ç¼–å·
  */
 static void sok_show_nav_group(void) {
     s_menu_visible = 1;
-    s_menu_slide_y = SOK_BTN_Y;   /* Ãæ°åÍ£¿¿Î»: µç³Ø»Ö¸´°´Õâ¸öÉÏÔµ²Ã¼ô, ±ğÁô¾ÉÖµ */
+    s_menu_slide_y = SOK_BTN_Y;   /* é¢æ¿åœé ä½: ç”µæ± æ¢å¤æŒ‰è¿™ä¸ªä¸Šç¼˜è£å‰ª, åˆ«ç•™æ—§å€¼ */
     sok_redraw_nav_group();
 }
 
 /**
- * @brief  ³·Ïú°´Å¥ÃüÖĞ: 0=Î´ÃüÖĞ 1=ÉÏÒ»²½ 2=·µ»Ø 3=ÏÂÒ»²½
- * @note   ºáÏòÑØÓÃ 60px ²ÛÎ»(45/105/165 Æğ, ºÃµã); ×İÏòÓÃ³·Ïú°´Å¥×Ô¼ºÄÇÌ×Õ­´ø
+ * @brief  æ’¤é”€æŒ‰é’®å‘½ä¸­: 0=æœªå‘½ä¸­ 1=ä¸Šä¸€æ­¥ 2=è¿”å› 3=ä¸‹ä¸€æ­¥
+ * @note   æ¨ªå‘æ²¿ç”¨ 60px æ§½ä½(45/105/165 èµ·, å¥½ç‚¹); çºµå‘ç”¨æ’¤é”€æŒ‰é’®è‡ªå·±é‚£å¥—çª„å¸¦
  */
 static uint8_t sok_undo_hit_test(uint16_t x, uint16_t y) {
     if (y < SOK_UNDO_HIT_Y0 || y >= SOK_UNDO_HIT_Y1) return 0;
@@ -1097,24 +1097,24 @@ static uint8_t sok_undo_hit_test(uint16_t x, uint16_t y) {
 }
 
 /**
- * @brief  ÖØ»æÒ»¸ñ, µ«Ìø¹ı"±»³·Ïú°´Å¥¸Ç×¡"µÄ¸ñ×Ó
- * @note   ³·Ïú°´Å¥ÊÇ²»Í¸Ã÷°å, »­ÁËÒ²¿´²»¼û; °´Å¥¹Ø±Õ/»»×éÊ±»á sok_redraw_grid_below
- *         °ÑÄÇÒ»Õû¿é²¹»ØÀ´, ËùÒÔÕâÀïÌø¹ı²»»áÁôÏÂ´í»­Ãæ
- * @note   noinline: ÓĞ 4 ´¦µ÷ÓÃ, ÄÚÁª»á°ÑÕâ¶Î±È½Ï¸´ÖÆ 4 ·İ, ·´¶ø¸üÕ¼ flash
+ * @brief  é‡ç»˜ä¸€æ ¼, ä½†è·³è¿‡"è¢«æ’¤é”€æŒ‰é’®ç›–ä½"çš„æ ¼å­
+ * @note   æ’¤é”€æŒ‰é’®æ˜¯ä¸é€æ˜æ¿, ç”»äº†ä¹Ÿçœ‹ä¸è§; æŒ‰é’®å…³é—­/æ¢ç»„æ—¶ä¼š sok_redraw_grid_below
+ *         æŠŠé‚£ä¸€æ•´å—è¡¥å›æ¥, æ‰€ä»¥è¿™é‡Œè·³è¿‡ä¸ä¼šç•™ä¸‹é”™ç”»é¢
+ * @note   noinline: æœ‰ 4 å¤„è°ƒç”¨, å†…è”ä¼šæŠŠè¿™æ®µæ¯”è¾ƒå¤åˆ¶ 4 ä»½, åè€Œæ›´å  flash
  */
 static void __attribute__((noinline)) sok_redraw_cell_ui(uint8_t r, uint8_t c) {
-    /* Ö»Ìø'ÍêÈ«±»°´Å¥¸Ç×¡'µÄ¸ñ×Ó; ¿çÔÚ°´Å¥ÉÏ±ßÔµÄÇÒ»¸ñÒªÕÕ»­(ËüÔÚÃæ°åÉÏ·½»¹Â¶Ò»Ìõ),
-       ¸Ç×¡°´Å¥µÄ²¿·ÖËæºóÓÉ sok_draw_undo_buttons() ²¹»ØÀ´ */
+    /* åªè·³'å®Œå…¨è¢«æŒ‰é’®ç›–ä½'çš„æ ¼å­; è·¨åœ¨æŒ‰é’®ä¸Šè¾¹ç¼˜é‚£ä¸€æ ¼è¦ç…§ç”»(å®ƒåœ¨é¢æ¿ä¸Šæ–¹è¿˜éœ²ä¸€æ¡),
+       ç›–ä½æŒ‰é’®çš„éƒ¨åˆ†éšåç”± sok_draw_undo_buttons() è¡¥å›æ¥ */
     if (g_oy + (int16_t)r * (int16_t)g_tile_size >= SOK_UNDO_Y) return;
     sokoban_draw_cell_at(r, c);
 }
 
 /**
- * @brief  ¼ÇÂ¼Ò»²½³·ÏúÀúÊ·(»·ĞÎ: ÂúÁË¸²¸Ç×î¾É; ×ßĞÂµÄÒ»²½×÷·Ï"Î´À´")
+ * @brief  è®°å½•ä¸€æ­¥æ’¤é”€å†å²(ç¯å½¢: æ»¡äº†è¦†ç›–æœ€æ—§; èµ°æ–°çš„ä¸€æ­¥ä½œåºŸ"æœªæ¥")
  */
 static void sok_hist_push(uint8_t step) {
-    /* ³·»ØºóÓÖ×ßĞÂµÄÒ»²½: ÏÈ°Ñ"Î´À´"½Ø¶Ï(×÷·ÏÒÑ³·ÏúµÄ·ÖÖ§)¡£
-       ·ñÔòÀúÊ·ÌõÊı»áÓëÊµ¼Ê×ß¹ıµÄ²½Êı²»Ò»ÖÂ, ÔÙ³·¾Í»á¶àÍËÒ»²½ -> ÈËÎï´©Ç½ */
+    /* æ’¤å›ååˆèµ°æ–°çš„ä¸€æ­¥: å…ˆæŠŠ"æœªæ¥"æˆªæ–­(ä½œåºŸå·²æ’¤é”€çš„åˆ†æ”¯)ã€‚
+       å¦åˆ™å†å²æ¡æ•°ä¼šä¸å®é™…èµ°è¿‡çš„æ­¥æ•°ä¸ä¸€è‡´, å†æ’¤å°±ä¼šå¤šé€€ä¸€æ­¥ -> äººç‰©ç©¿å¢™ */
     if (s_hist_pos < s_hist_cnt) s_hist_cnt = s_hist_pos;
     if (s_hist_cnt < SOK_HIST_MAX) {
         s_hist[(uint8_t)((s_hist_head + s_hist_cnt) & (SOK_HIST_MAX - 1))] = step;
@@ -1127,13 +1127,13 @@ static void sok_hist_push(uint8_t step) {
 }
 
 /**
- * @brief  °´ÀúÊ·¼ÇÂ¼×ßÒ»²½: forward=0 ·´ÍÆ(³·Ïú), 1 ÕıÍÆ(ÖØ×ö), ²¢¾Ö²¿ÖØ»æ 2~4 ¸ñ
- * @note   Íæ¼ÒÎ»ÖÃÏÖ³¡É¨³öÀ´(²»Áí´æ), Ïä×Ó/Ä¿±ê¿¿ is_orig_target() ·´²éÔ­Ê¼µØÍ¼¡£
- *         Ç°½ø/ºóÍËÖ»²îÒ»¸ö·ûºÅ: Íæ¼Ò Ô´¡úÔ´+sgn*dir; Ïä×ÓºãÎª (Ô´+dir)¡ú(Ô´+dir+sgn*dir),
- *         ËùÒÔÁ½Õß¹²ÓÃÕâÒ»¶Î(¼û¿ª·¢×¢ÒâÊÂÏî ¡ì38 µÄ"1 ×Ö½Ú/²½ + ·´ÍÆ")¡£
+ * @brief  æŒ‰å†å²è®°å½•èµ°ä¸€æ­¥: forward=0 åæ¨(æ’¤é”€), 1 æ­£æ¨(é‡åš), å¹¶å±€éƒ¨é‡ç»˜ 2~4 æ ¼
+ * @note   ç©å®¶ä½ç½®ç°åœºæ‰«å‡ºæ¥(ä¸å¦å­˜), ç®±å­/ç›®æ ‡é  is_orig_target() åæŸ¥åŸå§‹åœ°å›¾ã€‚
+ *         å‰è¿›/åé€€åªå·®ä¸€ä¸ªç¬¦å·: ç©å®¶ æºâ†’æº+sgn*dir; ç®±å­æ’ä¸º (æº+dir)â†’(æº+dir+sgn*dir),
+ *         æ‰€ä»¥ä¸¤è€…å…±ç”¨è¿™ä¸€æ®µ(è§å¼€å‘æ³¨æ„äº‹é¡¹ Â§38 çš„"1 å­—èŠ‚/æ­¥ + åæ¨")ã€‚
  */
 static uint8_t sok_hist_step(uint8_t step, uint8_t forward) {
-    static const int8_t dr4[4] = { -1, 1, 0, 0 };   /* ÉÏ/ÏÂ/×ó/ÓÒ (Óë SokobanDir Í¬Ğò) */
+    static const int8_t dr4[4] = { -1, 1, 0, 0 };   /* ä¸Š/ä¸‹/å·¦/å³ (ä¸ SokobanDir åŒåº) */
     static const int8_t dc4[4] = { 0, 0, -1, 1 };
     uint8_t d = (uint8_t)(step & 3);
     uint8_t pushed = (uint8_t)((step >> 2) & 1);
@@ -1145,14 +1145,14 @@ static uint8_t sok_hist_step(uint8_t step, uint8_t forward) {
 
     sokoban_find_player(&pr8, &pc8);
     pr = (int8_t)pr8;  pc = (int8_t)pc8;
-    nr = (int8_t)(pr + dr);  nc = (int8_t)(pc + dc);            /* Íæ¼ÒÄ¿±ê¸ñ */
+    nr = (int8_t)(pr + dr);  nc = (int8_t)(pc + dc);            /* ç©å®¶ç›®æ ‡æ ¼ */
     if (pushed) {
-        bx = (int8_t)(pr + dr4[d]);  bc = (int8_t)(pc + dc4[d]);  /* Ïä×Óµ±Ç°¸ñ */
-        tx = (int8_t)(bx + dr);      tc = (int8_t)(bc + dc);      /* Ïä×ÓÄ¿±ê¸ñ */
+        bx = (int8_t)(pr + dr4[d]);  bc = (int8_t)(pc + dc4[d]);  /* ç®±å­å½“å‰æ ¼ */
+        tx = (int8_t)(bx + dr);      tc = (int8_t)(bc + dc);      /* ç®±å­ç›®æ ‡æ ¼ */
     }
 
-    /* ÔÙ±£ÏÕ: Ô½½ç»ò"Ä¿±ê¸ñÊÇÇ½"(ËµÃ÷ÀúÊ·ÓëµØÍ¼¶Ô²»ÉÏ)¾ÍÕû²½×÷·Ï,
-       ¾ø²»ÈÃÔ½½çÏÂ±êĞ´»µÄÚ´æ¡¢Ò²²»ÈÃÇ½±»¸Ä³ÉµØ°å(ÈËÎï´©Ç½) */
+    /* å†ä¿é™©: è¶Šç•Œæˆ–"ç›®æ ‡æ ¼æ˜¯å¢™"(è¯´æ˜å†å²ä¸åœ°å›¾å¯¹ä¸ä¸Š)å°±æ•´æ­¥ä½œåºŸ,
+       ç»ä¸è®©è¶Šç•Œä¸‹æ ‡å†™åå†…å­˜ã€ä¹Ÿä¸è®©å¢™è¢«æ”¹æˆåœ°æ¿(äººç‰©ç©¿å¢™) */
     if (nr < 0 || nr >= (int8_t)g_level_rows || nc < 0 || nc >= (int8_t)g_level_cols) return 0;
     cell = g_runtime_map[nr * g_level_cols + nc];
     if (cell == SOK_WALL || cell == SOK_OUTER) return 0;
@@ -1160,7 +1160,7 @@ static uint8_t sok_hist_step(uint8_t step, uint8_t forward) {
         if (tx < 0 || tx >= (int8_t)g_level_rows || tc < 0 || tc >= (int8_t)g_level_cols) return 0;
     }
 
-    /* Ë³ĞòÒª½ô: ¢Ù Íæ¼ÒÀë¿ª ¢Ú Ïä×ÓÒÆ¶¯(»áÓÃµ½/pr,pc »ò nr,nc ÖØµşµÄ¸ñ×Ó) ¢Û Íæ¼Òµ½´ï */
+    /* é¡ºåºè¦ç´§: â‘  ç©å®¶ç¦»å¼€ â‘¡ ç®±å­ç§»åŠ¨(ä¼šç”¨åˆ°/pr,pc æˆ– nr,nc é‡å çš„æ ¼å­) â‘¢ ç©å®¶åˆ°è¾¾ */
     g_runtime_map[pr * g_level_cols + pc] =
         is_orig_target((uint8_t)pr, (uint8_t)pc) ? SOK_TARGET : SOK_FLOOR;
     if (pushed) {
@@ -1180,27 +1180,27 @@ static uint8_t sok_hist_step(uint8_t step, uint8_t forward) {
         sok_redraw_cell_ui((uint8_t)tx, (uint8_t)tc);
     }
     LCD_CS_SET;
-    if (s_undo_visible) sok_draw_undo_buttons();   /* Í¬ÉÏ: ¿çÏß¸ñ×Ó»á¸Ç×¡°´Å¥, ²¹»­ */
+    if (s_undo_visible) sok_draw_undo_buttons();   /* åŒä¸Š: è·¨çº¿æ ¼å­ä¼šç›–ä½æŒ‰é’®, è¡¥ç”» */
     game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 1);
     return 1;
 }
 
 /**
- * @brief  °´ÀúÊ·×ßÒ»²½: dirn<0=³·Ïú, >0=ÖØ×ö; µ½Í·ÁË/×ß²»¶¯·µ»Ø 0(µãÁËÃ»·´Ó¦)
+ * @brief  æŒ‰å†å²èµ°ä¸€æ­¥: dirn<0=æ’¤é”€, >0=é‡åš; åˆ°å¤´äº†/èµ°ä¸åŠ¨è¿”å› 0(ç‚¹äº†æ²¡ååº”)
  */
 static uint8_t sok_hist_go(int8_t dirn) {
     uint8_t done;
     uint8_t pos0 = s_hist_pos;
 
     if (dirn < 0) {
-        if (s_hist_pos == 0) return 0;          /* Õ»¿Õ/ÒÑ³·µ½µ× */
+        if (s_hist_pos == 0) return 0;          /* æ ˆç©º/å·²æ’¤åˆ°åº• */
         s_hist_pos--;
     } else if (s_hist_pos >= s_hist_cnt) {
-        return 0;                               /* Ã»ÓĞ¿ÉÖØ×öµÄÁË */
+        return 0;                               /* æ²¡æœ‰å¯é‡åšçš„äº† */
     }
     done = sok_hist_step(s_hist[(uint8_t)((s_hist_head + s_hist_pos) & (SOK_HIST_MAX - 1))],
                          (uint8_t)(dirn > 0));
-    if (!done) {                                /* ×´Ì¬¶Ô²»ÉÏ: Ö¸ÕëÍË»Ø, Ê²Ã´Ò²Ã»×ö */
+    if (!done) {                                /* çŠ¶æ€å¯¹ä¸ä¸Š: æŒ‡é’ˆé€€å›, ä»€ä¹ˆä¹Ÿæ²¡åš */
         s_hist_pos = pos0;
         return 0;
     }
@@ -1212,7 +1212,7 @@ static uint8_t sok_hist_go(int8_t dirn) {
 }
 
 /**
- * @brief  ¹Ø±Õ³·Ïú°´Å¥×é; back_to_nav=1 Ê±»»»ØÒ»¼¶µ¼º½°´Å¥×é
+ * @brief  å…³é—­æ’¤é”€æŒ‰é’®ç»„; back_to_nav=1 æ—¶æ¢å›ä¸€çº§å¯¼èˆªæŒ‰é’®ç»„
  */
 static void sok_undo_hide(uint8_t back_to_nav) {
     s_undo_visible = 0;
@@ -1227,9 +1227,9 @@ static void sok_undo_hide(uint8_t back_to_nav) {
 }
 
 /**
- * @brief  ÉÏ·½ÇøÓòÏÂ»¬ -> ´ò¿ªÍË³ö²Ëµ¥(ÓÎÏ·ÄÚ/¶ş¼¶²Ëµ¥/³·Ïú½çÃæ¹²ÓÃ)
- * @param  y  µ±Ç°´¥µãY
- * @retval 1=ÒÑ´ò¿ª(µ÷ÓÃ·½°´ĞèÔÙÊÕµô×Ô¼ºµÄÃæ°å)
+ * @brief  ä¸Šæ–¹åŒºåŸŸä¸‹æ»‘ -> æ‰“å¼€é€€å‡ºèœå•(æ¸¸æˆå†…/äºŒçº§èœå•/æ’¤é”€ç•Œé¢å…±ç”¨)
+ * @param  y  å½“å‰è§¦ç‚¹Y
+ * @retval 1=å·²æ‰“å¼€(è°ƒç”¨æ–¹æŒ‰éœ€å†æ”¶æ‰è‡ªå·±çš„é¢æ¿)
  */
 static uint8_t sok_try_open_exit_menu(uint16_t y) {
     if (s_menu_cooldown != 0 || s_swipe_origin_y >= MENU_SWIPE_START_Y) return 0;
@@ -1244,7 +1244,7 @@ static uint8_t sok_try_open_exit_menu(uint16_t y) {
 }
 
 /**
- * @brief  ³·Ïú½çÃæÃ¿Ö¡´¦Àí: ÉÏÒ»²½/ÏÂÒ»²½/·µ»Ø/µã¿Õ°×
+ * @brief  æ’¤é”€ç•Œé¢æ¯å¸§å¤„ç†: ä¸Šä¸€æ­¥/ä¸‹ä¸€æ­¥/è¿”å›/ç‚¹ç©ºç™½
  */
 static void sok_undo_ui_update(void) {
     TouchState ts;
@@ -1252,23 +1252,23 @@ static void sok_undo_ui_update(void) {
 
     Touch_Scan(&ts);
 
-    /* ¸ÕÓÉÉÏ»®À­³ö: ±¾´ÎÊÖÊÆÖ»¿´ËÉ¿ª, ²»µ±µã»÷(·ñÔòËÉÊÖÎ»ÖÃÂäÔÚ°´Å¥ÉÏ»áÎó´¥·¢) */
+    /* åˆšç”±ä¸Šåˆ’æ‹‰å‡º: æœ¬æ¬¡æ‰‹åŠ¿åªçœ‹æ¾å¼€, ä¸å½“ç‚¹å‡»(å¦åˆ™æ¾æ‰‹ä½ç½®è½åœ¨æŒ‰é’®ä¸Šä¼šè¯¯è§¦å‘) */
     if (sok_swipe_enter(ts.pressed)) return;
 
     if (!s_prev_pressed && ts.pressed) {
         s_prev_pressed = 1;
-        s_swipe_origin_y = ts.y;      /* ¼ÇÏÂÆğÊÖY, ¹©"ÔÙÉÏ»®»»³É¶ş¼¶²Ëµ¥"ÓÃ */
+        s_swipe_origin_y = ts.y;      /* è®°ä¸‹èµ·æ‰‹Y, ä¾›"å†ä¸Šåˆ’æ¢æˆäºŒçº§èœå•"ç”¨ */
         return;
     }
     if (ts.pressed) {
-        /* °´×¡ÖĞ: ÔÚ×îµ×²¿ÉÏ»® -> ÊÕÆğ³·Ïú°´Å¥, »»³É¶ş¼¶²Ëµ¥(ÓëÒ»¼¶Ãæ°åÍ¬Ò»ÊÖ¸Ğ) */
+        /* æŒ‰ä½ä¸­: åœ¨æœ€åº•éƒ¨ä¸Šåˆ’ -> æ”¶èµ·æ’¤é”€æŒ‰é’®, æ¢æˆäºŒçº§èœå•(ä¸ä¸€çº§é¢æ¿åŒä¸€æ‰‹æ„Ÿ) */
         if (s_menu_cooldown == 0 && s_swipe_origin_y > SOK_SWIPE_Y
             && (int16_t)s_swipe_origin_y - (int16_t)ts.y > MENU_SWIPE_TRIGGER_DIST) {
             int16_t up_move = (int16_t)s_swipe_origin_y - (int16_t)ts.y;
             sok_undo_hide(0);
             sok_panel_drag_start(1, up_move);
         }
-        /* ÉÏ·½ÇøÓòÏÂ»¬ -> ÊÕÆğ³·Ïú°´Å¥, ´ò¿ªÍË³ö²Ëµ¥(ÓëÓÎÏ·ÄÚÒ»ÖÂ) */
+        /* ä¸Šæ–¹åŒºåŸŸä¸‹æ»‘ -> æ”¶èµ·æ’¤é”€æŒ‰é’®, æ‰“å¼€é€€å‡ºèœå•(ä¸æ¸¸æˆå†…ä¸€è‡´) */
         if (sok_try_open_exit_menu(ts.y)) {
             s_exit_from_undo = 1;
             sok_undo_hide(0);
@@ -1279,25 +1279,25 @@ static void sok_undo_ui_update(void) {
     s_prev_pressed = 0;
 
     hit = sok_undo_hit_test(ts.x, ts.y);
-    if (hit == 1)      sok_hist_go(-1);      /* ÉÏÒ»²½(³·Ïú) */
-    else if (hit == 3) sok_hist_go(1);       /* ÏÂÒ»²½(ÖØ×ö) */
-    else if (hit == 2) sok_undo_hide(1);     /* ·µ»Ø ¡ú Ò»¼¶°´Å¥×é */
-    else               sok_undo_hide(0);     /* µã¿Õ°× ¡ú ¹Ø±Õ, ¿É²Ù×÷ÓÎÏ· */
+    if (hit == 1)      sok_hist_go(-1);      /* ä¸Šä¸€æ­¥(æ’¤é”€) */
+    else if (hit == 3) sok_hist_go(1);       /* ä¸‹ä¸€æ­¥(é‡åš) */
+    else if (hit == 2) sok_undo_hide(1);     /* è¿”å› â†’ ä¸€çº§æŒ‰é’®ç»„ */
+    else               sok_undo_hide(0);     /* ç‚¹ç©ºç™½ â†’ å…³é—­, å¯æ“ä½œæ¸¸æˆ */
 }
 
 /**
- * @brief  ¹Ø±ÕÒ»¼¶°´Å¥Ãæ°å: ÇåÎÄ×Ö´ø+°´Å¥´ø(Õ­´ø, ²»È«ÆÁºÚ)²¢»Ö¸´ÆäÏÂµØÍ¼
- * @note   Ô­ÏÈÕâ¶ÎÔÚ"È¡Ïû/µã¿Õ°×/¶ş´ÎÉÏ»®"Èı´¦¸÷Ğ´Ò»±é, ºÏ²¢³ÉÕâÒ»·İ
+ * @brief  å…³é—­ä¸€çº§æŒ‰é’®é¢æ¿: æ¸…æ–‡å­—å¸¦+æŒ‰é’®å¸¦(çª„å¸¦, ä¸å…¨å±é»‘)å¹¶æ¢å¤å…¶ä¸‹åœ°å›¾
+ * @note   åŸå…ˆè¿™æ®µåœ¨"å–æ¶ˆ/ç‚¹ç©ºç™½/äºŒæ¬¡ä¸Šåˆ’"ä¸‰å¤„å„å†™ä¸€é, åˆå¹¶æˆè¿™ä¸€ä»½
  */
 static void sok_close_nav_panel(void) {
-    sok_level_clear();                                        /* ¹Ø¿¨ÎÄ×Ö´ø */
-    LCD_Fill(0, SOK_BTN_Y, 239, SOK_BTN_Y + SOK_BTN_H, LCD_BLACK);  /* °´Å¥´ø */
-    sok_redraw_grid_below(84);                                /* ÆäÏÂµØÍ¼¸ñ×Ó */
+    sok_level_clear();                                        /* å…³å¡æ–‡å­—å¸¦ */
+    LCD_Fill(0, SOK_BTN_Y, 239, SOK_BTN_Y + SOK_BTN_H, LCD_BLACK);  /* æŒ‰é’®å¸¦ */
+    sok_redraw_grid_below(84);                                /* å…¶ä¸‹åœ°å›¾æ ¼å­ */
     s_menu_visible = 0;
 }
 
 /**
- * @brief  ÖØĞÂ¿ªÊ¼µ±Ç°¹Ø¿¨(±£Áô²Ëµ¥×´Ì¬)
+ * @brief  é‡æ–°å¼€å§‹å½“å‰å…³å¡(ä¿ç•™èœå•çŠ¶æ€)
  */
 static void sokoban_restart_current_level(void) {
     if (!sokoban_prepare_level(s_current_level)) return;
@@ -1317,21 +1317,21 @@ static void sokoban_restart_current_level(void) {
 }
 
 /**
- * @brief  ÖØÖÃ´¥Ãş×´Ì¬ (ÇĞ»»¹Ø¿¨Ê±µ÷ÓÃ, ·ÀÖ¹Îó´¥·¢»¬¶¯)
+ * @brief  é‡ç½®è§¦æ‘¸çŠ¶æ€ (åˆ‡æ¢å…³å¡æ—¶è°ƒç”¨, é˜²æ­¢è¯¯è§¦å‘æ»‘åŠ¨)
  */
 void sokoban_reset_touch(void) {
-    s_prev_pressed = 1;      /* ÉèÎª1·ÀÖ¹Ê×´Î´¥¿Ø±»ºöÂÔ, ±ÜÃâÁ¢¼´´¥·¢²Ëµ¥ */
+    s_prev_pressed = 1;      /* è®¾ä¸º1é˜²æ­¢é¦–æ¬¡è§¦æ§è¢«å¿½ç•¥, é¿å…ç«‹å³è§¦å‘èœå• */
     s_touch_start_x = 0;
     s_touch_start_y = 0;
-    s_swipe_origin_y = MENU_SWIPE_START_Y;  /* ÍË³ö²Ëµ¥ÊÖÊÆÆğÊ¼Y×ø±êÉèÎª°²È«Öµ */
+    s_swipe_origin_y = MENU_SWIPE_START_Y;  /* é€€å‡ºèœå•æ‰‹åŠ¿èµ·å§‹Yåæ ‡è®¾ä¸ºå®‰å…¨å€¼ */
     s_menu_cooldown = 0;
 }
 
 /**
- * @brief  ĞòÁĞ»¯ÍÆÏä×Óµ±Ç°×´Ì¬µ½´æµµ»º³å¡£
- * @param  buf     Êä³ö»º³å
- * @param  max_len »º³åÉÏÏŞ
- * @return Ğ´Èë×Ö½ÚÊı
+ * @brief  åºåˆ—åŒ–æ¨ç®±å­å½“å‰çŠ¶æ€åˆ°å­˜æ¡£ç¼“å†²ã€‚
+ * @param  buf     è¾“å‡ºç¼“å†²
+ * @param  max_len ç¼“å†²ä¸Šé™
+ * @return å†™å…¥å­—èŠ‚æ•°
  */
 uint8_t sokoban_save_state(uint8_t* buf, uint8_t max_len) {
     uint16_t cells;
@@ -1361,10 +1361,10 @@ uint8_t sokoban_save_state(uint8_t* buf, uint8_t max_len) {
 }
 
 /**
- * @brief  ´Ó´æµµ»º³å»Ö¸´ÍÆÏä×Ó×´Ì¬²¢ÖØ»æ¡£
- * @param  buf ´æµµ»º³å
- * @param  len ³¤¶È
- * @return 1=³É¹¦, 0=Ê§°Ü
+ * @brief  ä»å­˜æ¡£ç¼“å†²æ¢å¤æ¨ç®±å­çŠ¶æ€å¹¶é‡ç»˜ã€‚
+ * @param  buf å­˜æ¡£ç¼“å†²
+ * @param  len é•¿åº¦
+ * @return 1=æˆåŠŸ, 0=å¤±è´¥
  */
 uint8_t sokoban_restore_state(const uint8_t* buf, uint8_t len) {
     const SokobanLevel* level;
@@ -1413,7 +1413,7 @@ uint8_t sokoban_restore_state(const uint8_t* buf, uint8_t len) {
     s_hold_us = 0;
     s_menu_cooldown = 0;
     sokoban_draw_level(s_current_level);
-    if (s_won) {              /* Î´Í¨¹ØÊ± s_menu_visible=0, ²»»­°´Å¥Ãæ°å */
+    if (s_won) {              /* æœªé€šå…³æ—¶ s_menu_visible=0, ä¸ç”»æŒ‰é’®é¢æ¿ */
         sok_win_draw(65, 120);
         sok_redraw_nav_group();
     }
@@ -1421,46 +1421,46 @@ uint8_t sokoban_restore_state(const uint8_t* buf, uint8_t len) {
 }
 
 /**
- * @brief  ²Ëµ¥¿É¼ûÇÒ°´×¡°´Å¥Ê±µÄ³¤°´ÇĞ¹Ø´¦Àí (ÕæÊµÊ±¼ä½ÚÅÄ)
- * @note   ´Ó sokoban_update ³é³ö, ¼õĞ¡³¬´óº¯Êı±ÜÃâ R_RISCV_RVC_JUMP ³¬·¶Î§
+ * @brief  èœå•å¯è§ä¸”æŒ‰ä½æŒ‰é’®æ—¶çš„é•¿æŒ‰åˆ‡å…³å¤„ç† (çœŸå®æ—¶é—´èŠ‚æ‹)
+ * @note   ä» sokoban_update æŠ½å‡º, å‡å°è¶…å¤§å‡½æ•°é¿å… R_RISCV_RVC_JUMP è¶…èŒƒå›´
  */
 static void sokoban_hold_update(void) {
     TouchState ts;
-    /* ³¤°´¼ÆÊıÖĞ²»Ë¢ĞÂ×ø±ê, Ê¡I2CÊ±¼ä */
+    /* é•¿æŒ‰è®¡æ•°ä¸­ä¸åˆ·æ–°åæ ‡, çœI2Cæ—¶é—´ */
     if (!s_hold_button) {
         Touch_UpdateCoords();
         Touch_Scan(&ts);
-        if (s_drag_btn != 4) s_drag_btn = sok_btn_hit_test(ts.x, ts.y);   /* ÒÑ×÷·ÏµÄÊÖÊÆ²»¸´»î */
+        if (s_drag_btn != 4) s_drag_btn = sok_btn_hit_test(ts.x, ts.y);   /* å·²ä½œåºŸçš„æ‰‹åŠ¿ä¸å¤æ´» */
         if (ts.y > s_btn_max_y) s_btn_max_y = ts.y;
     }
-    /* Ëø¶¨°´×¡Ä¿±ê, ·ÀÊÖÖ¸Î¢ÒÆµ¼ÖÂ¼ÆÊ±¹éÁã */
+    /* é”å®šæŒ‰ä½ç›®æ ‡, é˜²æ‰‹æŒ‡å¾®ç§»å¯¼è‡´è®¡æ—¶å½’é›¶ */
     if (s_hold_us == 0) {
         s_hold_button = (s_drag_btn == 1 || s_drag_btn == 3)
             ? s_drag_btn : 0;
-        s_hold_last_us = GetTimerCount();   /* ¿ªÊ¼¼ÆÊ±»ù×¼ */
+        s_hold_last_us = GetTimerCount();   /* å¼€å§‹è®¡æ—¶åŸºå‡† */
     }
     if (s_hold_button == 1 || s_hold_button == 3) {
-        uint32_t now_us = GetTimerCount();  /* ÕæÊµÊ±¼ä½ÚÅÄ, ÓëÖ¡ÂÊÎŞ¹Ø */
+        uint32_t now_us = GetTimerCount();  /* çœŸå®æ—¶é—´èŠ‚æ‹, ä¸å¸§ç‡æ— å…³ */
         s_hold_us += (uint32_t)(now_us - s_hold_last_us);
         s_hold_last_us = now_us;
         if (s_hold_us >= HOLD_START_US) {
-            s_won_transition = 0;   /* ×Ô¶¯ÇĞ¹ØÒÑ·¢Éú, Çå³ıWON±ê¼Ç */
+            s_won_transition = 0;   /* è‡ªåŠ¨åˆ‡å…³å·²å‘ç”Ÿ, æ¸…é™¤WONæ ‡è®° */
             if (s_hold_button == 1 && s_current_level > 0) {
                 sokoban_init_level(s_current_level - 1);
                 s_menu_visible = 1;
-                s_hold_button = 1;    /* ±£Áô, ·Àprepare_levelÇåÁãºó³¤°´¸ú×ÙÖĞ¶Ï */
-                s_drag_btn = 0;    /* ËÉÊÖ²»´¥·¢ÖØ¸´ÇĞ¹Ø */
-                s_prev_pressed = 1;    /* ±£³Ö°´×¡Ì¬, ·ÀÏÂÒ»Ö¡ÖØĞÂ³õÊ¼»¯ */
-                s_menu_cooldown = HOLD_COOLDOWN_FRAMES;  /* Á¬ÌøÆÚ¼äÓÀ²»¹ıÆÚ, ËÉÊÖ°²È« */
+                s_hold_button = 1;    /* ä¿ç•™, é˜²prepare_levelæ¸…é›¶åé•¿æŒ‰è·Ÿè¸ªä¸­æ–­ */
+                s_drag_btn = 0;    /* æ¾æ‰‹ä¸è§¦å‘é‡å¤åˆ‡å…³ */
+                s_prev_pressed = 1;    /* ä¿æŒæŒ‰ä½æ€, é˜²ä¸‹ä¸€å¸§é‡æ–°åˆå§‹åŒ– */
+                s_menu_cooldown = HOLD_COOLDOWN_FRAMES;  /* è¿è·³æœŸé—´æ°¸ä¸è¿‡æœŸ, æ¾æ‰‹å®‰å…¨ */
             }
             else if (s_hold_button == 3
                 && s_current_level < SOKOBAN_LEVEL_COUNT - 1) {
                 sokoban_init_level(s_current_level + 1);
                 s_menu_visible = 1;
-                s_hold_button = 3;    /* ±£Áô, ·Àprepare_levelÇåÁãºó³¤°´¸ú×ÙÖĞ¶Ï */
-                s_drag_btn = 0;    /* ËÉÊÖ²»´¥·¢ÖØ¸´ÇĞ¹Ø */
-                s_prev_pressed = 1;    /* ±£³Ö°´×¡Ì¬, ·ÀÏÂÒ»Ö¡ÖØĞÂ³õÊ¼»¯ */
-                s_menu_cooldown = HOLD_COOLDOWN_FRAMES;  /* Á¬ÌøÆÚ¼äÓÀ²»¹ıÆÚ, ËÉÊÖ°²È« */
+                s_hold_button = 3;    /* ä¿ç•™, é˜²prepare_levelæ¸…é›¶åé•¿æŒ‰è·Ÿè¸ªä¸­æ–­ */
+                s_drag_btn = 0;    /* æ¾æ‰‹ä¸è§¦å‘é‡å¤åˆ‡å…³ */
+                s_prev_pressed = 1;    /* ä¿æŒæŒ‰ä½æ€, é˜²ä¸‹ä¸€å¸§é‡æ–°åˆå§‹åŒ– */
+                s_menu_cooldown = HOLD_COOLDOWN_FRAMES;  /* è¿è·³æœŸé—´æ°¸ä¸è¿‡æœŸ, æ¾æ‰‹å®‰å…¨ */
             }
             s_hold_us = HOLD_START_US - HOLD_REPEAT_US;
         }
@@ -1471,10 +1471,10 @@ static void sokoban_hold_update(void) {
 }
 
 /**
- * @brief  ÖØ»æ [x0,x1]x[y0,y1] ·¶Î§ÄÚ¸²¸ÇµÄµØÍ¼ÍßÆ¬
- * @note   µç³ØÃğ¶Î»Ö¸´: ÏÈÓÃ LCD_ClearLowBatteryOverlay °Ñµç³ØÍ¼±êÕû¿éË¢ºÚ(ºìÉ«ÏñËØ¡úºÚ),
- *         µØÍ¼ÍâºÚÇø/Í¹Æğ±äºÚ¼´ÎŞºìÉ«²ĞÁô; ´Ë´¦½öÖØ»æµç³ØÇøµØÍ¼ÍßÆ¬¸Ç»Ø±»Ë¢ºÚµÄĞÎ×´¡£
- * @param  x0,y0,x1,y1  ÏñËØ¾ØĞÎ·¶Î§(²»º¬ÓÒ/ÏÂ±ß½ç, Óë LCD_Fill Ò»ÖÂ)
+ * @brief  é‡ç»˜ [x0,x1]x[y0,y1] èŒƒå›´å†…è¦†ç›–çš„åœ°å›¾ç“¦ç‰‡
+ * @note   ç”µæ± ç­æ®µæ¢å¤: å…ˆç”¨ LCD_ClearLowBatteryOverlay æŠŠç”µæ± å›¾æ ‡æ•´å—åˆ·é»‘(çº¢è‰²åƒç´ â†’é»‘),
+ *         åœ°å›¾å¤–é»‘åŒº/å‡¸èµ·å˜é»‘å³æ— çº¢è‰²æ®‹ç•™; æ­¤å¤„ä»…é‡ç»˜ç”µæ± åŒºåœ°å›¾ç“¦ç‰‡ç›–å›è¢«åˆ·é»‘çš„å½¢çŠ¶ã€‚
+ * @param  x0,y0,x1,y1  åƒç´ çŸ©å½¢èŒƒå›´(ä¸å«å³/ä¸‹è¾¹ç•Œ, ä¸ LCD_Fill ä¸€è‡´)
  */
 static void sok_redraw_battery_tiles(int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
 
@@ -1501,16 +1501,16 @@ static void sok_redraw_battery_tiles(int16_t x0, int16_t y0, int16_t x1, int16_t
 }
 
 /**
- * @brief  µÍµçÍ¼±êÃğ¶Î»Ö¸´: °´²Ëµ¥¸²¸Ç·¶Î§ÖØ»æµç³ØÇøÍßÆ¬¡£
- * @note   ÉèÖÃÄ£Ê½ÖØ»æµç³ØÇø; ´¿ÓÎÏ·ÖØ»æÕûÆÁ¡£ÉèÖÃÄ£Ê½ÏÂ sokoban_update() ²»ÅÜ,
- *         g_sok_dirty ÎŞÈËÏû·Ñ, ¹ÊĞèÁ¢¼´»Ö¸´: Ö»ÖØ»æÌõ´øÓÒÔµÍâÍ¹µã + Ìõ´øÎ´¸Ç×¡Ê±
- *         ¿òÍâÂ¶³öµÄµç³ØÖ÷Ìå; ·ÇÉèÖÃÄ£Ê½±£³ÖÖÃÔà, ÓÉÏÂÒ»Ö¡ sokoban_update() »Ö¸´¡£
+ * @brief  ä½ç”µå›¾æ ‡ç­æ®µæ¢å¤: æŒ‰èœå•è¦†ç›–èŒƒå›´é‡ç»˜ç”µæ± åŒºç“¦ç‰‡ã€‚
+ * @note   è®¾ç½®æ¨¡å¼é‡ç»˜ç”µæ± åŒº; çº¯æ¸¸æˆé‡ç»˜æ•´å±ã€‚è®¾ç½®æ¨¡å¼ä¸‹ sokoban_update() ä¸è·‘,
+ *         g_sok_dirty æ— äººæ¶ˆè´¹, æ•…éœ€ç«‹å³æ¢å¤: åªé‡ç»˜æ¡å¸¦å³ç¼˜å¤–å‡¸ç‚¹ + æ¡å¸¦æœªç›–ä½æ—¶
+ *         æ¡†å¤–éœ²å‡ºçš„ç”µæ± ä¸»ä½“; éè®¾ç½®æ¨¡å¼ä¿æŒç½®è„, ç”±ä¸‹ä¸€å¸§ sokoban_update() æ¢å¤ã€‚
  */
 void sokoban_lowbatt_restore(void) {
     if (g_settings_from_game) {
         LCD_ClearLowBatteryOverlay();
-        /* ¶ş¼¶ÉèÖÃ²Ëµ¥Ìõ´ø(x=45~195)¸Ç×¡µç³ØÖ÷Ìå, ²»ÖØ»æ¿òÄÚ(·ñÔòÏÈÍßÆ¬ºóÌõ´øÉÁÒ»Ö¡);
-           Ö»ÖØ»æÌõ´øÓÒÔµÍâµÄÍ¹µã(x=195~210) + Ìõ´øÎ´¸Ç×¡Ê±¿òÍâÂ¶³öµÄµç³ØÖ÷Ìå(»¬³öÖĞ) */
+        /* äºŒçº§è®¾ç½®èœå•æ¡å¸¦(x=45~195)ç›–ä½ç”µæ± ä¸»ä½“, ä¸é‡ç»˜æ¡†å†…(å¦åˆ™å…ˆç“¦ç‰‡åæ¡å¸¦é—ªä¸€å¸§);
+           åªé‡ç»˜æ¡å¸¦å³ç¼˜å¤–çš„å‡¸ç‚¹(x=195~210) + æ¡å¸¦æœªç›–ä½æ—¶æ¡†å¤–éœ²å‡ºçš„ç”µæ± ä¸»ä½“(æ»‘å‡ºä¸­) */
         sok_redraw_battery_tiles(195, 104, 210, 136);
         if (s_video_menu_slide_y > 79) {
             int16_t ye = (s_video_menu_slide_y < 161) ? s_video_menu_slide_y : 161;
@@ -1523,45 +1523,45 @@ void sokoban_lowbatt_restore(void) {
 }
 
 /**
- * @brief  ÍÆÏä×ÓÃ¿Ö¡¸üĞÂ: ´¦Àí´¥Ãş¡¢²Ëµ¥¡¢ÒÆ¶¯ÓëäÖÈ¾¡£
- * @return GAME_RET_* ·µ»ØÃüÁî
+ * @brief  æ¨ç®±å­æ¯å¸§æ›´æ–°: å¤„ç†è§¦æ‘¸ã€èœå•ã€ç§»åŠ¨ä¸æ¸²æŸ“ã€‚
+ * @return GAME_RET_* è¿”å›å‘½ä»¤
  */
 uint8_t sokoban_update(void) {
     uint8_t interacted = 0;
 
-    /* ²Ëµ¥ÀäÈ´µİ¼õ */
+    /* èœå•å†·å´é€’å‡ */
     if (s_menu_cooldown > 0) s_menu_cooldown--;
     if (g_menu_cooldown > 0) g_menu_cooldown--;
 
-    /* ÉèÖÃ²Ëµ¥ÖĞ¶¥²¿ÏÂ»¬¡úÍË³ö²Ëµ¥ (main.c Éè±êÖ¾, ËÄÓÎÏ·¸÷×ÔÏû·Ñ; ÍÆÏä×ÓĞè×ÔĞĞ´¦Àí) */
+    /* è®¾ç½®èœå•ä¸­é¡¶éƒ¨ä¸‹æ»‘â†’é€€å‡ºèœå• (main.c è®¾æ ‡å¿—, å››æ¸¸æˆå„è‡ªæ¶ˆè´¹; æ¨ç®±å­éœ€è‡ªè¡Œå¤„ç†) */
     if (g_game_enter_exit_menu) {
         g_game_enter_exit_menu = 0;
         s_menu_visible = 0;
         s_exit_menu_visible = 1;
         s_exit_dragging = 1;
         s_exit_sliding = 0;
-        s_exit_drag_start_y = 0;   /* game_menu_drag_poll ÄÚ²¿ÓÃ gdp_start_ty ¼ÇÂ¼, ´ËÖµ½ö×÷Êä³ö */
+        s_exit_drag_start_y = 0;   /* game_menu_drag_poll å†…éƒ¨ç”¨ gdp_start_ty è®°å½•, æ­¤å€¼ä»…ä½œè¾“å‡º */
         s_exit_drag_y = -MENU_H + MENU_DRAG_MAX_STEP;
         s_hold_button = 0;
         s_hold_us = 0;
-        s_prev_pressed = 1;   /* ÎüÊÕÏÂÒ»Ö¡´¥Ãş¶¶¶¯ */
-        sokoban_draw_level(s_current_level);   /* ÉèÖÃÏÂ»¬ÒÑ°ÑÆÁÄ»Ë¢ºÚ, ĞèÖØ»æÕûÍ¼ */
+        s_prev_pressed = 1;   /* å¸æ”¶ä¸‹ä¸€å¸§è§¦æ‘¸æŠ–åŠ¨ */
+        sokoban_draw_level(s_current_level);   /* è®¾ç½®ä¸‹æ»‘å·²æŠŠå±å¹•åˆ·é»‘, éœ€é‡ç»˜æ•´å›¾ */
     }
 
-    /* ---- µç³ØÉÁÃğ»Ö¸´: Õû¿éË¢ºÚÍ¼±ê(ºì¡úºÚ)+ÖØ»æ¸Ã´¦ÍßÆ¬ ---- */
+    /* ---- ç”µæ± é—ªç­æ¢å¤: æ•´å—åˆ·é»‘å›¾æ ‡(çº¢â†’é»‘)+é‡ç»˜è¯¥å¤„ç“¦ç‰‡ ---- */
     if (g_sok_dirty) {
         LCD_ClearLowBatteryOverlay();
-        /* µç³ØÍ¹µã/ÓÒ±ß¿òÂäÔÚ²Ëµ¥¿òÓÒÔµ(x=195)Ö®Íâ, ÈÎºÎ×´Ì¬¶¼Òª²¹ */
+        /* ç”µæ± å‡¸ç‚¹/å³è¾¹æ¡†è½åœ¨èœå•æ¡†å³ç¼˜(x=195)ä¹‹å¤–, ä»»ä½•çŠ¶æ€éƒ½è¦è¡¥ */
         sok_redraw_battery_tiles(195, 79, 210, 161);
         if (!s_exit_menu_visible) {
-            /* ÖØ»æUI¸²¸Ç²ã: ¶ş¼¶²Ëµ¥¿ò(¸Ç×¡µç³ØÇø) / µ¼º½°´Å¥ / Í¨¹Ø»­Ãæ¡£
-               ³·Ïú°´Å¥ÔÚ y=189 ÒÔÏÂ, µç³ØÇøÖØ»æ¹»²»µ½Ëü, ²»ÓÃ¹Ü */
+            /* é‡ç»˜UIè¦†ç›–å±‚: äºŒçº§èœå•æ¡†(ç›–ä½ç”µæ± åŒº) / å¯¼èˆªæŒ‰é’® / é€šå…³ç”»é¢ã€‚
+               æ’¤é”€æŒ‰é’®åœ¨ y=189 ä»¥ä¸‹, ç”µæ± åŒºé‡ç»˜å¤Ÿä¸åˆ°å®ƒ, ä¸ç”¨ç®¡ */
             if (s_lvl2_visible) {
                 menu_draw_nrow_frame_only(RESTART_MENU_Y - 1, sok_lvl2_row_types, 3);
             }
             else {
-                /* Ö»²¹Ãæ°åÉÏÔµ(s_menu_slide_y, ´¿ÓÎÏ·=240)ÒÔÉÏÂ¶³öµÄµç³ØÇø: ¸úÊÖ»¬¶¯Ê±Ãæ°å
-                   ÉÏÔµÃ¿Ö¡¶¼ÔÚ±ä, ÏÈ²¹ÍßÆ¬ÔÙÓÉÃæ°å¸Ç»ØÈ¥»áÉÁÒ»Ö¡, Ãæ°å¸Ç×¡µÄ²¿·Ö½»¸øÃæ°å */
+                /* åªè¡¥é¢æ¿ä¸Šç¼˜(s_menu_slide_y, çº¯æ¸¸æˆ=240)ä»¥ä¸Šéœ²å‡ºçš„ç”µæ± åŒº: è·Ÿæ‰‹æ»‘åŠ¨æ—¶é¢æ¿
+                   ä¸Šç¼˜æ¯å¸§éƒ½åœ¨å˜, å…ˆè¡¥ç“¦ç‰‡å†ç”±é¢æ¿ç›–å›å»ä¼šé—ªä¸€å¸§, é¢æ¿ç›–ä½çš„éƒ¨åˆ†äº¤ç»™é¢æ¿ */
 
                 sok_redraw_battery_tiles(45, 79, 195, s_menu_slide_y);
                 if (s_menu_visible) {
@@ -1571,10 +1571,10 @@ uint8_t sokoban_update(void) {
             }
         }
         else {
-            /* ÍË³ö²Ëµ¥¿ò(x=45~195)¸Ç×¡µç³ØÖ÷Ìå, ²»ÖØ»æ¿òÄÚ(·ñÔòÏÈÍßÆ¬ºó²Ëµ¥ÉÁÒ»Ö¡);
-               Ö»ÖØ»æ²Ëµ¥ÍÏ×§ÖĞ(Î´¸Ç×¡µç³Ø)¿òÍâÂ¶³öµÄÖ÷Ìå(Í¹µãÒÑÔÚÉÏ·½²¹¹ı) */
+            /* é€€å‡ºèœå•æ¡†(x=45~195)ç›–ä½ç”µæ± ä¸»ä½“, ä¸é‡ç»˜æ¡†å†…(å¦åˆ™å…ˆç“¦ç‰‡åèœå•é—ªä¸€å¸§);
+               åªé‡ç»˜èœå•æ‹–æ‹½ä¸­(æœªç›–ä½ç”µæ± )æ¡†å¤–éœ²å‡ºçš„ä¸»ä½“(å‡¸ç‚¹å·²åœ¨ä¸Šæ–¹è¡¥è¿‡) */
             {
-                int16_t mb = s_exit_drag_y + MENU_H;   /* ²Ëµ¥¿òµ×²¿y */
+                int16_t mb = s_exit_drag_y + MENU_H;   /* èœå•æ¡†åº•éƒ¨y */
                 sok_redraw_battery_tiles(45, mb, 195, 161);
             }
             menu_draw_nrow_frame_only(s_exit_drag_y, sok_row_types, 5);
@@ -1585,7 +1585,7 @@ uint8_t sokoban_update(void) {
     if (s_exit_menu_visible) goto process_exit_menu;
     game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 0);
 
-    /* ---- ¶ş¼¶²Ëµ¥ / ³·Ïú½çÃæ: ¶ÀÁ¢´¦Àí, ±¾Ö¡µ½´ËÎªÖ¹ ---- */
+    /* ---- äºŒçº§èœå• / æ’¤é”€ç•Œé¢: ç‹¬ç«‹å¤„ç†, æœ¬å¸§åˆ°æ­¤ä¸ºæ­¢ ---- */
     if (s_lvl2_visible) {
         uint8_t r = sok_lvl2_update();
         return r ? r : 1;
@@ -1595,14 +1595,14 @@ uint8_t sokoban_update(void) {
         return 1;
     }
 
-    /* ---- ²Ëµ¥¿É¼ûÊ±³ÖĞø»æÖÆ(¹Ø¿¨±àºÅUI) ---- */
+    /* ---- èœå•å¯è§æ—¶æŒç»­ç»˜åˆ¶(å…³å¡ç¼–å·UI) ---- */
     if (s_menu_visible) {
         sok_level_draw(s_level_num, LCD_RED);
     }
 
-    /* ---- Í¨¹Ø×´Ì¬ ---- */
+    /* ---- é€šå…³çŠ¶æ€ ---- */
     if (s_won) {
-        /* Í¨¹ØºóÑÓÊ±0.5sÔÙÏÔÊ¾²Ëµ¥(Ê¤Àû¶¯»­+°´Å¥) */
+        /* é€šå…³åå»¶æ—¶0.5så†æ˜¾ç¤ºèœå•(èƒœåˆ©åŠ¨ç”»+æŒ‰é’®) */
         if (s_won == 1) {
             Delay_Ms(500);
             s_menu_visible = 1;
@@ -1610,7 +1610,7 @@ uint8_t sokoban_update(void) {
             s_won = 2;
         }
 
-        /* ÒÑÍ¨¹ØÊ±´¦Àí°´Å¥´¥Ãş ¡ª¡ª °´ÏÂ¼´ÇĞµÚÒ»¹Ø, ³¤°´ÔÚmenu_visibleÎŞ·ì¼ÌĞø */
+        /* å·²é€šå…³æ—¶å¤„ç†æŒ‰é’®è§¦æ‘¸ â€”â€” æŒ‰ä¸‹å³åˆ‡ç¬¬ä¸€å…³, é•¿æŒ‰åœ¨menu_visibleæ— ç¼ç»§ç»­ */
         TouchState ts;
         Touch_Scan(&ts);
 
@@ -1621,8 +1621,8 @@ uint8_t sokoban_update(void) {
                 if (s_current_level > 0) {
                     sokoban_init_level(s_current_level - 1);
                     s_hold_button = 1;
-                    s_drag_btn = 1;   /* ÈÃmenu_visible±£³Ö³¤°´¸ú×Ù */
-                    s_won_transition = 1;  /* ±ê¼ÇÀ´×ÔWON, menu_visibleÊ×´ÎËÉÊÖ²»ÇĞ¹Ø */
+                    s_drag_btn = 1;   /* è®©menu_visibleä¿æŒé•¿æŒ‰è·Ÿè¸ª */
+                    s_won_transition = 1;  /* æ ‡è®°æ¥è‡ªWON, menu_visibleé¦–æ¬¡æ¾æ‰‹ä¸åˆ‡å…³ */
                 }
             }
             else if (ts.x >= SOK_BTN2_X && ts.x < SOK_BTN2_X + SOK_BTN_W && ts.y >= SOK_BTN_HIT_Y0 && ts.y < SOK_BTN_HIT_Y1) {
@@ -1632,18 +1632,18 @@ uint8_t sokoban_update(void) {
                 if (s_current_level < SOKOBAN_LEVEL_COUNT - 1) {
                     sokoban_init_level(s_current_level + 1);
                     s_hold_button = 3;
-                    s_drag_btn = 3;   /* ÈÃmenu_visible±£³Ö³¤°´¸ú×Ù */
-                    s_won_transition = 1;  /* ±ê¼ÇÀ´×ÔWON, menu_visibleÊ×´ÎËÉÊÖ²»ÇĞ¹Ø */
+                    s_drag_btn = 3;   /* è®©menu_visibleä¿æŒé•¿æŒ‰è·Ÿè¸ª */
+                    s_won_transition = 1;  /* æ ‡è®°æ¥è‡ªWON, menu_visibleé¦–æ¬¡æ¾æ‰‹ä¸åˆ‡å…³ */
                 }
             }
-            /* ¼ÇÂ¼±¾´Î´¥ÃşÆğµãÓÃÓÚºóĞø»¬¶¯¼ì²â */
+            /* è®°å½•æœ¬æ¬¡è§¦æ‘¸èµ·ç‚¹ç”¨äºåç»­æ»‘åŠ¨æ£€æµ‹ */
             s_touch_start_x = ts.x;
             s_touch_start_y = ts.y;
             s_swipe_origin_y = ts.y;
             s_btn_max_y = ts.y;
             s_prev_pressed = 1;
         }
-        /* ÏÂ»¬½øÈëÍË³ö²Ëµ¥ (Î´ÃüÖĞ·Çrestart°´Å¥Ê±ÉúĞ§) */
+        /* ä¸‹æ»‘è¿›å…¥é€€å‡ºèœå• (æœªå‘½ä¸­érestartæŒ‰é’®æ—¶ç”Ÿæ•ˆ) */
         if (ts.pressed && s_won) {
             Touch_UpdateCoords();
             Touch_Scan(&ts);
@@ -1652,7 +1652,7 @@ uint8_t sokoban_update(void) {
                 return interacted;
             }
         }
-        /* ËÉÊÖÏÂ»¬Ìá½»ÍË³ö²Ëµ¥ */
+        /* æ¾æ‰‹ä¸‹æ»‘æäº¤é€€å‡ºèœå• */
         if (!s_prev_pressed) {
             int16_t exit_dy =
                 (int16_t)ts.y - (int16_t)s_swipe_origin_y;
@@ -1676,18 +1676,18 @@ uint8_t sokoban_update(void) {
         return interacted;
     }
 
-    /* ---- ²Ëµ¥¿É¼û×´Ì¬ (ÍÏ×§×·×Ù: °´ÏÂ¼ÇÂ¼¡úÍÏ×§¸üĞÂ¡úËÉÊÖÖ´ĞĞ) ---- */
+    /* ---- èœå•å¯è§çŠ¶æ€ (æ‹–æ‹½è¿½è¸ª: æŒ‰ä¸‹è®°å½•â†’æ‹–æ‹½æ›´æ–°â†’æ¾æ‰‹æ‰§è¡Œ) ---- */
     if (s_menu_visible) {
         TouchState ts;
         Touch_Scan(&ts);
 
-        /* ÓÉÉÏ»®½øÈë²Ëµ¥: ÆÁ±Î°´Å¥½»»¥, µÈÊÖÖ¸ÍêÈ«ËÉ¿ªÔÙ»Ö¸´ */
+        /* ç”±ä¸Šåˆ’è¿›å…¥èœå•: å±è”½æŒ‰é’®äº¤äº’, ç­‰æ‰‹æŒ‡å®Œå…¨æ¾å¼€å†æ¢å¤ */
         if (s_menu_from_swipe) {
             if (ts.pressed) {
                 s_prev_pressed = 1;
                 return interacted;
             }
-            /* ÊÖÖ¸ËÉ¿ª, Çå³ı±£»¤, ÏÂÒ»Ö¡Õı³£½»»¥ */
+            /* æ‰‹æŒ‡æ¾å¼€, æ¸…é™¤ä¿æŠ¤, ä¸‹ä¸€å¸§æ­£å¸¸äº¤äº’ */
             s_menu_from_swipe = 0;
             s_prev_pressed = 0;
             s_drag_btn = 0;
@@ -1695,7 +1695,7 @@ uint8_t sokoban_update(void) {
             return interacted;
         }
 
-        /* °´ÏÂ: ¼ÇÂ¼ÃüÖĞ°´Å¥ */
+        /* æŒ‰ä¸‹: è®°å½•å‘½ä¸­æŒ‰é’® */
         if (!s_prev_pressed && ts.pressed) {
             interacted = 1;
             s_drag_btn = sok_btn_hit_test(ts.x, ts.y);
@@ -1709,9 +1709,9 @@ uint8_t sokoban_update(void) {
             return interacted;
         }
 
-        /* °´×¡ÖĞ: ÍÏ×§×·×Ù + ³¤°´Á¬Ìø(btn1/btn3ÓĞĞ§Ê±) */
+        /* æŒ‰ä½ä¸­: æ‹–æ‹½è¿½è¸ª + é•¿æŒ‰è¿è·³(btn1/btn3æœ‰æ•ˆæ—¶) */
         if (ts.pressed) {
-            /* ÏÂ»®´ò¶Ï°´Å¥²Ëµ¥, ´ò¿ªÍË³ö²Ëµ¥ */
+            /* ä¸‹åˆ’æ‰“æ–­æŒ‰é’®èœå•, æ‰“å¼€é€€å‡ºèœå• */
             if (s_swipe_origin_y < MENU_SWIPE_START_Y
                 && s_menu_cooldown == 0) {
                 Touch_UpdateCoords();
@@ -1720,7 +1720,7 @@ uint8_t sokoban_update(void) {
                     s_menu_visible = 0;
                     s_hold_button = 0;
                     s_hold_us = 0;
-                    /* Çå³ı°´Å¥ÇøÓò: ÏÈºÚµ×ÔÙÖØ»æÓÎÏ·¸ñ×Ó, ·À±ßÔµ²ĞÁô */
+                    /* æ¸…é™¤æŒ‰é’®åŒºåŸŸ: å…ˆé»‘åº•å†é‡ç»˜æ¸¸æˆæ ¼å­, é˜²è¾¹ç¼˜æ®‹ç•™ */
                     LCD_Fill(SOK_BTN1_X, SOK_BTN_Y, SOK_BTN1_X + SOK_BTN_W, SOK_BTN_Y + SOK_BTN_H + 2, LCD_BLACK);
                     LCD_Fill(SOK_BTN2_X, SOK_BTN_Y, SOK_BTN2_X + SOK_BTN_W, SOK_BTN_Y + SOK_BTN_H + 2, LCD_BLACK);
                     LCD_Fill(SOK_BTN3_X, SOK_BTN_Y, SOK_BTN3_X + SOK_BTN_W, SOK_BTN_Y + SOK_BTN_H + 2, LCD_BLACK);
@@ -1729,8 +1729,8 @@ uint8_t sokoban_update(void) {
                 }
             }
 
-            /* ¶ş´ÎÉÏ»®: °´Å¥Ãæ°åÒÑÏÔÊ¾Ê±, ÔÙ´ÎÉÏ»®´ò¿ª¶ş¼¶²Ëµ¥(³·Ïú/ÉèÖÃ/·µ»Ø)
-             * ÆğÊÖÎ»ÖÃÓëÒ»¼¶°´Å¥Ò»ÖÂ(×îµ×²¿Õ­´ø Y > SOK_SWIPE_Y), ¾àÀëÒ²ÓÃÍ¬Ò»¸ö 5px */
+            /* äºŒæ¬¡ä¸Šåˆ’: æŒ‰é’®é¢æ¿å·²æ˜¾ç¤ºæ—¶, å†æ¬¡ä¸Šåˆ’æ‰“å¼€äºŒçº§èœå•(æ’¤é”€/è®¾ç½®/è¿”å›)
+             * èµ·æ‰‹ä½ç½®ä¸ä¸€çº§æŒ‰é’®ä¸€è‡´(æœ€åº•éƒ¨çª„å¸¦ Y > SOK_SWIPE_Y), è·ç¦»ä¹Ÿç”¨åŒä¸€ä¸ª 5px */
             if (s_menu_cooldown == 0
                 && (int16_t)s_swipe_origin_y - (int16_t)ts.y > MENU_SWIPE_TRIGGER_DIST) {
                 int16_t up_move;
@@ -1741,17 +1741,17 @@ uint8_t sokoban_update(void) {
                     if (s_swipe_origin_y > SOK_SWIPE_Y) {
                         s_hold_button = 0;
                         s_hold_us = 0;
-                        s_prev_pressed = 1;    /* °´×¡Ì¬, ·ÀÏÂÒ»Ö¡Îó´¥ */
-                        /* ¾Ö²¿Çå³ı°´Å¥Ãæ°åÇø(Óë°´Å¥Ãæ°åÍË³öÒ»ÖÂ): Ö»ÇåÎÄ×ÖÕ­´ø + °´Å¥´øÁ½¸öĞ¡ÇøÓò,
-                           ²»È«¿í/²»È«ÆÁÖØ»æ(»áÉÁ)¡£ */
+                        s_prev_pressed = 1;    /* æŒ‰ä½æ€, é˜²ä¸‹ä¸€å¸§è¯¯è§¦ */
+                        /* å±€éƒ¨æ¸…é™¤æŒ‰é’®é¢æ¿åŒº(ä¸æŒ‰é’®é¢æ¿é€€å‡ºä¸€è‡´): åªæ¸…æ–‡å­—çª„å¸¦ + æŒ‰é’®å¸¦ä¸¤ä¸ªå°åŒºåŸŸ,
+                           ä¸å…¨å®½/ä¸å…¨å±é‡ç»˜(ä¼šé—ª)ã€‚ */
                         sok_close_nav_panel();
-                        sok_panel_drag_start(1, up_move);   /* ¶ş¼¶²Ëµ¥¸úÊÖ»¬Èë */
+                        sok_panel_drag_start(1, up_move);   /* äºŒçº§èœå•è·Ÿæ‰‹æ»‘å…¥ */
                         return interacted;
                     }
-                    /* °´Å¥ÇøÆğÊÖ»®¶¯>20px: ±¾ÊÖÊÆ×÷·Ï(4) ¡ª¡ª ²»Á¬Ìø, ËÉÊÖÒ²²»µã»÷ */
+                    /* æŒ‰é’®åŒºèµ·æ‰‹åˆ’åŠ¨>20px: æœ¬æ‰‹åŠ¿ä½œåºŸ(4) â€”â€” ä¸è¿è·³, æ¾æ‰‹ä¹Ÿä¸ç‚¹å‡» */
                     if (up_move > MENU_SWIPE_COMMIT_DIST) {
                         s_drag_btn = 4;
-                        s_hold_button = 0;   /* ÒÑ¿ªÊ¼Ëø¶¨µÄ³¤°´¼ÆÊ±Ò²ÒªÍ£, ·ñÔò1sºóÈÔ»áÁ¬Ìø */
+                        s_hold_button = 0;   /* å·²å¼€å§‹é”å®šçš„é•¿æŒ‰è®¡æ—¶ä¹Ÿè¦åœ, å¦åˆ™1såä»ä¼šè¿è·³ */
                         s_hold_us = 0;
                         return interacted;
                     }
@@ -1760,9 +1760,9 @@ uint8_t sokoban_update(void) {
             sokoban_hold_update();
         }
 
-        /* ËÉÊÖ: Ö´ĞĞÍÏ×§Ä¿±ê°´Å¥ */
+        /* æ¾æ‰‹: æ‰§è¡Œæ‹–æ‹½ç›®æ ‡æŒ‰é’® */
         if (s_prev_pressed && !ts.pressed) {
-            if (s_won_transition) {  /* WONÇĞ¹ØºóÊ×´ÎËÉÊÖ, À¹½Ø²»ÇĞ, Çå³ı±ê¼Ç */
+            if (s_won_transition) {  /* WONåˆ‡å…³åé¦–æ¬¡æ¾æ‰‹, æ‹¦æˆªä¸åˆ‡, æ¸…é™¤æ ‡è®° */
                 s_won_transition = 0;
                 s_drag_btn = 0;
                 s_hold_button = 0;
@@ -1770,23 +1770,23 @@ uint8_t sokoban_update(void) {
                 s_prev_pressed = 0;
                 return interacted;
             }
-            if (s_menu_cooldown > 0) {  /* ³¤°´×Ô¶¯ÇĞ¹ØºóµÄÀäÈ´ÆÚÄÚËÉÊÖ */
+            if (s_menu_cooldown > 0) {  /* é•¿æŒ‰è‡ªåŠ¨åˆ‡å…³åçš„å†·å´æœŸå†…æ¾æ‰‹ */
                 s_drag_btn = 0;
                 s_hold_button = 0;
                 s_hold_us = 0;
                 s_prev_pressed = 0;
                 return interacted;
             }
-            if (s_hold_button != 0 && s_drag_btn == 0 && s_hold_us > 0) {  /* ³¤°´×Ô¶¯ÇĞ¹ØÒÑ·¢Éú(drag_btn±»ÇåÁã), ËÉÊÖ²»×ö¶îÍâ²Ù×÷ */
+            if (s_hold_button != 0 && s_drag_btn == 0 && s_hold_us > 0) {  /* é•¿æŒ‰è‡ªåŠ¨åˆ‡å…³å·²å‘ç”Ÿ(drag_btnè¢«æ¸…é›¶), æ¾æ‰‹ä¸åšé¢å¤–æ“ä½œ */
                 s_drag_btn = 0;
                 s_hold_button = 0;
                 s_hold_us = 0;
                 s_prev_pressed = 0;
                 return interacted;
             }
-            /*  °´Å¥À¸ÏÂ»¬>5pxÈ¡Ïû */
+            /*  æŒ‰é’®æ ä¸‹æ»‘>5pxå–æ¶ˆ */
             if (s_btn_max_y - s_touch_start_y > 5) {
-                /* Õ­´øÇå³ı: ÎÄ×Ö´ø+°´Å¥´ø, ±ÜÃâÕû¿éºÚÉÁ */
+                /* çª„å¸¦æ¸…é™¤: æ–‡å­—å¸¦+æŒ‰é’®å¸¦, é¿å…æ•´å—é»‘é—ª */
                 sok_close_nav_panel();
                 s_drag_btn = 0;
                 s_hold_button = 0;
@@ -1808,7 +1808,7 @@ uint8_t sokoban_update(void) {
                 s_menu_visible = 1;
             }
             else if (s_drag_btn == 0 && !s_menu_from_swipe) {
-                /* ·ÇÉÏ»®µÄ²Ëµ¥: µã»÷¿Õ°×Çø¹Ø±Õ²Ëµ¥¿ªÊ¼ÓÎÏ· */
+                /* éä¸Šåˆ’çš„èœå•: ç‚¹å‡»ç©ºç™½åŒºå…³é—­èœå•å¼€å§‹æ¸¸æˆ */
                 sok_close_nav_panel();
                 s_menu_cooldown =
                     (s_swipe_origin_y < MENU_SWIPE_START_Y) ? 0 : 15;
@@ -1822,8 +1822,8 @@ uint8_t sokoban_update(void) {
         return interacted;
     }
 
-    /* ---- ¸úÊÖÉÏ»®: ÍÏ×§Ä£Ê½ (ÏŞËÙ, ¸úËæÊÖÖ¸) ---- */
-    /* Ãæ°å»¬¶¯/¶¯»­ÖĞ: ĞÂµÄÏÂ»®ÊÖÊÆ¿ÉÖ±½Ó´ò¶Ï, ¸Ä¿ªÍË³ö²Ëµ¥(Óë¾²Ö¹Ì¬Ò»ÖÂ) */
+    /* ---- è·Ÿæ‰‹ä¸Šåˆ’: æ‹–æ‹½æ¨¡å¼ (é™é€Ÿ, è·Ÿéšæ‰‹æŒ‡) ---- */
+    /* é¢æ¿æ»‘åŠ¨/åŠ¨ç”»ä¸­: æ–°çš„ä¸‹åˆ’æ‰‹åŠ¿å¯ç›´æ¥æ‰“æ–­, æ”¹å¼€é€€å‡ºèœå•(ä¸é™æ­¢æ€ä¸€è‡´) */
     if (s_menu_sliding || s_menu_slide_anim) {
         TouchState ts_c;
         Touch_Scan(&ts_c);
@@ -1844,7 +1844,7 @@ uint8_t sokoban_update(void) {
 
     if (s_menu_sliding) {
         TouchState ts_s;
-        Touch_UpdateCoords();  /* ÊµÊ±¶ÁÈ¡´¥Ãş×ø±ê, ±£Ö¤¸úÊÖÁ÷³© */
+        Touch_UpdateCoords();  /* å®æ—¶è¯»å–è§¦æ‘¸åæ ‡, ä¿è¯è·Ÿæ‰‹æµç•… */
         Touch_Scan(&ts_s);
 
         if (ts_s.pressed) {
@@ -1853,7 +1853,7 @@ uint8_t sokoban_update(void) {
             int16_t target = 240 - total_dy;
             if (target < s_panel_rest) target = s_panel_rest;
             if (target > 240) target = 240;
-            /* ÏŞËÙ: Ã¿Ö¡×î¶àÒÆ¶¯ SOK_SLIDE_MAX_STEP, ·ÀÌø±ä */
+            /* é™é€Ÿ: æ¯å¸§æœ€å¤šç§»åŠ¨ SOK_SLIDE_MAX_STEP, é˜²è·³å˜ */
             if (target < s_menu_slide_y) {
                 int16_t step = s_menu_slide_y - target;
                 if (step > SOK_SLIDE_MAX_STEP) step = SOK_SLIDE_MAX_STEP;
@@ -1862,7 +1862,7 @@ uint8_t sokoban_update(void) {
         }
 
         if (!ts_s.pressed) {
-            /* ËÉÊÖ: ´Ó×îÔ¶Î»ÒÆ»ØÍË>2pxÔòÈ¡Ïû, ·ñÔò×Ô¶¯»¬Èë */
+            /* æ¾æ‰‹: ä»æœ€è¿œä½ç§»å›é€€>2pxåˆ™å–æ¶ˆ, å¦åˆ™è‡ªåŠ¨æ»‘å…¥ */
             int16_t total_dy = (int16_t)s_swipe_origin_y - (int16_t)ts_s.y;
             int16_t back_dist = s_slide_max_dy - total_dy;
             if (back_dist > 2) {
@@ -1870,8 +1870,8 @@ uint8_t sokoban_update(void) {
                 int16_t clip_y = s_menu_slide_y;
                 if (clip_y > 239) clip_y = 239;
                 s_menu_slide_y = 240;
-                s_prev_pressed = 0;  /* ÊÍ·Å´¥ÃşÌ¬, ·ÀÖ¹ÏÂÒ»Ö¡Îó´¥·¢ */
-                s_menu_cooldown = 15; /* ÀäÈ´, ·ÀÁ¢¼´ÖØ´¥·¢ÉÏ»® */
+                s_prev_pressed = 0;  /* é‡Šæ”¾è§¦æ‘¸æ€, é˜²æ­¢ä¸‹ä¸€å¸§è¯¯è§¦å‘ */
+                s_menu_cooldown = 15; /* å†·å´, é˜²ç«‹å³é‡è§¦å‘ä¸Šåˆ’ */
                 sok_panel_clear_from(clip_y);
                 sok_redraw_grid_below(clip_y);
             }
@@ -1882,14 +1882,14 @@ uint8_t sokoban_update(void) {
             return 0;
         }
 
-        /* »æÖÆ (½ö°´×¡Ê±µ½´ï) */
+        /* ç»˜åˆ¶ (ä»…æŒ‰ä½æ—¶åˆ°è¾¾) */
         if (s_menu_slide_y <= s_panel_rest) {
-            /* ÍÏµ½µ×: ÇĞ»»ÎªÃæ°å¿É¼ûÄ£Ê½ */
+            /* æ‹–åˆ°åº•: åˆ‡æ¢ä¸ºé¢æ¿å¯è§æ¨¡å¼ */
             s_menu_sliding = 0;
-            s_prev_pressed = 1;      /* °´×¡Ì¬, ·ÀÖ¹ÏÂÒ»Ö¡Îó´¥ */
-            s_menu_from_swipe = 1;   /* ·ÀÖ¹Ê×Ö¡Îó´¥¹Ø±ÕÃæ°å */
+            s_prev_pressed = 1;      /* æŒ‰ä½æ€, é˜²æ­¢ä¸‹ä¸€å¸§è¯¯è§¦ */
+            s_menu_from_swipe = 1;   /* é˜²æ­¢é¦–å¸§è¯¯è§¦å…³é—­é¢æ¿ */
             if (s_panel_kind == 1) {
-                s_lvl2_visible = 1;  /* ¶ş¼¶²Ëµ¥: ºóÃæ½»¸ø sok_lvl2_update ´¦Àí´¥Ãş */
+                s_lvl2_visible = 1;  /* äºŒçº§èœå•: åé¢äº¤ç»™ sok_lvl2_update å¤„ç†è§¦æ‘¸ */
             } else {
                 s_menu_visible = 1;
                 s_drag_btn = sok_btn_hit_test(ts_s.x, ts_s.y);
@@ -1903,19 +1903,19 @@ uint8_t sokoban_update(void) {
         return 0;
     }
 
-    /* ---- ¸úÊÖÉÏ»®: ×Ô¶¯»¬¶¯¶¯»­ (ËÉÊÖºó»¬µ½×îÖÕÎ»ÖÃ) ---- */
+    /* ---- è·Ÿæ‰‹ä¸Šåˆ’: è‡ªåŠ¨æ»‘åŠ¨åŠ¨ç”» (æ¾æ‰‹åæ»‘åˆ°æœ€ç»ˆä½ç½®) ---- */
     if (s_menu_slide_anim) {
         s_menu_slide_y -= SOK_SLIDE_SPEED;
         if (s_menu_slide_y <= s_panel_rest) {
             s_menu_slide_y = s_panel_rest;
             s_menu_slide_anim = 0;
-            s_menu_from_swipe = 1;  /* ·ÀÖ¹Ê×Ö¡Îó´¥¹Ø±ÕÃæ°å */
-            s_prev_pressed = 1;     /* ÎüÊÕ¶¯»­ºó´¥Ãş¶¶¶¯ */
+            s_menu_from_swipe = 1;  /* é˜²æ­¢é¦–å¸§è¯¯è§¦å…³é—­é¢æ¿ */
+            s_prev_pressed = 1;     /* å¸æ”¶åŠ¨ç”»åè§¦æ‘¸æŠ–åŠ¨ */
             if (s_panel_kind == 1) {
                 s_lvl2_visible = 1;
             } else {
                 s_menu_visible = 1;
-                s_drag_btn = 0;     /* Çå³ı¾ÉÍÏ×§×´Ì¬ */
+                s_drag_btn = 0;     /* æ¸…é™¤æ—§æ‹–æ‹½çŠ¶æ€ */
                 sok_level_draw(s_level_num, LCD_RED);
             }
             sok_panel_draw_at(s_menu_slide_y);
@@ -1927,15 +1927,15 @@ uint8_t sokoban_update(void) {
     }
 
 process_exit_menu:
-    /* ---- ÍË³ö²Ëµ¥²»Ë¢ĞÂµç³ØÍ¼±ê£¬ÆäËû²Ëµ¥±£³Ö¼ÆÊ±Æ÷ÔËĞĞ ---- */
+    /* ---- é€€å‡ºèœå•ä¸åˆ·æ–°ç”µæ± å›¾æ ‡ï¼Œå…¶ä»–èœå•ä¿æŒè®¡æ—¶å™¨è¿è¡Œ ---- */
     if (!s_exit_menu_visible) {
         game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 0);
     }
-    /* ---- ÍË³ö²Ëµ¥´¦Àí (ÍÏ×§Ä£Ê½) ---- */
+    /* ---- é€€å‡ºèœå•å¤„ç† (æ‹–æ‹½æ¨¡å¼) ---- */
     if (s_exit_menu_visible) {
-        /* ÍÏ×§Ä£Ê½´¦Àí */
+        /* æ‹–æ‹½æ¨¡å¼å¤„ç† */
         if (s_exit_dragging) {
-            /* ÉÏ»®´ò¶ÏÍË³ö²Ëµ¥ÍÏ×§ */
+            /* ä¸Šåˆ’æ‰“æ–­é€€å‡ºèœå•æ‹–æ‹½ */
             if (sok_exit_swipe_cancel()) return 0;
 
             TouchState ts_d;
@@ -1943,7 +1943,7 @@ process_exit_menu:
             uint8_t poll_ret = game_menu_drag_poll(&s_exit_drag_y, &s_exit_drag_start_y,
                 &s_exit_dragging, &ts_d, sok_row_types);
             if (poll_ret == 2) {
-                /* ÉÏ»®»ØÍË>10pxËÉÊÖÈ¡Ïû: Çå¿É¼ûÇøÓò²¢²¹»­¸ñ×Ó */
+                /* ä¸Šåˆ’å›é€€>10pxæ¾æ‰‹å–æ¶ˆ: æ¸…å¯è§åŒºåŸŸå¹¶è¡¥ç”»æ ¼å­ */
                 menu_clear_exit_area_to(s_exit_drag_y);
                 s_exit_menu_visible = 0;
                 s_exit_sliding = 0;
@@ -1958,17 +1958,17 @@ process_exit_menu:
             return 0;
         }
 
-        /* »¬¶¯¶¯»­Ä£Ê½: ×Ô¶¯»¬ÖÁÄ¿±ê, ÖğÖ¡Ë¢ĞÂ */
+        /* æ»‘åŠ¨åŠ¨ç”»æ¨¡å¼: è‡ªåŠ¨æ»‘è‡³ç›®æ ‡, é€å¸§åˆ·æ–° */
         if (s_exit_sliding) {
 
-            /* ÉÏ»®´ò¶ÏÍË³ö²Ëµ¥»¬¶¯¶¯»­ */
+            /* ä¸Šåˆ’æ‰“æ–­é€€å‡ºèœå•æ»‘åŠ¨åŠ¨ç”» */
             if (sok_exit_swipe_cancel()) return 0;
 
             s_exit_drag_y += MENU_SLIDE_SPEED;
             if (s_exit_drag_y >= MENU_Y) {
                 s_exit_drag_y = MENU_Y;
                 s_exit_sliding = 0;
-                s_prev_pressed = 0;  /* »¬Èë½áÊøÖØÖÃ°´ÏÂÌ¬, ·ÀÍÏ×§ËÉÊÖ±»ÎóÅĞÎªµã²Ëµ¥Íâ¹Ø±Õ */
+                s_prev_pressed = 0;  /* æ»‘å…¥ç»“æŸé‡ç½®æŒ‰ä¸‹æ€, é˜²æ‹–æ‹½æ¾æ‰‹è¢«è¯¯åˆ¤ä¸ºç‚¹èœå•å¤–å…³é—­ */
             }
             menu_draw_nrow_frame_only(s_exit_drag_y, sok_row_types, 5);
             return 0;
@@ -1976,12 +1976,12 @@ process_exit_menu:
 
         TouchState ts;
 
-        /* ÉÏ»®´ò¶ÏÍË³ö²Ëµ¥(¾²Ö¹Ì¬) */
+        /* ä¸Šåˆ’æ‰“æ–­é€€å‡ºèœå•(é™æ­¢æ€) */
         if (sok_exit_swipe_cancel()) return 0;
-        /* (µ×²¿/ÖĞ¼äÇøÓòÉÏ»®¶¼ÔÚÉÏÒ»ĞĞµÄµ÷ÓÃÀïÍ³Ò»´¦Àí) */
+        /* (åº•éƒ¨/ä¸­é—´åŒºåŸŸä¸Šåˆ’éƒ½åœ¨ä¸Šä¸€è¡Œçš„è°ƒç”¨é‡Œç»Ÿä¸€å¤„ç†) */
         uint8_t ret = game_exit_menu_poll(sokoban_exit_map, &s_prev_pressed, &ts);
         if (ret == EXIT_RET_BACK) {
-            /* "·µ»Ø" ¼üÍË³ö²Ëµ¥»Øµ½ÓÎÏ·, ²Á³ı²Ëµ¥ÇøÓò, ²¹»­µØÍ¼ */
+            /* "è¿”å›" é”®é€€å‡ºèœå•å›åˆ°æ¸¸æˆ, æ“¦é™¤èœå•åŒºåŸŸ, è¡¥ç”»åœ°å›¾ */
             s_exit_menu_visible = 0;
             s_exit_sliding = 0;
             s_exit_dragging = 0;
@@ -2008,7 +2008,7 @@ process_exit_menu:
         return 0;
     }
 
-    /* ---- ÓÎÏ·½øĞĞÖĞ ---- */
+    /* ---- æ¸¸æˆè¿›è¡Œä¸­ ---- */
     TouchState ts;
     Touch_Scan(&ts);
 
@@ -2016,31 +2016,31 @@ process_exit_menu:
         interacted = 1;
         s_touch_start_x = ts.x;
         s_touch_start_y = ts.y;
-        s_swipe_origin_y = ts.y;   // ¼ÇÂ¼´¥ÃşÆğÊ¼Y(ÓÃÓÚÍË³ö²Ëµ¥ÊÖÊÆ)
+        s_swipe_origin_y = ts.y;   // è®°å½•è§¦æ‘¸èµ·å§‹Y(ç”¨äºé€€å‡ºèœå•æ‰‹åŠ¿)
     }
 
     if (ts.pressed) {
         Touch_UpdateCoords();
         Touch_Scan(&ts);
 
-        /* ¼ì²âÍË³ö²Ëµ¥ÊÖÊÆ: ÉÏ·½ÇøÓò + ÏòÏÂ»¬¶¯ > 5px Ôò¿ÉÍÏ³öÍË³ö²Ëµ¥ */
+        /* æ£€æµ‹é€€å‡ºèœå•æ‰‹åŠ¿: ä¸Šæ–¹åŒºåŸŸ + å‘ä¸‹æ»‘åŠ¨ > 5px åˆ™å¯æ‹–å‡ºé€€å‡ºèœå• */
         if (sok_try_open_exit_menu(ts.y)) return 0;
 
-        /* µ×²¿ÉÏ»®: ¸úÏÂ»¬²Ëµ¥Ò»Ñù, ÒÆ¶¯>5px¼´Æô¶¯¸úÊÖ»¬¶¯ */
+        /* åº•éƒ¨ä¸Šåˆ’: è·Ÿä¸‹æ»‘èœå•ä¸€æ ·, ç§»åŠ¨>5pxå³å¯åŠ¨è·Ÿæ‰‹æ»‘åŠ¨ */
         if (s_swipe_origin_y > SOK_SWIPE_Y
             && s_menu_cooldown == 0) {
             int16_t swipe_dy = (int16_t)ts.y - (int16_t)s_swipe_origin_y;
             if (swipe_dy < 0 && -swipe_dy > MENU_SWIPE_TRIGGER_DIST) {
                 if (s_undo_group) {
-                    /* ³·ÏúÄ£Ê½: ÉÏ»®ÏÔÊ¾³·Ïú°´Å¥×é(¹Ì¶¨Î»ÖÃ, ²»¸úÊÖ);
-                       ±¾´ÎÊÖÊÆµÄËÉÊÖÒªÎüÊÕµô, ·ñÔò»áÂäÔÚ°´Å¥ÉÏÎó´¥·¢ */
+                    /* æ’¤é”€æ¨¡å¼: ä¸Šåˆ’æ˜¾ç¤ºæ’¤é”€æŒ‰é’®ç»„(å›ºå®šä½ç½®, ä¸è·Ÿæ‰‹);
+                       æœ¬æ¬¡æ‰‹åŠ¿çš„æ¾æ‰‹è¦å¸æ”¶æ‰, å¦åˆ™ä¼šè½åœ¨æŒ‰é’®ä¸Šè¯¯è§¦å‘ */
                     s_undo_visible = 1;
                     s_menu_from_swipe = 1;
                     sok_draw_undo_buttons();
                     s_prev_pressed = 1;
                     return interacted;
                 }
-                sok_panel_drag_start(0, -swipe_dy);   /* µ¼º½°´Å¥×é¸úÊÖ»¬Èë */
+                sok_panel_drag_start(0, -swipe_dy);   /* å¯¼èˆªæŒ‰é’®ç»„è·Ÿæ‰‹æ»‘å…¥ */
                 s_drag_btn = sok_btn_hit_test(ts.x, ts.y);
                 s_prev_pressed = 1;
                 return 0;
@@ -2061,7 +2061,7 @@ process_exit_menu:
         }
 
         if (dir != SOK_DIR_NONE) {
-            /* ¹ıÂËÎó´¥: ¶¥²¿ÇøÓò²»´¥·¢ÉÏ»¬, µ×²¿ÇøÓò°´ÏÂ»¬ */
+            /* è¿‡æ»¤è¯¯è§¦: é¡¶éƒ¨åŒºåŸŸä¸è§¦å‘ä¸Šæ»‘, åº•éƒ¨åŒºåŸŸæŒ‰ä¸‹æ»‘ */
             if ((dir == SOK_DIR_UP && s_swipe_origin_y > SOK_SWIPE_Y)
                 || (dir == SOK_DIR_DOWN
                     && s_swipe_origin_y < MENU_SWIPE_START_Y)) {
@@ -2086,7 +2086,7 @@ process_exit_menu:
         int16_t adx = (dx < 0) ? -dx : dx;
         int16_t ady = (dy < 0) ? -dy : dy;
 
-        /* ÊÍ·Å¼ì²â: ÍË³ö²Ëµ¥ÊÖÊÆÓÅÏÈÓÚÒÆ¶¯·½Ïò½âÎö */
+        /* é‡Šæ”¾æ£€æµ‹: é€€å‡ºèœå•æ‰‹åŠ¿ä¼˜å…ˆäºç§»åŠ¨æ–¹å‘è§£æ */
         int16_t exit_dy = (int16_t)ts.y - (int16_t)s_swipe_origin_y;
         if (exit_dy >= MENU_SWIPE_COMMIT_DIST
             && s_swipe_origin_y < MENU_SWIPE_START_Y
@@ -2098,20 +2098,20 @@ process_exit_menu:
             return interacted;
         }
 
-        /* ÏÔÊ¾²Ëµ¥ÊÖÊÆ: µ×²¿ÇøÓòÉÏ»¬(³¤¾àÀë»¬¶¯ÉúĞ§) */
+        /* æ˜¾ç¤ºèœå•æ‰‹åŠ¿: åº•éƒ¨åŒºåŸŸä¸Šæ»‘(é•¿è·ç¦»æ»‘åŠ¨ç”Ÿæ•ˆ) */
         int16_t swipe_dy = (int16_t)ts.y - (int16_t)s_swipe_origin_y;
         int16_t swipe_ady = (swipe_dy < 0) ? -swipe_dy : swipe_dy;
 
-        /* µ×²¿ÇøÓòÏòÉÏ»¬¶¯³¬¹ıãĞÖµÊ±, ÏÔÊ¾°´Å¥×é:
-           ³·ÏúÄ£Ê½ÏÔÊ¾"ÉÏÒ»²½/·µ»Ø/ÏÂÒ»²½", ·ñÔòÏÔÊ¾µ¼º½(ÉÏÒ»¹Ø+ÖØĞÂ¿ªÊ¼+ÏÂÒ»¹Ø);
-           ÆğÊÖÎ»ÖÃ¶¼ÔÚ×îµ×²¿ÄÇÌõÕ­´øÄÚ(Y > SOK_SWIPE_Y), ÃâµÃÔÚ°´Å¥ÇøËæÊÖ»®Ò»ÏÂ¾Íµ¯ */
+        /* åº•éƒ¨åŒºåŸŸå‘ä¸Šæ»‘åŠ¨è¶…è¿‡é˜ˆå€¼æ—¶, æ˜¾ç¤ºæŒ‰é’®ç»„:
+           æ’¤é”€æ¨¡å¼æ˜¾ç¤º"ä¸Šä¸€æ­¥/è¿”å›/ä¸‹ä¸€æ­¥", å¦åˆ™æ˜¾ç¤ºå¯¼èˆª(ä¸Šä¸€å…³+é‡æ–°å¼€å§‹+ä¸‹ä¸€å…³);
+           èµ·æ‰‹ä½ç½®éƒ½åœ¨æœ€åº•éƒ¨é‚£æ¡çª„å¸¦å†…(Y > SOK_SWIPE_Y), å…å¾—åœ¨æŒ‰é’®åŒºéšæ‰‹åˆ’ä¸€ä¸‹å°±å¼¹ */
         if (swipe_ady > MENU_SWIPE_TRIGGER_DIST
             && swipe_dy < 0 && s_swipe_origin_y > SOK_SWIPE_Y && s_menu_cooldown == 0) {
             if (s_undo_group) {
                 s_undo_visible = 1;
                 sok_draw_undo_buttons();
             } else {
-                sok_draw_nav_buttons_at(SOK_BTN_Y);   /* °´ÓïÑÔÑ¡ÖĞ/Ó¢ÎÄÄÇÌ×, ²¢×Ô´øÊ×Ä©¹ØÅĞ¶Ï */
+                sok_draw_nav_buttons_at(SOK_BTN_Y);   /* æŒ‰è¯­è¨€é€‰ä¸­/è‹±æ–‡é‚£å¥—, å¹¶è‡ªå¸¦é¦–æœ«å…³åˆ¤æ–­ */
                 s_menu_visible = 1;
             }
             s_prev_pressed = 0;
@@ -2133,7 +2133,7 @@ process_exit_menu:
             if (sokoban_is_won()) {
                 sok_win_draw(65, 120);
                 s_won = 1;
-                s_undo_group = 0;   /* Í¨¹Øºó»Øµ½ÆÕÍ¨µ¼º½°´Å¥×é(¿Éµã"ÏÂÒ»¹Ø") */
+                s_undo_group = 0;   /* é€šå…³åå›åˆ°æ™®é€šå¯¼èˆªæŒ‰é’®ç»„(å¯ç‚¹"ä¸‹ä¸€å…³") */
             }
         }
     }
@@ -2180,7 +2180,7 @@ int sokoban_sim_touch_rects(void)
 }
 #endif
 #ifdef SIM_BUILD
-/* ---- sim-only: ³¤°´Õï¶ÏÌ½Õë (which: 0=ÀÛ¼Æms 1=hold°´Å¥ 2=drag°´Å¥ 3=²Ëµ¥ÀäÈ´ 4=Ãæ°åÎ») ---- */
+/* ---- sim-only: é•¿æŒ‰è¯Šæ–­æ¢é’ˆ (which: 0=ç´¯è®¡ms 1=holdæŒ‰é’® 2=dragæŒ‰é’® 3=èœå•å†·å´ 4=é¢æ¿ä½) ---- */
 int sokoban_sim_hold_info(int which)
 {
     switch (which) {

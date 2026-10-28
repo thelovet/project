@@ -27,7 +27,14 @@ CACHE = os.path.join(HERE, 'cache')
 BURN_STEP = os.path.join(HERE, 'burn_step.ps1')
 IMPORTED = os.path.join(CACHE, 'imported_video.bin')
 IMPORTED_NAME = os.path.join(CACHE, 'imported_video.name')   # 导入时的原文件名
+IMPORTED_SEGS = os.path.join(CACHE, 'imported_video.segs.json')  # 多文件分段的起止地址
 MAXLOG = 3000
+
+# 用绝对路径调 powershell: 服务可能是被 WMI/计划任务拉起的, PATH 里不一定有 powershell
+POWERSHELL = os.path.join(os.environ.get('SystemRoot', r'C:\Windows'),
+                          'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+if not os.path.isfile(POWERSHELL):
+    POWERSHELL = 'powershell'
 
 
 def find_proj(start):
@@ -62,6 +69,43 @@ def log(msg):
         del _state['log'][0:len(_state['log']) - MAXLOG]
 
 
+def write_video_map(segs):
+    """按导入的 bin 段生成固件用的 video_map.h(段数 + 每段起止地址)。"""
+    if not PROJ:
+        return '没有工程根, 跳过 video_map.h'
+    path = os.path.join(PROJ, 'SPI', 'SPI_LCD', 'User', 'inc', 'video_map.h')
+    out = []
+    out.append('/* 视频段地址表 —— 由烧录面板(导入视频 bin 时)自动生成, 不要手改。')
+    out.append('   每段 8 字节 = 起始地址(4 字节, 大端) + 结束地址(4 字节, 大端)。')
+    out.append('   段数 = 导入的 bin 个数; 地址按"多个 bin 依序首尾相连烧到 Flash 地址 0"计算。')
+    out.append('   生成时间: %s */' % time.strftime('%Y-%m-%d %H:%M:%S'))
+    for i, s in enumerate(segs):
+        out.append('/* 段%d: %-24s %8d 字节  0x%08X-0x%08X */'
+                   % (i + 1, (s.get('name') or '')[:24], s['size'], s['start'], s['end']))
+    out.append('#ifndef VIDEO_MAP_H')
+    out.append('#define VIDEO_MAP_H')
+    out.append('')
+    out.append('#define VIDEO_SEGMENT_COUNT  %d' % len(segs))
+    out.append('')
+    body = []
+    for s in segs:
+        a, b = s['start'], s['end']
+        body.append('    { 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X }'
+                    % ((a >> 24) & 255, (a >> 16) & 255, (a >> 8) & 255, a & 255,
+                       (b >> 24) & 255, (b >> 16) & 255, (b >> 8) & 255, b & 255))
+    out.append('#define VIDEO_RANGES_INIT \\')
+    out.append(', \\\n'.join(body))      # 每段之间必须有逗号(行尾续行符)
+    out.append('')
+    out.append('#endif /* VIDEO_MAP_H */')
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w', encoding='utf-8', newline='\n') as fp:
+            fp.write('\n'.join(out) + '\n')
+        return path
+    except OSError as exc:
+        return '写 video_map.h 失败: %s' % exc
+
+
 def imported_info():
     if os.path.isfile(IMPORTED):
         orig = ''
@@ -70,12 +114,21 @@ def imported_info():
                 orig = fp.read().strip()
         except OSError:
             orig = ''
-        return {'name': 'imported_video.bin', 'orig': orig, 'size': os.path.getsize(IMPORTED)}
+        segs = []
+        try:
+            with open(IMPORTED_SEGS, 'r', encoding='utf-8') as fp:
+                segs = json.load(fp)
+        except (OSError, ValueError):
+            segs = []
+        size = os.path.getsize(IMPORTED)
+        if not segs:
+            segs = [{'name': orig, 'size': size, 'start': 0, 'end': size - 1}]
+        return {'name': 'imported_video.bin', 'orig': orig, 'size': size, 'segs': segs}
     return None
 
 
 def runner(step, binpath, with_video):
-    cmd = ['powershell', '-ExecutionPolicy', 'Bypass', '-File', BURN_STEP, '-Step', step]
+    cmd = [POWERSHELL, '-ExecutionPolicy', 'Bypass', '-File', BURN_STEP, '-Step', step]
     if binpath:
         cmd += ['-BinPath', binpath]
     if with_video:
@@ -83,9 +136,21 @@ def runner(step, binpath, with_video):
     log('执行: ' + ' '.join(cmd))
     ok = False
     try:
+        # 子脚本(burn_step/burn_all)里还会用 "& powershell ..." 调下一层, 而本服务可能是
+        # WMI/计划任务拉起的, PATH 里没有 PowerShell → 这里补进子进程环境, 一次修到底。
+        env = os.environ.copy()
+        sysroot = env.get('SystemRoot', r'C:\Windows')
+        parts = [p for p in env.get('PATH', '').split(os.pathsep) if p]
+        low = [p.lower() for p in parts]
+        for extra in (os.path.join(sysroot, 'System32'),
+                      os.path.join(sysroot, 'System32', 'WindowsPowerShell', 'v1.0')):
+            if extra.lower() not in low:
+                parts.append(extra)
+        env['PATH'] = os.pathsep.join(parts)
+
         # CREATE_NO_WINDOW: 不给子进程建可见控制台, 它下面的 make/openocd 也继承这个不可见控制台 → 全程不弹窗口
         p = subprocess.Popen(cmd, cwd=HERE, stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT, bufsize=0,
+                             stderr=subprocess.STDOUT, bufsize=0, env=env,
                              creationflags=0x08000000)
         for raw in iter(p.stdout.readline, b''):
             line = raw.decode('gbk', errors='replace').rstrip('\r\n')
@@ -161,9 +226,35 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     fp.write(orig)
             except OSError:
                 pass
+            # 多文件: ?segs=[{"name":..,"size":..}, ...] —— 按选择顺序首尾相连烧到地址 0
+            segs = []
+            try:
+                q = urllib.parse.parse_qs(self.path.split('?', 1)[1]) if '?' in self.path else {}
+                raw_items = json.loads((q.get('segs') or [''])[0] or '[]')
+                off = 0
+                for it in raw_items:
+                    sz = int(it.get('size') or 0)
+                    if sz <= 0:
+                        continue
+                    segs.append({'name': str(it.get('name') or ''), 'size': sz,
+                                 'start': off, 'end': off + sz - 1})
+                    off += sz
+                if off != len(data):
+                    segs = []          # 大小对不上: 退回单段
+            except (ValueError, TypeError):
+                segs = []
+            if not segs:
+                segs = [{'name': orig, 'size': len(data), 'start': 0, 'end': len(data) - 1}]
+            try:
+                with open(IMPORTED_SEGS, 'w', encoding='utf-8') as fp:
+                    json.dump(segs, fp, ensure_ascii=False)
+            except OSError:
+                pass
+            mp = write_video_map(segs)
+            log('video_map.h -> %s' % mp)
             md5 = hashlib.md5(data).hexdigest().upper()
-            log('导入视频 bin: %d 字节, MD5=%s%s' % (len(data), md5, (', 原文件名=' + orig) if orig else ''))
-            return self._json({'ok': True, 'size': len(data), 'md5': md5, 'orig': orig})
+            log('导入视频 bin: %d 字节, %d 段, MD5=%s' % (len(data), len(segs), md5))
+            return self._json({'ok': True, 'size': len(data), 'md5': md5, 'orig': orig, 'segs': segs})
 
         if path == '/api/run':
             body = self.rfile.read(n) if n else b'{}'
