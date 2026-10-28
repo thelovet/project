@@ -603,6 +603,19 @@ static void menu_blit_en_row(uint8_t* row, uint16_t mw, uint16_t cr,
  * @param  n_rows    行数
  * @note   条带复用 shared_buffer 前后两半, 不额外占 RAM; 低电亮段时电池区条带叠加图标。
  */
+/* 180° 翻转(屏幕方向=180° 时 g_lcd_flip180=1): 条带是"多行窗口"的一段,
+   逐点倒序做不到, 只能整条倒过来(行序 + 行内像素), 再由外层循环从下往上送。
+   倒的是 16bit 像素, 像素内字节序不变。 */
+static void menu_flip_strip(uint8_t *buf, uint16_t bytes)
+{
+    uint16_t *p = (uint16_t *)buf;
+    uint16_t n = (uint16_t)(bytes >> 1);
+    uint16_t i;
+    for (i = 0; i < (uint16_t)(n >> 1); i++) {
+        uint16_t t = p[i]; p[i] = p[n - 1 - i]; p[n - 1 - i] = t;
+    }
+}
+
 void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
     uint8_t n_rows) {
     /* 条带高度: MENU_W=150 → 行宽300B, 每条带8行=2400B,
@@ -693,7 +706,15 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
     while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);
     LCD_DC_SET;
 
-    for (int16_t sy = 0; sy < (y1 - y0); sy += STRIP_H) {
+    /* 180° 时整框的像素流必须整个倒过来: 条带从下往上送, 每条带内部再整体倒序;
+       0° 时照常从上往下送。 */
+    {
+        int16_t strip_total = (int16_t)(y1 - y0);
+        int16_t sy = g_lcd_flip180
+            ? (int16_t)(((strip_total - 1) / STRIP_H) * STRIP_H)
+            : 0;
+        for (; g_lcd_flip180 ? (sy >= 0) : (sy < strip_total);
+               sy = (int16_t)(sy + (g_lcd_flip180 ? -STRIP_H : STRIP_H))) {
         int16_t h = STRIP_H;
         if ((int16_t)(sy + h) > (y1 - y0)) h = (int16_t)(y1 - y0 - sy);
         int16_t abs_y0 = y0 + sy;
@@ -837,9 +858,12 @@ void menu_draw_nrow_frame_only(int16_t y_top, const uint8_t* row_types,
             while (SPI2_DMA_TX_CH->CNTR > 0);
             while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);
         }
+        if (g_lcd_flip180)
+            menu_flip_strip(buf, bytes);   /* 180°: 条带整体倒序 */
         SPI2_Write_DMA(buf, bytes);
         active ^= 1;
         first = 0;
+        }
     }
 
     while (SPI2_DMA_TX_CH->CNTR > 0);

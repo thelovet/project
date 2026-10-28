@@ -396,9 +396,9 @@ static void Standby_PinConfig(void) {
 
     // GPIOB CFGHR: PB8=AIN(0x0) PB9=PP50(0x3) PB10~11=AIN(0x0) PB12=PP50(0x3) PB13~15=AIN(0x0)
     GPIOB->CFGHR = 0x00030030;
-    /* ★ 屏在待机时是断电的: 背光(PB9)和片选(PB12)必须拉低 ——
-       拉高的话, 面板断电后引脚上的高电平会经面板 IO 的保护二极管给面板"灌电"(幽灵供电), 反而更费电 */
-    GPIOB->BCR  = GPIO_Pin_9;                   // PB9拉低(面板无电, 背光不会亮; 同时避免灌电)
+    /* ★ 待机时屏已断电: 背光 PB9 低电平有效 -> 保持高电平 = 关背光;
+       片选 PB12 拉低。两个脚都不给面板"灌电", 避免经面板 IO 保护二极管倒灌而更费电 */
+    GPIOB->BSHR = GPIO_Pin_9;                   // PB9置高(背光低电平有效 -> 关背光; 面板无电, 同时避免灌电)
     GPIOB->BCR  = GPIO_Pin_12;                  // PB12拉低(片选低; 同时避免灌电)
 }
 
@@ -1449,7 +1449,54 @@ static void Main_UpdateActiveMode(uint8_t *charging_game_saved)
  */
 
 int main(void) {
-#ifdef VIDEO_CHUNK_STORE_MODE
+    /* FAST STANDBY PATH -- must run before any peripheral init (verified on hardware).
+       Only leave standby when a real wake source was recorded in BKP; anything else
+       (no magic / stale ARMED) goes straight back to standby. This avoids the old
+       "unknown wake -> full boot -> reset -> ..." 1s reboot loop. */
+    if (RCC_GetFlagStatus(RCC_FLAG_SFTRST) != RESET) {
+        uint16_t magic;
+        RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);
+        RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
+        PWR_BackupAccessCmd(ENABLE);
+        magic = BKP_ReadBackupRegister(BKP_DR9);
+        BKP_WriteBackupRegister(BKP_DR9, 0);
+        PWR_BackupAccessCmd(DISABLE);
+        if (magic == STANDBY_TOUCH_WAKE_MAGIC)       s_standby_touch_wake = 1;
+        else if (magic == STANDBY_CHARGE_WAKE_MAGIC) s_standby_charge_wake = 1;
+    
+        if (!s_standby_touch_wake && !s_standby_charge_wake) {
+            /* cut LCD power + park unused pins (lowest standby current) */
+        RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB |
+                               RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD, ENABLE);
+        GPIOC->CFGLR = 0x00000000;
+        GPIOC->CFGHR = 0x00000000;
+        GPIOD->CFGLR = 0x00000000;
+        GPIOD->CFGHR = 0x00000000;
+        Standby_PinConfig();
+        /* hold LCD in hardware reset (PB1 low): panel stops drawing current */
+        GPIOB->CFGLR = (GPIOB->CFGLR & ~0x000000F0u) | 0x00000030u;
+        GPIOB->BCR   = GPIO_Pin_1;
+                Delay_Init();               /* touch soft-I2C uses Delay_Ms */
+                Touch_WakeResumeInit();     /* set up soft-I2C pins, no IC reset */
+        Delay_Ms(120);              /* let the IC finish booting before I2C */
+                CST816S_SleepEnable();      /* MCU reset re-activated the 816D -> sleep it again */
+        /* release the soft-I2C pins: driving them push-pull HIGH while the IC
+           holds SDA low burns ~mA. Park PB10/PB11 as analog inputs. */
+        GPIOB->CFGHR &= ~0x0000FF00u;
+        Battery_StandbyWakeupConfig();
+            Touch_StandbyWakeupConfig();
+            PWR_WakeUpPinCmd(DISABLE);
+            NVIC->IRER[0] = 0xFFFFFFFF;
+            NVIC->IRER[1] = 0xFFFFFFFF;
+            SysTick->CTLR = 0;
+            PWR_EnterSTANDBYMode();
+            PWR_BackupAccessCmd(ENABLE);
+            Standby_RecordWakeSource();
+            NVIC_SystemReset();
+            while (1);
+        }
+    }
+    #ifdef VIDEO_CHUNK_STORE_MODE
     /* ====== 视频数据块烧录模式 ======
      * 将嵌入固件的视频数据块(g_video_chunk)烧录到外部Flash地址0(视频区域),
      * 块内容由 gen_video_chunk.py 生成; 注释掉宏即恢复正常程序 */
@@ -1610,44 +1657,6 @@ int main(void) {
         g_language_index = (uint8_t)((orient >> 2) & 0x0001u); /* bit2=语言(DR11 超出 BKP 范围, 不用) */
     }
 
-#ifndef TEST_NO_SLEEP
-    if (RCC_GetFlagStatus(RCC_FLAG_SFTRST) != RESET
-        && !s_standby_touch_wake && !s_standby_charge_wake
-        && !s_standby_unknown_wake) {
-        RCC_ClearFlag();  // 清除复位标志
-        RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB |
-            RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD | RCC_APB2Periph_AFIO, ENABLE);
-
-        // GPIOC/D时钟已使能，GPIOA/B由Standby_PinConfig设置
-        GPIOC->CFGLR = 0x00000000;
-        GPIOC->CFGHR = 0x00000000;
-        GPIOD->CFGLR = 0x00000000;
-        GPIOD->CFGHR = 0x00000000;
-
-        Standby_PinConfig();//Standby模式引脚配置
-
-        // 配置PB6(CHRG) EXTI中断唤醒
-        Battery_StandbyWakeupConfig();
-        /* 触摸唤醒: 触摸IC独立供电, 与LCD断电无关 → 恒定启用 */
-        Touch_WaitWakeInputsReleased();
-        Touch_StandbyWakeupConfig();
-
-        /* PA0作为KEY未启用，PA8仅作触摸唤醒，PB5/PB6充电唤醒 */
-        PWR_WakeUpPinCmd(DISABLE);
-        BKP_WriteBackupRegister(BKP_DR9, STANDBY_WAKE_ARMED_MAGIC);
-
-        /*
-         * PA8 EXTI Event触发WFI后会引发Power Reset丢失SRAM数据，
-         * 因此需要重新初始化所有外设复位
-         */
-        PWR_EnterSTANDBYMode_RAM();
-        Standby_RecordWakeSource();
-        PWR->CTLR &= ~PWR_CTLR_PDDS;
-        NVIC->SCTLR &= ~(1U << 2);
-        NVIC_SystemReset();
-        while (1);
-    }
-#endif
     RCC_ClearFlag();
 #endif
 

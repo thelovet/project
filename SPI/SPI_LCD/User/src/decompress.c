@@ -171,6 +171,142 @@ void Set_display_range_DMA() {//读取坐标后配置屏幕显示位置
 int  sim_image_active(void);
 void sim_image_draw(void);
 #endif
+
+/* ---------------- 180° 翻转: 视频段写到镜像后的位置 ----------------
+   (g_lcd_flip180=1 时才走这里; 屏幕方向=180° 时由 Settings_ApplyOrientation 打开)
+   一帧 = 一个窗口 (start_x..end_x, start_y..end_y), 后面紧跟一串"长度为 n 的连续段"
+   (纯色段 / 原始像素段), 按行主序填满整个窗口。180° 之后整帧的像素顺序完全倒过来,
+   所以每一段都要写到"帧内序号 q = w*h - k - n"开始的地方, 并把段内像素倒序:
+     · 纯色段: 颜色一样, 不用倒序, 只要窗口位置对;
+     · 像素段: 先在内存里把 n 个像素倒过来, 再按行段顺序送出。
+   段长 n 最大 255(编码格式限制), 所以每段最多跨 2~3 行, 按行拆窗口就够。 */
+static void LCD_EmitRunFlipped(uint16_t bx, uint16_t by, uint16_t w, uint16_t h,
+                               uint32_t k, uint16_t n, uint8_t *data,
+                               uint8_t colorh, uint8_t colorl)
+{
+    uint32_t q;
+    uint16_t r0, c0, r1, c1, r, cs, ce;
+    uint32_t off = 0;
+
+    if (n == 0) return;
+    q = (uint32_t)w * h - k - n;         /* 这一段在镜像帧里的起始序号 */
+
+    if (data) {                          /* 像素段: 整段倒序(16bit 为单位, 像素内字节序不变) */
+        uint16_t *p = (uint16_t *)data;
+        uint16_t i, half = (uint16_t)(n >> 1);
+        for (i = 0; i < half; i++) {
+            uint16_t t = p[i]; p[i] = p[n - 1 - i]; p[n - 1 - i] = t;
+        }
+    }
+
+    r0 = (uint16_t)(q / w);              c0 = (uint16_t)(q % w);
+    r1 = (uint16_t)((q + n - 1) / w);    c1 = (uint16_t)((q + n - 1) % w);
+
+    /* 逐行段写; 连续整行(r0 之后到 r1 之前)合并成一次矩形窗口, 少设几次窗口
+       (长纯色段能跨上百行, 一行一设窗口太费) */
+    r = r0;
+    while (r <= r1) {
+        cs = (r == r0) ? c0 : 0;
+        ce = (r == r1) ? c1 : (uint16_t)(w - 1);
+
+        /* ★ 设窗口前必须等上一段的 DMA 彻底发完:
+           LCD_Address_Set_DMA_Calculate_remaining 是靠数 DMA 剩余字节来切 DC 的,
+           上一次 SPI2_Write_DMA / StartDMA 还是非阻塞的, 没发完就设窗口会把
+           命令/数据的 DC 时序切错 → 屏上花屏, 严重时面板直接不认。 */
+        while (SPI2_DMA_TX_CH->CNTR > 0);
+        while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);
+
+        if (cs == 0 && ce == (uint16_t)(w - 1)) {
+            /* 整行: 往后找连续整行 */
+            uint16_t r2 = r;
+            uint16_t total;
+            while (r2 < r1) {
+                uint16_t ns = (uint16_t)((r2 + 1 == r0) ? c0 : 0);
+                uint16_t ne = (uint16_t)((r2 + 1 == r1) ? c1 : (uint16_t)(w - 1));
+                if (ns != 0 || ne != (uint16_t)(w - 1)) break;
+                r2++;
+            }
+            total = (uint16_t)(r2 - r + 1);
+            /* ★ 这里给的是"逻辑坐标", lcd.c 的窗口函数会再做一次镜像:
+               镜像帧里的行 r 对应逻辑行 by+h-1-r (不是 by+r!), 两行都要按此换算 */
+            LCD_Address_Set_DMA_Calculate_remaining(bx, (uint16_t)(by + h - 1 - r2),
+                                                    (uint16_t)(bx + w - 1), (uint16_t)(by + h - 1 - r));
+            LCD_DC_SET;
+            if (data) {
+                SPI2_Write_DMA(data + off, (uint16_t)(total * w * 2));
+                off += (uint32_t)total * w * 2;
+            } else {
+                LCD_DMA_Write_Buffer_Add_coordinates(colorh, colorl, (uint32_t)total * w);
+            }
+            r = (uint16_t)(r2 + 1);
+        } else {
+            uint16_t lx0 = (uint16_t)(bx + w - 1 - ce);   /* 列也要反: 镜像帧的 cs..ce */
+            uint16_t lx1 = (uint16_t)(bx + w - 1 - cs);   /*   -> 逻辑 bx+w-1-ce .. bx+w-1-cs */
+            uint16_t ly  = (uint16_t)(by + h - 1 - r);    /* 行: 镜像帧的 r -> 逻辑 by+h-1-r */
+            LCD_Address_Set_DMA_Calculate_remaining(lx0, ly, lx1, ly);
+            LCD_DC_SET;
+            if (data) {
+                uint16_t cnt = (uint16_t)(ce - cs + 1);
+                SPI2_Write_DMA(data + off, (uint16_t)(cnt * 2));
+                off += (uint32_t)cnt * 2;
+            } else {
+                LCD_DMA_Write_Buffer_Add_coordinates(colorh, colorl, (uint32_t)(ce - cs + 1));
+            }
+            r++;
+        }
+    }
+}
+
+/* 像素段: pre_count 个像素已在 shared_buffer, 剩下的 count 个直接接着读进 shared_buffer,
+   整段倒序后送到镜像位置。
+   注意: 这里不能用 LCD_Address_Set_DMA(它会拿 shared_buffer 存地址字节), 只能用
+   局部缓冲的 LCD_Address_Set_DMA_Calculate_remaining, 这样 shared_buffer 里的像素不会被踩。 */
+static void LCD_drawImageFlipped(uint16_t count, uint8_t pre_count,
+                                 uint16_t bx, uint16_t by, uint16_t w, uint16_t h, uint32_t k)
+{
+    uint16_t total = (uint16_t)(count + pre_count);
+    uint16_t i;
+
+#ifdef SIM_BUILD
+    for (i = 0; i < count; i++) {
+        uint8_t lo = FLASH_Read();
+        uint8_t hi = FLASH_Read();
+        shared_buffer[(pre_count + i) * 2]     = lo;
+        shared_buffer[(pre_count + i) * 2 + 1] = hi;
+    }
+#else
+    if (count) {
+        SPI1_Read_DMA_NonBlocking(shared_buffer + pre_count * 2, (uint16_t)(count * 2));
+        SPI1_DMA_WaitComplete();
+    }
+#endif
+    LCD_EmitRunFlipped(bx, by, w, h, k, total, (uint8_t *)shared_buffer, 0, 0);
+}
+
+/* 180° 是否生效(窗口尺寸有效时才算) */
+static uint8_t LCD_FlipOn(uint16_t w, uint16_t h)
+{
+    return (uint8_t)(g_lcd_flip180 && w && h);
+}
+
+/* 送一段纯色: 180° 走镜像位置, 否则照旧整段填 */
+static void LCD_FillRun(uint16_t bx, uint16_t by, uint16_t w, uint16_t h,
+                        uint32_t *pk, uint32_t len, uint8_t ch, uint8_t cl)
+{
+    if (LCD_FlipOn(w, h)) LCD_EmitRunFlipped(bx, by, w, h, *pk, (uint16_t)len, 0, ch, cl);
+    else                  LCD_DMA_Write_Buffer_Add_coordinates(ch, cl, len);
+    *pk += len;
+}
+
+/* 送一段像素: 180° 先整段倒序再按行段送, 否则照旧边读边发 */
+static void LCD_DrawRun(uint16_t bx, uint16_t by, uint16_t w, uint16_t h,
+                        uint32_t *pk, uint16_t count, uint8_t pre_count)
+{
+    if (LCD_FlipOn(w, h)) LCD_drawImageFlipped(count, pre_count, bx, by, w, h, *pk);
+    else                  LCD_drawImageWithSize_DMA(count, pre_count);
+    *pk += (uint32_t)count + pre_count;
+}
+
 u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16* location1) {
 #ifdef SIM_BUILD
 	/* 模拟器: 循环静帧(60fps 节流), 让固件每帧整屏重绘背景, 避免菜单残影 */
@@ -201,6 +337,9 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 	u8 datah = 0;   // 当前像素的高字节（默认值）
 	u8 datal = 0;   // 当前像素的低字节（默认值）			
 	uint8_t pre_count = 0;//预读像素数量
+	uint16_t fw = 0;    // 180°: 本帧窗口宽度
+	uint16_t fh = 0;    // 180°: 本帧窗口高度
+	uint32_t fk = 0;    // 180°: 已送出的像素数(段在帧内的序号)
 
 	/* 按当前段号刷新目标帧间隔: 前 VIDEO_SLOW_SEGMENTS 段 40fps, 其余 TARGET_FPS */
 	target_frame_us = (current_video_index < VIDEO_SLOW_SEGMENTS) ? SLOW_FRAME_TIME_US : INIT_FRAME_TIME_US;
@@ -254,6 +393,10 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 		end_y = FLASH_Read();//读取画面结束位置y			
 		input_pos += 4;//地址加4
 		while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);//等待SPI2屏幕刷新完成
+		/* 180°: 记下本帧窗口, 段序号从头开始(每帧 = 一个窗口 + 一串连续段) */
+		fw = (end_x >= start_x) ? (uint16_t)(end_x - start_x + 1) : 0;
+		fh = (end_y >= start_y) ? (uint16_t)(end_y - start_y + 1) : 0;
+		fk = 0;
 
 		if (start_x == 0xF1 && start_y == 0xF1) {// 检查是否是帧结束标志 (0xF1,0xF1,0xFF,0xFF,0xFF)
 			if (end_x == 0xFF && end_y == 0xFF) {//符合帧结束标志
@@ -363,7 +506,8 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 			LCD_LED_SET;
 			return 0;
 		}
-		Set_display_range_DMA();//设置显示范围
+		/* 180°: 整帧窗口在这里没意义(每段都要写到镜像位置), 由 LCD_EmitRunFlipped 自己设窗口 */
+		if (!g_lcd_flip180) Set_display_range_DMA();//设置显示范围
 		while (1) {
 			header = FLASH_Read();//读取头（SPI1正在读取时，SPI2正在发送）
 			// 等待SPI2发送完成（DMA的BSY等待统一放回此处）
@@ -386,7 +530,7 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 					input_pos += 4;//地址加4
 					length = ((u32)len_high << 8) + (u32)len_low;  // 实际长度=高字节加低字节值
 
-					LCD_DMA_Write_Buffer_Add_coordinates((uint16_t)datah, (uint16_t)datal, length);//发送数据到LCD屏幕
+					LCD_FillRun(start_x, start_y, fw, fh, &fk, length, datah, datal);
 					break;
 				default:// 短重复块处理（长度1~127）
 					header1 = FLASH_Read();//读取数据高字节
@@ -398,7 +542,7 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 					datal = header2;
 					input_pos += 2;//地址加2
 
-					LCD_DMA_Write_Buffer_Add_coordinates((uint16_t)datah, (uint16_t)datal, length);//发送数据到LCD屏幕
+					LCD_FillRun(start_x, start_y, fw, fh, &fk, length, datah, datal);
 					break;
 				}
 			}
@@ -425,17 +569,19 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 					length--;//实际长度减1，因为已经读取了一个数据
 
 					pre_count = 1;
+					if (!LCD_FlipOn(fw, fh)) {   /* 180° 要整段读进来再倒序, 不做预读 */
 					while (length > 0 && ((SPI2_DMA_TX_CH->CNTR) > 9 || length < 2)) {//屏幕在发送时或剩余很少时预读取数据
 						((uint16_t*)shared_buffer)[pre_count] = FLASH_Read() | ((uint16_t)FLASH_Read() << 8);//预读取第二个像素
 						length--;
 						pre_count++;
+					}
 					}
 					// while (length--) {
 					// 	LCD_WR_DATA(FLASH_Read());
 					// 	LCD_WR_DATA(FLASH_Read());
 					// }
 					(void)SPI1->DATAR;  // 清空接收缓冲区残留数据
-					LCD_drawImageWithSize_DMA(length, pre_count);//读取flash数据发送到LCD屏幕
+					LCD_DrawRun(start_x, start_y, fw, fh, &fk, length, pre_count);
 					break;
 				default:// 短非重复块处理（长度1~127）
 					((uint16_t*)shared_buffer)[0] = FLASH_Read() | ((uint16_t)FLASH_Read() << 8);//预读取第一个像素
@@ -453,17 +599,19 @@ u16 flash_decompress_and_show(u8* location4, u16* location3, u16* location2, u16
 					length--;//实际长度减1，因为已经读取了一个数据
 
 					pre_count = 1;
+					if (!LCD_FlipOn(fw, fh)) {   /* 180° 要整段读进来再倒序, 不做预读 */
 					while (length > 0 && ((SPI2_DMA_TX_CH->CNTR) > 9 || length < 2)) {//屏幕在发送时或剩余很少时预读取数据
 						((uint16_t*)shared_buffer)[pre_count] = FLASH_Read() | ((uint16_t)FLASH_Read() << 8);//预读取第二个像素
 						length--;
 						pre_count++;
+					}
 					}
 					// while (length--) {
 					// 	LCD_WR_DATA(FLASH_Read());
 					// 	LCD_WR_DATA(FLASH_Read());
 					// }
 					(void)SPI1->DATAR;  // 清空接收缓冲区残留数据
-					LCD_drawImageWithSize_DMA(length, pre_count);//读取flash数据发送到LCD屏幕
+					LCD_DrawRun(start_x, start_y, fw, fh, &fk, length, pre_count);
 					break;
 				}
 			}

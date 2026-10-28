@@ -724,13 +724,19 @@ static uint8_t Touch_TryApplyCoords(uint16_t raw_x, uint16_t raw_y)
             mx = (nx > 239u) ? 239u : nx;
         }
 #endif
-        /* 根据屏幕方向旋转触摸坐标 (坐标已在 MapCoord 里按各轴窗口归一化, 四方向一致) */
-        switch (g_orientation_index) {
-        case 0: g_touch_x = mx;        g_touch_y = my;        break;
-        case 1: g_touch_x = my;        g_touch_y = 239 - mx;  break;
-        case 2: g_touch_x = 239 - mx;  g_touch_y = 239 - my;  break;
-        case 3: g_touch_x = 239 - my;  g_touch_y = mx;        break;
-        default: g_touch_x = mx;       g_touch_y = my;        break;
+        /* 816D: 触摸 X 轴与显示方向相反, 先镜像(硬件补偿, 与方向无关) */
+#if !TOUCH_IC_IT7259
+        mx = (uint16_t)(239u - mx);
+#endif
+        /* 方向只有 0°/180°(90/270 在 ST77912 上做不到):
+           0° 直接用 mx/my; 180° 由 g_lcd_flip180 统一翻(和画面同一套)。
+           ★ 不要再按 g_orientation_index 旋转: 180° 时索引=2, 那边已经翻过一次,
+             再翻一次就抵消了(踩过: 画面倒了、触摸却没倒)。 */
+        g_touch_x = mx;
+        g_touch_y = my;
+        if (g_lcd_flip180) {
+            g_touch_x = (uint16_t)(239u - g_touch_x);
+            g_touch_y = (uint16_t)(239u - g_touch_y);
         }
     }
     g_touch_last_raw_x = raw_x;
@@ -938,6 +944,14 @@ void CST816S_SleepEnable(void)
     CST816S_WriteReg(CST816S_REG_LP_SCAN_TH,
                      CST816S_LP_SCAN_THRESHOLD);
     CST816S_WriteReg(CST816S_REG_AUTOSLEEP, CST816S_SLEEP_ENABLE);
+    /* 816D(海栎创 8xxT 系列): 工作模式命令是 0xE5,
+       0xE5=0x01 -> 手势/低功耗模式(触摸仍会拉 INT),
+       0xE5=0x03 -> 深睡, 但深睡下 IRQ 被关掉, 触摸叫不醒。
+       本机实测: 只要保留触摸唤醒, 这颗 816D 写什么都吃 ~1.8mA
+       (0xFE=0 / 0xE5=0x01 / 配手势 都试过); 只有深睡 0xE5=0x03 能降到 ~28uA,
+       但那样就没有唤醒。所以这里只保留自动待机(0xFE=0),
+       真正的低功耗唤醒要换 816T/816S, 或找供应商要低功耗固件。详见备忘录 §61。 */
+    Delay_Ms(5);
 #endif
 }
 

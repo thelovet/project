@@ -94,10 +94,21 @@
 //#define DEBUG_BLACK_VIDEO   /* 调试用: 打开=视频不刷帧(黑屏), 菜单/触摸照常; 正式版必须注释掉 */
 
 /* 测试模式: 不休眠, 屏幕常亮(用于触摸调试) */
-#define TEST_NO_SLEEP   1
+#define TEST_NO_SLEEP   0
 
 /* LCD 初始化选择: 0=旧GC9A01, 1=新ST77912, 2=TFT */
 #define LCD_PANEL_INIT   1
+
+/* 180° 软件翻转: 已经并入"屏幕方向"设置(设置页点一下在 0°/180° 之间切), 不再用编译开关。
+   ST77912 的 MADCTL 反扫不能用(见备忘录 §60: 反扫要求整帧送图, 本机是增量绘制),
+   所以 180° 在 BSP 层做:
+     ① LCD_Address_Set* 把窗口四角镜像到对角位置;
+     ② 单行窗口(逐点画)的像素先进行缓冲, 凑满一行后整行倒序送出;
+     ③ 多行窗口(菜单条带/视频帧)由调用方自己整段倒序(menu.c / decompress.c);
+     ④ 触摸坐标同步翻转(touch.c)。
+   g_lcd_flip180 = 1 表示当前是 180°; 由 Settings_ApplyOrientation() 设置, 定义在 lcd.c。 */
+extern unsigned char g_lcd_flip180;
+void LCD_SetFlip180(unsigned char on);
 
 /* 屏幕测试: 常显白色 (debug only) */
 //#define LCD_TEST_WHITE  1

@@ -224,15 +224,21 @@ static void DrawBack(void)
 }
 
 /**
-* @brief  应用屏幕方向(写 MADCTL 0x36 寄存器)。
-* @param  index 方向索引 0~3(越界钳位为 0)
+* @brief  应用屏幕方向(0°/180°)。
+* @param  index 方向索引 0~3; 90°/270° 在不支持, 一律当 0°
+* @note   ST77912 的 MADCTL 反扫会把小窗口拉歪(备忘录 §60), 所以 90/270 做不了;
+*         180° 也不用 MADCTL, 而是让 BSP 层软件翻转(LCD_SetFlip180), MADCTL 始终按 0° 写。
+*         触摸坐标在 touch.c 里跟着 g_lcd_flip180 一起翻。
 */
 void Settings_ApplyOrientation(uint8_t index)
 {
     if (index > 3) index = 0;
+    if (index == 1 || index == 3) index = 0;   /* 90/270 物理上做不到, 归 0 */
+    g_orientation_index = index;               /* 归一化后写回, 存 BKP 也一致 */
+    LCD_SetFlip180((unsigned char)(index == 2));
     LCD_CS_CLR;
     LCD_WR_REG(0x36);
-    LCD_WR_DATA(madctl_rotations[index]);
+    LCD_WR_DATA(madctl_rotations[0]);          /* 0°/180° 都按 0° 的 MADCTL */
     LCD_CS_SET;
 }
 
@@ -498,7 +504,7 @@ static uint8_t Orientation_Update(void)
         /* 与其它设置页一致: 避让顶部下拉/底部上划手势带, 防误触 */
         if (dx <= TAP_THRESHOLD && dy <= TAP_THRESHOLD
             && SETTINGS_TAP_Y_OK(s_or_start_y)) {
-            g_orientation_index = (g_orientation_index + 1) & 3;
+            g_orientation_index = (uint8_t)(g_orientation_index ^ 2);  /* 只在 0°/180° 之间切 */
             Settings_ApplyOrientation(g_orientation_index);
             Settings_SaveAll();
             Orientation_Draw();

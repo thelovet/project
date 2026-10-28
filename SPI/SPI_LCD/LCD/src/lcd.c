@@ -27,6 +27,68 @@ static void LCD_Init_CmdTbl(const uint8_t *tbl);
 static void LCD_InitPanel_New(void);//遍历初始化序列表，依次发送寄存器命令与数据
 #endif /* LCD_PANEL_INIT == 1 */
 
+/* ==================== 180° 软件翻转 (跟"屏幕方向"设置走) ====================
+   ST77912 的 MADCTL 反扫不能用(备忘录 §60), 只能在送图这一层做出 180°:
+   · 窗口坐标: (x1,y1)-(x2,y2) → (LCD_W-1-x2, LCD_H-1-y2)-(LCD_W-1-x1, LCD_H-1-y1)
+     两端要对调, 只减不换等于把整块内容搬到对角位置(内容本身没翻)。
+   · 单行窗口(高=1, 逐点画的图/字): 像素先存进行缓冲, 凑满一行后整行倒序送出。
+   · 多行窗口: 逐点没法倒序, 由调用方整段倒序(菜单条带 menu.c / 视频 decompress.c)。
+   · 纯色填充不用倒序, 只要窗口对了颜色就对了。
+   行宽最大 240 → 缓冲 480B。
+   g_lcd_flip180 由 Settings_ApplyOrientation() 设置(方向=180° 时为 1)。 */
+unsigned char g_lcd_flip180 = 0;
+static uint16_t s_flip_row[LCD_W];   /* 单行像素缓存 */
+static uint16_t s_flip_len;          /* 已缓存像素数 */
+static uint16_t s_flip_max;          /* 当前窗口一行几像素; 0=不缓存(多行窗口/DMA窗口) */
+
+/* 窗口四角镜像到对角 */
+static void LCD_FlipWindow(uint16_t *x1, uint16_t *y1, uint16_t *x2, uint16_t *y2)
+{
+    uint16_t t;
+    t = *x1; *x1 = (uint16_t)(LCD_W - 1 - *x2); *x2 = (uint16_t)(LCD_W - 1 - t);
+    t = *y1; *y1 = (uint16_t)(LCD_H - 1 - *y2); *y2 = (uint16_t)(LCD_H - 1 - t);
+}
+
+/* 把行缓冲里的像素倒序送出(送完清空) */
+static void LCD_FlipFlush(void)
+{
+    uint16_t n = s_flip_len;
+    s_flip_len = 0;
+    if (n == 0) return;
+    /* 逐点写之前先等 DMA 发完: SPI2_Write_DMA/StartDMA 都是非阻塞的,
+       DMA 还在发的时候往 DATAR 里塞字节会和 DMA 抢总线, 屏上会花 */
+    while (SPI2_DMA_TX_CH->CNTR > 0);
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);
+    LCD_DC_SET;
+    while (n) {
+        uint16_t d = s_flip_row[--n];
+        while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET);
+        SPI_I2S_SendData(SPI2, (uint16_t)(d >> 8));
+        while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET);
+        SPI_I2S_SendData(SPI2, (uint16_t)(d & 0xFF));
+    }
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);
+}
+
+/* 换窗口 / 发命令前调用: 没凑满的行先倒序送完, 然后退出逐点缓存 */
+static void LCD_FlipSync(void)
+{
+    if (s_flip_len) LCD_FlipFlush();
+    s_flip_max = 0;
+}
+
+/**
+ * @brief  切换 180° 软件翻转 (由屏幕方向设置调用)
+ * @param  on  1=翻转(180°), 0=正常(0°)
+ * @note   切换前把行缓冲送完再改状态, 避免残留像素落到新窗口里。
+ */
+void LCD_SetFlip180(unsigned char on)
+{
+    LCD_FlipSync();
+    s_flip_len = 0;
+    g_lcd_flip180 = on ? 1 : 0;
+}
+
 
 /**
  * @brief  向LCD写入8位命令字
@@ -35,6 +97,7 @@ static void LCD_InitPanel_New(void);//遍历初始化序列表，依次发送寄
  */
 void LCD_WR_REG(uint8_t data)
 {
+    LCD_FlipSync();   /* 180°: 发命令前把没凑满的行先倒序送完 */
     //LCD_CS_CLR;
     LCD_DC_CLR;
     SPI2_Write(data);
@@ -62,6 +125,12 @@ void LCD_WR_DATA(uint8_t data)
  */
 void LCD_WR_DATA_16Bit(uint16_t dat)
 {
+    /* 180° 且是单行窗口: 先攒着, 凑满一行再整行倒序送出(逐点画的图/字才不会被镜像) */
+    if (g_lcd_flip180 && s_flip_max) {
+        s_flip_row[s_flip_len++] = dat;
+        if (s_flip_len >= s_flip_max) LCD_FlipFlush();
+        return;
+    }
 	LCD_DC_SET;
     while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET);//等待发送缓冲区为空
     SPI_I2S_SendData(SPI2, dat >> 8);      // 发送高字节
@@ -493,6 +562,10 @@ void LCD_Clear(uint16_t Color)
  */
 void LCD_Address_Set(uint16_t x1,uint16_t y1,uint16_t x2,uint16_t y2)
 {
+		if (g_lcd_flip180) {
+			LCD_FlipSync();                          /* 上一窗口没凑满的行先送完 */
+			LCD_FlipWindow(&x1, &y1, &x2, &y2);      /* 窗口映射到 180° 后的对角位置 */
+		}
 		//P_SWI = 0x00;
 		LCD_WR_REG(0x2a);//列地址设置
 		LCD_WR_DATA_16Bit(x1);
@@ -502,6 +575,12 @@ void LCD_Address_Set(uint16_t x1,uint16_t y1,uint16_t x2,uint16_t y2)
 		LCD_WR_DATA_16Bit(y2);
 		LCD_WR_REG(0x2c);//储存器写
 		//P_SWI = 0x04;
+		/* 180° 且高=1 的窗口才走行缓冲: 这时"倒序"才等价于 180°;
+		   多行窗口要整段倒序, 由调用方负责(menu.c / decompress.c) */
+		if (g_lcd_flip180 && y1 == y2) {
+			s_flip_len = 0;
+			s_flip_max = (uint16_t)(x2 - x1 + 1);
+		}
 }
 
 
@@ -518,6 +597,10 @@ void LCD_Address_Set_DMA(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
 {
     uint8_t *buf = shared_buffer;
     
+    if (g_lcd_flip180) {
+        LCD_FlipSync();                          /* 180°: 没凑满的行先送完 + 退出逐点缓存 */
+        LCD_FlipWindow(&x1, &y1, &x2, &y2);      /* 窗口映射到对角位置 */
+    }
     buf[0] = (x1 >> 8) & 0xFF;
     buf[1] = x1 & 0xFF;
     buf[2] = (x2 >> 8) & 0xFF;
@@ -577,6 +660,10 @@ void LCD_Address_Set_DMA_Calculate_remaining(uint16_t x1, uint16_t y1, uint16_t 
     uint8_t buf[11] = {0};
     // uint16_t remaining = 0;
     
+    if (g_lcd_flip180) {
+        LCD_FlipSync();                          /* 180°: 没凑满的行先送完 + 退出逐点缓存 */
+        LCD_FlipWindow(&x1, &y1, &x2, &y2);      /* 窗口映射到对角位置 */
+    }
     buf[0] = 0x2a;
     buf[1] = (x1 >> 8) & 0xFF;
     buf[2] = x1 & 0xFF;
@@ -588,6 +675,12 @@ void LCD_Address_Set_DMA_Calculate_remaining(uint16_t x1, uint16_t y1, uint16_t 
     buf[8] = (y2 >> 8) & 0xFF;
     buf[9] = y2 & 0xFF;
     buf[10] = 0x2c;
+
+    /* ★ 本函数靠数 DMA 剩余字节(CNTR)来切 DC, 必须在总线空闲时调用:
+       上一次 SPI2_Write_DMA / StartDMA 都是非阻塞的, 没发完就进来会把
+       命令/数据的 DC 切错 → 屏上花屏(严重时面板会进错状态/黑屏)。 */
+    while (SPI2_DMA_TX_CH->CNTR > 0);
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);
 
     // 发送列地址命令和数据
     LCD_CS_CLR;  // ? 选中LCD
