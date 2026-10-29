@@ -43,6 +43,7 @@ $elf     = Join-Path $obj 'SPI_LCD.elf'
 $logFile = Join-Path $obj 'burn_log.txt'
 $switchScript = Join-Path $PSScriptRoot 'switch_mode.ps1'
 $burnAll = Join-Path $PSScriptRoot 'burn_all.ps1'
+$uartBurn = Join-Path $PSScriptRoot 'uart_burn.ps1'   # 视频: 串口流式烧录(快约 10 倍)
 $buildScript = Join-Path $proj '编译与下载.ps1'   # 编译复用根目录脚本(工具链/开关只维护一处)
 
 $mrs     = 'D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32'
@@ -113,9 +114,29 @@ function ReadWords([string]$addr, [int]$n, [string]$tag) {
     return ($hit.Groups[1].Value -split ',' | ForEach-Object { [Convert]::ToUInt32($_.Substring(2), 16) })
 }
 
+# 串口与 SWD 并线时, 固件驱动 PA9(UART TX, 空闲高) 会把 SDI 顶死 -> 先发 7F 7F 7F
+# 让 UART 烧录固件把 PA9/PA10 设成浮空并重新打开 SWD(等于"软件上拔掉 UART")
+function Send-SwdRelease {
+    $dev = (Get-CimInstance Win32_SerialPort -ErrorAction SilentlyContinue |
+            Where-Object { $_.Description -match 'WCH-Link' } | Select-Object -First 1)
+    if (-not $dev) { return }
+    foreach ($b in @(1200000, 1500000, 460800)) {
+        try {
+            $sp = New-Object System.IO.Ports.SerialPort($dev.DeviceID, $b)
+            $sp.ReadTimeout = 150; $sp.WriteTimeout = 300
+            $sp.Open(); Start-Sleep -Milliseconds 80
+            $sp.Write([byte[]](0x7F,0x7F,0x7F), 0, 3)
+            Start-Sleep -Milliseconds 120
+            $sp.Close()
+        } catch { }
+        Start-Sleep -Milliseconds 40
+    }
+}
+
 # 等 SWD 连上(设备待机时要点一下屏幕唤醒); 200 次 x 1.2s
 function WaitConn([int]$max = 200) {
     for ($k = 1; $k -le $max; $k++) {
+        if ($k -eq 1) { Send-SwdRelease }
         & $openocd -f $ocfg -c "adapter speed $SwdSpeed" -c 'chip_id CH32V20x' -c 'init' -c 'shutdown' *> (Join-Path $obj 'step_probe.txt')
         $t = $latin.GetString([IO.File]::ReadAllBytes((Join-Path $obj 'step_probe.txt')))
         if ($t -notmatch 'failed to connect') {
@@ -154,6 +175,7 @@ function Step-Font {
     Log '===== 步骤 1/3 字库/图片资源 ====='
     if (-not $DryRun) {
         Start-PsScript -Script $switchScript -ExtraArgs @('game') -Wait | Out-Null   # 视频宏关 + 去 -flto + make clean
+        SetMacro 'UART_STORE_MODE' $false | Out-Null
         SetMacro 'FLASH_DATA_STORE_MODE' $true | Out-Null
         Log 'config.h: FLASH_DATA_STORE_MODE = 开(另两个宏已关)'
         if ((Build '字库') -ne 0) { return '编译失败' }
@@ -176,6 +198,7 @@ function Step-Btn {
     if (-not $DryRun) {
         Start-PsScript -Script $switchScript -ExtraArgs @('game') -Wait | Out-Null
         SetMacro 'FLASH_DATA_STORE_MODE' $false | Out-Null
+        SetMacro 'UART_STORE_MODE' $false | Out-Null
         SetMacro 'BTN_IMG_STORE_MODE' $true | Out-Null
         Log 'config.h: BTN_IMG_STORE_MODE = 开(另两个宏已关)'
         if ((Build '按钮图') -ne 0) { return '编译失败' }
@@ -198,6 +221,7 @@ function Step-Game {
     if (-not $DryRun) {
         Start-PsScript -Script $switchScript -ExtraArgs @('game') -Wait | Out-Null
         SetMacro 'FLASH_DATA_STORE_MODE' $false | Out-Null
+        SetMacro 'UART_STORE_MODE' $false | Out-Null
         SetMacro 'BTN_IMG_STORE_MODE' $false | Out-Null
         Log 'config.h: 三个烧录宏全关(GAME 模式)'
         if ((Build '游戏') -ne 0) { return '编译失败' }
@@ -211,35 +235,44 @@ function Step-Game {
     return ''
 }
 
-# ---------- 视频: 复用 burn_all.ps1, 并把它的日志实时回显出来 ----------
+# ---------- 视频: UART 烧录固件 + 串口流式(8MB 约 70s), 比 SWD 分块快约 10 倍 ----------
 function Step-Video {
-    Log '===== 视频数据块(外部 Flash 地址 0) ====='
+    Log '===== 视频数据块(外部 Flash 地址 0, 串口流式) ====='
     if ($BinPath -eq '' -or -not (Test-Path -LiteralPath $BinPath)) {
         return '没有视频 bin(请先在面板上导入)'
     }
     Log ("视频源: {0}" -f $BinPath)
     if ($DryRun) { Log 'STEP_OK video'; return '' }
-    Start-PsScript -Script $switchScript -ExtraArgs @('burn') -Wait | Out-Null   # 视频宏开 + 去 -flto + make clean
-    Log 'config.h: VIDEO_CHUNK_STORE_MODE = 开'
-    $before = 0
-    if (Test-Path $logFile) { $before = (Get-Content -LiteralPath $logFile).Count }
-    $p = Start-PsScript -Script $burnAll -ExtraArgs @('-start', '0', '-BinPath', $BinPath)
-    $lastLine = 0
-    while (-not $p.HasExited) {
-        Start-Sleep -Milliseconds 1500
-        if (Test-Path $logFile) {
-            $all = Get-Content -LiteralPath $logFile
-            if ($all.Count -gt $before) {
-                for ($i = [Math]::Max($before, $lastLine); $i -lt $all.Count; $i++) { Log ("  视频 " + $all[$i]) }
-                $lastLine = $all.Count
-            }
-        }
+
+    # 1) 切到 UART 烧录固件: 只开 UART_STORE_MODE, 其余烧录宏全关
+    SetMacro 'FLASH_DATA_STORE_MODE' $false | Out-Null
+    SetMacro 'BTN_IMG_STORE_MODE' $false | Out-Null
+    SetMacro 'VIDEO_CHUNK_STORE_MODE' $false | Out-Null
+    SetMacro 'UART_STORE_MODE' $true | Out-Null
+    Log 'config.h: UART_STORE_MODE = 开(其余烧录宏已关)'
+    if ((Build '串口烧录') -ne 0) { return '编译失败' }
+
+    # 2) 烧进 MCU(SWD), 复位后就在跑串口烧录固件
+    #    用 program ... reset exit(先复位再写, 最稳); 失败重发 7F 再来
+    if (-not (WaitConn)) { return 'SWD 连不上(设备待机?)' }
+    $flashed = $false
+    for ($t = 1; $t -le 3 -and -not $flashed; $t++) {
+        Send-SwdRelease
+        $o = & $openocd -f $ocfg -c "adapter speed $SwdSpeed" -c 'chip_id CH32V20x' `
+             -c "program {$elf} reset exit" 2>&1 | Out-String
+        if ($o -match 'Programming Finished') { $flashed = $true }
+        else { Log ("  烧写第 {0} 次失败, 重试" -f $t); Start-Sleep -Milliseconds 500 }
     }
-    if (Test-Path $logFile) {
-        $all = Get-Content -LiteralPath $logFile
-        for ($i = [Math]::Max($before, $lastLine); $i -lt $all.Count; $i++) { Log ("  视频 " + $all[$i]) }
-    }
-    if ($p.ExitCode -ne 0) { return 'burn_all.ps1 退出码非 0' }
+    if (-not $flashed) { return 'SWD 烧写失败(请按一下复位再试)' }
+    Log '串口烧录固件已烧写, 等它启动...'
+    Start-Sleep -Seconds 6
+
+    # 3) 串口流式写外部 Flash: 1MB 分块, 每块独立 CRC/重试, 边收边写
+    #    ★ 直接在同一个进程里调用: 起子进程(Start-Process + 输出重定向)实测会让 MCU
+    #      在第一块之后就失联, 同进程调用稳定
+    & $uartBurn -Stream -Baud 1200000 -ChunkKB 1024 -BinPath $BinPath 2>&1 |
+        ForEach-Object { Log ("  视频 " + $_) }
+    if ($LASTEXITCODE -ne 0) { return '串口流式烧录失败(详见上面的输出)' }
     Log 'STEP_OK video'
     return ''
 }

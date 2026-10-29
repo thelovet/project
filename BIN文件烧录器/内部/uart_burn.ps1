@@ -96,7 +96,7 @@ function Send-Ping([int]$timeoutMs) {
     return $false
 }
 $conn = $false
-for ($t = 1; $t -le 3 -and -not $conn; $t++) { $conn = Send-Ping 1500 }
+for ($t = 1; $t -le 8 -and -not $conn; $t++) { $conn = Send-Ping 1500 }
 if (-not $conn) { "链路无响应(ping 没回 0x06): 检查串口线/波特率/固件是否在烧录模式"; $sp.Close(); exit 1 }
 $ver = -1
 try { $ver = $sp.ReadByte() } catch { }
@@ -208,6 +208,16 @@ if ($Stream) {
         $addr += $n
         $kbps = $addr / $swAll.Elapsed.TotalSeconds / 1024
         "  {0:N0} / {1:N0} 字节  ({2:N1} KB/s)" -f $addr, $padlen, $kbps
+        # 块间同步: 确认 MCU 还活着(并给它收尾的时间), 否则下一块必然失败
+        Start-Sleep -Milliseconds 120
+        $sp.DiscardInBuffer()
+        $sp.Write([byte[]](0xB5,0x5A,0xD0,0xFF,0xFF,0xFF,0,0), 0, 8)
+        $alive = $false
+        $dl = (Get-Date).AddMilliseconds(1500)
+        while ((Get-Date) -lt $dl) {
+            try { $x = $sp.ReadByte(); if ($x -eq 0x06) { $alive = $true; break } } catch { }
+        }
+        if (-not $alive) { $sp.Close(); "MCU 在块 @ {0:X6} 之后无响应(供电/串口异常?)" -f $addr; exit 1 }
     }
     $swAll.Stop()
     $sp.Close()

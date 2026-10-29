@@ -1414,11 +1414,16 @@ void USART1_IRQHandler(void)
 static void su_stream_begin(void)
 {
     while (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) != RESET) { (void)USART_ReceiveData(USART1); }
+    /* ★ 串口与 SWD 并线: 传输期间把 SWD 关掉, PA13/PA14 不被调试口牵制,
+       否则高码率连续收数据时会零星丢字节 */
+    su_disable_swd();
     s_cur = 0; s_fill = 0; s_ready = 0; s_ovf = 0;
     USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
 }
 
-/** @brief  结束流式接收: 关 RXNE 中断, 丢掉残留字节 */
+/** @brief  结束流式接收: 关 RXNE 中断, 丢掉残留字节
+ *  @note   ★ 这里刻意不重新打开 SWD: 串口与 SWD 并线时, 调试口一开就会把 UART 那根线
+ *           顶死(表现为"收完一块后再也收不到包")。需要烧固件时按复位, 或发 7F 7F 7F。 */
 static void su_stream_end(void)
 {
     USART_ITConfig(USART1, USART_IT_RXNE, DISABLE);
@@ -1574,7 +1579,8 @@ void UartStore_BurnLoop(void)
                 }
                 su_stream_burn(a, n, c);
                 total += n;
-                LCD_ShowNum((uint16_t)(total & 0xFFFF), 40);   /* 一段收完(DMA 已还给屏)才刷 */
+                /* ★ 这里刻意不刷屏: 刷屏(LCD_Fill 逐字节等 SPI2)要几毫秒, 而这期间 PC
+                   已经把下一块的包头发过来了, 会丢字节甚至卡死。进度由 PC 端/面板显示。 */
                 continue;
             }
 
