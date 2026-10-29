@@ -60,11 +60,37 @@ function Show-BuildResult {
     Show-MemUsage
 }
 
+# ---- release SWD from the burn firmware before flashing ----
+# If UART and SWD share the same header, the firmware's UART TX (PA9, idle high)
+# holds SWDIO and OpenOCD cannot connect. Sending 7F 7F 7F makes the burn firmware
+# float PA9/PA10 and reopen SWD (same as unplugging UART). Harmless on game firmware.
+function Send-SwdRelease {
+    $dev = (Get-CimInstance Win32_SerialPort -ErrorAction SilentlyContinue |
+            Where-Object { $_.Description -match 'WCH-Link' } | Select-Object -First 1)
+    if (-not $dev) { Write-Host '  (no WCH-Link serial port, skip 7F release)' -ForegroundColor DarkYellow; return }
+    foreach ($b in @(1200000, 1500000, 460800)) {
+        try {
+            $sp = New-Object System.IO.Ports.SerialPort($dev.DeviceID, $b)
+            $sp.ReadTimeout = 150; $sp.WriteTimeout = 300
+            $sp.Open(); Start-Sleep -Milliseconds 80
+            $sp.Write([byte[]](0x7F,0x7F,0x7F), 0, 3)
+            Start-Sleep -Milliseconds 120
+            $sp.Close()
+            Write-Host ("  sent 7F 7F 7F @ {0} ({1})" -f $dev.DeviceID, $b) -ForegroundColor DarkGray
+        } catch { }
+        Start-Sleep -Milliseconds 50
+    }
+}
 function Do-Flash {
     if (-not (Test-Path $elf)) { Write-Host "Î´ÕÒµ½ $elf £¬ÇëÏÈ±àÒë" -ForegroundColor Red; $script:hadError = 1; return }
     Write-Host "==> program $elf" -ForegroundColor Cyan
-    & $openocd -f $cfg -c "adapter speed 8000" -c "chip_id CH32V20x" -c "program {$elf} reset exit"
-    if ($LASTEXITCODE -ne 0) { $script:flashOk = $false } else { $script:flashOk = $true }
+    $ok = $false
+    for ($try = 1; $try -le 3 -and -not $ok; $try++) {
+        Send-SwdRelease
+        & $openocd -f $cfg -c "adapter speed 8000" -c "chip_id CH32V20x" -c "program {$elf} reset exit"
+        if ($LASTEXITCODE -eq 0) { $ok = $true }
+    }
+    $script:flashOk = $ok
 }
 
 function Show-FlashResult {

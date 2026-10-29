@@ -1129,7 +1129,8 @@ void BtnImgStore_BurnAll(void)
  *   0x06 = 写完且校验通过   0x15 = CRC 不对   0x16 = 参数不对(addr/len)
  * 控制帧(切波特率, 只发 8 字节头): [B5][5A][F0 FF FF FF][baud/1000 :2 LE]
  *   例: 1500 = 1.5 Mbps; MCU 先用旧速率回 0x06, 之后用新速率收发
- * 其它: 空闲每 ~0.5s 发一个心跳 'U'(0x55); 串口连收 3 个 0x7F 把 SWD 还给调试口。
+ * 其它: 不发心跳(PC 用 ping 帧 [B5][5A][D0 FF FF FF][00 00] 主动探测, MCU 回 0x06);
+ *       串口连收 3 个 0x7F 把 SWD 还给调试口。
  * ================================================================ */
 #ifdef UART_STORE_MODE
 
@@ -1139,9 +1140,14 @@ void BtnImgStore_BurnAll(void)
 
 #define SU_TX_PIN     GPIO_Pin_14
 #define SU_RX_PIN     GPIO_Pin_13
-#define SU_BAUD       1500000UL
+#define SU_BAUD       1200000UL
 /* 1 = 用硬件 USART1(PA9=TX, PA10=RX); 0 = 用 PA13/PA14 软件模拟 */
 #define SU_HW_UART    1
+/* 开机后保留 SWD 的时间(ms); 0 = 一直开着 SWD(不关)。
+   ★ 调试用: 设 0 时烧录固件运行期间 SWD 一直可用, PC 随时能 OpenOCD 连上。
+     但串口 TX 会一直驱动它那根线, 如果和 SDI 并在一起就会互相打架 —— 并线时要注意。
+     设 3000 = 开机 3 秒后关掉 SWD, 要烧固件就"按复位 + 3 秒内连"。 */
+#define SU_SWD_WINDOW_MS  0
 #define SU_XTAL       144000000UL
 #define SU_BIT_CYC    (SU_XTAL / SU_BAUD)         /* 1 bit = 312 个核周期(默认) */
 
@@ -1152,6 +1158,9 @@ static uint16_t s_bit_cyc = (uint16_t)SU_BIT_CYC;
 #define SU_CTRL_ADDR  0xFFFFFFF0UL
 /* 控制帧: addr = 0xFFFFFFE0, len = 64KB 块数 → 从地址 0 开始整片块擦除 */
 #define SU_ERASE_ADDR 0xFFFFFFE0UL
+/* 控制帧: addr = 0xFFFFFFD0 → ping, MCU 回 0x06 + SU_VERSION(PC 用它确认固件版本) */
+#define SU_PING_ADDR  0xFFFFFFD0UL
+#define SU_VERSION    0x2C
 
 /**
  * @brief  软 UART 初始化: 关 SWD, PA13 输入上拉(RX), PA14 推挽输出(TX), TIM2 自由计数当时间轴
@@ -1231,6 +1240,33 @@ static void su_hw_init(void)
     u.USART_Mode                = USART_Mode_Tx | USART_Mode_Rx;
     USART_Init(USART1, &u);
     USART_Cmd(USART1, ENABLE);
+
+    {   /* ★ 流式接收要靠 USART1 中断, 这里把 NVIC 通道打开(中断本身在 su_stream_begin 里才使能) */
+        NVIC_InitTypeDef n = {0};
+        n.NVIC_IRQChannel                   = USART1_IRQn;
+        n.NVIC_IRQChannelPreemptionPriority = 0;
+        n.NVIC_IRQChannelSubPriority        = 0;
+        n.NVIC_IRQChannelCmd                = ENABLE;
+        NVIC_Init(&n);
+    }
+}
+
+/**
+ * @brief  硬件 USART1 换波特率(等上一条应答发完再改, 避免把正在发的字节切坏)
+ * @param  baud 新波特率
+ */
+static void su_hw_set_baud(uint32_t baud)
+{
+    USART_InitTypeDef u = {0};
+
+    while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET) { }
+    u.USART_BaudRate            = baud;
+    u.USART_WordLength          = USART_WordLength_8b;
+    u.USART_StopBits            = USART_StopBits_1;
+    u.USART_Parity              = USART_Parity_No;
+    u.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    u.USART_Mode                = USART_Mode_Tx | USART_Mode_Rx;
+    USART_Init(USART1, &u);
 }
 
 /**
@@ -1324,8 +1360,128 @@ static uint8_t su_wait_byte(uint8_t *out, uint16_t ms)
 #endif
 }
 
-static uint8_t s_ubuf[12288];    /* 单帧数据缓冲(len ≤ 12288, 3 个 4KB 扇区) */
+static uint8_t s_ubuf[4096];     /* 分帧模式的数据缓冲(len ≤ 4096); 流式模式用 s_buf[2][4096] */
 static uint32_t s_erased_end = 0;/* 已被"块擦除"命令擦干净的结束地址 */
+
+/* ================================================================
+ * 流式烧录(环形缓冲 + RXNE 中断): 中断只负责收, 主循环同时写 Flash
+ * ----------------------------------------------------------------
+ * 头(13 字节, 由主循环用轮询收):
+ *   [B5][5A][0x02][addr:4 LE][len:4 LE][crc16:2 LE]
+ *   len 必须是 4096 的整数倍(PC 端用 0xFF 补齐); crc16 = MODBUS, 算整段数据
+ * 握手: 头校验通过 -> 先回 0x06 表示"可以发数据了", 整段收完再回 0x06;
+ *       CRC 不对/溢出回 0x15(PC 重发这一块), 参数不对回 0x16
+ * ★ 不用 USART RX DMA: 它和 LCD(SPI2_TX) 共用 DMA1_Channel5, 而且实测会在
+ *   启动时多带 1 个字节, 整段数据错位 → CRC 永远不对。RXNE 中断没有这个问题,
+ *   也不影响屏的 DMA。
+ * ★ 4 块 × 2KB: 收 1 块约 17ms(1.2Mbps), 写 1 块约 15ms, 留 2 块余量顶抖动
+ * ================================================================ */
+#define SU_BLK       2048
+#define SU_NBUF      4
+
+static uint8_t  s_buf[SU_NBUF][SU_BLK]; /* 环形缓冲: 中断往一块里填, CPU 写另一块 */
+static volatile uint8_t  s_cur   = 0;   /* 中断正在填的缓冲号 0..SU_NBUF-1 */
+static volatile uint16_t s_fill  = 0;   /* 当前缓冲已填字节数 */
+static volatile uint8_t  s_ready = 0;   /* 位图: 已收满、还没写进 Flash */
+static volatile uint8_t  s_ovf   = 0;   /* 溢出: 一个空闲缓冲都找不到了 */
+
+/**
+ * @brief  USART1 接收中断: 每来一个字节存进环形缓冲, 填满一块就换下一块
+ */
+void USART1_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+void USART1_IRQHandler(void)
+{
+    uint8_t n, k;
+
+    if (USART_GetITStatus(USART1, USART_IT_RXNE) == RESET) return;
+    {
+        uint8_t d = (uint8_t)USART_ReceiveData(USART1);
+        if (s_ovf) return;
+        s_buf[s_cur][s_fill++] = d;
+        if (s_fill >= SU_BLK) {
+            s_ready |= (uint8_t)(1u << s_cur);
+            s_fill = 0;
+            for (k = 1; k <= SU_NBUF; k++) {        /* 按环形顺序找一块空闲缓冲 */
+                n = (uint8_t)((s_cur + k) % SU_NBUF);
+                if (!(s_ready & (uint8_t)(1u << n))) { s_cur = n; return; }
+            }
+            s_ovf = 1;                              /* 四块全满: 写入赶不上接收 */
+        }
+    }
+}
+
+/** @brief  开始流式接收: 丢掉残留字节, 清状态, 打开 RXNE 中断 */
+static void su_stream_begin(void)
+{
+    while (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) != RESET) { (void)USART_ReceiveData(USART1); }
+    s_cur = 0; s_fill = 0; s_ready = 0; s_ovf = 0;
+    USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
+}
+
+/** @brief  结束流式接收: 关 RXNE 中断, 丢掉残留字节 */
+static void su_stream_end(void)
+{
+    USART_ITConfig(USART1, USART_IT_RXNE, DISABLE);
+    while (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) != RESET) { (void)USART_ReceiveData(USART1); }
+}
+
+/**
+ * @brief  流式烧录一段数据(中断收 / CPU 写 Flash 重叠)
+ * @param  addr   起始地址(4KB 对齐)
+ * @param  len    字节数(4096 的整数倍)
+ * @param  crc_pc PC 端算好的整段 CRC16
+ * @note   失败时回 0x15 + 1 字节原因: 01=缓冲溢出 02=收到的长度不够 03=CRC 不符
+ */
+static void su_stream_burn(uint32_t addr, uint32_t len, uint16_t crc_pc)
+{
+    uint16_t crc  = 0xFFFF;
+    uint32_t done = 0;
+    uint8_t  i, k;
+    uint32_t t_last;
+
+    su_stream_begin();
+    t_last = su_now();
+    su_tx_byte(0x06);                   /* 告诉 PC: 可以发数据了 */
+
+    while (done < len && !s_ovf) {
+        uint8_t found = 0;
+        for (k = 1; k <= SU_NBUF; k++) {         /* 从最老的开始取 */
+            i = (uint8_t)((s_cur + k) % SU_NBUF);
+            if (s_ready & (uint8_t)(1u << i)) { found = 1; break; }
+        }
+        if (!found) {
+            /* ★ PC 中途掉线时不能死等: 3 秒没新数据就放弃, 回到主循环等命令 */
+            if ((su_now() - t_last) > 432000000UL) break;
+            continue;
+        }
+        {
+            uint16_t j;
+            for (j = 0; j < SU_BLK; j++) crc = flash_store_crc16_update(crc, s_buf[i][j]);
+        }
+        flash_store_write(s_buf[i], addr, SU_BLK);
+        addr += SU_BLK;
+        done += SU_BLK;
+        __disable_irq();                        /* 与中断里 s_ready |= 互斥 */
+        s_ready &= (uint8_t)~(1u << i);
+        __enable_irq();
+        t_last = su_now();
+    }
+    su_stream_end();
+
+    if (s_ovf || done != len || crc != crc_pc) {
+        su_tx_byte(0x15);               /* 失败: PC 重发这一块 */
+        su_tx_byte(s_ovf ? 0x01 : (done != len ? 0x02 : 0x03));
+        /* 诊断: MCU 算出的 CRC + PC 传来的 CRC + 前两块缓冲的头 8 字节 */
+        su_tx_byte((uint8_t)(crc & 0xFF));
+        su_tx_byte((uint8_t)(crc >> 8));
+        su_tx_byte((uint8_t)(crc_pc & 0xFF));
+        su_tx_byte((uint8_t)(crc_pc >> 8));
+        for (k = 0; k < 8; k++) su_tx_byte(s_buf[0][k]);
+        for (k = 0; k < 8; k++) su_tx_byte(s_buf[1][k]);
+        return;
+    }
+    su_tx_byte(0x06);
+}
 
 /**
  * @brief  串口烧录主循环(不返回)
@@ -1336,17 +1492,21 @@ void UartStore_BurnLoop(void)
 {
     uint8_t  b;
     uint8_t  ok;
-    uint32_t idle = 0;
     uint32_t esc  = 0;
     uint32_t total = 0;
-    uint32_t last_hb = 0;
 
     su_init();
     LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
     LCD_ShowNum(0, 40);
 
 #if SU_HW_UART
-    su_hw_init();                              /* 硬件 USART1(PA9/PA10), 不用关 SWD */
+    su_hw_init();                              /* 硬件 USART1(PA9/PA10) */
+#if SU_SWD_WINDOW_MS > 0
+    /* ★ 开机保留 SWD 窗口, 到点关掉(串口与 SWD 并联时避免互相打架);
+       要烧固件: 按复位, 3 秒内连即可 */
+    Delay_Ms(SU_SWD_WINDOW_MS);
+    su_disable_swd();
+#endif
 #else
     /* ★ 复位后先留 3 秒"SWD 可用窗口": 这段时间调试口是活的, 想重烧就趁现在;
        过了才把 PA13/PA14 让给软 UART(顺序不能反: 先配 GPIO 的话配置会被 SDI 覆盖)。 */
@@ -1358,12 +1518,8 @@ void UartStore_BurnLoop(void)
     SPI_Flash_WAKEUP();
 
     while (1) {
-        /* ---- 空闲: 等字节; 每 ~0.5s 发一个心跳 'U' ---- */
-        if (!su_getc(&b)) {
-            if ((su_now() - last_hb) > 72000000UL) { last_hb = su_now(); su_tx_byte(0x55); }
-            continue;
-        }
-        idle = 0;
+        /* ---- 空闲: 只是等字节, 不发心跳(PC 端用 ping 帧主动探测链路) ---- */
+        if (!su_getc(&b)) continue;
 
         /* 7F 7F 7F: 交出 SWD + 释放串口引脚(之后停在原地, 复位可再次进入本模式) */
         if (b == 0x7F) {
@@ -1391,14 +1547,40 @@ void UartStore_BurnLoop(void)
         if (b != 0xB5) continue;                    /* 找帧头 B5 5A */
         if (!su_wait_byte(&b, 20) || b != 0x5A) continue;
 
-        /* ---- 6 字节头: addr(4, LE) + len(2, LE) ---- */
+        /* ---- 头: 第 3 字节 0x02 = 流式烧录; 否则是老的分帧协议(它就是 addr 的最低字节) ---- */
         {
             uint8_t  h[6];
+            uint8_t  t;
             uint32_t addr;
             uint16_t len;
 
+            if (!su_wait_byte(&t, 20)) continue;
+
+            if (t == 0x02) {                        /* 流式: addr4 + len4 + crc2 */
+                uint8_t  g[10];
+                uint32_t a, n;
+                uint16_t c;
+                ok = 1;
+                for (uint8_t i = 0; i < 10; i++) {
+                    if (!su_wait_byte(&g[i], 20)) { ok = 0; break; }
+                }
+                if (!ok) continue;
+                a = (uint32_t)g[0] | ((uint32_t)g[1] << 8) | ((uint32_t)g[2] << 16) | ((uint32_t)g[3] << 24);
+                n = (uint32_t)g[4] | ((uint32_t)g[5] << 8) | ((uint32_t)g[6] << 16) | ((uint32_t)g[7] << 24);
+                c = (uint16_t)(g[8] | (g[9] << 8));
+                if ((a & 0xFFFUL) || n == 0 || (n & 0xFFFUL) || (a + n) > s_erased_end) {
+                    su_tx_byte(0x16);
+                    continue;
+                }
+                su_stream_burn(a, n, c);
+                total += n;
+                LCD_ShowNum((uint16_t)(total & 0xFFFF), 40);   /* 一段收完(DMA 已还给屏)才刷 */
+                continue;
+            }
+
+            h[0] = t;
             ok = 1;
-            for (uint8_t i = 0; i < 6; i++) {
+            for (uint8_t i = 1; i < 6; i++) {
                 if (!su_wait_byte(&h[i], 5)) { ok = 0; break; }
             }
             if (!ok) continue;
@@ -1407,6 +1589,13 @@ void UartStore_BurnLoop(void)
                  | ((uint32_t)h[2] << 16) | ((uint32_t)h[3] << 24);
             len  = (uint16_t)(h[4] | (h[5] << 8));
 
+            /* ---- 控制帧: ping(PC 主动探测链路, 回 0x06 + 版本号) ---- */
+            if (addr == SU_PING_ADDR) {
+                su_tx_byte(0x06);
+                su_tx_byte(SU_VERSION);
+                continue;
+            }
+
             /* ---- 控制帧: 切波特率(只发 8 字节头, 不带数据/CRC) ----
                addr = 0xFFFFFFF0, len = 新波特率/1000
                MCU 先用"旧速率"回 ACK, 再从下一帧起用新速率收发 */
@@ -1414,6 +1603,9 @@ void UartStore_BurnLoop(void)
                 if (len >= 115 && len <= 6000) {
                     su_tx_byte(0x06);
                     s_bit_cyc = (uint16_t)(SU_XTAL / ((uint32_t)len * 1000UL));
+#if SU_HW_UART
+                    su_hw_set_baud((uint32_t)len * 1000UL);   /* 硬件串口: 真的换 BRR */
+#endif
                     LCD_ShowNum(len, 70);         /* 屏上显示当前设定的速率(kbps) */
                 } else {
                     su_tx_byte(0x16);
