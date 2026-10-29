@@ -80,6 +80,10 @@
 //#define FLASH_DATA_STORE_MODE
 //#define BURN_BRIDGE_MODE   /* 烧录助手(桥): PC 通过 SWD 灌数据写外部 Flash(平时保持注释) */
 //#define VIDEO_CHUNK_STORE_MODE
+/* 烧录口当软 UART 用(PA13=RX / PA14=TX, 460800 8N1), 绕过 WCH-Link 的 SWD 通道。
+   目前只是"收什么回什么"的回环测试: PC 发 N 字节应收回 N 字节, 屏上显示累计字节数。
+   ★ 打开后 SWD 会被关掉(复位后恢复), 进入前先烧好本固件。 */
+//#define UART_STORE_MODE
 /* 推箱子导航按钮图 + 撤销界面按钮图 + 菜单追加字模: 都放外部Flash的固定保留区,
    不进资源表/目录(内部Flash 装不下) → 用独立烧录模式单独烧一次, 不动字库:
    - 英文导航按钮图 5580B   → BTN_IMG_EN_ADDR

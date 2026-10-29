@@ -268,4 +268,13 @@ uint8_t *FlashStore_Scratch(void);
  * ================================================================ */
 void VideoChunkStore_BurnAll(void);
 
+/* ================================================================
+ * 软 UART 烧录 (UART_STORE_MODE)
+ * 把烧录口两根线当数据线: PA13(原SWDIO)=RX, PA14(原SWCLK)=TX, 460800 8N1 软件模拟。
+ * 帧协议: [B5][5A][addr:4][len:2][data][crc16:2], 每帧擦+写一段外部 Flash,
+ * 成功回 0x06 / CRC 错回 0x15 / 参数错回 0x16; 串口发 7F 7F 7F 可把 SWD 还回去。
+ * 本函数不返回。
+ * ================================================================ */
+void UartStore_BurnLoop(void);
+
 #endif /* __FLASH_STORE_H__ */

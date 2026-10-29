@@ -1503,7 +1503,8 @@ int main(void) {
          SFTRST 置位时若走这里会直接进 Standby -> 下一块 SWD 连不上(HANDSHAKE TIMEOUT),
          必须点屏唤醒才能继续。 */
 #if !defined(VIDEO_CHUNK_STORE_MODE) && !defined(FLASH_DATA_STORE_MODE) \
-    && !defined(BTN_IMG_STORE_MODE) && !defined(BURN_BRIDGE_MODE)
+    && !defined(BTN_IMG_STORE_MODE) && !defined(BURN_BRIDGE_MODE) \
+    && !defined(UART_STORE_MODE)
     if (RCC_GetFlagStatus(RCC_FLAG_SFTRST) != RESET) {
         uint16_t magic;
         RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);
@@ -1549,7 +1550,28 @@ int main(void) {
     }
 #endif /* 非烧录模式才走"复位后直接回待机"的快速路径 */
 
-    #ifdef VIDEO_CHUNK_STORE_MODE
+    #ifdef UART_STORE_MODE
+    /* ====== 软 UART 回环测试模式 ======
+     * 把烧录口当数据线: PA13(原SWDIO)=RX, PA14(原SWCLK)=TX, 460800 8N1 软件模拟。
+     * 收到什么原样发回, 屏上显示累计字节数 —— 用来验证软 UART 时序是否稳;
+     * 验证通过后再扩展成"边收边写外部 Flash"。 */
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
+    SystemCoreClockUpdate();
+    Delay_Init();
+
+    LCD_PWR_Init();
+    LCD_PWR_ON;
+    Delay_Ms(20);
+    SPI_FLASH_Init();
+    SPI_Flash_WAKEUP();
+    LCD_Init();
+
+    LCD_Backlight_PWM_Stop();
+    LCD_LED_CLR;                 // 打开背光, 方便看屏上的计数
+
+    UartStore_BurnLoop();        // 不返回
+    while (1) { Delay_Ms(1000); }
+    #elif defined(VIDEO_CHUNK_STORE_MODE)
     /* ====== 视频数据块烧录模式 ======
      * 将嵌入固件的视频数据块(g_video_chunk)烧录到外部Flash地址0(视频区域),
      * 块内容由 gen_video_chunk.py 生成; 注释掉宏即恢复正常程序 */

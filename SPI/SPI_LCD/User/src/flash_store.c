@@ -138,7 +138,7 @@ static uint8_t s_scratch[FLASH_STORE_SCRATCH_SIZE];
  * 仅烧录模式使用(写入/校验), 游戏模式不编译以消除警告
  * ================================================================ */
 #if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE) \
-    || defined(BTN_IMG_STORE_MODE)
+    || defined(BTN_IMG_STORE_MODE) || defined(UART_STORE_MODE)
 /**
  * @brief  CRC16 迭代更新(每字节)。
  * @param  crc  当前 CRC
@@ -173,7 +173,7 @@ static uint16_t flash_store_crc16(const uint8_t *data, uint32_t len)
  * 擦除/写入仅烧录模式使用; 读取游戏模式也用, 不参与条件编译
  * ================================================================ */
 #if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE) \
-    || defined(BTN_IMG_STORE_MODE)
+    || defined(BTN_IMG_STORE_MODE) || defined(UART_STORE_MODE)
 /**
  * @brief  用 4B 指令擦除外部 Flash 扇区。
  * @param  addr 扇区地址
@@ -276,7 +276,7 @@ static void flash_store_detect_chip(void)
  * 统一扇区擦除/跨页写 (仅烧录模式使用)
  * ================================================================ */
 #if defined(FLASH_DATA_STORE_MODE) || defined(VIDEO_CHUNK_STORE_MODE) \
-    || defined(BTN_IMG_STORE_MODE)
+    || defined(BTN_IMG_STORE_MODE) || defined(UART_STORE_MODE)
 /**
  * @brief  擦除外部 Flash 扇区(普通指令)。
  * @param  addr 扇区地址
@@ -287,6 +287,31 @@ static void flash_store_erase_sector(uint32_t addr)
         flash_store_erase_sector_4b(addr);
     } else {
         SPI_Flash_Erase_Sector(addr / 4096);   /* 3字节地址, 参数为扇区序号 */
+    }
+}
+
+/**
+ * @brief  擦除 64KB 块(比擦 16 个 4KB 扇区快约一倍)
+ * @param  addr 块起始地址(64KB 对齐)
+ */
+static void flash_store_erase_block64(uint32_t addr)
+{
+    if (s_use_4b) {
+        SPI_FLASH_Write_Enable();
+        SPI_Flash_Wait_Busy();
+        FLASH_CS_CLR;
+        FLASH_Write(W25X_64KBBlockEraseWith4ByteAddress);
+        FLASH_Write((uint8_t)(addr >> 24));
+        FLASH_Write((uint8_t)(addr >> 16));
+        FLASH_Write((uint8_t)(addr >> 8));
+        FLASH_Write((uint8_t)addr);
+        FLASH_CS_SET;
+        SPI_Flash_Wait_Busy();
+    } else {
+        uint32_t a;
+        for (a = addr; a < addr + 65536UL; a += 4096) {
+            SPI_Flash_Erase_Sector(a / 4096);
+        }
     }
 }
 
@@ -1088,3 +1113,360 @@ void BtnImgStore_BurnAll(void)
     }
 }
 #endif /* BTN_IMG_STORE_MODE */
+
+/* ================================================================
+ * 软 UART 回环测试 (UART_STORE_MODE)
+ * ----------------------------------------------------------------
+ * 用烧录口的两根线当数据线, 绕开 WCH-Link 的 SWD 通道:
+ *   PA13 (原 SWDIO) = RX   <- 适配器 TX
+ *   PA14 (原 SWCLK) = TX   -> 适配器 RX
+ * 这两个脚没有 USART 复用功能, 只能软件模拟: 460800 8N1, 1 bit = 144e6/460800 ≈ 312 个核周期。
+ *
+ * 帧协议(PC -> MCU):
+ *   [0xB5][0x5A][addr:4 LE][len:2 LE][data:len][crc16:2 LE]
+ *   addr 必须 4KB 对齐, len 1~4096; crc16 = MODBUS(0xFFFF 初值), 只算 data
+ * 应答(MCU -> PC, 1 字节):
+ *   0x06 = 写完且校验通过   0x15 = CRC 不对   0x16 = 参数不对(addr/len)
+ * 控制帧(切波特率, 只发 8 字节头): [B5][5A][F0 FF FF FF][baud/1000 :2 LE]
+ *   例: 1500 = 1.5 Mbps; MCU 先用旧速率回 0x06, 之后用新速率收发
+ * 其它: 空闲每 ~0.5s 发一个心跳 'U'(0x55); 串口连收 3 个 0x7F 把 SWD 还给调试口。
+ * ================================================================ */
+#ifdef UART_STORE_MODE
+
+#include "ch32v20x_tim.h"
+#include "ch32v20x_exti.h"     /* EXTI13(PA13 边沿中断) */
+#include "ch32v20x_misc.h"     /* NVIC_Init */
+
+#define SU_TX_PIN     GPIO_Pin_14
+#define SU_RX_PIN     GPIO_Pin_13
+#define SU_BAUD       1500000UL
+/* 1 = 用硬件 USART1(PA9=TX, PA10=RX); 0 = 用 PA13/PA14 软件模拟 */
+#define SU_HW_UART    1
+#define SU_XTAL       144000000UL
+#define SU_BIT_CYC    (SU_XTAL / SU_BAUD)         /* 1 bit = 312 个核周期(默认) */
+
+/* 运行期位周期: 支持 PC 端发"切速率"命令后按新波特率继续(见 UartStore_BurnLoop) */
+static uint16_t s_bit_cyc = (uint16_t)SU_BIT_CYC;
+
+/* 控制帧: addr = 0xFFFFFFF0, len = 新波特率/1000 (例如 1500 表示 1.5Mbps) */
+#define SU_CTRL_ADDR  0xFFFFFFF0UL
+/* 控制帧: addr = 0xFFFFFFE0, len = 64KB 块数 → 从地址 0 开始整片块擦除 */
+#define SU_ERASE_ADDR 0xFFFFFFE0UL
+
+/**
+ * @brief  软 UART 初始化: 关 SWD, PA13 输入上拉(RX), PA14 推挽输出(TX), TIM2 自由计数当时间轴
+ */
+static void su_init(void)
+{
+    TIM_TimeBaseInitTypeDef t = {0};
+
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_AFIO, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+
+    /* TIM2: 不分频自由计数(1 tick = 1 个核周期); 只用 16 位差值比较, 单次等待 < 227us 即可 */
+    t.TIM_Prescaler     = 0;
+    t.TIM_Period        = 0xFFFF;
+    t.TIM_CounterMode   = TIM_CounterMode_Up;
+    TIM_TimeBaseInit(TIM2, &t);
+    TIM_Cmd(TIM2, ENABLE);
+}
+
+/**
+ * @brief  关掉 SWD, 把 PA13/PA14 真正让给软 UART
+ * @note   ★ 调用前有 3 秒"SWD 可用窗口"(见 UartStore_EchoLoop):
+ *         复位后 3 秒内调试口是活的, PC 想重烧就趁这段时间; 过了才切到软 UART。
+ */
+static void su_disable_swd(void)
+{
+    AFIO->PCFR1 = (AFIO->PCFR1 & ~AFIO_PCFR1_SWJ_CFG) | AFIO_PCFR1_SWJ_CFG_DISABLE;
+}
+
+/**
+ * @brief  配置 PA13(RX, 上拉输入) / PA14(TX, 推挽输出, 空闲高)
+ * @note   ★ 必须在 su_disable_swd() 之后调用: SWD 还开着时这两个脚被 SDI 复用占用,
+ *         GPIO 配置不会生效(TX 就不会出波形)。
+ */
+static void su_gpio_init(void)
+{
+    GPIO_InitTypeDef g = {0};
+
+    g.GPIO_Speed = GPIO_Speed_50MHz;
+    g.GPIO_Pin   = SU_RX_PIN;
+    g.GPIO_Mode  = GPIO_Mode_IPU;
+    GPIO_Init(GPIOA, &g);
+    g.GPIO_Pin   = SU_TX_PIN;
+    g.GPIO_Mode  = GPIO_Mode_Out_PP;
+    GPIO_Init(GPIOA, &g);
+    GPIOA->BSHR = SU_TX_PIN;                      /* 空闲电平为高 */
+}
+
+/**
+ * @brief  硬件 USART1 初始化(PA9=TX, PA10=RX)
+ * @note   ★ 用硬件串口就不用关 SWD, 也不需要 3 秒窗口, 随时可以重烧。
+ *         PA9/PA10 上还挂着语音 IC(9600), 烧录期间它会收到我们的数据(按需留意)。
+ */
+static void su_hw_init(void)
+{
+    GPIO_InitTypeDef  g = {0};
+    USART_InitTypeDef u = {0};
+
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_USART1 | RCC_APB2Periph_AFIO, ENABLE);
+
+    /* ★ 保险: 显式把 SWJ_CFG 设回 000(打开 SWD), 防止上一次运行把它关掉后一直影响调试口 */
+    AFIO->PCFR1 &= ~AFIO_PCFR1_SWJ_CFG;
+
+    g.GPIO_Speed = GPIO_Speed_50MHz;
+    g.GPIO_Pin   = GPIO_Pin_9;                     /* TX */
+    g.GPIO_Mode  = GPIO_Mode_AF_PP;
+    GPIO_Init(GPIOA, &g);
+    g.GPIO_Pin   = GPIO_Pin_10;                    /* RX */
+    g.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
+    GPIO_Init(GPIOA, &g);
+
+    u.USART_BaudRate            = SU_BAUD;
+    u.USART_WordLength          = USART_WordLength_8b;
+    u.USART_StopBits            = USART_StopBits_1;
+    u.USART_Parity              = USART_Parity_No;
+    u.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    u.USART_Mode                = USART_Mode_Tx | USART_Mode_Rx;
+    USART_Init(USART1, &u);
+    USART_Cmd(USART1, ENABLE);
+}
+
+/**
+ * @brief  软 UART 发一个字节(8N1)
+ * @param  v 待发送字节
+ */
+static void su_tx_byte(uint8_t v)
+{
+#if SU_HW_UART
+    while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET) { }
+    USART_SendData(USART1, v);
+    return;
+#else
+    uint16_t target = (uint16_t)TIM2->CNT;
+
+    GPIOA->BCR = SU_TX_PIN;                       /* 起始位 */
+    for (uint8_t i = 0; i < 8; i++) {
+        target = (uint16_t)(target + s_bit_cyc);
+        while ((int16_t)(TIM2->CNT - target) < 0) { }   /* 等到本 bit 结束 */
+        if (v & (1u << i)) GPIOA->BSHR = SU_TX_PIN;
+        else               GPIOA->BCR  = SU_TX_PIN;
+    }
+    target = (uint16_t)(target + s_bit_cyc);
+    while ((int16_t)(TIM2->CNT - target) < 0) { }
+    GPIOA->BSHR = SU_TX_PIN;                      /* 停止位 */
+#endif
+}
+
+/** @brief  取一个字节: 硬件 USART1 版(直接读 RXNE) */
+static uint8_t su_getc(uint8_t *out)
+{
+#if SU_HW_UART
+    if (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) == RESET) return 0;
+    *out = (uint8_t)USART_ReceiveData(USART1);
+    return 1;
+#else
+    uint16_t t0, target;
+    uint8_t  v = 0;
+
+    t0 = (uint16_t)TIM2->CNT;
+    while (GPIOA->INDR & SU_RX_PIN) {
+        if ((uint16_t)(TIM2->CNT - t0) > 60000) return 0;      /* ~416us 超时 */
+    }
+    t0 = (uint16_t)TIM2->CNT;
+
+    target = (uint16_t)(t0 + s_bit_cyc / 2);                   /* 起始位中心 */
+    while ((int16_t)(TIM2->CNT - target) < 0) { }
+    if (GPIOA->INDR & SU_RX_PIN) return 0;
+
+    for (uint8_t i = 0; i < 8; i++) {                          /* 1.5 ~ 8.5 bit */
+        target = (uint16_t)(target + s_bit_cyc);
+        while ((int16_t)(TIM2->CNT - target) < 0) { }
+        if (GPIOA->INDR & SU_RX_PIN) v |= (uint8_t)(1u << i);
+    }
+    target = (uint16_t)(target + s_bit_cyc);                   /* 9.5 bit = 停止位中心 */
+    while ((int16_t)(TIM2->CNT - target) < 0) { }
+    if ((GPIOA->INDR & SU_RX_PIN) == 0) return 0;
+
+    *out = v;
+    return 1;
+#endif
+}
+
+/** @brief  32 位时间戳(由 TIM2 的 16 位计数累加, 单位=核周期/144MHz) */
+static uint32_t su_now(void)
+{
+    static uint32_t acc = 0;
+    static uint16_t prev = 0;
+    uint16_t n = (uint16_t)TIM2->CNT;
+    acc += (uint16_t)(n - prev);
+    prev = n;
+    return acc;
+}
+
+/** @brief  带超时取字节(单位约 ms; 纯轮询, 1ms ≈ 14000 次) */
+static uint8_t su_wait_byte(uint8_t *out, uint16_t ms)
+{
+#if SU_HW_UART
+    uint32_t t0  = su_now();
+    uint32_t lim = (uint32_t)ms * 144000UL;      /* 144 个核周期 = 1us */
+    while ((su_now() - t0) < lim) {
+        if (su_getc(out)) return 1;
+    }
+    return 0;
+#else
+    uint32_t n = (uint32_t)ms * 3 + 1;      /* 每次空等约 0.42ms */
+    while (n--) {
+        if (su_getc(out)) return 1;
+    }
+    return 0;
+#endif
+}
+
+static uint8_t s_ubuf[12288];    /* 单帧数据缓冲(len ≤ 12288, 3 个 4KB 扇区) */
+static uint32_t s_erased_end = 0;/* 已被"块擦除"命令擦干净的结束地址 */
+
+/**
+ * @brief  串口烧录主循环(不返回)
+ * @note   帧协议: [B5][5A][addr:4][len:2][data][crc16:2], 每帧擦+写一段外部 Flash,
+ *         写完回 0x06(成功) / 0x15(CRC错) / 0x16(参数错)。屏上显示累计写入字节数。
+ */
+void UartStore_BurnLoop(void)
+{
+    uint8_t  b;
+    uint8_t  ok;
+    uint32_t idle = 0;
+    uint32_t esc  = 0;
+    uint32_t total = 0;
+    uint32_t last_hb = 0;
+
+    su_init();
+    LCD_Fill(0, 0, LCD_W, LCD_H, LCD_BLACK);
+    LCD_ShowNum(0, 40);
+
+#if SU_HW_UART
+    su_hw_init();                              /* 硬件 USART1(PA9/PA10), 不用关 SWD */
+#else
+    /* ★ 复位后先留 3 秒"SWD 可用窗口": 这段时间调试口是活的, 想重烧就趁现在;
+       过了才把 PA13/PA14 让给软 UART(顺序不能反: 先配 GPIO 的话配置会被 SDI 覆盖)。 */
+    Delay_Ms(3000);
+    su_disable_swd();
+    su_gpio_init();
+#endif
+    flash_store_detect_chip();
+    SPI_Flash_WAKEUP();
+
+    while (1) {
+        /* ---- 空闲: 等字节; 每 ~0.5s 发一个心跳 'U' ---- */
+        if (!su_getc(&b)) {
+            if ((su_now() - last_hb) > 72000000UL) { last_hb = su_now(); su_tx_byte(0x55); }
+            continue;
+        }
+        idle = 0;
+
+        /* 7F 7F 7F: 交出 SWD + 释放串口引脚(之后停在原地, 复位可再次进入本模式) */
+        if (b == 0x7F) {
+            if (++esc >= 3) {
+                AFIO->PCFR1 &= ~AFIO_PCFR1_SWJ_CFG;   /* SWJ_CFG=000: 重新打开 SWD */
+#if SU_HW_UART
+                /* 关掉 USART1 并把 PA9/PA10 放成浮空, MCU 不再驱动这两根线,
+                   方便调试器/语音 IC 使用, 也避免和 SWD 抢线 */
+                USART_Cmd(USART1, DISABLE);
+                {
+                    GPIO_InitTypeDef g = {0};
+                    g.GPIO_Speed = GPIO_Speed_50MHz;
+                    g.GPIO_Pin   = GPIO_Pin_9 | GPIO_Pin_10;
+                    g.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
+                    GPIO_Init(GPIOA, &g);
+                }
+#endif
+                LCD_ShowNum(0x7F7F, 70);
+                while (1) { Delay_Ms(500); }
+            }
+            continue;
+        }
+        esc = 0;
+
+        if (b != 0xB5) continue;                    /* 找帧头 B5 5A */
+        if (!su_wait_byte(&b, 20) || b != 0x5A) continue;
+
+        /* ---- 6 字节头: addr(4, LE) + len(2, LE) ---- */
+        {
+            uint8_t  h[6];
+            uint32_t addr;
+            uint16_t len;
+
+            ok = 1;
+            for (uint8_t i = 0; i < 6; i++) {
+                if (!su_wait_byte(&h[i], 5)) { ok = 0; break; }
+            }
+            if (!ok) continue;
+
+            addr = (uint32_t)h[0] | ((uint32_t)h[1] << 8)
+                 | ((uint32_t)h[2] << 16) | ((uint32_t)h[3] << 24);
+            len  = (uint16_t)(h[4] | (h[5] << 8));
+
+            /* ---- 控制帧: 切波特率(只发 8 字节头, 不带数据/CRC) ----
+               addr = 0xFFFFFFF0, len = 新波特率/1000
+               MCU 先用"旧速率"回 ACK, 再从下一帧起用新速率收发 */
+            if (addr == SU_CTRL_ADDR) {
+                if (len >= 115 && len <= 6000) {
+                    su_tx_byte(0x06);
+                    s_bit_cyc = (uint16_t)(SU_XTAL / ((uint32_t)len * 1000UL));
+                    LCD_ShowNum(len, 70);         /* 屏上显示当前设定的速率(kbps) */
+                } else {
+                    su_tx_byte(0x16);
+                }
+                continue;
+            }
+
+            /* ---- 控制帧: 整片块擦除 ----
+               addr = 0xFFFFFFE0, len = 64KB 块数(从地址 0 开始擦)
+               擦完才回 ACK(8MB 大约 20 秒, PC 端要放宽超时) */
+            if (addr == SU_ERASE_ADDR) {
+                uint32_t i;
+                for (i = 0; i < (uint32_t)len; i++) {
+                    flash_store_erase_block64(i * 65536UL);
+                    LCD_ShowNum((uint16_t)(i & 0xFFFF), 40);
+                }
+                s_erased_end = (uint32_t)len * 65536UL;
+                su_tx_byte(0x06);
+                continue;
+            }
+
+            if ((addr & 0xFFFUL) != 0 || len == 0 || len > sizeof(s_ubuf)) {
+                su_tx_byte(0x16);                   /* 参数不对 */
+                for (uint8_t j = 0; j < 6; j++) { su_tx_byte(h[j]); }   /* 调试: 回传解析到的头 */
+                continue;
+            }
+
+            /* ---- 数据 + CRC ---- */
+            for (uint16_t i = 0; i < len; i++) {
+                if (!su_wait_byte(&s_ubuf[i], 5)) { ok = 0; break; }
+            }
+            {
+                uint8_t c[2];
+                if (!ok || !su_wait_byte(&c[0], 5) || !su_wait_byte(&c[1], 5)) continue;
+                if (flash_store_crc16(s_ubuf, len) != (uint16_t)(c[0] | (c[1] << 8))) {
+                    su_tx_byte(0x15);               /* CRC 不对, PC 重发这一帧 */
+                    continue;
+                }
+            }
+
+            /* ---- 擦扇区 + 写入: 如果这段已经被"块擦除"命令擦过, 就不再重复擦 ---- */
+            if ((uint32_t)addr + len > s_erased_end) {
+                for (uint32_t a = addr; a < addr + len; a += 4096) {
+                    flash_store_erase_sector(a);
+                }
+            }
+            flash_store_write(s_ubuf, addr, len);
+            su_tx_byte(0x06);                       /* ACK: 这一帧写完 */
+
+            total += len;
+            LCD_ShowNum((uint16_t)(total & 0xFFFF), 40);
+        }
+    }
+}
+
+#endif /* UART_STORE_MODE */
