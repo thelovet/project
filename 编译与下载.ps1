@@ -86,7 +86,8 @@ function Do-Flash {
     Write-Host "==> program $elf" -ForegroundColor Cyan
     $ok = $false
     for ($try = 1; $try -le 3 -and -not $ok; $try++) {
-        Send-SwdRelease
+        # 第 1 次直接烧; 连不上(烧录固件把 UART 线占着)再发 7F 释放 SWD 重试
+        if ($try -gt 1) { Send-SwdRelease }
         & $openocd -f $cfg -c "adapter speed 8000" -c "chip_id CH32V20x" -c "program {$elf} reset exit"
         if ($LASTEXITCODE -eq 0) { $ok = $true }
     }

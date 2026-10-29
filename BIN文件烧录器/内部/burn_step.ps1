@@ -136,7 +136,8 @@ function Send-SwdRelease {
 # 等 SWD 连上(设备待机时要点一下屏幕唤醒); 200 次 x 1.2s
 function WaitConn([int]$max = 200) {
     for ($k = 1; $k -le $max; $k++) {
-        if ($k -eq 1) { Send-SwdRelease }
+        # 第 1 次直接探测; 连不上再发 7F 释放 SWD(烧录固件把 UART 线占着时才需要)
+        if ($k -eq 2 -or $k -eq 6) { Send-SwdRelease }
         & $openocd -f $ocfg -c "adapter speed $SwdSpeed" -c 'chip_id CH32V20x' -c 'init' -c 'shutdown' *> (Join-Path $obj 'step_probe.txt')
         $t = $latin.GetString([IO.File]::ReadAllBytes((Join-Path $obj 'step_probe.txt')))
         if ($t -notmatch 'failed to connect') {
@@ -150,13 +151,24 @@ function WaitConn([int]$max = 200) {
 }
 
 # 烧录固件 + 清 magic(防止读到上一块板/上次运行残留的 RAM) + 复位运行
+# 烧写 elf: 失败时先发 7F 7F 7F 释放 SWD 再重试
+# (烧录固件跑完视频后 SWD 是关的, 串口还占着线, 必须先释放)
+function FlashElf([string[]]$ExtraCmds = @(), [int]$tries = 3) {
+    for ($t = 1; $t -le $tries; $t++) {
+        if ($t -gt 1) { Send-SwdRelease }
+        $a = @('-f', $ocfg, '-c', "adapter speed $SwdSpeed", '-c', 'chip_id CH32V20x') + $ExtraCmds
+        $o = & $openocd @a 2>&1 | Out-String
+        if ($o -match 'Programming Finished') { return $true }
+        Log ("  烧写第 {0} 次失败, 释放 SWD 后重试" -f $t)
+        Start-Sleep -Milliseconds 300
+    }
+    return $false
+}
 function FlashEmf([string]$magicAddr, [bool]$clearMagic) {
-    $args = @('-f', $ocfg, '-c', "adapter speed $SwdSpeed", '-c', 'chip_id CH32V20x',
-              '-c', "program {$elf} verify")
-    if ($clearMagic -and $magicAddr -ne '') { $args += @('-c', "mww 0x$magicAddr 0") }
-    $args += @('-c', 'reset run', '-c', 'shutdown')
-    $o = & $openocd @args 2>&1 | Out-String
-    return ($o -match 'Programming Finished')
+    $extra = @('-c', "program {$elf} verify")
+    if ($clearMagic -and $magicAddr -ne '') { $extra += @('-c', "mww 0x$magicAddr 0") }
+    $extra += @('-c', 'reset run', '-c', 'shutdown')
+    return (FlashElf $extra)
 }
 
 # 轮询某个进度结构: magic 通过且 result != 0 才返回
@@ -226,9 +238,7 @@ function Step-Game {
         Log 'config.h: 三个烧录宏全关(GAME 模式)'
         if ((Build '游戏') -ne 0) { return '编译失败' }
         if (-not (WaitConn)) { return 'SWD 连不上(设备待机?)' }
-        $o = & $openocd -f $ocfg -c "adapter speed $SwdSpeed" -c 'chip_id CH32V20x' `
-             -c "program {$elf} reset exit" 2>&1 | Out-String
-        if ($o -notmatch 'Programming Finished') { return 'SWD 烧写失败' }
+        if (-not (FlashElf @('-c', "program {$elf} reset exit"))) { return 'SWD 烧写失败' }
         Log '游戏固件已烧写并复位运行'
     }
     Log 'STEP_OK game'
@@ -255,15 +265,7 @@ function Step-Video {
     # 2) 烧进 MCU(SWD), 复位后就在跑串口烧录固件
     #    用 program ... reset exit(先复位再写, 最稳); 失败重发 7F 再来
     if (-not (WaitConn)) { return 'SWD 连不上(设备待机?)' }
-    $flashed = $false
-    for ($t = 1; $t -le 3 -and -not $flashed; $t++) {
-        Send-SwdRelease
-        $o = & $openocd -f $ocfg -c "adapter speed $SwdSpeed" -c 'chip_id CH32V20x' `
-             -c "program {$elf} reset exit" 2>&1 | Out-String
-        if ($o -match 'Programming Finished') { $flashed = $true }
-        else { Log ("  烧写第 {0} 次失败, 重试" -f $t); Start-Sleep -Milliseconds 500 }
-    }
-    if (-not $flashed) { return 'SWD 烧写失败(请按一下复位再试)' }
+    if (-not (FlashElf @('-c', "program {$elf} reset exit"))) { return 'SWD 烧写失败(请按一下复位再试)' }
     Log '串口烧录固件已烧写, 等它启动...'
     Start-Sleep -Seconds 6
 
