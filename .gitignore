@@ -38,3 +38,5 @@ SPI/SPI_LCD/User/inc/video_chunk.h
 
 # 烧录面板的运行时缓存(导入的视频 bin / 缓存的固件镜像, 不入库)
 BIN文件烧录器/内部/cache/
+# Python 字节码缓存
+__pycache__/
