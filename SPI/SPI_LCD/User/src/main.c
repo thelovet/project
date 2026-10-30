@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @brief  待机低功耗模式说明（PA8 触摸 + PB5/PB6 充电唤醒）
  * @note   参考 EVT/EXAM/PWR/Standby_Mode
  *
@@ -487,6 +487,11 @@ void Enter_Standby(void) {
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_BKP, ENABLE);
     PWR_BackupAccessCmd(ENABLE);
     BKP_WriteBackupRegister(BKP_DR9, STANDBY_WAKE_ARMED_MAGIC);
+    /* ★ 进待机前清掉唤醒挂起标志: 否则配置 PA10/EXTI10 时产生的边沿会让它刚睡就被自己叫醒(睡不下) */
+    EXTI_ClearFlag(EXTI_Line8);
+    EXTI_ClearFlag(EXTI_Line10);
+    EXTI_ClearFlag(EXTI_Line5);
+    EXTI_ClearFlag(EXTI_Line6);
     PWR_EnterSTANDBYMode_RAM();
     Standby_RecordWakeSource();
 

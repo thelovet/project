@@ -131,13 +131,15 @@ function Send-SwdRelease {
         } catch { }
         Start-Sleep -Milliseconds 40
     }
+    # 等被唤醒的设备复位启动(串口唤醒后约 1s 才能连 SWD)
+    Start-Sleep -Milliseconds 1200
 }
 
 # 等 SWD 连上(设备待机时要点一下屏幕唤醒); 200 次 x 1.2s
 function WaitConn([int]$max = 200) {
     for ($k = 1; $k -le $max; $k++) {
         # 第 1 次直接探测; 连不上再发 7F 释放 SWD(烧录固件把 UART 线占着时才需要)
-        if ($k -eq 2 -or $k -eq 6) { Send-SwdRelease }
+        if ($k -eq 1 -or $k -eq 4) { Send-SwdRelease }   # 兼作唤醒字节
         & $openocd -f $ocfg -c "adapter speed $SwdSpeed" -c 'chip_id CH32V20x' -c 'init' -c 'shutdown' *> (Join-Path $obj 'step_probe.txt')
         $t = $latin.GetString([IO.File]::ReadAllBytes((Join-Path $obj 'step_probe.txt')))
         if ($t -notmatch 'failed to connect') {

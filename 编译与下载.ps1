@@ -80,6 +80,8 @@ function Send-SwdRelease {
         } catch { }
         Start-Sleep -Milliseconds 50
     }
+    # 等被唤醒的设备复位启动(串口唤醒后约 1s 才能连 SWD)
+    Start-Sleep -Milliseconds 1200
 }
 function Do-Flash {
     if (-not (Test-Path $elf)) { Write-Host "未找到 $elf ，请先编译" -ForegroundColor Red; $script:hadError = 1; return }
@@ -87,7 +89,7 @@ function Do-Flash {
     $ok = $false
     for ($try = 1; $try -le 3 -and -not $ok; $try++) {
         # 第 1 次直接烧; 连不上(烧录固件把 UART 线占着)再发 7F 释放 SWD 重试
-        if ($try -gt 1) { Send-SwdRelease }
+        Send-SwdRelease   # 兼作唤醒字节: 待机中的设备收到任一字节即醒
         & $openocd -f $cfg -c "adapter speed 8000" -c "chip_id CH32V20x" -c "program {$elf} reset exit"
         if ($LASTEXITCODE -eq 0) { $ok = $true }
     }

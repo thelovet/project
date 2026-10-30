@@ -1218,6 +1218,17 @@ void Touch_StandbyWakeupConfig(void)
     EXTI_InitStructure.EXTI_LineCmd = ENABLE;
     EXTI_Init(&EXTI_InitStructure);
 
+    /* ★ 串口唤醒: PA10(USART1_RX) 也挂在待机唤醒上(与触摸同写法: 事件模式 + 单个下降沿),
+       PC 发任意一个字节的起始位就能唤醒 → 免点屏幕烧录 */
+    GPIO_InitStructure.GPIO_Pin  = GPIO_Pin_10;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+    GPIO_EXTILineConfig(GPIO_PortSourceGPIOA, GPIO_PinSource10);
+    EXTI_InitStructure.EXTI_Line    = EXTI_Line10;
+    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+    EXTI_Init(&EXTI_InitStructure);
+    EXTI_ClearFlag(EXTI_Line10);
+
 #if TOUCH_IC_IT7259
     /* ★ 待机省电(定案): 电源模式命令 Idle —— 手册5.3.4: Command 0x04/子命令0x00, 参数0x01=Idle,
        标称 25uA; 不上报数据包, 用户触摸时自动回 Active → 待机触摸唤醒保留。
