@@ -108,3 +108,25 @@ foreach ($rel in $mkList) {
     SaveLines $o
 }
 Write-Host 'apply_lto: LTO enabled on all gcc lines, LCD/src/lcd.c excluded.'
+
+# ---- 工具链名与路径自愈(每次编译前自动执行) ----
+# MounRiver IDE 编译会把 makefile 重新生成成 riscv-none-embed-*(GCC8)、且绝对路径指回工程旧位置;
+# 命令行统一用 GCC12, 这里自动改回来, 免得报 "riscv-none-embed-gcc: not found" / 头文件找不到。
+$selfHealFiles = @(Get-ChildItem -Path $obj -Recurse -File | Where-Object { $_.Extension -eq '.mk' -or $_.Name -eq 'makefile' })
+$gbkEnc  = [Text.Encoding]::GetEncoding(936)
+$utf8Enc = New-Object Text.UTF8Encoding($false)
+$utf8Chk = [Text.Encoding]::GetEncoding('utf-8',[Text.EncoderFallback]::ExceptionFallback,[Text.DecoderFallback]::ExceptionFallback)
+foreach ($f in $selfHealFiles) {
+    $fb = [IO.File]::ReadAllBytes($f.FullName)
+    $fe = $gbkEnc
+    try { $null = $utf8Chk.GetString($fb); $fe = $utf8Enc } catch { }
+    $fs = $fe.GetString($fb)
+    $changed = $false
+    if ($fs.Contains('riscv-none-embed')) { $fs = $fs.Replace('riscv-none-embed','riscv-wch-elf'); $changed = $true }
+    foreach ($pair in @(@('大屏幕 - 触摸屏/','大屏幕 - 触摸屏/64MB触摸屏程序/'),
+                        @('大屏幕\ -\ 触摸屏/','大屏幕\ -\ 触摸屏/64MB触摸屏程序/'),
+                        @('触摸屏\SRC\Ld','触摸屏\64MB触摸屏程序\SRC\Ld'))) {
+        if ($fs.Contains($pair[0]) -and -not $fs.Contains($pair[1])) { $fs = $fs.Replace($pair[0],$pair[1]); $changed = $true }
+    }
+    if ($changed) { [IO.File]::WriteAllText($f.FullName, $fs, $fe) }
+}

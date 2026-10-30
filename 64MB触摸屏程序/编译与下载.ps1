@@ -1,12 +1,12 @@
-# build_flash.ps1 - Ò»¼ü±àÒë²¢ÏÂÔØÓÎÏ·¹Ì¼şµ½ CH32V203
-# ÓÃ·¨:
-#   powershell -File build_flash.ps1          # ±àÒë + ÏÂÔØ (Ä¬ÈÏ)
-#   powershell -File build_flash.ps1 build    # ½ö±àÒë
-#   powershell -File build_flash.ps1 flash   # ½öÏÂÔØ (ĞèÒÑ±àÒë)
-#   powershell -File build_flash.ps1 clean    # ÇåÀíºóÖØĞÂ±àÒë + ÏÂÔØ
+ï»¿# build_flash.ps1 - ä¸€é”®ç¼–è¯‘å¹¶ä¸‹è½½æ¸¸æˆå›ºä»¶åˆ° CH32V203
+# ç”¨æ³•:
+#   powershell -File build_flash.ps1          # ç¼–è¯‘ + ä¸‹è½½ (é»˜è®¤)
+#   powershell -File build_flash.ps1 build    # ä»…ç¼–è¯‘
+#   powershell -File build_flash.ps1 flash   # ä»…ä¸‹è½½ (éœ€å·²ç¼–è¯‘)
+#   powershell -File build_flash.ps1 clean    # æ¸…ç†åé‡æ–°ç¼–è¯‘ + ä¸‹è½½
 param([string]$mode = "all")  # all | build | flash | clean
 
-# --- MRS ¹¤¾ßÁ´Â·¾¶ ---
+# --- MRS å·¥å…·é“¾è·¯å¾„ ---
 $openocd = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\components\WCH\OpenOCD\OpenOCD\bin\openocd.exe"
 $cfg     = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\components\WCH\OpenOCD\OpenOCD\bin\wch-riscv.cfg"
 $gcc     = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32\components\WCH\Toolchain\RISC-V Embedded GCC12\bin"
@@ -14,7 +14,7 @@ $mk      = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\reso
 
 $env:Path = "$gcc;$mk;" + $env:Path
 
-# --- ÓÃ½Å±¾ËùÔÚÄ¿Â¼×Ô¶¯¶¨Î» obj (±ÜÃâÓ²±àÂëÖĞÎÄÂ·¾¶) ---
+# --- ç”¨è„šæœ¬æ‰€åœ¨ç›®å½•è‡ªåŠ¨å®šä½ obj (é¿å…ç¡¬ç¼–ç ä¸­æ–‡è·¯å¾„) ---
 $obj = Join-Path $PSScriptRoot "SPI\SPI_LCD\obj"
 $elf = Join-Path $obj "SPI_LCD.elf"
 Set-Location $obj
@@ -27,36 +27,36 @@ function Show-MemUsage {
     $line = (& riscv-wch-elf-size --format=berkeley SPI_LCD.elf 2>$null |
              Where-Object { $_ -match '\.elf$' -and $_ -match '\d' } |
              Select-Object -First 1)
-    if (-not $line) { Write-Host "  Î´ÄÜ½âÎöÄÚ´æÕ¼ÓÃ" -ForegroundColor Yellow; return }
+    if (-not $line) { Write-Host "  æœªèƒ½è§£æå†…å­˜å ç”¨" -ForegroundColor Yellow; return }
     $p = ($line.Trim() -split '\s+')
     $text = [int]$p[0]; $data = [int]$p[1]; $bss = [int]$p[2]
     $flash = $text + $data
     $ram   = $data + $bss
-    # Ğ¾Æ¬ÈİÁ¿: Flash=65280B(0xFF00, Ä©Î²Áô´æµµÇø), RAM=20480B(20K)
+    # èŠ¯ç‰‡å®¹é‡: Flash=65280B(0xFF00, æœ«å°¾ç•™å­˜æ¡£åŒº), RAM=20480B(20K)
     $flashPct = [math]::Round($flash / 65280.0 * 100, 2)
     $ramPct   = [math]::Round($ram / 20480.0 * 100, 2)
-    Write-Host ("  Flash ÒÑÓÃ: {0} B ({1}% / 65280 B)  Ê£Óà: {2} B" -f $flash, $flashPct, (65280 - $flash)) -ForegroundColor Yellow
-    Write-Host ("  RAM ÒÑÓÃ:   {0} B ({1}% / 20480 B)  Ê£Óà: {2} B" -f $ram, $ramPct, (20480 - $ram)) -ForegroundColor Yellow
+    Write-Host ("  Flash å·²ç”¨: {0} B ({1}% / 65280 B)  å‰©ä½™: {2} B" -f $flash, $flashPct, (65280 - $flash)) -ForegroundColor Yellow
+    Write-Host ("  RAM å·²ç”¨:   {0} B ({1}% / 20480 B)  å‰©ä½™: {2} B" -f $ram, $ramPct, (20480 - $ram)) -ForegroundColor Yellow
 }
 
 function Do-Build {
-    # ÏÈÔöÁ¿±àÒë(¿ì); ÈôÊ§°Ü(ÈçÔ´Âë×ªÂëºó¾É.oµ÷ÊÔĞÅÏ¢Ê§Åäµ¼ÖÂÁ´½Ó´í), ÔÙÇåÀí¹ıÆÚÄ¿±êÎÄ¼şÖØ±àÒ»´Î
+    # å…ˆå¢é‡ç¼–è¯‘(å¿«); è‹¥å¤±è´¥(å¦‚æºç è½¬ç åæ—§.oè°ƒè¯•ä¿¡æ¯å¤±é…å¯¼è‡´é“¾æ¥é”™), å†æ¸…ç†è¿‡æœŸç›®æ ‡æ–‡ä»¶é‡ç¼–ä¸€æ¬¡
     # [apply_lto] enable LTO but keep LCD/src/lcd.c out (see memo 56)
     $lto = Join-Path $PSScriptRoot 'apply_lto.ps1'
     if (Test-Path $lto) { & powershell -NoProfile -ExecutionPolicy Bypass -File "$lto" | Out-Null }
     Write-Host "==> make all" -ForegroundColor Cyan
     make all
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "ÔöÁ¿±àÒëÊ§°Ü, ÇåÀí¹ıÆÚÄ¿±êÎÄ¼şºóÖØ±à..." -ForegroundColor Yellow
+        Write-Host "å¢é‡ç¼–è¯‘å¤±è´¥, æ¸…ç†è¿‡æœŸç›®æ ‡æ–‡ä»¶åé‡ç¼–..." -ForegroundColor Yellow
         Get-ChildItem -Path $obj -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in ".o",".d",".map",".lst" } | Remove-Item -Force
         make all
-        if ($LASTEXITCODE -ne 0) { Write-Host "±àÒëÊ§°Ü" -ForegroundColor Red; exit 1 }
+        if ($LASTEXITCODE -ne 0) { Write-Host "ç¼–è¯‘å¤±è´¥" -ForegroundColor Red; exit 1 }
     }
     $script:buildOk = $true
 }
 
 function Show-BuildResult {
-    Write-Host "±àÒë³É¹¦" -ForegroundColor Green
+    Write-Host "ç¼–è¯‘æˆåŠŸ" -ForegroundColor Green
     Show-MemUsage
 }
 
@@ -80,16 +80,16 @@ function Send-SwdRelease {
         } catch { }
         Start-Sleep -Milliseconds 50
     }
-    # µÈ±»»½ĞÑµÄÉè±¸¸´Î»Æô¶¯(´®¿Ú»½ĞÑºóÔ¼ 1s ²ÅÄÜÁ¬ SWD)
+    # ç­‰è¢«å”¤é†’çš„è®¾å¤‡å¤ä½å¯åŠ¨(ä¸²å£å”¤é†’åçº¦ 1s æ‰èƒ½è¿ SWD)
     Start-Sleep -Milliseconds 1200
 }
 function Do-Flash {
-    if (-not (Test-Path $elf)) { Write-Host "Î´ÕÒµ½ $elf £¬ÇëÏÈ±àÒë" -ForegroundColor Red; $script:hadError = 1; return }
+    if (-not (Test-Path $elf)) { Write-Host "æœªæ‰¾åˆ° $elf ï¼Œè¯·å…ˆç¼–è¯‘" -ForegroundColor Red; $script:hadError = 1; return }
     Write-Host "==> program $elf" -ForegroundColor Cyan
     $ok = $false
     for ($try = 1; $try -le 3 -and -not $ok; $try++) {
-        # µÚ 1 ´ÎÖ±½ÓÉÕ; Á¬²»ÉÏ(ÉÕÂ¼¹Ì¼ş°Ñ UART ÏßÕ¼×Å)ÔÙ·¢ 7F ÊÍ·Å SWD ÖØÊÔ
-        Send-SwdRelease   # ¼æ×÷»½ĞÑ×Ö½Ú: ´ı»úÖĞµÄÉè±¸ÊÕµ½ÈÎÒ»×Ö½Ú¼´ĞÑ
+        # ç¬¬ 1 æ¬¡ç›´æ¥çƒ§; è¿ä¸ä¸Š(çƒ§å½•å›ºä»¶æŠŠ UART çº¿å ç€)å†å‘ 7F é‡Šæ”¾ SWD é‡è¯•
+        Send-SwdRelease   # å…¼ä½œå”¤é†’å­—èŠ‚: å¾…æœºä¸­çš„è®¾å¤‡æ”¶åˆ°ä»»ä¸€å­—èŠ‚å³é†’
         & $openocd -f $cfg -c "adapter speed 8000" -c "chip_id CH32V20x" -c "program {$elf} reset exit"
         if ($LASTEXITCODE -eq 0) { $ok = $true }
     }
@@ -98,13 +98,13 @@ function Do-Flash {
 
 function Show-FlashResult {
     if ($script:flashOk) {
-        Write-Host "ÉÕÂ¼³É¹¦" -ForegroundColor Green
+        Write-Host "çƒ§å½•æˆåŠŸ" -ForegroundColor Green
     } else {
-        Write-Host "ÉÕÂ¼Ê§°Ü" -ForegroundColor Red
-        Write-Host "  ¿ÉÄÜÔ­Òò/´¦Àí:" -ForegroundColor Yellow
-        Write-Host "  1) Éè±¸´ı»ú/Ã»µçÁ¬²»ÉÏ -> ÏÈ¸øÉè±¸³äµç, »òµãÒ»ÏÂÆÁÄ»»½ĞÑ" -ForegroundColor Yellow
-        Write-Host "  2) Á¬½ÓÒì³£(DM°æ±¾´í/¶Á±£»¤) -> ¶ÏµçÖØÆôºóÔÙÊÔ" -ForegroundColor Yellow
-        Write-Host "  3) ÈÔ²»ĞĞ -> ½ø BOOT Ä£Ê½(BOOT0=VCC,BOOT1=GND) ÓÃ ISP ÉÕÂ¼" -ForegroundColor Yellow
+        Write-Host "çƒ§å½•å¤±è´¥" -ForegroundColor Red
+        Write-Host "  å¯èƒ½åŸå› /å¤„ç†:" -ForegroundColor Yellow
+        Write-Host "  1) è®¾å¤‡å¾…æœº/æ²¡ç”µè¿ä¸ä¸Š -> å…ˆç»™è®¾å¤‡å……ç”µ, æˆ–ç‚¹ä¸€ä¸‹å±å¹•å”¤é†’" -ForegroundColor Yellow
+        Write-Host "  2) è¿æ¥å¼‚å¸¸(DMç‰ˆæœ¬é”™/è¯»ä¿æŠ¤) -> æ–­ç”µé‡å¯åå†è¯•" -ForegroundColor Yellow
+        Write-Host "  3) ä»ä¸è¡Œ -> è¿› BOOT æ¨¡å¼(BOOT0=VCC,BOOT1=GND) ç”¨ ISP çƒ§å½•" -ForegroundColor Yellow
         $script:hadError = 1
     }
 }
@@ -114,13 +114,13 @@ switch ($mode) {
     "build" { Do-Build; Show-BuildResult }
     "flash" { Do-Flash; Show-FlashResult }
     "rebuild" {
-        Write-Host "==> ÇåÀí" -ForegroundColor Cyan
+        Write-Host "==> æ¸…ç†" -ForegroundColor Cyan
         make clean
         Do-Build
         Show-BuildResult
     }
     "clean" {
-        Write-Host "==> ÇåÀí" -ForegroundColor Cyan
+        Write-Host "==> æ¸…ç†" -ForegroundColor Cyan
         make clean
         Do-Build
         Do-Flash
@@ -130,5 +130,5 @@ switch ($mode) {
     default { Do-Build; Do-Flash; Show-BuildResult; Show-FlashResult }
 }
 $sw.Stop()
-Write-Host ("Íê³É, ÓÃÊ± {0:N1}s" -f $sw.Elapsed.TotalSeconds) -ForegroundColor Yellow
+Write-Host ("å®Œæˆ, ç”¨æ—¶ {0:N1}s" -f $sw.Elapsed.TotalSeconds) -ForegroundColor Yellow
 if ($script:hadError) { exit 1 }

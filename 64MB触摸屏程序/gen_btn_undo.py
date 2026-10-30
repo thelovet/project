@@ -33,9 +33,9 @@ if not os.path.exists(SRC):
 
 raw = open(SRC, "rb").read()
 try:
-    text = raw.decode("gbk")
+    text = raw.decode("utf-8")
 except UnicodeDecodeError:
-    text = raw.decode("utf-8", errors="replace")
+    text = raw.decode("gbk", errors="replace")
 
 # label of each image = nearest preceding comment
 blocks = []

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-# Convert Íæ¼Ò.txt (RGB565 little-endian byte stream, white 0xFFFF transparent)
+# Convert çŽ©å®¶.txt (RGB565 little-endian byte stream, white 0xFFFF transparent)
 # into Game/font_library/player_imgs.c and Game/inc/player_imgs.h
 #
-# Usage: python gen_player_imgs.py "<path to Íæ¼Ò.txt>"
+# Usage: python gen_player_imgs.py "<path to çŽ©å®¶.txt>"
 import re, os, sys
 
 # player stages: (name, width, height) matching the txt header order (9 stages)
@@ -21,7 +21,7 @@ stages = [
 if len(sys.argv) > 1:
     SRC = sys.argv[1]
 else:
-    SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wanjia.txt")
+    SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "çŽ©å®¶.txt")
 print("SRC:", SRC)
 if not os.path.exists(SRC):
     print("ERROR: source not found:", SRC)
@@ -33,9 +33,9 @@ OUT_H = os.path.join(ROOT, "SPI", "SPI_LCD", "Game", "inc", "player_imgs.h")
 
 raw = open(SRC, "rb").read()
 try:
-    text = raw.decode("gbk")
+    text = raw.decode("utf-8")
 except UnicodeDecodeError:
-    text = raw.decode("utf-8", errors="replace")
+    text = raw.decode("gbk", errors="replace")
 
 blocks = re.findall(r"const uint16_t image_data\[\]\s*=\s*\{(.*?)\};", text, re.S)
 print("found blocks:", len(blocks))
