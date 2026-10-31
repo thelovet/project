@@ -290,9 +290,9 @@ static void LCD_drawImageFlipped(uint16_t count, uint8_t pre_count,
                                  uint16_t bx, uint16_t by, uint16_t w, uint16_t h, uint32_t k)
 {
     uint16_t total = (uint16_t)(count + pre_count);
-    uint16_t i;
 
 #ifdef SIM_BUILD
+    uint16_t i;   /* 仅模拟器分支用到; 放进来避免真机编译报 unused */
     for (i = 0; i < count; i++) {
         uint8_t lo = FLASH_Read();
         uint8_t hi = FLASH_Read();

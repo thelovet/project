@@ -212,7 +212,7 @@ static uint8_t GameRestore_ApplyPending(void)
  */
 static void GameAutoSleep_Enter(void)
 {
-#ifdef TEST_NO_SLEEP
+#if TEST_NO_SLEEP
     /* 测试模式: 不进待机, 屏幕保持常亮 */
     s_game_last_activity_us = GetTimerCount();
     return;
