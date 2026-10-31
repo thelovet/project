@@ -42,6 +42,14 @@ def find_proj(start):
     for _ in range(8):
         if os.path.isdir(os.path.join(d, 'SPI', 'SPI_LCD', 'User', 'src')):
             return d
+        # 工程可能收进了子目录(如 64MB触摸屏程序): 再看一层子目录
+        try:
+            for c in os.listdir(d):
+                cd = os.path.join(d, c)
+                if os.path.isdir(os.path.join(cd, 'SPI', 'SPI_LCD', 'User', 'src')):
+                    return cd
+        except OSError:
+            pass
         nd = os.path.dirname(d)
         if nd == d:
             break
@@ -127,12 +135,14 @@ def imported_info():
     return None
 
 
-def runner(step, binpath, with_video):
+def runner(step, binpath, with_video, force=False):
     cmd = [POWERSHELL, '-ExecutionPolicy', 'Bypass', '-File', BURN_STEP, '-Step', step]
     if binpath:
         cmd += ['-BinPath', binpath]
     if with_video:
         cmd += ['-WithVideo']
+    if force:
+        cmd += ['-Force']
     log('执行: ' + ' '.join(cmd))
     ok = False
     try:
@@ -274,7 +284,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 _state['log'] = []
             use_bin = bool(req.get('useBin')) and os.path.isfile(IMPORTED)
             t = threading.Thread(target=runner,
-                                 args=(step, IMPORTED if use_bin else '', bool(req.get('withVideo'))),
+                                 args=(step, IMPORTED if use_bin else '', bool(req.get('withVideo')), bool(req.get('force'))),
                                  daemon=True)
             t.start()
             return self._json({'ok': True})

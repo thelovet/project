@@ -212,6 +212,7 @@ $base = [IO.File]::ReadAllBytes($elf)
 Add-Content $log ("base image: {0} bytes, patch meta@{1} data@{2}" -f $base.Length, $metaOff, $dataOff)
 
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
+Write-Host ("开始 SWD 分块烧录: 共 {0} 块(#{1}~{2}), 每块约 3 秒" -f ($endIndex - $start), $start, ($endIndex - 1))
 $failed = $false   # 中途任何一块失败都要以非 0 退出, 否则 burn_step.ps1 会误报"成功"
 for ($i = $start; $i -lt $endIndex; $i++) {
     $t0 = $sw.Elapsed.TotalSeconds
@@ -301,8 +302,11 @@ for ($i = $start; $i -lt $endIndex; $i++) {
         $tinfo = (" erase={0}ms write={1}ms verify={2}ms crc=0x{3:X4}" -f `
                   $pr.MsErase, $pr.MsWrite, $pr.MsVerify, $pr.CrcSrc)
     }
-    Add-Content $log ("block {0} done offset={1} round={2:N1}s total={3:N1}s{4}" -f `
-                      $i, ($i * $BS), ($sw.Elapsed.TotalSeconds - $t0), $sw.Elapsed.TotalSeconds, $tinfo)
+    $line = ("block {0} done offset={1} round={2:N1}s total={3:N1}s{4}" -f `
+             $i, ($i * $BS), ($sw.Elapsed.TotalSeconds - $t0), $sw.Elapsed.TotalSeconds, $tinfo)
+    Add-Content $log $line
+    Write-Host ("  块 {0}/{1}  {2:N1}s/块  累计 {3:N1}s" -f $i, ($endIndex - 1), ($sw.Elapsed.TotalSeconds - $t0), $sw.Elapsed.TotalSeconds)
 }
 Add-Content $log ("==== finished total {0:N1}s ====" -f $sw.Elapsed.TotalSeconds)
+Write-Host ("完成: {0} 块, 总用时 {1:N1}s{2}" -f ($endIndex - $start), $sw.Elapsed.TotalSeconds, $(if ($failed) { " (有失败)" } else { "" }))
 if ($failed) { exit 1 }

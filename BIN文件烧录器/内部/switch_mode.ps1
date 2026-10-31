@@ -13,6 +13,10 @@ function Find-Proj([string]$startDir) {
     $d = $startDir
     for ($i = 0; $i -lt 8; $i++) {
         if (Test-Path (Join-Path $d 'SPI\SPI_LCD\User\src')) { return $d }
+        # 工程可能收进了子目录(如 64MB触摸屏程序): 再看一层子目录
+        foreach ($c in (Get-ChildItem -LiteralPath $d -Directory -ErrorAction SilentlyContinue)) {
+            if (Test-Path (Join-Path $c.FullName 'SPI\SPI_LCD\User\src')) { return $c.FullName }
+        }
         $p = Split-Path $d -Parent
         if (-not $p -or $p -eq $d) { break }
         $d = $p

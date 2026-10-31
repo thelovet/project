@@ -16,7 +16,7 @@
 #
 # 注意: 三步烧录固件都只做"编译 + SWD 烧写", 不自动把游戏固件烧回去;
 #       游戏固件由 game 那一步负责(所以单独烧 font/btn 后, 记得再点"程序烧录")。
-param([string]$Step = 'auto', [string]$BinPath = '', [switch]$WithVideo, [switch]$DryRun, [int]$SwdSpeed = 8000)
+param([string]$Step = 'auto', [string]$BinPath = '', [switch]$WithVideo, [switch]$DryRun, [int]$SwdSpeed = 8000, [switch]$Force)
 
 $ErrorActionPreference = 'Continue'
 
@@ -25,6 +25,10 @@ function Find-Proj([string]$startDir) {
     $d = $startDir
     for ($i = 0; $i -lt 8; $i++) {
         if (Test-Path (Join-Path $d 'SPI\SPI_LCD\User\src')) { return $d }
+        # 工程可能收进了子目录(如 64MB触摸屏程序): 再看一层子目录
+        foreach ($c in (Get-ChildItem -LiteralPath $d -Directory -ErrorAction SilentlyContinue)) {
+            if (Test-Path (Join-Path $c.FullName 'SPI\SPI_LCD\User\src')) { return $c.FullName }
+        }
         $p = Split-Path $d -Parent
         if (-not $p -or $p -eq $d) { break }
         $d = $p
@@ -56,6 +60,70 @@ $env:Path = "$gcc;$mkbin;" + $env:Path
 $latin = [Text.Encoding]::GetEncoding(28591)      # byte<->char 1:1, 保住 config.h 原编码
 
 function Log($m) { Write-Host ("[{0}] {1}" -f (Get-Date -Format 'HH:mm:ss'), $m) }
+
+# ---------- 烧录状态: 内容与上次相同就跳过, 不重复烧 ----------
+$stateFile = Join-Path $PSScriptRoot 'cache\burned_state.txt'
+$resDir = Join-Path $proj 'SPI\SPI_LCD\Game\font_library'
+$resInc = Join-Path $proj 'SPI\SPI_LCD\Game\inc'
+$gameRoot = Join-Path $proj 'SPI\SPI_LCD'
+function Read-BurnState {
+    $d = @{}
+    if (Test-Path -LiteralPath $stateFile) {
+        foreach ($ln in (Get-Content -LiteralPath $stateFile -Encoding UTF8)) {
+            $m = [regex]::Match($ln, '^\s*(\w+)\s*=\s*([0-9a-fA-F]+)\s+(.*)$')
+            if ($m.Success) { $d[$m.Groups[1].Value] = @{ hash = $m.Groups[2].Value; time = $m.Groups[3].Value.Trim() } }
+        }
+    }
+    return $d
+}
+# 资源源文件指纹: font_library/*.c + Game/inc/*.h (与编译结果无关, 稳定可复现)
+function Get-ShaSet {
+    $parts = @()
+    foreach ($f in (Get-ChildItem -LiteralPath $resDir -Filter '*.c' -File -ErrorAction SilentlyContinue | Sort-Object Name)) {
+        $parts += ($f.Name + ':' + (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash)
+    }
+    foreach ($f in (Get-ChildItem -LiteralPath $resInc -Filter '*.h' -File -ErrorAction SilentlyContinue | Sort-Object Name)) {
+        $parts += ($f.Name + ':' + (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash)
+    }
+    $b = [Text.Encoding]::UTF8.GetBytes(($parts -join '|'))
+    $sha = [Security.Cryptography.SHA256]::Create().ComputeHash($b)
+    return (($sha | ForEach-Object { $_.ToString('x2') }) -join '').Substring(0, 16)
+}
+function Get-Sha([string]$path) {
+    if (-not (Test-Path -LiteralPath $path)) { return '' }
+    return (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.Substring(0, 16).ToLower()
+}
+# 游戏固件指纹: SPI_LCD 下所有 .c/.h (排除 obj 与 font_library)
+function Get-ShaGame {
+    $parts = @()
+    $fs = Get-ChildItem -LiteralPath $gameRoot -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { ($_.Extension -eq '.c' -or $_.Extension -eq '.h') -and $_.FullName -notmatch '\\obj\\' -and $_.FullName -notmatch '\\font_library\\' } |
+        Sort-Object FullName
+    foreach ($f in $fs) {
+        $parts += ($f.FullName.Substring($gameRoot.Length) + ':' + (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash)
+    }
+    $b = [Text.Encoding]::UTF8.GetBytes(($parts -join '|'))
+    $sha = [Security.Cryptography.SHA256]::Create().ComputeHash($b)
+    return (($sha | ForEach-Object { $_.ToString('x2') }) -join '').Substring(0, 16)
+}
+# 返回上次烧录时间 = 内容相同(应跳过); 返回 null = 需要烧
+function Test-Skip([string]$key, [string]$hash) {
+    if ($Force -or $hash -eq '') { return $null }
+    $d = Read-BurnState
+    if ($d.ContainsKey($key) -and $d[$key].hash -eq $hash) { return $d[$key].time }
+    return $null
+}
+function Save-BurnState([string]$key, [string]$hash) {
+    $d = Read-BurnState
+    $d[$key] = @{ hash = $hash; time = (Get-Date -Format 'yyyy-MM-dd HH:mm') }
+    $lines = @()
+    foreach ($k in @('font', 'btn', 'video', 'game')) {
+        if ($d.ContainsKey($k)) { $lines += ('{0}={1} {2}' -f $k, $d[$k].hash, $d[$k].time) }
+    }
+    $dir = Split-Path -Parent $stateFile
+    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    Set-Content -LiteralPath $stateFile -Value $lines -Encoding UTF8
+}
 
 # ---------- config.h 宏开关 ----------
 function SetMacro([string]$name, [bool]$on) {
@@ -120,7 +188,8 @@ function Send-SwdRelease {
     $dev = (Get-CimInstance Win32_SerialPort -ErrorAction SilentlyContinue |
             Where-Object { $_.Description -match 'WCH-Link' } | Select-Object -First 1)
     if (-not $dev) { return }
-    foreach ($b in @(1200000, 1500000, 460800)) {
+    # 只发 1.2M: 固件波特率写死 1.2M 且按字节精确匹配 0x7F (1.5M/460800 是旧固件遗留, 收不到)
+    foreach ($b in @(1200000)) {
         try {
             $sp = New-Object System.IO.Ports.SerialPort($dev.DeviceID, $b)
             $sp.ReadTimeout = 150; $sp.WriteTimeout = 300
@@ -175,10 +244,20 @@ function FlashEmf([string]$magicAddr, [bool]$clearMagic) {
 
 # 轮询某个进度结构: magic 通过且 result != 0 才返回
 function WaitProg([string]$addr, [int]$words, [uint32]$magic, [int]$timeoutSec = 120) {
-    $deadline = (Get-Date).AddSeconds($timeoutSec)
+    $deadline  = (Get-Date).AddSeconds($timeoutSec)
+    $t0        = Get-Date
+    $kick      = $false
+    $seenMagic = $false
     while ((Get-Date) -lt $deadline) {
         $v = ReadWords $addr $words 'PG'
-        if ($v -and $v[0] -eq $magic -and $v[($words - 1)] -ne 0) { return $v }
+        if ($v -and $v[0] -eq $magic) { $seenMagic = $true }
+        if ($seenMagic -and $v[($words - 1)] -ne 0) { return $v }
+        # 兜底: 烧完后 core 偶尔停在 halt 没跑起来(进度区永远是随机值) -> 6 秒补一次 reset run
+        if (-not $kick -and -not $seenMagic -and ((Get-Date) - $t0).TotalSeconds -ge 6) {
+            $kick = $true
+            Log '6 秒未见进度 -> 补发一次 reset run'
+            & $openocd -f $ocfg -c "adapter speed 8000" -c "chip_id CH32V20x" -c "init" -c "reset run" -c "shutdown" 2>&1 | Out-Null
+        }
         Start-Sleep -Milliseconds 500
     }
     return $null
@@ -188,7 +267,14 @@ function WaitProg([string]$addr, [int]$words, [uint32]$magic, [int]$timeoutSec =
 function Step-Font {
     Log '===== 步骤 1/3 字库/图片资源 ====='
     if (-not $DryRun) {
-        Start-PsScript -Script $switchScript -ExtraArgs @('game') -Wait | Out-Null   # 视频宏关 + 去 -flto + make clean
+        $h = Get-ShaSet
+        $t = Test-Skip 'font' $h
+        if ($null -ne $t) {
+            Log ("字库/图片资源与 {0} 烧录的内容完全相同, 已跳过(要强制重烧加 -Force)" -f $t)
+            Log 'STEP_OK font'
+            return ''
+        }
+        Start-PsScript -Script $switchScript -ExtraArgs @('game', '-ProjPath', $proj) -Wait | Out-Null   # 视频宏关 + 去 -flto + make clean
         SetMacro 'UART_STORE_MODE' $false | Out-Null
         SetMacro 'FLASH_DATA_STORE_MODE' $true | Out-Null
         Log 'config.h: FLASH_DATA_STORE_MODE = 开(另两个宏已关)'
@@ -202,6 +288,7 @@ function Step-Font {
         if (-not $v) { return '等不到 g_res_prog 结果(超时)' }
         if ($v[5] -ne 1) { return ("字库烧录失败: result={0} crc_fail={1}" -f $v[5], $v[4]) }
         Log ("资源 {0}/{1} 项已写入, CRC 全部通过" -f $v[2], $v[1])
+        Save-BurnState 'font' $h
     }
     Log 'STEP_OK font'
     return ''
@@ -210,7 +297,14 @@ function Step-Font {
 function Step-Btn {
     Log '===== 步骤 2/3 按钮图 + 菜单字模 ====='
     if (-not $DryRun) {
-        Start-PsScript -Script $switchScript -ExtraArgs @('game') -Wait | Out-Null
+        $h = Get-ShaSet
+        $t = Test-Skip 'btn' $h
+        if ($null -ne $t) {
+            Log ("按钮图/菜单字模与 {0} 烧录的内容完全相同, 已跳过(要强制重烧加 -Force)" -f $t)
+            Log 'STEP_OK btn'
+            return ''
+        }
+        Start-PsScript -Script $switchScript -ExtraArgs @('game', '-ProjPath', $proj) -Wait | Out-Null
         SetMacro 'FLASH_DATA_STORE_MODE' $false | Out-Null
         SetMacro 'UART_STORE_MODE' $false | Out-Null
         SetMacro 'BTN_IMG_STORE_MODE' $true | Out-Null
@@ -225,6 +319,7 @@ function Step-Btn {
         if (-not $v) { return '等不到 g_btn_prog 结果(超时)' }
         if ($v[3] -ne 1) { return ("按钮图烧录失败: result={0}" -f $v[3]) }
         Log ("保留区 {0} 字节(英文导航 + 撤销中英 + 菜单字模) 已写入且 CRC 通过" -f $v[1])
+        Save-BurnState 'btn' $h
     }
     Log 'STEP_OK btn'
     return ''
@@ -233,7 +328,14 @@ function Step-Btn {
 function Step-Game {
     Log '===== 步骤 3/3 游戏程序 ====='
     if (-not $DryRun) {
-        Start-PsScript -Script $switchScript -ExtraArgs @('game') -Wait | Out-Null
+        $h = Get-ShaGame
+        $t = Test-Skip 'game' $h
+        if ($null -ne $t) {
+            Log ("游戏程序和 {0} 烧录的内容完全相同, 已跳过(要强制重烧加 -Force)" -f $t)
+            Log 'STEP_OK game'
+            return ''
+        }
+        Start-PsScript -Script $switchScript -ExtraArgs @('game', '-ProjPath', $proj) -Wait | Out-Null
         SetMacro 'FLASH_DATA_STORE_MODE' $false | Out-Null
         SetMacro 'UART_STORE_MODE' $false | Out-Null
         SetMacro 'BTN_IMG_STORE_MODE' $false | Out-Null
@@ -242,6 +344,7 @@ function Step-Game {
         if (-not (WaitConn)) { return 'SWD 连不上(设备待机?)' }
         if (-not (FlashElf @('-c', "program {$elf} reset exit"))) { return 'SWD 烧写失败' }
         Log '游戏固件已烧写并复位运行'
+        Save-BurnState 'game' $h
     }
     Log 'STEP_OK game'
     return ''
@@ -255,6 +358,13 @@ function Step-Video {
     }
     Log ("视频源: {0}" -f $BinPath)
     if ($DryRun) { Log 'STEP_OK video'; return '' }
+    $vh = Get-Sha $BinPath
+    $vt = Test-Skip 'video' $vh
+    if ($null -ne $vt) {
+        Log ("视频与 {0} 烧录的内容完全相同, 已跳过(要强制重烧加 -Force)" -f $vt)
+        Log 'STEP_OK video'
+        return ''
+    }
 
     # 1) 切到 UART 烧录固件: 只开 UART_STORE_MODE, 其余烧录宏全关
     SetMacro 'FLASH_DATA_STORE_MODE' $false | Out-Null
@@ -276,7 +386,17 @@ function Step-Video {
     #      在第一块之后就失联, 同进程调用稳定
     & $uartBurn -Stream -Baud 1200000 -ChunkKB 1024 -BinPath $BinPath 2>&1 |
         ForEach-Object { Log ("  视频 " + $_) }
-    if ($LASTEXITCODE -ne 0) { return '串口流式烧录失败(详见上面的输出)' }
+    if ($LASTEXITCODE -ne 0) {
+        Log '串口流式失败 -> 自动回退: SWD 分块烧录(burn_all.ps1, 慢约 10 倍)'
+        SetMacro 'UART_STORE_MODE' $false | Out-Null
+        & powershell -NoProfile -ExecutionPolicy Bypass -File "$switchScript" burn -ProjPath "$proj" 2>&1 |
+            ForEach-Object { Log ("  切模式 " + $_) }
+        & powershell -NoProfile -ExecutionPolicy Bypass -File "$burnAll" -BinPath "$BinPath" -ProjPath "$proj" 2>&1 |
+            ForEach-Object { Log ("  视频(SWD) " + $_) }
+        if ($LASTEXITCODE -ne 0) { return '串口失败, SWD 回退也失败(详见上面的输出)' }
+        Log '(已用 SWD 回退方式烧完)'
+    }
+    Save-BurnState 'video' $vh
     Log 'STEP_OK video'
     return ''
 }

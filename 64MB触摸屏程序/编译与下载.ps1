@@ -61,35 +61,43 @@ function Show-BuildResult {
 }
 
 # ---- release SWD from the burn firmware before flashing ----
-# If UART and SWD share the same header, the firmware's UART TX (PA9, idle high)
-# holds SWDIO and OpenOCD cannot connect. Sending 7F 7F 7F makes the burn firmware
-# float PA9/PA10 and reopen SWD (same as unplugging UART). Harmless on game firmware.
-function Send-SwdRelease {
+# 串口烧录固件的 USART1 波特率写死 1.2M, 且按字节精确匹配 0x7F(flash_store.c:1530),
+# 所以只发 1.2M。1.5M / 460800 是旧固件遗留: 波特率不对时收到的不是 0x7F, 收不到, 纯白花时间。
+# 连发 3 个 0x7F -> 固件交还 SWD 并把 PA9/PA10 放成浮空(等价于拔掉串口线)。
+# 顺带作用: 待机中的设备收到任意字节就会醒, 这一次发送同时完成"免点屏幕唤醒"。
+function Send-SwdRelease([switch]$Quiet) {
     $dev = (Get-CimInstance Win32_SerialPort -ErrorAction SilentlyContinue |
             Where-Object { $_.Description -match 'WCH-Link' } | Select-Object -First 1)
-    if (-not $dev) { Write-Host '  (no WCH-Link serial port, skip 7F release)' -ForegroundColor DarkYellow; return }
-    foreach ($b in @(1200000, 1500000, 460800)) {
-        try {
-            $sp = New-Object System.IO.Ports.SerialPort($dev.DeviceID, $b)
-            $sp.ReadTimeout = 150; $sp.WriteTimeout = 300
-            $sp.Open(); Start-Sleep -Milliseconds 80
-            $sp.Write([byte[]](0x7F,0x7F,0x7F), 0, 3)
-            Start-Sleep -Milliseconds 120
-            $sp.Close()
-            Write-Host ("  sent 7F 7F 7F @ {0} ({1})" -f $dev.DeviceID, $b) -ForegroundColor DarkGray
-        } catch { }
-        Start-Sleep -Milliseconds 50
+    if (-not $dev) {
+        if (-not $Quiet) { Write-Host '  (没有 WCH-Link 串口, 跳过 7F)' -ForegroundColor DarkYellow }
+        return
     }
-    # 等被唤醒的设备复位启动(串口唤醒后约 1s 才能连 SWD)
+    try {
+        $sp = New-Object System.IO.Ports.SerialPort($dev.DeviceID, 1200000)
+        $sp.ReadTimeout = 150; $sp.WriteTimeout = 300
+        $sp.Open(); Start-Sleep -Milliseconds 80
+        $sp.Write([byte[]](0x7F, 0x7F, 0x7F), 0, 3)
+        Start-Sleep -Milliseconds 120
+        $sp.Close()
+        if (-not $Quiet) { Write-Host ("  sent 7F 7F 7F @ {0} (1.2M)" -f $dev.DeviceID) -ForegroundColor DarkGray }
+    } catch {
+        if (-not $Quiet) { Write-Host ("  串口 {0} 打不开(被别的程序占用?)" -f $dev.DeviceID) -ForegroundColor Yellow }
+    }
     Start-Sleep -Milliseconds 1200
 }
+
 function Do-Flash {
     if (-not (Test-Path $elf)) { Write-Host "未找到 $elf ，请先编译" -ForegroundColor Red; $script:hadError = 1; return }
     Write-Host "==> program $elf" -ForegroundColor Cyan
     $ok = $false
     for ($try = 1; $try -le 3 -and -not $ok; $try++) {
-        # 第 1 次直接烧; 连不上(烧录固件把 UART 线占着)再发 7F 释放 SWD 重试
-        Send-SwdRelease   # 兼作唤醒字节: 待机中的设备收到任一字节即醒
+        if ($try -eq 1) {
+            Send-SwdRelease
+        } else {
+            Write-Host ("  第 {0} 次重试: 设备可能在待机, 请点一下屏幕; 3 秒后重连" -f $try) -ForegroundColor Yellow
+            Send-SwdRelease -Quiet
+            Start-Sleep -Seconds 3
+        }
         & $openocd -f $cfg -c "adapter speed 8000" -c "chip_id CH32V20x" -c "program {$elf} reset exit"
         if ($LASTEXITCODE -eq 0) { $ok = $true }
     }

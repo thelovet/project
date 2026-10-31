@@ -5,7 +5,7 @@
 #   addr 必须 4KB 对齐, len 1..4096; crc16 = MODBUS(初值 0xFFFF), 只算 data
 #   应答: 0x06=成功  0x15=CRC错(重发)  0x16=参数错
 param(
-    [string]$Com = 'COM10',
+    [string]$Com = '',          # 留空 = 自动挑(WCH-Link -> COM10 -> 第一个)
     [int]$Baud = 460800,
     [string]$BinPath = '',
     [long]$StartByte = 0,
@@ -47,12 +47,26 @@ function Crc16([byte[]]$data, [int]$offset, [int]$len) {
     return $crc
 }
 
+# ---- 串口自动选择: 未指定 -Com 时优先 WCH-Link, 其次 COM10, 再不行取第一个 ----
+if ($Com -eq '') {
+    $ports = @(Get-CimInstance Win32_SerialPort -ErrorAction SilentlyContinue)
+    $pick = $ports | Where-Object { $_.Description -match 'WCH-Link' } | Select-Object -First 1
+    if (-not $pick) { $pick = $ports | Where-Object { $_.DeviceID -eq 'COM10' } | Select-Object -First 1 }
+    if (-not $pick -and $ports.Count -gt 0) { $pick = $ports[0] }
+    if (-not $pick) { "找不到任何串口(设备没插或驱动没装)"; exit 1 }
+    $Com = $pick.DeviceID
+    "串口: {0} ({1})" -f $Com, $pick.Description
+}
 $sp = New-Object System.IO.Ports.SerialPort($Com, $Baud, [System.IO.Ports.Parity]::None, 8, [System.IO.Ports.StopBits]::One)
 $sp.ReadTimeout = 200
 $sp.WriteTimeout = 3000
 $sp.ReadBufferSize = 65536
 $sp.WriteBufferSize = 65536
-$sp.Open()
+try { $sp.Open() }
+catch {
+    "串口 {0} 打不开(被别的程序占用?): {1}" -f $Com, $_.Exception.Message
+    exit 1          # 让上层(burn_step)能走到 SWD 回退
+}
 "已打开 {0} @ {1}" -f $Com, $Baud
 Start-Sleep -Milliseconds 300
 $sp.DiscardInBuffer()
@@ -96,7 +110,7 @@ function Send-Ping([int]$timeoutMs) {
     return $false
 }
 $conn = $false
-for ($t = 1; $t -le 8 -and -not $conn; $t++) { $conn = Send-Ping 1500 }
+for ($t = 1; $t -le 3 -and -not $conn; $t++) { $conn = Send-Ping 1500 }
 if (-not $conn) { "链路无响应(ping 没回 0x06): 检查串口线/波特率/固件是否在烧录模式"; $sp.Close(); exit 1 }
 $ver = -1
 try { $ver = $sp.ReadByte() } catch { }

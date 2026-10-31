@@ -1,4 +1,4 @@
-# �������
+# 编译产物
 obj/
 *.o
 *.d
@@ -10,21 +10,21 @@ obj/
 *.md
 *.txt
 
-# MounRiver Studio ����ļ�
+# MounRiver Studio 工程文件
 .mrs/
 .dbg/
 
-# IDE ����ļ�
+# IDE 配置
 .vscode/
 
-# ��ʱ�ļ�
+# 临时文件
 *.tmp
 
-# �ű����ɵ��ļ�(gen_video_chunk.py ÿ�鶼����д; �¿�¡�ֿ����ǰ������һ��������)
-SPI/SPI_LCD/User/src/video_chunk.c
-SPI/SPI_LCD/User/inc/video_chunk.h
+# 脚本生成的文件(gen_video_chunk.py 每块都重新写; 新克隆仓库前必须生成一次)
+video_chunk.c
+video_chunk.h
 
-# ������¼�ű��Ĺ̼�����ָ��(burn_factory.ps1 ����; *.elf �ѱ�����Ĺ������)
+# 桥烧录脚本的固件指纹缓存(burn_factory.ps1 生成; *.elf 已被上面的规则忽略)
 *.elf.hash
 
 # simulator folder is its own git repo

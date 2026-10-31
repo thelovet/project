@@ -28,6 +28,14 @@ def find_proj(start):
     for _ in range(8):
         if os.path.isdir(os.path.join(d, "SPI", "SPI_LCD", "User", "src")):
             return d
+        # 工程可能收进了子目录(如 64MB触摸屏程序): 再看一层子目录
+        try:
+            for _c in sorted(os.listdir(d)):
+                _cd = os.path.join(d, _c)
+                if os.path.isdir(os.path.join(_cd, "SPI", "SPI_LCD", "User", "src")):
+                    return _cd
+        except OSError:
+            pass
         nd = os.path.dirname(d)
         if nd == d:
             break

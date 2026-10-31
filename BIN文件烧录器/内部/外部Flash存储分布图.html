@@ -99,6 +99,7 @@
     <button class="btn" data-step="video" id="btnVideo">视频烧录</button>
     <button class="btn primary" data-step="auto" id="btnAuto">自动全部烧录</button>
     <label class="chk"><input type="checkbox" id="withVideo"> 自动时含视频</label>
+    <label class="chk"><input type="checkbox" id="forceBurn" title="忽略内容相同检查, 全部重烧"> 强制重烧</label>
     <button class="btn ghost" id="btnQuit">停止服务</button>
   </div>
 
@@ -362,6 +363,11 @@ try { $withVid.checked = (localStorage.getItem('burn.withVideo') === '1'); } cat
 $withVid.addEventListener('change', function(){
   try { localStorage.setItem('burn.withVideo', $withVid.checked ? '1' : '0'); } catch (e) { }
 });
+var $force   = document.getElementById('forceBurn');
+try { $force.checked = (localStorage.getItem('burn.force') === '1'); } catch (e) { }
+if ($force) $force.addEventListener('change', function(){
+  try { localStorage.setItem('burn.force', $force.checked ? '1' : '0'); } catch (e) { }
+});
 var $file    = document.getElementById('binFile');
 var $btns    = Array.prototype.slice.call(document.querySelectorAll('.btn[data-step]'));
 var $quit    = document.getElementById('btnQuit');
@@ -477,7 +483,7 @@ $btns.forEach(function(b){
     fetch('/api/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ step: step, withVideo: wv, useBin: true })
+      body: JSON.stringify({ step: step, withVideo: wv, useBin: true, force: ($force && $force.checked) })
     }).then(function(r){ return r.json(); }).then(function(j){
       if (!j.ok) alert(j.msg || '启动失败');
       poll();
