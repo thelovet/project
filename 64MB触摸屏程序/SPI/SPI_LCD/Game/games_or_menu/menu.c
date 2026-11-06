@@ -1726,7 +1726,7 @@ uint8_t game_menu_command(const GameMenuCfg* cfg, uint8_t* state, uint8_t* out_r
            滑入期间: 只认松手路径(game_menu_swipe_up_poll 里已按 g_exit_sliding 屏蔽按住路径),
            这样"下滑打开退出菜单"那一下的手指抖动不会误触发, 而真正想上划切菜单的手势仍能打断;
            拖拽期间不判(那时手势归拖拽所有) */
-        if (!g_exit_dragging) {
+        if (!g_exit_dragging && cfg->restart != GAME_MENU_NO_RESTART) {
             uint8_t r = menu_swipe_to_restart_handler(cfg->y_threshold, cfg->release_thresh);
             if (r) {
                 cfg->mark_dirty();

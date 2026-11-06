@@ -157,6 +157,9 @@ typedef struct {
 
 /* 供各游戏定义自身 GameMenuCfg 时使用的电池位置哨兵 */
 #define GAME_MENU_BAT_NONE 0xFFFF
+/* 供 GameMenuCfg.restart 使用: 该游戏没有"上划重新开始菜单"(推箱子),
+   退出菜单里底部上划不切走, 保持原样 */
+#define GAME_MENU_NO_RESTART 0xFF
 
 /* ===================== 外部数组/变量 ===================== */
 
