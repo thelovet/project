@@ -495,6 +495,26 @@ $quit.addEventListener('click', function(){
   fetch('/api/quit', { method: 'POST' }).then(function(){ setTimeout(poll, 800); });
 });
 
+/* 文件名自然排序: 数字段按数值比(2 < 10), 其余按字符比。
+   导入顺序 = 烧录顺序 = video_map.h 的段顺序; 不能再让"资源管理器当前怎么排"
+   决定烧录顺序(之前按名称降序选文件 -> 烧成 4,3,2,1, 与预期 1,2,3,4 相反)。 */
+function naturalCmp(a, b){
+  var re = /(\d+)|(\D+)/g;
+  var ax = String(a).match(re) || [], bx = String(b).match(re) || [];
+  var n = Math.min(ax.length, bx.length), i;
+  for (i = 0; i < n; i++) {
+    var x = ax[i], y = bx[i];
+    if (x === y) continue;
+    if (/^\d+$/.test(x) && /^\d+$/.test(y)) {
+      var d = parseInt(x, 10) - parseInt(y, 10);
+      if (d) return d;
+    } else {
+      return x < y ? -1 : 1;
+    }
+  }
+  return ax.length - bx.length;
+}
+
 /* ---- 多文件: 起止地址表 + 可直接粘贴进 decompress.c 的 video_ranges ---- */
 function hex8(v){
   var s = (v >>> 0).toString(16).toUpperCase();
@@ -526,7 +546,9 @@ function renderSegs(segs){
 $file.addEventListener('change', function(ev){
   var files = ev.target.files ? Array.prototype.slice.call(ev.target.files) : [];
   if (!files.length) return;
-  $binInfo.textContent = '导入中：' + files.length + ' 个文件 ...';
+  /* 按文件名自然排序(1,2,3,...,10): 导入顺序就是烧录顺序, 与资源管理器排序无关 */
+  files.sort(function(a, b){ return naturalCmp(a.name, b.name); });
+  $binInfo.textContent = '导入中：' + files.length + ' 个文件（按文件名排序）...';
   var bufs = [], segs = [], total = 0, idx = 0;
 
   function readNext(){

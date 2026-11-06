@@ -19,6 +19,8 @@
 param([string]$Step = 'auto', [string]$BinPath = '', [switch]$WithVideo, [switch]$DryRun, [int]$SwdSpeed = 8000, [switch]$Force)
 
 $ErrorActionPreference = 'Continue'
+# 子脚本统一用绝对路径调用: 某些环境(如 Trae 内置终端)的 PATH 里没有 powershell
+$psExe = Join-Path $PSHOME 'powershell.exe'
 
 # ---------- 路径: 脚本可能放在工程内, 也可能在外面 ----------
 function Find-Proj([string]$startDir) {
@@ -70,8 +72,17 @@ function Read-BurnState {
     $d = @{}
     if (Test-Path -LiteralPath $stateFile) {
         foreach ($ln in (Get-Content -LiteralPath $stateFile -Encoding UTF8)) {
+            # 行格式: <键>=<内容指纹> <烧录时间> uid=<芯片唯一ID>
             $m = [regex]::Match($ln, '^\s*(\w+)\s*=\s*([0-9a-fA-F]+)\s+(.*)$')
-            if ($m.Success) { $d[$m.Groups[1].Value] = @{ hash = $m.Groups[2].Value; time = $m.Groups[3].Value.Trim() } }
+            if (-not $m.Success) { continue }
+            $rest = $m.Groups[3].Value
+            $tm = [regex]::Match($rest, '\d{4}-\d\d-\d\d \d\d:\d\d')
+            $um = [regex]::Match($rest, 'uid=([0-9a-fA-F]+)')
+            $d[$m.Groups[1].Value] = @{
+                hash = $m.Groups[2].Value
+                time = $(if ($tm.Success) { $tm.Value } else { $rest.Trim() })
+                uid  = $(if ($um.Success) { $um.Groups[1].Value.ToLower() } else { '' })
+            }
         }
     }
     return $d
@@ -106,19 +117,34 @@ function Get-ShaGame {
     $sha = [Security.Cryptography.SHA256]::Create().ComputeHash($b)
     return (($sha | ForEach-Object { $_.ToString('x2') }) -join '').Substring(0, 16)
 }
-# 返回上次烧录时间 = 内容相同(应跳过); 返回 null = 需要烧
+# 返回上次烧录时间 = 内容相同且是同一块板(应跳过); 返回 null = 需要烧
+# ★ 只比内容不够: 本地状态记的是"上次烧过什么", 换一块新板照样会命中 -> 新板一字未烧却被跳过。
+#   所以还要比芯片唯一 ID, 读不到就不跳过(宁多烧一次, 不漏烧)。
 function Test-Skip([string]$key, [string]$hash) {
     if ($Force -or $hash -eq '') { return $null }
     $d = Read-BurnState
-    if ($d.ContainsKey($key) -and $d[$key].hash -eq $hash) { return $d[$key].time }
-    return $null
+    if (-not $d.ContainsKey($key) -or $d[$key].hash -ne $hash) { return $null }
+    $uid = Get-DeviceUid
+    if ($uid -eq '') {
+        Log '读不到芯片唯一 ID(SWD 没连上或设备待机) -> 无法确认是同一块板, 本次照常烧录'
+        return $null
+    }
+    if ($d[$key].uid -eq '') {
+        Log '上次烧录没记芯片 ID(旧版状态文件) -> 本次照常烧录'
+        return $null
+    }
+    if ($d[$key].uid -ne $uid) {
+        Log ("换了一块板(上次 {0}, 这块 {1}) -> 内容虽相同仍照常烧录" -f $d[$key].uid, $uid)
+        return $null
+    }
+    return $d[$key].time
 }
 function Save-BurnState([string]$key, [string]$hash) {
     $d = Read-BurnState
-    $d[$key] = @{ hash = $hash; time = (Get-Date -Format 'yyyy-MM-dd HH:mm') }
+    $d[$key] = @{ hash = $hash; time = (Get-Date -Format 'yyyy-MM-dd HH:mm'); uid = (Get-DeviceUid) }
     $lines = @()
     foreach ($k in @('font', 'btn', 'video', 'game')) {
-        if ($d.ContainsKey($k)) { $lines += ('{0}={1} {2}' -f $k, $d[$k].hash, $d[$k].time) }
+        if ($d.ContainsKey($k)) { $lines += ('{0}={1} {2} uid={3}' -f $k, $d[$k].hash, $d[$k].time, $d[$k].uid) }
     }
     $dir = Split-Path -Parent $stateFile
     if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
@@ -159,7 +185,7 @@ function Build([string]$tag) {
     # 复用根目录 编译与下载.ps1 的 rebuild 模式(清 + 编译, 不烧写):
     # 工具链(GCC12)与编译开关只在那边维护一处, 避免两边不一致(见备忘录 §52/§54)
     if (-not (Test-Path $buildScript)) { Log ("找不到编译脚本: {0}" -f $buildScript); return 1 }
-    $o = & powershell -NoProfile -ExecutionPolicy Bypass -File "$buildScript" rebuild 2>&1 | Out-String
+    $o = & $psExe -NoProfile -ExecutionPolicy Bypass -File "$buildScript" rebuild 2>&1 | Out-String
     $ec = $LASTEXITCODE
     if ($ec -ne 0) {
         Log ("编译失败({0})" -f $tag)
@@ -202,6 +228,30 @@ function Send-SwdRelease {
     }
     # 等被唤醒的设备复位启动(串口唤醒后约 1s 才能连 SWD)
     Start-Sleep -Milliseconds 1200
+}
+
+# ---------- 芯片唯一 ID ----------
+# CH32V20x 的 96bit 唯一 ID 在 0x1FFFF7E8(出厂烧死, 不可改), 用它区分"这块板"。
+# 读不到(设备待机/没接 SWD 线)返回 '', 调用方按"不能跳过"处理。
+$script:devUid = $null      # 读到过就缓存, 一次烧录流程只读一遍
+function Get-DeviceUid {
+    if ($null -ne $script:devUid) { return $script:devUid }
+    for ($k = 1; $k -le 3; $k++) {
+        if ($k -gt 1) { Send-SwdRelease }   # 兼作唤醒字节: 串口烧录固件占着 PA9 时靠它放开 SWD
+        $v = ReadWords '1FFFF7E8' 3 'UID'
+        # 0 或全 FF 说明没读到有效 ESIG(PowerShell 里 0xFFFFFFFF 是 Int32 -1, 必须用十进制比较)
+        $bad = $false
+        if ($v) {
+            if (($v[0] -eq 0 -and $v[1] -eq 0 -and $v[2] -eq 0) -or
+                ($v[0] -eq 4294967295 -and $v[1] -eq 4294967295 -and $v[2] -eq 4294967295)) { $bad = $true }
+        } else { $bad = $true }
+        if (-not $bad) {
+            $script:devUid = (($v | ForEach-Object { $_.ToString('x8') }) -join '')
+            return $script:devUid
+        }
+        Start-Sleep -Milliseconds 800
+    }
+    return ''
 }
 
 # 等 SWD 连上(设备待机时要点一下屏幕唤醒); 200 次 x 1.2s
@@ -270,7 +320,7 @@ function Step-Font {
         $h = Get-ShaSet
         $t = Test-Skip 'font' $h
         if ($null -ne $t) {
-            Log ("字库/图片资源与 {0} 烧录的内容完全相同, 已跳过(要强制重烧加 -Force)" -f $t)
+            Log ("字库/图片资源与 {0} 烧录的内容完全相同(同一块板), 已跳过(要强制重烧加 -Force)" -f $t)
             Log 'STEP_OK font'
             return ''
         }
@@ -300,7 +350,7 @@ function Step-Btn {
         $h = Get-ShaSet
         $t = Test-Skip 'btn' $h
         if ($null -ne $t) {
-            Log ("按钮图/菜单字模与 {0} 烧录的内容完全相同, 已跳过(要强制重烧加 -Force)" -f $t)
+            Log ("按钮图/菜单字模与 {0} 烧录的内容完全相同(同一块板), 已跳过(要强制重烧加 -Force)" -f $t)
             Log 'STEP_OK btn'
             return ''
         }
@@ -331,7 +381,7 @@ function Step-Game {
         $h = Get-ShaGame
         $t = Test-Skip 'game' $h
         if ($null -ne $t) {
-            Log ("游戏程序和 {0} 烧录的内容完全相同, 已跳过(要强制重烧加 -Force)" -f $t)
+            Log ("游戏程序和 {0} 烧录的内容完全相同(同一块板), 已跳过(要强制重烧加 -Force)" -f $t)
             Log 'STEP_OK game'
             return ''
         }
@@ -361,7 +411,7 @@ function Step-Video {
     $vh = Get-Sha $BinPath
     $vt = Test-Skip 'video' $vh
     if ($null -ne $vt) {
-        Log ("视频与 {0} 烧录的内容完全相同, 已跳过(要强制重烧加 -Force)" -f $vt)
+        Log ("视频与 {0} 烧录的内容完全相同(同一块板), 已跳过(要强制重烧加 -Force)" -f $vt)
         Log 'STEP_OK video'
         return ''
     }
@@ -389,9 +439,9 @@ function Step-Video {
     if ($LASTEXITCODE -ne 0) {
         Log '串口流式失败 -> 自动回退: SWD 分块烧录(burn_all.ps1, 慢约 10 倍)'
         SetMacro 'UART_STORE_MODE' $false | Out-Null
-        & powershell -NoProfile -ExecutionPolicy Bypass -File "$switchScript" burn -ProjPath "$proj" 2>&1 |
+        & $psExe -NoProfile -ExecutionPolicy Bypass -File "$switchScript" burn -ProjPath "$proj" 2>&1 |
             ForEach-Object { Log ("  切模式 " + $_) }
-        & powershell -NoProfile -ExecutionPolicy Bypass -File "$burnAll" -BinPath "$BinPath" -ProjPath "$proj" 2>&1 |
+        & $psExe -NoProfile -ExecutionPolicy Bypass -File "$burnAll" -BinPath "$BinPath" -ProjPath "$proj" 2>&1 |
             ForEach-Object { Log ("  视频(SWD) " + $_) }
         if ($LASTEXITCODE -ne 0) { return '串口失败, SWD 回退也失败(详见上面的输出)' }
         Log '(已用 SWD 回退方式烧完)'
@@ -402,27 +452,41 @@ function Step-Video {
 }
 
 # ---------- 主流程 ----------
+$swTotal = [Diagnostics.Stopwatch]::StartNew()
+function Format-Elapsed([double]$sec) {
+    if ($sec -lt 60) { return ('{0:N1} 秒' -f $sec) }
+    return ('{0} 分 {1:N0} 秒' -f [math]::Floor($sec / 60), ($sec % 60))
+}
+# 跑一个步骤并打印这一步自己花的时间(跳过/失败也打, 一眼看出是哪步慢)
+function Run-Step([string]$title, [scriptblock]$body) {
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $r = & $body
+    if ($r -is [array]) { $r = ($r | Where-Object { $_ -ne $null } | Select-Object -Last 1) }
+    Log ("  {0} {1}, 耗时 {2}" -f $title, $(if ($null -eq $r -or $r -eq '') { '完成' } else { '失败' }), (Format-Elapsed $sw.Elapsed.TotalSeconds))
+    return $r
+}
 Log ("烧录步骤: {0}{1}" -f $Step, $(if ($DryRun) { ' (DryRun 只列步骤不烧写)' } else { '' }))
 
 $fail = ''
 switch ($Step) {
-    'font'  { $fail = Step-Font }
-    'btn'   { $fail = Step-Btn }
-    'game'  { $fail = Step-Game }
-    'video' { $fail = Step-Video }
+    'font'  { $fail = Run-Step '步骤1 字库/图片资源' { Step-Font } }
+    'btn'   { $fail = Run-Step '步骤2 按钮图/菜单字模' { Step-Btn } }
+    'game'  { $fail = Run-Step '步骤3 游戏程序' { Step-Game } }
+    'video' { $fail = Run-Step '视频数据块' { Step-Video } }
     'auto'  {
-        $fail = Step-Font
-        if ($fail -eq '') { $fail = Step-Btn }
-        if ($fail -eq '' -and $WithVideo) { $fail = Step-Video }
-        if ($fail -eq '') { $fail = Step-Game }
+        $fail = Run-Step '步骤1 字库/图片资源' { Step-Font }
+        if ($fail -eq '') { $fail = Run-Step '步骤2 按钮图/菜单字模' { Step-Btn } }
+        if ($fail -eq '' -and $WithVideo) { $fail = Run-Step '视频数据块' { Step-Video } }
+        if ($fail -eq '') { $fail = Run-Step '步骤3 游戏程序' { Step-Game } }
     }
     default { $fail = "未知步骤: $Step" }
 }
 
 if ($fail -ne '') {
     Log ("失败: {0}" -f $fail)
+    Log ("总耗时 {0}" -f (Format-Elapsed $swTotal.Elapsed.TotalSeconds))
     Log ("STEP_FAIL {0} {1}" -f $Step, $fail)
     exit 1
 }
-Log '全部完成'
+Log ("全部完成, 总耗时 {0}" -f (Format-Elapsed $swTotal.Elapsed.TotalSeconds))
 exit 0

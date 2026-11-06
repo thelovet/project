@@ -17,6 +17,8 @@
 param([int]$Boards = 1, [switch]$Refresh, [string]$BinPath = '', [string]$ProjPath = '', [int]$SwdSpeed = 8000)
 
 $ErrorActionPreference = 'Continue'
+# 子脚本统一用绝对路径调用: 某些环境(如 Trae 内置终端)的 PATH 里没有 powershell
+$psExe = Join-Path $PSHOME 'powershell.exe'
 
 # ---------- 工具路径 ----------
 $mrs  = "D:\Programs\MounRiver_Studio\MounRiver_Studio\MounRiver_Studio2\resources\app\resources\win32"
@@ -179,7 +181,7 @@ function Wait-ResProg([string]$elfPath) {
 
 # 烧视频并统计本次运行结果(读 burn_all 自己的日志)
 function Burn-Video() {
-    & powershell -ExecutionPolicy Bypass -File $burnAll -start 0 -BinPath $bin *> $null
+    & $psExe -ExecutionPolicy Bypass -File $burnAll -start 0 -BinPath $bin *> $null
     $l = Get-Content -LiteralPath (Join-Path $obj 'burn_log.txt') -Encoding UTF8
     $h = ($l | Select-String 'burn_all\(patch\) start=' | Select-Object -Last 1).LineNumber
     if (-not $h) { return [pscustomobject]@{ Blocks = 0; Errors = 999 } }
@@ -229,7 +231,7 @@ if ($needData -or $needGame) {
     Step "== 编译阶段(只做一次; 后续板子纯烧写) =="
     # 字库固件要求"视频宏关 + 字库宏开"。视频宏若开着, 必须先关掉:
     # 两个烧录宏同时定义时 main.c 的 #if/#elif 只会走视频分支 → 编出来的根本不是字库固件 ✗
-    if (Ensure-VideoMode) { & powershell -ExecutionPolicy Bypass -File $switch game *> $null }
+    if (Ensure-VideoMode) { & $psExe -ExecutionPolicy Bypass -File $switch game *> $null }
     if ($needData) {
         Set-DataMacro $true | Out-Null
         New-Build '字库'
@@ -241,7 +243,7 @@ if ($needData -or $needGame) {
     }
     if ($needGame) {
         Set-DataMacro $false | Out-Null       # ★ 必须在编译前关掉字库宏, 否则编出来的"游戏固件"其实是字库固件
-        & powershell -ExecutionPolicy Bypass -File $switch game *> $null
+        & $psExe -ExecutionPolicy Bypass -File $switch game *> $null
         New-Build '游戏'
         Assert-Sym $elf 'g_res_prog' $false   # 自检: 游戏固件绝不能有 g_res_prog(那是字库固件的标志)
         Assert-Sym $elf 'g_video_chunk' $false
@@ -259,7 +261,7 @@ if ($needData -or $needGame) {
 #      漏掉这步就会让 config.h 停在字库模式, 下次谁一编译就烧错了 ✗
 #   ② config.h 停在"视频烧录模式" —— burn_all.ps1 要用它编基准镜像; 否则它会把游戏固件当基准打补丁 ✗
 Set-DataMacro $false | Out-Null
-if (-not (Ensure-VideoMode)) { & powershell -ExecutionPolicy Bypass -File $switch burn *> $null }
+if (-not (Ensure-VideoMode)) { & $psExe -ExecutionPolicy Bypass -File $switch burn *> $null }
 Write-Host ("  视频源: {0}" -f $bin)
 
 # ---------- 每块板 ----------
@@ -305,7 +307,7 @@ for ($b = 1; $b -le $Boards; $b++) {
 }
 
 # 收尾: 把 config.h 从"视频烧录模式"恢复成 GAME —— 否则仓库停在烧录模式, 下次谁一 make 就编错固件 ✗
-& powershell -ExecutionPolicy Bypass -File $switch game *> $null
+& $psExe -ExecutionPolicy Bypass -File $switch game *> $null
 Step "已把 config.h 恢复为 GAME 模式(下次跑本脚本会重新切回视频模式, 会多花一次 clean+重编)"
 
 $sw.Stop()

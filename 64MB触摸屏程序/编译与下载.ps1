@@ -43,12 +43,15 @@ function Do-Build {
     # 先增量编译(快); 若失败(如源码转码后旧.o调试信息失配导致链接错), 再清理过期目标文件重编一次
     # [apply_lto] enable LTO but keep LCD/src/lcd.c out (see memo 56)
     $lto = Join-Path $PSScriptRoot 'apply_lto.ps1'
-    if (Test-Path $lto) { & powershell -NoProfile -ExecutionPolicy Bypass -File "$lto" | Out-Null }
+    # 用绝对路径: Trae 内置终端的 PATH 里可能没有 powershell, "& powershell" 会直接失败
+    if (Test-Path $lto) { & (Join-Path $PSHOME 'powershell.exe') -NoProfile -ExecutionPolicy Bypass -File "$lto" | Out-Null }
     Write-Host "==> make all" -ForegroundColor Cyan
     make all
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "增量编译失败, 清理过期目标文件后重编..." -ForegroundColor Yellow
-        Get-ChildItem -Path $obj -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in ".o",".d",".map",".lst" } | Remove-Item -Force
+        # GCC12 + LTO 偶发: 静态变量被改名成 xxx.lto_priv.N, 汇编器报 illegal operands。
+        # 只删 .o 偶尔仍会复现 -> 直接 make clean 后重编一次, 成功率最高。
+        Write-Host "编译失败, 清理目标文件后重编..." -ForegroundColor Yellow
+        make clean
         make all
         if ($LASTEXITCODE -ne 0) { Write-Host "编译失败" -ForegroundColor Red; exit 1 }
     }

@@ -20,21 +20,51 @@ $mode = if ($Fast) { 'build' } else { 'rebuild' }
 Write-Host ("==> 只编译({0}), 不烧录" -f $(if ($Fast) { '增量' } else { '全量 make clean + 重编' })) -ForegroundColor Cyan
 
 # 边打印边收集, 结束后统计 warning / error
-$log = New-Object System.Collections.ArrayList
-& powershell -NoProfile -ExecutionPolicy Bypass -File "$build" $mode 2>&1 | ForEach-Object {
-    $line = "$_"
-    Write-Host $line
-    [void]$log.Add($line)
+# ★ 必须用 powershell.exe 的绝对路径: 某些环境(如 Trae 内置终端)的 PATH 里没有
+#   powershell, 写 "& powershell" 会直接报"无法识别", 而 $LASTEXITCODE 仍保留上一次
+#   的值(通常是 0) -> 编译根本没跑, 却打印"编译成功"(误报)。
+$psExe = Join-Path $PSHOME 'powershell.exe'
+if (-not (Test-Path -LiteralPath $psExe)) {
+    Write-Host ("找不到 {0}" -f $psExe) -ForegroundColor Red
+    exit 1
 }
-$code = $LASTEXITCODE
+$log = New-Object System.Collections.ArrayList
+$code = 1
+try {
+    & $psExe -NoProfile -ExecutionPolicy Bypass -File "$build" $mode 2>&1 | ForEach-Object {
+        $line = "$_"
+        Write-Host $line
+        [void]$log.Add($line)
+    }
+    $code = $LASTEXITCODE
+} catch {
+    $line = "启动编译失败: " + $_.Exception.Message
+    Write-Host $line -ForegroundColor Red
+    [void]$log.Add($line)
+    $code = 1
+}
 
 $tAfter = if (Test-Path -LiteralPath $elfPath) { (Get-Item -LiteralPath $elfPath).LastWriteTime } else { Get-Date '2000-01-01' }
 $rebuilt = ($tAfter -ne $tBefore)
+
+# 编译与下载.ps1 有个兜底: 首次编译失败(LTO 偶发 bug)会自动清理目标文件再编一次。
+# 统计只算"最终那一次", 否则第一次的报错会被算进来(明明最后成功了却报一堆错误)。
+$retried = $false
+for ($i = $log.Count - 1; $i -ge 0; $i--) {
+    if ($log[$i] -match '清理目标文件后重编') {
+        $log = @($log[($i + 1)..($log.Count - 1)])
+        $retried = $true
+        break
+    }
+}
 
 $warns = @($log | Where-Object { $_ -match '(?i)\bwarning:' -and $_ -notmatch 'lto-wrapper' })
 $errs  = @($log | Where-Object { $_ -match '(?i)\berror:' -or $_ -match '\*\*\*.*Error \d+' })
 
 Write-Host ''
+if ($retried) {
+    Write-Host '  提示: 首次编译失败(GCC12 LTO 偶发), 已自动清理目标文件重编; 以下只统计最终那次' -ForegroundColor DarkYellow
+}
 Write-Host ("==== 编译结果: 错误 {0} 个, 警告 {1} 个 ====" -f $errs.Count, $warns.Count) -ForegroundColor $(if ($errs.Count -gt 0) { 'Red' } elseif ($warns.Count -gt 0) { 'Yellow' } else { 'Green' })
 if (-not $rebuilt) {
     Write-Host '  注意: 本次没有任何文件被重新编译(elf 未更新) -> 警告数必然为 0; 想看真实结果请去掉 -Fast' -ForegroundColor DarkYellow
