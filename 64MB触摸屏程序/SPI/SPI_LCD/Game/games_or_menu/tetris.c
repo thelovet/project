@@ -1456,4 +1456,11 @@ int tetris_sim_touch_rects(void)
     return 1;
 }
 
+/* ---- sim-only: 一键结束(游戏结束界面), 真机不编 ---- */
+void tetris_sim_force_over(void)
+{
+    g_state = TETRIS_STATE_OVER;
+    draw_game_over();
+}
+
 #endif

@@ -1388,4 +1388,21 @@ int fish_sim_touch_rects(void)
     sim_touch_add(0, 221, 240, 240, SIM_TOUCH_BAND);             /* y>220: restart menu */
     return 1;
 }
+
+/* ---- sim-only: 一键通关(达到通关分数 -> 绿色"通关"), 真机不编 ---- */
+void fish_sim_force_win(void)
+{
+    g_won   = 1;
+    g_score = FISH_WIN_SCORE;
+    g_state = FISH_STATE_OVER;
+    draw_game_over();
+}
+
+/* ---- sim-only: 一键结束(被大鱼吃掉 -> 红色"游戏结束"), 真机不编 ---- */
+void fish_sim_force_over(void)
+{
+    g_won   = 0;
+    g_state = FISH_STATE_OVER;
+    draw_game_over();
+}
 #endif

@@ -840,4 +840,11 @@ int klotski_sim_touch_rects(void)
     sim_touch_add(0, 211, 240, 240, SIM_TOUCH_BAND);             /* y>210: restart menu */
     return 1;
 }
+
+/* ---- sim-only: 一键通关(曹操归位), 真机不编 ---- */
+void klotski_sim_force_win(void)
+{
+    g_state = KLOTSKI_STATE_WON;
+    klotski_draw_win_screen(0);
+}
 #endif

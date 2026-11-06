@@ -45,11 +45,13 @@ static const SokobanLevel* g_cur_level;   /* 当前关卡 (只读, 指向关卡�
 #define SOK_BTN_H       60     // 按钮高度
 #define SOK_BTN_Y      160     // 按钮起始Y
 #define SOK_BTN_HIT_Y0 140     // 按钮命中区Y起点 (按钮上边 160 - 20)
-#define SOK_BTN_HIT_Y1 240     // 按钮命中区Y终点: 判定是 y>=此值则不算, 所以 240 = 直到 y=239(屏幕最底)
+#define SOK_BTN_HIT_Y1 (SOK_BTN_Y + SOK_BTN_H)  // 按钮命中区Y终点: 到按钮底边(220)为止 —— 再往下是"上划区",
+                                                // 不能算按钮; 原来给到 240 会把按钮下方整条上划带吃掉(划不动)
 /* 横向分界 = 相邻按钮中线, 让三个命中区"无缝"(不留死区)、且都以按钮为中心(与撤销组做法一致) */
 #define SOK_BTN_HIT_SPLIT1  82   // (75+90)/2  = 82.5 -> 上一关/重新开始 的分界
 #define SOK_BTN_HIT_SPLIT2 157   // (150+165)/2 = 157.5 -> 重新开始/下一关 的分界
-#define SOK_SWIPE_Y    230     // 滑动检测: 下方区域Y阈值 (当Y>此值显示菜单)
+#define SOK_SWIPE_Y    (SOK_BTN_Y + SOK_BTN_H)  // 上划检测: 按钮下沿到底边整条带(Y>此值显示菜单);
+                                                // 原写死 230 只剩最底 10px, 圆屏边缘又窄, 手指按不准划不动
 #define SOK_SLIDE_MAX_STEP   2  // 跟手拖拽每帧最大步进(防跳变)
 #define SOK_SLIDE_SPEED      2  // 松手后自动滑动速度(px/帧)
 
@@ -656,7 +658,14 @@ void sokoban_full_redraw(void) {
  *         所以这里按它判断该回哪个界面
  */
 static void sok_restore_panel_by_mode(void) {
-    if (s_undo_group) {
+    if (s_won) {
+        /* 通关界面拉出过二级菜单: 关掉后要回到"恭喜通关 + 按钮", 不能变成空白游戏画面 */
+        s_menu_slide_y = SOK_BTN_Y;
+        s_menu_visible = 1;
+        sok_win_draw(65, 120);
+        sok_redraw_nav_group();
+    }
+    else if (s_undo_group) {
         s_menu_slide_y = SOK_BTN_Y;   /* 电池恢复按这个上缘裁剪, 别留二级菜单的旧值 */
         s_undo_visible = 1;
         sok_draw_undo_buttons();
@@ -1036,6 +1045,9 @@ static uint8_t sok_lvl2_update(void) {
         s_undo_visible = 1;
         sok_draw_undo_buttons();
     } else if (row == 2) {                 /* 返回: 按模式回到撤销的3个按钮 / 一级按钮组 */
+        sok_restore_panel_by_mode();
+    } else if (row < 0 && s_won) {
+        /* 通关后点框外空白: 回到通关界面(原来什么都不恢复 -> 看着像"进入游戏了") */
         sok_restore_panel_by_mode();
     }
     s_menu_cooldown = 15;
@@ -1602,6 +1614,10 @@ uint8_t sokoban_update(void) {
 
     /* ---- 通关状态 ---- */
     if (s_won) {
+        /* 面板跟手滑动/滑入动画中: 交给下面的公共滑动状态机(二级菜单从这里出现),
+           否则本分支 return 掉, 滑动永远推进不了 -> 通关后上划没反应 */
+        if (s_menu_sliding || s_menu_slide_anim) goto slide_update;
+
         /* 通关后延时0.5s再显示菜单(胜利动画+按钮) */
         if (s_won == 1) {
             Delay_Ms(500);
@@ -1617,6 +1633,7 @@ uint8_t sokoban_update(void) {
         if (!s_prev_pressed && ts.pressed) {
             interacted = 1;
             s_hold_us = 0;
+            s_drag_btn = 0;      /* 本次按下先当"没命中按钮", 下面命中才赋值(上划检测要用) */
             if (ts.x < SOK_BTN1_X + SOK_BTN_W && ts.y >= SOK_BTN_HIT_Y0 && ts.y < SOK_BTN_HIT_Y1) {
                 if (s_current_level > 0) {
                     sokoban_init_level(s_current_level - 1);
@@ -1643,6 +1660,21 @@ uint8_t sokoban_update(void) {
             s_btn_max_y = ts.y;
             s_prev_pressed = 1;
         }
+        /* 通关后上划: 弹出二级菜单(撤销/设置/返回), 与按钮面板时的手感一致。
+           原先这个分支只有"点按钮 / 下滑退出菜单", 上划完全没反应 —— 通关后
+           按钮已经弹出来了, 再上划必须能拉出二级菜单, 不能又"弹一次按钮"。 */
+        if (ts.pressed && s_menu_cooldown == 0 && s_drag_btn == 0
+            && s_swipe_origin_y > SOK_SWIPE_Y
+            && (int16_t)s_swipe_origin_y - (int16_t)ts.y > MENU_SWIPE_TRIGGER_DIST) {
+            int16_t up_move = (int16_t)s_swipe_origin_y - (int16_t)ts.y;
+            s_hold_button = 0;
+            s_hold_us = 0;
+            s_prev_pressed = 1;            /* 按住态, 防下一帧误触 */
+            sok_close_nav_panel();         /* 收掉一级按钮面板 */
+            sok_panel_drag_start(1, up_move);
+            return interacted;
+        }
+
         /* 下滑进入退出菜单 (未命中非restart按钮时生效) */
         if (ts.pressed && s_won) {
             Touch_UpdateCoords();
@@ -1823,6 +1855,7 @@ uint8_t sokoban_update(void) {
     }
 
     /* ---- 跟手上划: 拖拽模式 (限速, 跟随手指) ---- */
+slide_update:
     /* 面板滑动/动画中: 新的下划手势可直接打断, 改开退出菜单(与静止态一致) */
     if (s_menu_sliding || s_menu_slide_anim) {
         TouchState ts_c;
@@ -2180,6 +2213,38 @@ int sokoban_sim_touch_rects(void)
 }
 #endif
 #ifdef SIM_BUILD
+/* ---- sim-only: 一键通关(测"通关界面 / 按钮 / 上划二级菜单"用), 真机不编 ----
+   直接把面板状态摆成"刚通关"的样子, 不用真的把箱子推到位。 */
+void sokoban_sim_force_win(void)
+{
+    s_won           = 2;      /* 2 = 通关界面已显示(跳过 0.5s 延时) */
+    s_menu_visible  = 1;
+    s_undo_group    = 0;      /* 通关后是普通导航按钮组(上一关/重来/下一关) */
+    s_undo_visible  = 0;
+    s_lvl2_visible  = 0;
+    s_exit_menu_visible = 0;
+    s_prev_pressed  = 0;
+    s_hold_button   = 0;
+    s_hold_us       = 0;
+    s_menu_cooldown = 0;
+    s_drag_btn      = 0;
+    /* ★ 触摸残留必须清干净: 否则通关分支里"松手下滑 >= 20px 且起点 < 40"会拿
+       上一次的 s_swipe_origin_y 和旧坐标去比, 一按按钮就误判成下滑 -> 弹出退出菜单。
+       origin 给 240: 任何残留坐标差都是负的, 不会命中下滑判定。 */
+    s_swipe_origin_y = 240;
+    s_touch_start_x  = 0;
+    s_touch_start_y  = 0;
+    s_btn_max_y      = 0;
+    s_menu_sliding   = 0;
+    s_menu_slide_anim = 0;
+    s_menu_slide_y   = 240;
+    s_menu_from_swipe = 0;
+    s_slide_max_dy   = 0;
+    sok_win_draw(65, 120);
+    sok_redraw_nav_group();
+}
+#endif
+#ifdef SIM_BUILD
 /* ---- sim-only: 长按诊断探针 (which: 0=累计ms 1=hold按钮 2=drag按钮 3=菜单冷却 4=面板位) ---- */
 int sokoban_sim_hold_info(int which)
 {
@@ -2190,6 +2255,10 @@ int sokoban_sim_hold_info(int which)
     case 3:  return (int)s_menu_cooldown;
     case 4:  return (int)(s_menu_visible | (s_undo_visible << 1) | (s_lvl2_visible << 2));
     case 5:  return (int)s_exit_menu_visible;
+    case 6:  return (int)s_won;                  /* 0=进行中 1=刚通关 2=通关界面 */
+    case 7:  return (int)s_menu_sliding;         /* 跟手滑动中 */
+    case 8:  return (int)s_panel_kind;           /* 0=一级按钮组 1=二级菜单 */
+    case 9:  return (int)s_current_level;        /* 当前关卡号 */
     default: return -1;
     }
 }

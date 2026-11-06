@@ -729,4 +729,18 @@ int d2048_sim_touch_rects(void)
     sim_touch_add(0, 211, 240, 240, SIM_TOUCH_BAND);             /* y>210: restart menu */
     return 1;
 }
+
+/* ---- sim-only: 一键通关(达成 2048), 真机不编 ---- */
+void d2048_sim_force_win(void)
+{
+    g_state = D2048_STATE_WON;
+    d2048_draw_win_lose_text();
+}
+
+/* ---- sim-only: 一键失败(无可用移动), 真机不编 ---- */
+void d2048_sim_force_lose(void)
+{
+    g_state = D2048_STATE_LOST;
+    d2048_draw_win_lose_text();
+}
 #endif
