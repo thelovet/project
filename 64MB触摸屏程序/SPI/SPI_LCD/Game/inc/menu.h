@@ -190,7 +190,8 @@ extern uint8_t  g_restart_dragging;      /* 重新开始菜单拖拽中 */
 extern int16_t  g_restart_slide_y;       /* 重新开始菜单滑动Y位置 */
 
 /* 菜单/重开区域清除色 (游戏可设为自身背景色, 避免清菜单黑闪) */
-extern uint16_t g_menu_clear_color;
+extern uint16_t g_menu_clear_color;   /* 菜单区清除色(游戏可设为背景色) */
+extern uint16_t g_bat_icon_bg;        /* 游戏电池图标底板色(默认黑; 鱼设成深海蓝) */
 extern uint8_t  g_lowbatt_showing;   /* 低电图标正显示中(亮段), 菜单重绘跳过电池区 */
 
 /* 从游戏进入设置的标志 (MAIN_MODE_VIDEO=无, 其他=来源游戏模式) */

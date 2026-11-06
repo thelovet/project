@@ -103,6 +103,7 @@ uint8_t  g_restart_sliding = 0;        /* 重新开始菜单滑动中 */
 uint8_t  g_restart_dragging = 0;       /* 重新开始菜单拖拽中 */
 int16_t  g_restart_slide_y = 240;      /* 重新开始菜单滑动Y位置 */
 uint16_t g_menu_clear_color = LCD_BLACK;  /* 菜单/重开区域清除色(游戏可设为背景色) */
+uint16_t g_bat_icon_bg = LCD_BLACK;       /* 游戏电池图标底板色(鱼是深海蓝, 否则图标周围一块黑) */
 uint8_t  g_settings_from_game = MAIN_MODE_VIDEO;  /* 从游戏进入设置的来源模式 */
 uint8_t  g_game_enter_exit_menu = 0;  /* 设置菜单中顶部下滑→退出菜单标志 */
 uint8_t  g_prev_pressed;              /* 上一帧触摸按下(各游戏共用, 供 game_menu_command/退出菜单轮询) */
@@ -186,7 +187,7 @@ static void game_battery_icon_draw(uint16_t x, uint16_t y,
 
     LCD_Fill(x, y,
         x + GAME_BATTERY_BODY_W + GAME_BATTERY_CAP_W,
-        y + GAME_BATTERY_BODY_H, LCD_BLACK);
+        y + GAME_BATTERY_BODY_H, g_bat_icon_bg);
     LCD_Fill(x, y, x + GAME_BATTERY_BODY_W, y + 2, outline);
     LCD_Fill(x, y + GAME_BATTERY_BODY_H - 2,
         x + GAME_BATTERY_BODY_W, y + GAME_BATTERY_BODY_H, outline);
@@ -1294,6 +1295,7 @@ uint8_t game_handle_ret(uint8_t ret, MainMode* mode, uint8_t* game_inited,
     if (ret == EXIT_RET_SETTINGS) { *key_resp = 1; return ret; }
     game_battery_icon_reset();
     g_menu_clear_color = LCD_BLACK;
+    g_bat_icon_bg = LCD_BLACK;   /* 切游戏恢复默认底板色(鱼会自己改成深海蓝) */
 
     /* 模式切换只在松手后发生，同时清除主循环触摸状态 */
     *game_inited = 0;

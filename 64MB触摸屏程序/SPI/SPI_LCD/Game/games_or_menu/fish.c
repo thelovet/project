@@ -65,6 +65,11 @@ static const uint8_t fish_row_types[5] = {
 #define PLAY_X_MAX    (LCD_W - 26)
 #define PLAY_CORNER   30   /* 8角形倒角边长: 切掉矩形四角, 让鱼不进入圆形屏被遮挡的四角 */
 
+/* 电池图标位置: 放在信息栏第2行(进度条)右侧的空档里 —— x=155 起(等级数字最右到 153),
+   y=18 与进度条同高; 圆屏在 y=18 处可见 x 只到 183, 28px 宽刚好塞得下(右缘 182) */
+#define FISH_BATTERY_X  155
+#define FISH_BATTERY_Y  18
+
 /* 游戏状态 */
 typedef struct {
     uint8_t active;      /* 是否在场 */
@@ -542,6 +547,8 @@ static void draw_hud(void) {
         draw_hud_progress();
         LCD_CS_SET;
     }
+    /* 信息栏整条刚被清过, 电池图标跟着补画(否则每次刷新分数/进度它都会被擦掉) */
+    game_battery_icon_update(FISH_BATTERY_X, FISH_BATTERY_Y, 1);
 }
 
 /**
@@ -712,6 +719,7 @@ void fish_init(void) {
     g_score = 0;
     g_won = 0;
     g_menu_clear_color = COLOR_BG;   /* 清菜单位置用背景色替代黑色, 避免切菜单黑闪 */
+    g_bat_icon_bg = COLOR_BG;        /* 电池图标底板也用背景色, 否则信息栏里一块黑 */
     g_hud_dirty = 1;   /* 首帧重绘顶部信息 */
     g_frame = 0;
     g_food_us = GetTimerCount();   /* 小鱼时间节拍基准 */
@@ -1180,6 +1188,8 @@ uint8_t fish_update(void) {
 
     /* 顶部信息 */
     draw_hud();
+    /* 电池图标: 内部有采样/重绘节流(充电时还会做亮格动画), 每帧调用即可 */
+    game_battery_icon_update(FISH_BATTERY_X, FISH_BATTERY_Y, 0);
 
     return GAME_RET_NONE;
 }
@@ -1359,6 +1369,7 @@ uint8_t fish_restore_state(const uint8_t* buf, uint8_t len) {
     }
 
     g_menu_clear_color = COLOR_BG;
+    g_bat_icon_bg = COLOR_BG;   /* 休眠唤醒是"重启+恢复存档", 全局默认是黑, 不设这里电池图标就是一坨黑 */
     g_hud_dirty = 1;   /* 首帧重绘顶部信息 */
     g_frame = 0;
     g_food_us = GetTimerCount();
