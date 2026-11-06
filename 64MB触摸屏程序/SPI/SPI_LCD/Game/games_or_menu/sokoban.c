@@ -1231,7 +1231,14 @@ static void sok_undo_hide(uint8_t back_to_nav) {
     LCD_Fill(SOK_UNDO_X1, SOK_UNDO_Y,
              SOK_UNDO_X3 + UNDO_IMG_W, SOK_UNDO_Y + UNDO_IMG_H, LCD_BLACK);
     sok_redraw_grid_below(SOK_UNDO_Y);
-    if (back_to_nav) {
+    if (s_won) {
+        /* 通关界面拉到过撤销按钮: 关掉后必须回到"恭喜通关 + 按钮组"。
+           否则 s_undo_visible/menu_visible 都是 0, 而 s_won 分支会吞掉所有移动触摸
+           -> 画面上既没文字也没按钮, 表现为"彻底操作不了" */
+        s_undo_group = 0;
+        sok_restore_panel_by_mode();
+    }
+    else if (back_to_nav) {
         s_undo_group = 0;
         sok_show_nav_group();
     }
@@ -1291,7 +1298,18 @@ static void sok_undo_ui_update(void) {
     s_prev_pressed = 0;
 
     hit = sok_undo_hit_test(ts.x, ts.y);
-    if (hit == 1)      sok_hist_go(-1);      /* 上一步(撤销) */
+    if (hit == 1) {                          /* 上一步(撤销) */
+        if (sok_hist_go(-1) && s_won) {
+            /* 通关后撤销成功: 关卡已经不再处于通关状态。
+               必须清 s_won 并重绘整屏 —— 否则下一帧仍进通关分支, 把移动触摸全吞掉,
+               玩家看着"撤销了也动不了"; 屏上的"恭喜通关"也要擦掉。 */
+            s_won = 0;
+            s_won_transition = 0;
+            s_menu_visible = 0;
+            sokoban_draw_level(s_current_level);
+            sok_draw_undo_buttons();         /* 撤销按钮继续显示, 可接着撤/重做 */
+        }
+    }
     else if (hit == 3) sok_hist_go(1);       /* 下一步(重做) */
     else if (hit == 2) sok_undo_hide(1);     /* 返回 → 一级按钮组 */
     else               sok_undo_hide(0);     /* 点空白 → 关闭, 可操作游戏 */
@@ -2259,6 +2277,8 @@ int sokoban_sim_hold_info(int which)
     case 7:  return (int)s_menu_sliding;         /* 跟手滑动中 */
     case 8:  return (int)s_panel_kind;           /* 0=一级按钮组 1=二级菜单 */
     case 9:  return (int)s_current_level;        /* 当前关卡号 */
+    case 10: return (int)s_hist_cnt;             /* 撤销历史步数 */
+    case 11: return (int)s_hist_pos;             /* 撤销历史当前位置(可重做 = cnt-pos) */
     default: return -1;
     }
 }
