@@ -38,9 +38,11 @@
       (保证拿在手里时两端都够得到); 代价是倍率 ×1.24 → 沿 X 的慢速拖动会有"1px、2px"交替的节奏。
    Y: 原始 Y 在增益命令后已稳定到约 10~239(健康轴), 故直接用满量程 0~239 →
       倍率正好 1.000(1:1 映射), 慢速拖动严格 1px 跟随, 没有任何步进感。
-   注: 等硬件把面板参考地做好(见开发注意事项 §27.4), X 也能回到 0~239, 那时两轴都无步进。 */
-#define TOUCH_NORM_MIN_X  20
-#define TOUCH_NORM_MAX_X  212
+   注: 等硬件把面板参考地做好(见开发注意事项 §27.4), X 也能回到 0~239, 那时两轴都无步进。
+   2026-11-06 换 816T 后: 先按满量程 0~239 关闭窗口(816 分支本来也不走这里, 见 MapCoord),
+   待实测新 IC 的原始可达范围再决定要不要收窄。 */
+#define TOUCH_NORM_MIN_X  0
+#define TOUCH_NORM_MAX_X  239
 #define TOUCH_NORM_MIN_Y  0
 #define TOUCH_NORM_MAX_Y  239
 
@@ -70,6 +72,8 @@ static uint8_t g_dbg_cmd_stat = 0xFF; /* 调试: 初始化下发命令后 Query 
 static uint16_t g_dbg_raw_x = 0;      /* 调试: 最近一次解析出的原始 12 位坐标(未映射) */
 static uint16_t g_dbg_raw_y = 0;
 static uint8_t  g_dbg_chip_id = 0xFF; /* 调试: 0xA7 读到的芯片 ID(换 IC 时确认贴的是哪颗) */
+static uint8_t  g_dbg_thgroup = 0xFF; /* 调试: 初始化写完 0x80 后回读的值(确认阈值到底写进去没有) */
+static uint8_t  g_dbg_thgroup_def = 0xFF; /* 调试: 写之前读到的 0x80 原始值(=芯片默认灵敏度阈值) */
 #endif
 #if TOUCH_IC_IT7259
 static uint16_t g_med_raw_x[3] = {0, 0, 0};   /* IT7259: 3点中值滤波缓存(最新在[2]) */
@@ -886,6 +890,31 @@ void Touch_Init(void)
 #endif
 
 #if !TOUCH_IC_IT7259
+#if TOUCH_DEBUG_SHOW
+    /* 先读 0x80 出厂默认值(写之前): 816T 实测是 0(=阈值最小/最灵敏) */
+    if (!CST816S_ReadReg(CST816S_REG_THGROUP, &g_dbg_thgroup_def, 1))
+        g_dbg_thgroup_def = 0xEE;
+#endif
+#if TOUCH_816_TH_ENABLE
+    /* 3.5 灵敏度: 触摸检测阈值 0x80(值越小越灵敏)。816T 实测出厂默认就是 0 = 已是最灵敏,
+       所以默认关闭写入(见 touch.h 的 TOUCH_816_TH_ENABLE); 换别的批次先看调试第2行的默认值。 */
+#if TOUCH_DEBUG_SHOW
+    /* 先读原始默认值(写之前), 再看写入后的回读 —— 两者相同说明"写 20"其实等于没改 */
+    if (!CST816S_ReadReg(CST816S_REG_THGROUP, &g_dbg_thgroup_def, 1))
+        g_dbg_thgroup_def = 0xEE;
+#endif
+    CST816S_WriteReg(CST816S_REG_THGROUP, TOUCH_816_THGROUP);
+    Delay_Ms(5);
+#if TOUCH_DEBUG_SHOW
+    /* 回读确认: 读回来等于写入值才算真的生效; 读回是别的(常见约 70/默认值)说明这颗 IC 不吃这个寄存器 */
+    if (!CST816S_ReadReg(CST816S_REG_THGROUP, &g_dbg_thgroup, 1))
+        g_dbg_thgroup = 0xEE;   /* 0xEE = 回读失败 */
+#endif
+#else
+#if TOUCH_DEBUG_SHOW
+    g_dbg_thgroup = g_dbg_thgroup_def;   /* 没写阈值: 回读=默认值(仍显示, 一眼看出没改) */
+#endif
+#endif
     /* 4. 配置中断控制寄存器: 0xFA=0x40 周期产生中断 (IT7259 走纯I2C轮询, 不配置中断) */
     CST816S_WriteReg(CST816S_REG_IRQCTL, CST816S_IRQ_ENABLE);
     Delay_Ms(10);
@@ -1313,29 +1342,37 @@ void Touch_DebugShow(void)
 #if TOUCH_IC_IT7259
     Touch_DebugReadBaseline();   /* 刷新基线诊断值(内部已限流、且仅无触摸时读) */
 #endif
-    /* 位置在菜单框(x 45~195)左侧之外的那条竖带里: 菜单打开时不会被盖掉。
-       圆屏限制: x=11~35 处可见 y 约 35~205, 故从 y=60 起、行距 14、共 10 行到 y=186。 */
-    LCD_Fill(205, 58, 229, 200, LCD_BLACK);
+    /* 位置在菜单框(x 45~195)右侧之外的那条竖带里: 菜单打开时不会被盖掉。
+       圆屏限制: y 越大可用宽度越窄 —— y=186 处可见 x 只到约 220, 故整条带到 x=196 起
+       (3 位数占 24px → 196~219), 否则最下面几行(芯片 ID)会被圆边切掉。 */
+    LCD_Fill(196, 58, 221, 200, LCD_BLACK);
     LCD_CS_CLR;
-    Touch_DebugNum3(205,  60, (uint16_t)(g_touch_pressed ? 1U : 0U), LCD_RED);   /* 行1 按下标志 */
-    Touch_DebugNum3(205,  74, g_dbg_point_buf[0], LCD_WHITE);                    /* 行2 Byte0(格式标志) */
-    Touch_DebugNum3(205,  88, g_dbg_point_buf[2], LCD_YELLOW);                   /* 行3 Byte2 = 原始X低8位 */
-    Touch_DebugNum3(205, 102, g_dbg_point_buf[3], LCD_GBLUE);                    /* 行4 Byte3 = X/Y高位 */
-    Touch_DebugNum3(205, 116, g_dbg_point_buf[4], LCD_WHITE);                    /* 行5 Byte4 = 原始Y低8位 */
-    Touch_DebugNum3(205, 130, g_touch_x, LCD_GREEN);                             /* 行6 映射后X */
-    Touch_DebugNum3(205, 144, g_touch_y, LCD_RED);                               /* 行7 映射后Y */
+    Touch_DebugNum3(196,  60, (uint16_t)(g_touch_pressed ? 1U : 0U), LCD_RED);   /* 行1 按下标志 */
+#if TOUCH_IC_IT7259
+    Touch_DebugNum3(196,  74, g_dbg_point_buf[0], LCD_WHITE);                    /* 行2 Byte0(格式标志) */
+#else
+    Touch_DebugNum3(196,  74, g_dbg_thgroup_def, LCD_WHITE);                     /* 行2 0x80 写前默认值(=20 说明默认就是20) */
+#endif
+#if TOUCH_IC_IT7259
+    Touch_DebugNum3(196,  88, g_dbg_point_buf[2], LCD_YELLOW);                   /* 行3 Byte2 = 原始X低8位 */
+    Touch_DebugNum3(196, 102, g_dbg_point_buf[3], LCD_GBLUE);                    /* 行4 Byte3 = X/Y高位 */
+    Touch_DebugNum3(196, 116, g_dbg_point_buf[4], LCD_WHITE);                    /* 行5 Byte4 = 原始Y低8位 */
+#endif
+    Touch_DebugNum3(196, 130, g_touch_x, LCD_GREEN);                             /* 行6 映射后X */
+    Touch_DebugNum3(196, 144, g_touch_y, LCD_RED);                               /* 行7 映射后Y */
 #if TOUCH_IC_IT7259
     /* 行8/9: 当前模式各通道 CSEL(基线补偿)的最小/最大值 —— 贴到 0 或 255 说明基线顶到边界,
        正是"轻触判不到/坐标随握持变化"的典型特征; 行10: 1=本帧读取成功 */
-    Touch_DebugNum3(205, 158, g_dbg_csel_min, LCD_CYAN);
-    Touch_DebugNum3(205, 172, g_dbg_csel_max, LCD_BLUE);
-    Touch_DebugNum3(205, 186, (uint16_t)g_dbg_csel_ok, LCD_WHITE);
+    Touch_DebugNum3(196, 158, g_dbg_csel_min, LCD_CYAN);
+    Touch_DebugNum3(196, 172, g_dbg_csel_max, LCD_BLUE);
+    Touch_DebugNum3(196, 186, (uint16_t)g_dbg_csel_ok, LCD_WHITE);
 #else
-    /* 816: 行8=原始X(青) 行9=原始Y(蓝) 行10=芯片ID(白)
-       原始值是滤波前、未映射的读数 —— 判断"串轴/超范围被丢弃"就看这两行 */
-    Touch_DebugNum3(205, 158, g_dbg_raw_x, LCD_CYAN);
-    Touch_DebugNum3(205, 172, g_dbg_raw_y, LCD_BLUE);
-    Touch_DebugNum3(205, 186, (uint16_t)g_dbg_chip_id, LCD_WHITE);
+    /* 816: 行2=0x80 写前默认值 行3=写后回读 行4=原始X 行5=原始Y 行6/7=映射后X/Y(见上)
+       行8=芯片ID(靠下, 圆边会切掉一点) —— 原始值是滤波前、未映射的读数 */
+    Touch_DebugNum3(196,  88, g_dbg_thgroup, LCD_WHITE);                         /* 行3 0x80 写入后回读 */
+    Touch_DebugNum3(196, 102, g_dbg_raw_x, LCD_CYAN);                             /* 行4 原始X */
+    Touch_DebugNum3(196, 116, g_dbg_raw_y, LCD_BLUE);                             /* 行5 原始Y */
+    Touch_DebugNum3(196, 158, (uint16_t)g_dbg_chip_id, LCD_WHITE);                /* 行8 芯片ID(靠下, 可能被圆边切一点) */
 #endif
     LCD_CS_SET;
 }

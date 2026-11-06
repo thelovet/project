@@ -13,8 +13,7 @@
 
 /**
  * @brief 触摸坐标调试显示开关: 1=屏幕左上角实时显示(行1=按下标志, 行2=X, 行3=Y)
- * @note  仅调试用; 调试完请改回 0, 避免占 Flash 和遮挡画面
- *        Flash 已满(65280B 全用尽), 要打开本调试须先腾出约 270B
+ * @note  仅调试用; 调试完请改回 0, 避免占 Flash 和遮挡画面(约 270B, 当前 Flash 还有余量)
  */
 #define TOUCH_DEBUG_SHOW   0
 
@@ -110,6 +109,15 @@ void Touch_DebugShow(void);
 #define CST816S_REG_AUTOSLEEP   0xFE           // 自动休眠控制
 #define CST816S_SLEEP_ENABLE    0x00           // 启用自动休眠(无触摸约2秒后休眠)
 #define CST816S_SLEEP_DISABLE   0x01           // 禁用自动休眠(始终保持活跃)
+/* 灵敏度阈值(FT6x36 兼容寄存器, 816S/D/T 通用): 值越小越灵敏。
+   0x80=触摸检测阈值(816T 实测出厂默认 0)、0x85=差值阈值。 */
+#define CST816S_REG_THGROUP     0x80           // 触摸检测阈值
+#define CST816S_REG_THDIFF      0x85           // 差值阈值
+/* 816 系列灵敏度微调: 只改"触摸检测阈值"这一项, 便于 A/B(改多了分不清是哪项起作用)。
+   ★ 816T 实测: 0x80 的出厂默认就是 0(=阈值最小/最灵敏), 写 20 反而更钝 → 默认关闭写入。
+   只有在别的批次上读到默认值明显偏大(如 70)时, 才把它打开并把 TOUCH_816_THGROUP 调到比默认小。 */
+#define TOUCH_816_TH_ENABLE     0              // 0=保持芯片默认(816T 默认已是最灵敏)
+#define TOUCH_816_THGROUP       20             // 仅 ENABLE=1 时生效; 必须小于芯片默认值才有意义
 #endif
 
 /**
