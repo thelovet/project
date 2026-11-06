@@ -54,7 +54,6 @@ static const SokobanLevel* g_cur_level;   /* 当前关卡 (只读, 指向关卡�
                                                 // 原写死 230 只剩最底 10px, 圆屏边缘又窄, 手指按不准划不动
 #define SOK_SLIDE_MAX_STEP   2  // 跟手拖拽每帧最大步进(防跳变)
 #define SOK_SLIDE_SPEED      2  // 松手后自动滑动速度(px/帧)
-
 /* 长按与滑动阈值 */
 #define SOK_HOLD_THRESHOLD    50 // 长按移动阈值(像素)
 #define SOK_RELEASE_THRESHOLD 10 // 松手滑动阈值(像素)
@@ -834,63 +833,66 @@ static void sok_draw_btn_clipped(uint16_t x, int16_t y, const uint16_t* img, int
 }
 
 /**
- * @brief  记录退出菜单是否由"撤销的3个按钮"打开: 是则上划关闭后恢复这组按钮
- * @note   由 sok_try_open_exit_menu() 清零; 撤销界面打开退出菜单时置 1
+ * 关闭退出菜单时, 按下面的 s_exit_prev_layer 恢复到打开前那一层
+ * @note 与其它四个游戏的 g_state_before_menu 等价, 由 sok_try_open_exit_menu() 记录
  */
-static uint8_t  s_exit_from_undo = 0;
+static uint8_t  s_exit_prev_layer = 0;   /* 打开退出菜单前是哪一层: 0=游戏内 1=一级面板 2=二级菜单 3=撤销 4=通关 */
 
 /**
- * @brief  退出菜单上划关闭后恢复撤销按钮(仅当它是由撤销按钮打开的)
- * @retval 1=已恢复(调用方不再滑入面板), 0=不是, 走常规滑回按钮面板
+ * @brief  关闭退出菜单, 并按打开前所在层恢复界面
+ * @param  clear_from_y 从这一行往下重绘(拖拽取消=菜单当前顶边, 静止取消=MENU_Y)
+ * @note   与其它四个游戏 game_menu_command() 的 exit 分支一致: 关闭后只回到打开前的状态,
+ *         绝不额外拉起按钮面板; 同时吸收本次手势, 松手不再落到游戏或按钮上。
  */
-static uint8_t sok_exit_restore_undo(void) {
-    if (!s_exit_from_undo) return 0;
-    s_undo_visible = 1;
-    s_menu_from_swipe = 1;   /* 吸收本次手势: 松手不再命中按钮, 否则按钮会被关掉 */
-    s_prev_pressed = 1;
-    sok_draw_undo_buttons();
-    return 1;
-}
-
-static uint8_t sok_exit_swipe_cancel(void) {
-    int16_t cancel_dy = 0;
-    uint8_t poll_ret = game_menu_swipe_up_poll(SOK_SWIPE_Y, MENU_SWIPE_TRIGGER_DIST, &cancel_dy);
-    if (!poll_ret) {
-        /* 中间区域上划只在静止态生效: 拖拽/滑入期间会误关刚打开的退出菜单(见备忘录 §437) */
-        if (s_exit_dragging || s_exit_sliding) return 0;
-        if (!game_menu_swipe_mid_up_close(SOK_SWIPE_Y, MENU_SWIPE_TRIGGER_DIST)) return 0;
-    }
-    else g_menu_cooldown = 15;
-
+static void sok_exit_close(int16_t clear_from_y) {
+    TouchState ts;
+    Touch_Scan(&ts);
 
     s_exit_menu_visible = 0;
     s_exit_sliding = 0;
     s_exit_dragging = 0;
-    s_prev_pressed = 0;
+
+    menu_clear_exit_area_to(clear_from_y);
+    sok_redraw_grid_below((clear_from_y < 0) ? 0 : clear_from_y);
+
+    /* 本次手势作废: 起手点复位(防松手被当成"又下滑一次"), 松手位置记为当前点(位移≈0) */
+    s_swipe_origin_y = MENU_SWIPE_START_Y;
+    s_touch_start_x = ts.x;
+    s_touch_start_y = ts.y;
+    s_prev_pressed = 1;
     s_menu_cooldown = 15;
-    g_touch_down = 0;   /* 清除全局触摸状态(松手由按钮面板处理, 不设吸收标志防跨游戏残留) */
-    LCD_CLEAR_MENU_AREA();           /* 清退出菜单区(含边框), 防黑色/残留 */
-    sok_redraw_grid_below(MENU_Y);
-    if (sok_exit_restore_undo()) {
-    }
-    else if (poll_ret == 2) {
-        /* 松手打断: 手指已抬起, 自动动画滑入 */
-        s_menu_slide_anim = 1;
+    g_touch_down = 0;
+
+    switch (s_exit_prev_layer) {
+    case 4:     /* 通关界面: 恭喜通关 + 一级按钮组 */
+        s_menu_sliding = 0;
+        s_menu_slide_anim = 0;
+        s_menu_slide_y = SOK_BTN_Y;
+        s_menu_from_swipe = 1;      /* 吸收本次手势, 防松手点到按钮 */
+        sok_show_win_screen();
+        break;
+    case 3:     /* 撤销按钮组 */
+        s_undo_visible = 1;
+        s_menu_from_swipe = 1;
+        if (s_won) sok_win_draw(65, 120);   /* 通关界面拉出的撤销组: 文字被清过, 补回来 */
+        sok_draw_undo_buttons();
+        break;
+    case 2:     /* 二级菜单 */
+        s_lvl2_visible = 1;
+        s_menu_from_swipe = 1;
+        menu_draw_nrow_frame_only(RESTART_MENU_Y - 1, sok_lvl2_row_types, 3);
+        break;
+    case 1:     /* 一级按钮面板 */
+        s_menu_from_swipe = 1;
+        sok_show_nav_group();
+        break;
+    default:    /* 0 = 纯游戏内: 菜单消失即可, 不拉按钮 */
+        s_menu_sliding = 0;
+        s_menu_slide_anim = 0;
         s_menu_slide_y = 240;
-    }
-    else {
-        /* 拖拽打断: 手指还在屏幕上, 跟手滑入 */
-        TouchState ts_now;
-        Touch_UpdateCoords();
-        Touch_Scan(&ts_now);
-        s_swipe_origin_y = g_touch_start_y; /* 上划起点, 用于计算总位移 */
-        s_menu_slide_y = 240;
-        s_menu_sliding = 1;
-        s_slide_max_dy = 0;   /* 复位最远位移, 防旧值导致回退>2误取消 */
-        s_drag_btn = sok_btn_hit_test(ts_now.x, ts_now.y);
+        break;
     }
     game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 1);
-    return 1;
 }
 
 /**
@@ -946,6 +948,10 @@ static uint8_t sok_swipe_enter(uint8_t pressed) {
     if (pressed) { s_prev_pressed = 1; return 1; }
     s_menu_from_swipe = 0;
     s_prev_pressed = 0;
+    /* 松手这一帧把长按/拖拽状态一并清掉: 一级面板分支原来自己清, 二级菜单/撤销界面不清,
+       但三者都不用这两个量, 统一到这里免得漏 */
+    s_drag_btn = 0;
+    s_hold_us = 0;
     return 1;
 }
 
@@ -1279,9 +1285,11 @@ static uint8_t sok_try_open_exit_menu(uint16_t y) {
     s_exit_menu_visible = 1;
     s_exit_dragging = 1;
     s_exit_sliding = 0;
+    /* 先记下"打开前是哪一层"(此时各层面板还没收), 关闭时按层恢复 */
+    s_exit_prev_layer = s_lvl2_visible ? 2 : s_undo_visible ? 3
+                      : (s_menu_visible ? (s_won ? 4 : 1) : 0);
     s_exit_drag_y = -MENU_H + MENU_DRAG_MAX_STEP;
     s_exit_drag_start_y = y;
-    s_exit_from_undo = 0;
     return 1;
 }
 
@@ -1361,8 +1369,11 @@ static uint8_t sok_open_exit_menu_here(uint16_t y) {
         sok_lvl2_clear_frame();
     }
     else if (s_undo_visible) {
-        s_exit_from_undo = 1;      /* 关菜单后恢复撤销按钮而不是一级面板 */
-        sok_undo_hide(0);
+        /* 只收按钮, 不走 sok_undo_hide(): 它在 s_won 时会把通关文字+按钮组重画出来,
+           菜单关掉后就会和恢复的撤销按钮叠在一起 */
+        s_undo_visible = 0;
+        sok_erase_panel(SOK_UNDO_X1, SOK_UNDO_Y,
+                        SOK_UNDO_X3 + UNDO_IMG_W, SOK_UNDO_Y + UNDO_IMG_H, SOK_UNDO_Y, 0);
     }
     else if (s_menu_visible) {
         sok_close_nav_panel();
@@ -1607,6 +1618,7 @@ uint8_t sokoban_update(void) {
     /* 设置菜单中顶部下滑→退出菜单 (main.c 设标志, 四游戏各自消费; 推箱子需自行处理) */
     if (g_game_enter_exit_menu) {
         g_game_enter_exit_menu = 0;
+        s_exit_prev_layer = 0;     /* 设置页下滑: 关闭后回纯游戏画面 */
         s_menu_visible = 0;
         s_exit_menu_visible = 1;
         s_exit_dragging = 1;
@@ -1750,6 +1762,7 @@ uint8_t sokoban_update(void) {
                 s_exit_menu_visible = 1;
                 s_exit_dragging = 0;
                 s_exit_sliding = 1;
+                s_exit_prev_layer = 4;     /* 通关界面下滑: 关闭后回恭喜通关 + 按钮组 */
                 s_exit_drag_y = -MENU_H;
                 s_prev_pressed = 0;
                 return interacted;
@@ -1770,18 +1783,7 @@ uint8_t sokoban_update(void) {
         Touch_Scan(&ts);
 
         /* 由上划进入菜单: 屏蔽按钮交互, 等手指完全松开再恢复 */
-        if (s_menu_from_swipe) {
-            if (ts.pressed) {
-                s_prev_pressed = 1;
-                return interacted;
-            }
-            /* 手指松开, 清除保护, 下一帧正常交互 */
-            s_menu_from_swipe = 0;
-            s_prev_pressed = 0;
-            s_drag_btn = 0;
-            s_hold_us = 0;
-            return interacted;
-        }
+        if (sok_swipe_enter(ts.pressed)) return interacted;
 
         /* 按下: 记录命中按钮 */
         if (!s_prev_pressed && ts.pressed) {
@@ -1912,6 +1914,8 @@ slide_update:
             s_swipe_origin_y = ts_c.y;
         }
         else if (sok_try_open_exit_menu(ts_c.y)) {
+            /* 面板还在滑入途中(尚未置 *_visible), 按面板种类补记打开前那一层 */
+            s_exit_prev_layer = (s_panel_kind == 1) ? 2 : 1;
             s_menu_sliding = 0;
             s_menu_slide_anim = 0;
             sok_panel_clear_from(s_menu_slide_y);
@@ -1953,6 +1957,9 @@ slide_update:
                 s_menu_cooldown = 15; /* 冷却, 防立即重触发上划 */
                 sok_panel_clear_from(clip_y);
                 sok_redraw_grid_below(clip_y);
+                /* 通关界面: 上划拉面板、不松手又下滑取消时, 必须回到"通关界面";
+                   否则画面只剩地图, 而 s_won 分支又把移动触摸吞掉 -> 像"掉进游戏里" */
+                if (s_won) sok_show_win_screen();
             }
             else {
                 s_menu_sliding = 0;
@@ -2010,70 +2017,50 @@ process_exit_menu:
     if (!s_exit_menu_visible) {
         game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 0);
     }
-    /* ---- 退出菜单处理 (拖拽模式) ---- */
+    /* ---- 退出菜单: 拖拽 / 滑入动画 / 静止, 三态互斥 ----
+       与其它四个游戏的 game_menu_command() 一致:
+       · 拖拽中只跟手向下, 按住期间不判定; 松手时回退 >10px 才取消, 否则继续滑入
+       · 滑入动画期间不认取消(此时手指早已抬起)
+       · 静止后, 中间区域上划 >MENU_SWIPE_COMMIT_DIST 才关闭(按住即关) */
     if (s_exit_menu_visible) {
-        /* 拖拽模式处理 */
         if (s_exit_dragging) {
-            /* 上划打断退出菜单拖拽 */
-            if (sok_exit_swipe_cancel()) return 0;
-
             TouchState ts_d;
             Touch_Scan(&ts_d);
             uint8_t poll_ret = game_menu_drag_poll(&s_exit_drag_y, &s_exit_drag_start_y,
                 &s_exit_dragging, &ts_d, sok_row_types);
-            if (poll_ret == 2) {
-                /* 上划回退>10px松手取消: 清可见区域并补画格子 */
-                menu_clear_exit_area_to(s_exit_drag_y);
-                s_exit_menu_visible = 0;
-                s_exit_sliding = 0;
-                s_exit_dragging = 0;
-                sok_redraw_grid_below((s_exit_drag_y < 0) ? 0 : s_exit_drag_y);
-                s_prev_pressed = 1;
-                s_menu_cooldown = 15;
-            }
-            else if (poll_ret == 1) {
-                s_exit_sliding = 1;
-            }
+            if (poll_ret == 2) sok_exit_close(s_exit_drag_y);   /* 松手回退: 取消, 回打开前那层 */
+            else if (poll_ret == 1) s_exit_sliding = 1;         /* 松手未回退: 继续滑入 */
             return 0;
         }
 
         /* 滑动动画模式: 自动滑至目标, 逐帧刷新 */
         if (s_exit_sliding) {
-
-            /* 上划打断退出菜单滑动动画 */
-            if (sok_exit_swipe_cancel()) return 0;
-
             s_exit_drag_y += MENU_SLIDE_SPEED;
             if (s_exit_drag_y >= MENU_Y) {
                 s_exit_drag_y = MENU_Y;
                 s_exit_sliding = 0;
                 s_prev_pressed = 0;  /* 滑入结束重置按下态, 防拖拽松手被误判为点菜单外关闭 */
+                /* 落下时清掉顶边上方的残影: 滑入途中菜单框顶边从屏幕最上方掠过(圆屏只在
+                   y=0~4 露出一小段), 落到 MENU_Y=5 后这 5 行就被让出来了 —— 不清的话会留下
+                   一条绿边(菜单边框色), 之后关菜单从 y=5 起清也清不到它。 */
+                LCD_Fill(MENU_X, 0, MENU_X + MENU_W, MENU_Y, LCD_BLACK);
+                sok_redraw_battery_tiles(MENU_X, 0, MENU_X + MENU_W, MENU_Y);  /* 该带若有瓦片补回 */
+                game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 1);     /* 电池上半被清, 补画 */
             }
             menu_draw_nrow_frame_only(s_exit_drag_y, sok_row_types, 5);
             return 0;
         }
 
-        TouchState ts;
+        /* 静止态: 中间区域上划 -> 关闭(按住即关) */
+        if (game_menu_swipe_mid_up_close(SOK_SWIPE_Y, MENU_SWIPE_COMMIT_DIST)) {
+            sok_exit_close(MENU_Y);
+            return 0;
+        }
 
-        /* 上划打断退出菜单(静止态) */
-        if (sok_exit_swipe_cancel()) return 0;
-        /* (底部/中间区域上划都在上一行的调用里统一处理) */
+        TouchState ts;
         uint8_t ret = game_exit_menu_poll(sokoban_exit_map, &s_prev_pressed, &ts);
-        if (ret == EXIT_RET_BACK) {
-            /* "返回" 键退出菜单回到游戏, 擦除菜单区域, 补画地图 */
-            s_exit_menu_visible = 0;
-            s_exit_sliding = 0;
-            s_exit_dragging = 0;
-            s_menu_visible = 0;
-            LCD_CLEAR_MENU_AREA();
-            sok_redraw_grid_below(MENU_Y);
-            if (s_won) sok_show_win_screen();
-            game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 1);
-            s_prev_pressed = 1;
-            s_touch_start_x = ts.x;
-            s_touch_start_y = ts.y;
-            s_swipe_origin_y = ts.y;
-            s_menu_cooldown = 15;
+        if (ret == EXIT_RET_BACK) {          /* 点空白 / 返回: 回打开前那一层 */
+            sok_exit_close(MENU_Y);
             return 0;
         }
         if (ret != EXIT_RET_NONE) {
@@ -2168,6 +2155,7 @@ process_exit_menu:
             && s_menu_cooldown == 0) {
             s_exit_menu_visible = 1;
             s_exit_sliding = 1;
+            s_exit_prev_layer = 0;     /* 游戏内下滑: 关闭后直接回游戏 */
             s_exit_drag_y = -MENU_H;
             s_prev_pressed = 0;
             return interacted;
@@ -2302,6 +2290,11 @@ int sokoban_sim_hold_info(int which)
     case 9:  return (int)s_current_level;        /* 当前关卡号 */
     case 10: return (int)s_hist_cnt;             /* 撤销历史步数 */
     case 11: return (int)s_hist_pos;             /* 撤销历史当前位置(可重做 = cnt-pos) */
+    case 12: return (int)s_swipe_origin_y;       /* 本次手势起手 Y */
+    case 13: return (int)s_prev_pressed;         /* 上一帧按下态 */
+    case 14: return (int)s_exit_drag_y;          /* 退出菜单当前顶边 */
+    case 15: return (int)s_exit_prev_layer;      /* 打开退出菜单前所在层 */
+    case 16: return (int)s_exit_dragging;        /* 退出菜单拖拽中 */
     default: return -1;
     }
 }

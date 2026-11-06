@@ -1784,6 +1784,14 @@ uint8_t game_menu_command(const GameMenuCfg* cfg, uint8_t* state, uint8_t* out_r
                     Touch_Scan(&ts_now);
                     if (ts_now.pressed) g_menu_cooldown = 15;
                 }
+                /* 落点上方那条带要交还给场景: 滑入途中菜单框顶边从屏幕最上方掠过
+                   (圆屏只在 y=0~4 露出一小段), 落到 MENU_Y=5 后这 5 行被让出来 ——
+                   不清就会留下一条绿边(菜单边框色), 之后关菜单只从 MENU_Y 起清也清不到。
+                   用 g_menu_clear_color 而不是写死黑: 鱼把背景色设成了深海蓝, 那条带本来
+                   就是蓝的, 清黑会在顶部多出一条黑边。 */
+                LCD_Fill(MENU_X, 0, MENU_X + MENU_W, MENU_Y, g_menu_clear_color);
+                if (cfg->bat_x != GAME_MENU_BAT_NONE)
+                    game_battery_icon_update(cfg->bat_x, cfg->bat_y, 1);
             }
             menu_draw_nrow_frame_only(g_exit_drag_y, cfg->exit_row_types, 5);
             return GAME_MENU_CMD_NONE;
