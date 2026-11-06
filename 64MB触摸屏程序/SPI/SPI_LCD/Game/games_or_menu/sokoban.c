@@ -653,6 +653,19 @@ void sokoban_full_redraw(void) {
 }
 
 /**
+ * @brief  显示"通关界面": 恭喜通关文字 + 一级按钮组
+ * @note   原来在"设置返回 / 存档恢复 / 退出菜单返回 / 模拟器强制通关"四处各写一遍,
+ *         漏写任一处就会出现"有按钮没文字"或"有文字没按钮"(68.7 那种卡死就是漏了)。
+ *         现在统一走这里, 只允许 s_won 非 0 时调用。
+ */
+static void sok_show_win_screen(void) {
+    s_menu_visible = 1;
+    s_menu_slide_y = SOK_BTN_Y;
+    sok_win_draw(65, 120);
+    sok_redraw_nav_group();
+}
+
+/**
  * @brief  从设置返回游戏时恢复游戏内面板: 撤销模式回撤销按钮组, 否则回一级按钮组
  * @note   s_undo_group 在进设置前就被置 1(撤销界面->上划二级菜单->设置), 期间没被清过,
  *         所以这里按它判断该回哪个界面
@@ -660,10 +673,7 @@ void sokoban_full_redraw(void) {
 static void sok_restore_panel_by_mode(void) {
     if (s_won) {
         /* 通关界面拉出过二级菜单: 关掉后要回到"恭喜通关 + 按钮", 不能变成空白游戏画面 */
-        s_menu_slide_y = SOK_BTN_Y;
-        s_menu_visible = 1;
-        sok_win_draw(65, 120);
-        sok_redraw_nav_group();
+        sok_show_win_screen();
     }
     else if (s_undo_group) {
         s_menu_slide_y = SOK_BTN_Y;   /* 电池恢复按这个上缘裁剪, 别留二级菜单的旧值 */
@@ -1443,10 +1453,7 @@ uint8_t sokoban_restore_state(const uint8_t* buf, uint8_t len) {
     s_hold_us = 0;
     s_menu_cooldown = 0;
     sokoban_draw_level(s_current_level);
-    if (s_won) {              /* 未通关时 s_menu_visible=0, 不画按钮面板 */
-        sok_win_draw(65, 120);
-        sok_redraw_nav_group();
-    }
+    if (s_won) sok_show_win_screen();   /* 未通关时 s_menu_visible=0, 不画按钮面板 */
     return 1;
 }
 
@@ -2039,11 +2046,7 @@ process_exit_menu:
             s_menu_visible = 0;
             LCD_CLEAR_MENU_AREA();
             sok_redraw_grid_below(MENU_Y);
-            if (s_won) {
-                s_menu_visible = 1;
-                sok_win_draw(65, 120);
-                sok_redraw_nav_group();
-            }
+            if (s_won) sok_show_win_screen();
             game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 1);
             s_prev_pressed = 1;
             s_touch_start_x = ts.x;
@@ -2258,8 +2261,7 @@ void sokoban_sim_force_win(void)
     s_menu_slide_y   = 240;
     s_menu_from_swipe = 0;
     s_slide_max_dy   = 0;
-    sok_win_draw(65, 120);
-    sok_redraw_nav_group();
+    sok_show_win_screen();
 }
 #endif
 #ifdef SIM_BUILD
