@@ -154,6 +154,7 @@ static void sok_draw_nav_buttons_at(int16_t y);   /* 导航按钮组绘制(定�
 static void sok_redraw_battery_tiles(int16_t x0, int16_t y0, int16_t x1, int16_t y1); /* 按矩形重绘地图瓦片(定义在下方) */
 static void sok_hist_push(uint8_t step);      /* 记录一步撤销历史(定义在下方) */
 static uint8_t sok_try_open_exit_menu(uint16_t y);  /* 上方区域下滑打开退出菜单(游戏内/二级菜单/撤销界面共用) */
+static uint8_t sok_open_exit_menu_here(uint16_t y); /* 打开退出菜单 + 收掉当前层的面板(四个入口共用) */
 
 /** @brief  重绘 skip_y 以下的游戏格子 (0~239), 含CS控制 */
 static void sok_redraw_grid_below(int16_t y_skip) {
@@ -990,6 +991,21 @@ static void sok_panel_drag_start(uint8_t kind, int16_t up_move) {
 }
 
 /**
+ * @brief  擦掉一块面板区域并恢复其下的地图
+ * @param  x0,y0,x1,y1  面板矩形(LCD_Fill 语义: 右下不含)
+ * @param  grid_from_y  从这里往下重绘地图格子(通常 <= y0)
+ * @param  use_dma      1=用 DMA 填充(大块菜单区), 0=普通填充
+ * @note   三个面板(一级按钮/撤销按钮/二级菜单)位置不同, 只有"先刷黑再补格子"这步共用;
+ *         统一到这里, 免得某处只刷黑忘了补格子(会留一块黑底)。
+ */
+static void sok_erase_panel(int16_t x0, int16_t y0, int16_t x1, int16_t y1,
+                            int16_t grid_from_y, uint8_t use_dma) {
+    if (use_dma) LCD_Fill_DMA((uint16_t)x0, (uint16_t)y0, (uint16_t)x1, (uint16_t)y1, LCD_BLACK);
+    else         LCD_Fill((uint16_t)x0, (uint16_t)y0, (uint16_t)x1, (uint16_t)y1, LCD_BLACK);
+    sok_redraw_grid_below(grid_from_y);
+}
+
+/**
  * @brief  擦掉二级菜单框 + 恢复其下地图
  */
 static void sok_lvl2_clear_frame(void) {
@@ -997,9 +1013,8 @@ static void sok_lvl2_clear_frame(void) {
     /* 滑动位置复位到按钮面板停靠位: 电池恢复按这个上缘裁剪, 用 240 会一直补到 y=219,
        把撤销界面的三个按钮(189 起)盖在地图下面 */
     s_menu_slide_y = SOK_BTN_Y;
-    LCD_Fill_DMA(RESTART_MENU_X, RESTART_MENU_Y - 1,
-                 RESTART_MENU_X + RESTART_MENU_W, 240, LCD_BLACK);
-    sok_redraw_grid_below(RESTART_MENU_Y - 1);
+    sok_erase_panel(RESTART_MENU_X, RESTART_MENU_Y - 1,
+                    RESTART_MENU_X + RESTART_MENU_W, 240, RESTART_MENU_Y - 1, 1);
 }
 
 /**
@@ -1022,8 +1037,7 @@ static uint8_t sok_lvl2_update(void) {
             s_swipe_origin_y = ts.y;
         }
         /* 按住中: 上方区域(y<40)下滑 -> 收起二级菜单, 打开退出菜单(与游戏内一致) */
-        else if (sok_try_open_exit_menu(ts.y)) {
-            sok_lvl2_clear_frame();
+        else if (sok_open_exit_menu_here(ts.y)) {
             s_menu_cooldown = 15;
         }
         return 0;
@@ -1238,9 +1252,8 @@ static uint8_t sok_hist_go(int8_t dirn) {
  */
 static void sok_undo_hide(uint8_t back_to_nav) {
     s_undo_visible = 0;
-    LCD_Fill(SOK_UNDO_X1, SOK_UNDO_Y,
-             SOK_UNDO_X3 + UNDO_IMG_W, SOK_UNDO_Y + UNDO_IMG_H, LCD_BLACK);
-    sok_redraw_grid_below(SOK_UNDO_Y);
+    sok_erase_panel(SOK_UNDO_X1, SOK_UNDO_Y,
+                    SOK_UNDO_X3 + UNDO_IMG_W, SOK_UNDO_Y + UNDO_IMG_H, SOK_UNDO_Y, 0);
     if (s_won) {
         /* 通关界面拉到过撤销按钮: 关掉后必须回到"恭喜通关 + 按钮组"。
            否则 s_undo_visible/menu_visible 都是 0, 而 s_won 分支会吞掉所有移动触摸
@@ -1298,10 +1311,7 @@ static void sok_undo_ui_update(void) {
             sok_panel_drag_start(1, up_move);
         }
         /* 上方区域下滑 -> 收起撤销按钮, 打开退出菜单(与游戏内一致) */
-        if (sok_try_open_exit_menu(ts.y)) {
-            s_exit_from_undo = 1;
-            sok_undo_hide(0);
-        }
+        (void)sok_open_exit_menu_here(ts.y);
         return;
     }
     if (!s_prev_pressed) return;
@@ -1331,9 +1341,33 @@ static void sok_undo_ui_update(void) {
  */
 static void sok_close_nav_panel(void) {
     sok_level_clear();                                        /* 关卡文字带 */
-    LCD_Fill(0, SOK_BTN_Y, 239, SOK_BTN_Y + SOK_BTN_H, LCD_BLACK);  /* 按钮带 */
-    sok_redraw_grid_below(84);                                /* 其下地图格子 */
+    sok_erase_panel(0, SOK_BTN_Y, 239, SOK_BTN_Y + SOK_BTN_H, 84, 0);   /* 按钮带 + 其下地图 */
     s_menu_visible = 0;
+}
+
+/**
+ * @brief  打开退出菜单, 并按当前所在层收掉自己的面板
+ * @param  y  当前触点 Y
+ * @retval 1=已打开(调用方直接返回) 0=未触发
+ * @note   四个入口(游戏内/一级按钮/二级菜单/撤销按钮)原来各写一遍"开菜单 + 收面板",
+ *         收法还不一样; 统一到这里, 避免某个入口漏收面板 → 退出菜单下面压着旧按钮,
+ *         关掉菜单后残留一层。
+ */
+static uint8_t sok_open_exit_menu_here(uint16_t y) {
+    if (!sok_try_open_exit_menu(y)) return 0;
+    s_hold_button = 0;
+    s_hold_us = 0;
+    if (s_lvl2_visible) {
+        sok_lvl2_clear_frame();
+    }
+    else if (s_undo_visible) {
+        s_exit_from_undo = 1;      /* 关菜单后恢复撤销按钮而不是一级面板 */
+        sok_undo_hide(0);
+    }
+    else if (s_menu_visible) {
+        sok_close_nav_panel();
+    }
+    return 1;
 }
 
 /**
@@ -1704,10 +1738,7 @@ uint8_t sokoban_update(void) {
         if (ts.pressed && s_won) {
             Touch_UpdateCoords();
             Touch_Scan(&ts);
-            if (sok_try_open_exit_menu(ts.y)) {
-                s_hold_button = 0;
-                return interacted;
-            }
+            if (sok_open_exit_menu_here(ts.y)) return interacted;
         }
         /* 松手下滑提交退出菜单 */
         if (!s_prev_pressed) {
@@ -1773,17 +1804,7 @@ uint8_t sokoban_update(void) {
                 && s_menu_cooldown == 0) {
                 Touch_UpdateCoords();
                 Touch_Scan(&ts);
-                if (sok_try_open_exit_menu(ts.y)) {
-                    s_menu_visible = 0;
-                    s_hold_button = 0;
-                    s_hold_us = 0;
-                    /* 清除按钮区域: 先黑底再重绘游戏格子, 防边缘残留 */
-                    LCD_Fill(SOK_BTN1_X, SOK_BTN_Y, SOK_BTN1_X + SOK_BTN_W, SOK_BTN_Y + SOK_BTN_H + 2, LCD_BLACK);
-                    LCD_Fill(SOK_BTN2_X, SOK_BTN_Y, SOK_BTN2_X + SOK_BTN_W, SOK_BTN_Y + SOK_BTN_H + 2, LCD_BLACK);
-                    LCD_Fill(SOK_BTN3_X, SOK_BTN_Y, SOK_BTN3_X + SOK_BTN_W, SOK_BTN_Y + SOK_BTN_H + 2, LCD_BLACK);
-                    sok_redraw_grid_below(SOK_BTN_Y);
-                    return interacted;
-                }
+                if (sok_open_exit_menu_here(ts.y)) return interacted;
             }
 
             /* 二次上划: 按钮面板已显示时, 再次上划打开二级菜单(撤销/设置/返回)
@@ -2078,7 +2099,7 @@ process_exit_menu:
         Touch_Scan(&ts);
 
         /* 检测退出菜单手势: 上方区域 + 向下滑动 > 5px 则可拖出退出菜单 */
-        if (sok_try_open_exit_menu(ts.y)) return 0;
+        if (sok_open_exit_menu_here(ts.y)) return 0;
 
         /* 底部上划: 跟下滑菜单一样, 移动>5px即启动跟手滑动 */
         if (s_swipe_origin_y > SOK_SWIPE_Y
