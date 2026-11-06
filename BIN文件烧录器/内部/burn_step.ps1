@@ -6,7 +6,7 @@
 #
 # 各步含义(与规则文档 §32.3 的步骤号对应):
 #   font  = 字库/图片资源(FLASH_DATA_STORE_MODE)   -> 外部 Flash 末尾
-#   btn   = 英文/撤销按钮图 + 菜单字模(BTN_IMG_STORE_MODE) -> 外部 Flash 保留区
+#   btn   = 英文/撤销按钮图 + 菜单字模 + 推箱子教程解法数据(BTN_IMG_STORE_MODE) -> 外部 Flash 保留区
 #   game  = 游戏程序(GAME: 三个烧录宏全关)          -> MCU 内部 Flash
 #   video = 视频数据块(VIDEO_CHUNK_STORE_MODE)     -> 外部 Flash 地址 0 (内部调用 burn_all.ps1)
 #   auto  = font -> btn -> [video] -> game   (video 只在 -WithVideo 且给了 bin 时才做)
@@ -345,7 +345,7 @@ function Step-Font {
 }
 
 function Step-Btn {
-    Log '===== 步骤 2/3 按钮图 + 菜单字模 ====='
+    Log '===== 步骤 2/3 按钮图 + 菜单字模 + 教程解法数据 ====='
     if (-not $DryRun) {
         $h = Get-ShaSet
         $t = Test-Skip 'btn' $h
@@ -368,7 +368,7 @@ function Step-Btn {
         $v = WaitProg $addr 4 0x42544E31 120
         if (-not $v) { return '等不到 g_btn_prog 结果(超时)' }
         if ($v[3] -ne 1) { return ("按钮图烧录失败: result={0}" -f $v[3]) }
-        Log ("保留区 {0} 字节(英文导航 + 撤销中英 + 菜单字模) 已写入且 CRC 通过" -f $v[1])
+        Log ("保留区 {0} 字节(英文导航 + 撤销中英 + 菜单字模 + 教程解法数据) 已写入且 CRC 通过" -f $v[1])
         Save-BurnState 'btn' $h
     }
     Log 'STEP_OK btn'
@@ -470,12 +470,12 @@ Log ("烧录步骤: {0}{1}" -f $Step, $(if ($DryRun) { ' (DryRun 只列步骤不
 $fail = ''
 switch ($Step) {
     'font'  { $fail = Run-Step '步骤1 字库/图片资源' { Step-Font } }
-    'btn'   { $fail = Run-Step '步骤2 按钮图/菜单字模' { Step-Btn } }
+    'btn'   { $fail = Run-Step '步骤2 按钮图/菜单字模/解法数据' { Step-Btn } }
     'game'  { $fail = Run-Step '步骤3 游戏程序' { Step-Game } }
     'video' { $fail = Run-Step '视频数据块' { Step-Video } }
     'auto'  {
         $fail = Run-Step '步骤1 字库/图片资源' { Step-Font }
-        if ($fail -eq '') { $fail = Run-Step '步骤2 按钮图/菜单字模' { Step-Btn } }
+        if ($fail -eq '') { $fail = Run-Step '步骤2 按钮图/菜单字模/解法数据' { Step-Btn } }
         if ($fail -eq '' -and $WithVideo) { $fail = Run-Step '视频数据块' { Step-Video } }
         if ($fail -eq '') { $fail = Run-Step '步骤3 游戏程序' { Step-Game } }
     }

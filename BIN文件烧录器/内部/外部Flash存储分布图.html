@@ -157,7 +157,9 @@
      DIR_SIZE   = FLASH_STORE_DIR_HEADER_SIZE(8) + FLASH_STORE_RES_COUNT(128) * 12 = 1544
      VIDEO      = 视频烧录 57 块 x 53248B(块宽) ; 源 bin 3,011,488B, 末块补 0xFF
      按钮保留区 = BTN_IMG_EN_ADDR 0x007E0000 / BTN_IMG_UNDO_CN 0x007E2000 / EN 0x007E4000, 各 3x1860B
-     菜单字模   = MENU_GLYPH_SIZE = 21 个 24x24 汉字 x 72B = 1512B, 地址 = (data_start 向下取整 4KB) - 1512
+     ★ 推箱子教程解法数据 = 2457B, 紧跟英文按钮图(SOK_DEMO_ADDR = 0x7E15CC, 到 0x7E1F65)
+       由 BTN_IMG_STORE_MODE 一起烧 + CRC 回读
+     菜单字模   = MENU_GLYPH_SIZE = 23 个 24x24 汉字 x 72B = 1656B, 地址 = (data_start 向下取整 4KB) - 1656
      RES_TOTAL  = s_resources[] 128 项字节和 = 56,705 (见 RG 明细, 逐项可核对)
      data_start = FLASH - DIR_SIZE - RES_TOTAL        (烧字库时的布局算法)
    ===================================================================== */
@@ -169,9 +171,10 @@ var VBLK_DEF  = 57;
 var VBLK      = (function(){ try { var v = Number(sessionStorage.getItem('vblk')); return v > 0 ? v : VBLK_DEF; } catch (e) { return VBLK_DEF; } })();
 var VIDEO     = VBLK * 53248;
 var BTN_ONE   = 5580;                     /* 3 张 x 1860 */
-var GLYPH_SZ  = 1512;
+var DEMO_SZ   = 2457;                     /* 推箱子教程解法数据(50 关 x 2bit/步, 每关字节对齐) */
+var GLYPH_SZ  = 1656;
 var DS        = FLASH - DIR_SIZE - RES_TOTAL;        /* data_start = 8330359 = 0x7F1C77 */
-var MG        = (DS - (DS % 4096)) - GLYPH_SZ;       /* 菜单字模块 = 8325656 = 0x7F0A18 */
+var MG        = (DS - (DS % 4096)) - GLYPH_SZ;       /* 菜单字模块 = 8325512 = 0x7F0974 */
 var TAIL0     = 0x7F0000;
 var BTN0      = 0x7E0000;
 
@@ -194,7 +197,9 @@ var R = [
     note:'视频区与按钮保留区之间' },
   { s:BTN0,            e:BTN0+BTN_ONE,        k:'btn',   n:'英文导航按钮图',
     note:'上一关 / 下一关 / 重新开始，各 1860B（30x31 RGB565）' },
-  { s:BTN0+BTN_ONE,    e:0x7E2000,            k:'free',  n:'空闲区',
+  { s:BTN0+BTN_ONE,    e:BTN0+BTN_ONE+DEMO_SZ, k:'res',  n:'推箱子教程解法数据',
+    note:'2457B = 50 关 x 2bit/步（每关按字节对齐）；SOK_DEMO_ADDR，与按钮图同一步烧 + CRC 校验' },
+  { s:BTN0+BTN_ONE+DEMO_SZ, e:0x7E2000,       k:'free',  n:'空闲区',
     note:'扇区对齐留空' },
   { s:0x7E2000,        e:0x7E2000+BTN_ONE,    k:'btn',   n:'撤销按钮图（中文套）',
     note:'上一步 / 返回 / 下一步，各 1860B' },
@@ -206,7 +211,7 @@ var R = [
   { s:TAIL0,           e:MG,                  k:'pad',   n:'扇区填充',
     note:'菜单字模块所在 4KB 扇区的前段（未使用）' },
   { s:MG,              e:MG+GLYPH_SZ,         k:'glyph', n:'菜单游戏名字模',
-    note:'21 个 24x24 汉字 = 1512B；由 BTN_IMG_STORE_MODE 单独烧（烧字库擦不到这里）' },
+    note:'23 个 24x24 汉字 = 1656B；由 BTN_IMG_STORE_MODE 单独烧（烧字库擦不到这里）' },
   { s:MG+GLYPH_SZ,     e:DS,                  k:'pad',   n:'擦除对齐填充',
     note:'字库擦除范围按 4KB 向下对齐，资源数据从 data_start 才开始' },
   { s:DS,              e:FLASH-DIR_SIZE,      k:'res',   n:'字库 / 图片资源区',
@@ -347,7 +352,7 @@ document.getElementById('foot').innerHTML =
   '参数来源：<code>SPI/SPI_LCD/User/inc/flash_store.h</code>（地址/尺寸宏）与 ' +
   '<code>User/src/flash_store.c</code> 的 <code>s_resources[]</code>（128 项资源）。<br>' +
   '尺寸算法：<code>data_start = 8,388,608 - 1544(目录) - 56,705(资源) = ' + hx(DS) + '</code>；' +
-  '菜单字模块 <code>= (data_start 向下取整 4KB) - 1512 = ' + hx(MG) + '</code>；' +
+  '菜单字模块 <code>= (data_start 向下取整 4KB) - 1656 = ' + hx(MG) + '</code>；' +
   '字库擦除范围 <code>= 4KB 对齐(data_start) ~ 芯片末尾</code>。<br>' +
   '改了资源表 / 视频长度 / 保留区宏之后，请同步修改本文件顶部 <code>&lt;script&gt;</code> 里的参数。';
 
@@ -392,7 +397,7 @@ function kb(n){ return n >= 1048576 ? (n / 1048576).toFixed(2) + ' MB' : (n / 10
 
 /* ---- 进度: 从日志里认阶段 + 视频块数 ----
    burn_step.ps1 会打 "步骤 N/3 ..."; 视频那段由 burn_all.ps1 打 "blocks=57" / "block N done"。 */
-var PHASES = ['字库/图片资源', '按钮图 + 菜单字模', '视频数据块', '游戏程序'];
+var PHASES = ['字库/图片资源', '按钮图 + 菜单字模 + 解法数据', '视频数据块', '游戏程序'];
 
 function calcProgress(st){
   var text = (st.log || []).join('\n');
@@ -483,7 +488,8 @@ $btns.forEach(function(b){
     fetch('/api/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ step: step, withVideo: wv, useBin: true, force: ($force && $force.checked) })
+      body: JSON.stringify({ step: step, withVideo: wv, useBin: true, force: ($force && $force.checked) })
+
     }).then(function(r){ return r.json(); }).then(function(j){
       if (!j.ok) alert(j.msg || '启动失败');
       poll();

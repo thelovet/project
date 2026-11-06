@@ -986,7 +986,8 @@ void BtnImgStore_BurnAll(void)
 
     g_btn_prog.magic  = BTN_PROG_MAGIC;
     g_btn_prog.size   = (uint32_t)BTN_IMG_EN_SIZE + (uint32_t)BTN_IMG_UNDO_SIZE * 2UL
-                        + (have_glyph ? (uint32_t)MENU_GLYPH_SIZE : 0UL);
+                        + (have_glyph ? (uint32_t)MENU_GLYPH_SIZE : 0UL)
+                        + SOK_DEMO_SIZE;
     g_btn_prog.pct    = 0;
     g_btn_prog.result = 0;
 
@@ -1055,11 +1056,23 @@ void BtnImgStore_BurnAll(void)
         }
     }
 
-    /* 5. 回读校验: 四小块分别与固件里的源数据比 CRC16 */
+    /* 4.5 写入推箱子教程解法数据(2457B, 紧跟英文按钮图后面, 同属 0x7E0000 扇区已擦过) */
+    {
+        uint32_t written = 0;
+        while (written < SOK_DEMO_SIZE) {
+            uint32_t n = SOK_DEMO_SIZE - written;
+            flash_store_write(sok_demo_bits + written, SOK_DEMO_ADDR + written, n);
+            written += n;
+            g_btn_prog.pct = (uint8_t)(85 + 5UL * written / SOK_DEMO_SIZE);
+            flash_store_ui_update((uint8_t)g_btn_prog.pct);
+        }
+    }
+
+    /* 5. 回读校验: 五小块分别与固件里的源数据比 CRC16 */
     {
         uint8_t  rbuf[64];
-        uint16_t c1 = 0xFFFF, c2 = 0xFFFF, c3 = 0xFFFF, c4 = 0xFFFF;
-        uint16_t s1, s2, s3, s4 = 0xFFFF;
+        uint16_t c1 = 0xFFFF, c2 = 0xFFFF, c3 = 0xFFFF, c4 = 0xFFFF, c5 = 0xFFFF;
+        uint16_t s1, s2, s3, s4 = 0xFFFF, s5;
         uint32_t i;
         uint8_t  ok;
 
@@ -1096,7 +1109,15 @@ void BtnImgStore_BurnAll(void)
         s1 = flash_store_crc16(g_btn_img_en, BTN_IMG_EN_SIZE);
         s2 = flash_store_crc16(g_btn_img_undo_cn, BTN_IMG_UNDO_SIZE);
         s3 = flash_store_crc16(g_btn_img_undo_en, BTN_IMG_UNDO_SIZE);
-        ok = ((c1 == s1) && (c2 == s2) && (c3 == s3) && (c4 == s4)) ? 1 : 0;
+        for (i = 0; i < SOK_DEMO_SIZE; i += (uint32_t)sizeof(rbuf)) {
+            uint32_t left = SOK_DEMO_SIZE - i;
+            uint16_t n = (left > sizeof(rbuf)) ? (uint16_t)sizeof(rbuf) : (uint16_t)left;
+            uint16_t j;
+            flash_store_read(rbuf, SOK_DEMO_ADDR + i, n);
+            for (j = 0; j < n; j++) c5 = flash_store_crc16_update(c5, rbuf[j]);
+        }
+        s5 = flash_store_crc16(sok_demo_bits, SOK_DEMO_SIZE);
+        ok = ((c1 == s1) && (c2 == s2) && (c3 == s3) && (c4 == s4) && (c5 == s5)) ? 1 : 0;
 
         g_btn_prog.pct    = 100;
         g_btn_prog.result = ok ? 1 : 2;

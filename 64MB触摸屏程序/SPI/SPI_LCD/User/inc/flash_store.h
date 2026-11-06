@@ -184,6 +184,14 @@ typedef enum {
 #define BTN_IMG_UNDO_CN_ADDR 0x007E2000UL              /* 中文套保留区(4KB对齐) */
 #define BTN_IMG_UNDO_EN_ADDR 0x007E4000UL              /* 英文套保留区(4KB对齐) */
 
+/* ---- 推箱子教程(自动演示)解法数据 ----
+   和英文按钮图同一块保留区: 英文按钮只占 5580B(0x7E0000~0x7E15CC), 后面到 0x7E2000
+   还有 2612B 空着, 放 2457B 的解法数据正好(不影响任何字库/资源)。
+   由 BTN_IMG_STORE_MODE 一起烧; 游戏里用 FlashStore_RawRead() 按关卡读一片。
+   ★ 内部 Flash 只剩 1KB 左右, 这 2.4KB 放不进固件 —— 所以放外部 Flash。 */
+#define SOK_DEMO_ADDR        (BTN_IMG_EN_ADDR + BTN_IMG_EN_SIZE)
+#define SOK_DEMO_SIZE        2457UL                    /* sokoban_maps.c: sok_demo_bits[] */
+
 /* 菜单"游戏名"用的汉字字模 (见 chinese_fonts.h 的 MENU_EXT_ID_*):
    放在**字库数据区紧前面**(与字库同一个区), 地址 = (data_start 向下取整到 4KB) - MENU_GLYPH_SIZE。
    这样它落在"全量烧字库"的擦除范围(从 data_start 所在扇区起到芯片末尾)之外,
@@ -191,8 +199,8 @@ typedef enum {
    ★ 字库资源总量变化(data_start 移动)后, 必须重烧这一块。
    读取接口 FlashStore_MenuGlyphRead() 内部按目录头里的 data_start 现算地址。 */
 #define MENU_GLYPH_ONE    72UL                                  /* 单字 24x24 1bpp */
-#define MENU_GLYPH_CNT    21UL                                  /* 方块消行/华容道/大鱼小鱼/合并/撤销 + 俄罗斯块/数字相融 */
-#define MENU_GLYPH_SIZE   (MENU_GLYPH_ONE * MENU_GLYPH_CNT)     /* 1512 字节 */
+#define MENU_GLYPH_CNT    23UL                                  /* 方块消行/华容道/大鱼小鱼/合并/撤销 + 俄罗斯块/数字相融 + 教程 */
+#define MENU_GLYPH_SIZE   (MENU_GLYPH_ONE * MENU_GLYPH_CNT)     /* 1656 字节 */
 
 /* ================================================================
  * 接口
@@ -209,13 +217,13 @@ void FlashStore_BurnAll(void);
  * @note   写三小块, 都不碰字库资源区/目录, 所以不用重烧字库:
  *         1) 英文按钮图 5580B → 固定保留区 BTN_IMG_EN_ADDR
  *         2) 撤销按钮图(中英各 5580B) → BTN_IMG_UNDO_CN_ADDR / BTN_IMG_UNDO_EN_ADDR
- *         3) 菜单追加字模(14 个汉字 1008B) → 字库数据区紧前面(见 MENU_GLYPH_SIZE 注释)
+ *         3) 菜单追加字模(23 个汉字 1656B) → 字库数据区紧前面(见 MENU_GLYPH_SIZE 注释)
  *         擦除+写入+CRC回读校验, 完成常驻显示100%; 本函数不返回。
  */
 void BtnImgStore_BurnAll(void);
 
 /**
- * @brief  读取"菜单"追加字模 (14 个 24x24 汉字, 共 MENU_GLYPH_SIZE 字节)
+ * @brief  读取"菜单"追加字模 (23 个 24x24 汉字, 共 MENU_GLYPH_SIZE 字节)
  * @param  buf 目标缓冲(至少 MENU_GLYPH_SIZE 字节)
  * @return 1=读取完成(没烧过时内容是 0xFF, 字不显示, 其它功能不受影响)
  * @note   地址按目录头里的 data_start 现算: (data_start 向下取整 4KB) - MENU_GLYPH_SIZE

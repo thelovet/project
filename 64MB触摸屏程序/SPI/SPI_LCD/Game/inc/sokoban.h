@@ -77,6 +77,16 @@ extern const uint16_t sok_img_box_on_target_palette[];
 extern const uint8_t sok_img_box_on_target[SOK_TILE_PIXELS];/* 箱子在目标上 30x30 */
 
 /**
+ * @brief 教程(自动演示)解法数据 (sokoban_maps.c, 工具/推箱子求解/gen_demo_data.py 生成)
+ *        sok_demo_off[i]..sok_demo_off[i+1] 是第 i 关的步号区间;
+ *        sok_demo_bits 每步 2bit(上0/下1/左2/右3, 高位在前), 每关按字节对齐。
+ *        ★ 固件运行时**不引用** sok_demo_bits(2.4KB 内部 Flash 放不下): 它由
+ *          BTN_IMG_STORE_MODE 烧到外部 Flash 的 SOK_DEMO_ADDR, 进教程页时按关读一片。
+ */
+extern const uint16_t sok_demo_off[SOKOBAN_LEVEL_COUNT + 1];
+extern const uint8_t  sok_demo_bits[];
+
+/**
  * @brief  绘制关卡到LCD
  * @param  level_index  关卡序号 (0 ~ SOKOBAN_LEVEL_COUNT-1)
  */

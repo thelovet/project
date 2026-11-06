@@ -103,15 +103,28 @@ static uint8_t  s_won_transition = 0;  // WON切关后进入menu_visible的标�
 static uint8_t  s_btn_max_y = 0;  // 按钮栏拖拽最远Y, 松手回退>5px取消
 static int16_t  s_slide_max_dy = 0;  // 上划拖拽最远位移, 松手回退>2px取消
 
-/* ---- 二级菜单(3行: 撤销/设置/返回), 由一级按钮面板"二次上划"跟手拉出 ---- */
+/* ---- 二级菜单(4行: 撤销/教程/设置/返回), 由一级按钮面板"二次上划"跟手拉出 ----
+   4 行用 menu.c 的 4 行菜单尺寸(高 188, 与主菜单同间距), 顶边贴屏幕底 -> y=52;
+   绘制时再上移 1px(51), 与原来 3 行菜单"上移1px 盖掉低电图标上边框"的做法一致 */
+#define SOK_LVL2_Y    (240 - VIDEO_MENU_H4)   /* = 52 */
+#define SOK_LVL2_ROWS 4
 static uint8_t  s_lvl2_visible = 0;
-/* ---- 跟手上划拉出的面板种类: 0=导航按钮组(停 y=SOK_BTN_Y), 1=二级菜单(停 y=RESTART_MENU_Y) ----
+/* ---- 跟手上划拉出的面板种类: 0=导航按钮组(停 y=SOK_BTN_Y), 1=二级菜单(停 y=SOK_LVL2_Y-1) ----
    两者共用同一套跟手滑动状态(s_menu_sliding/s_menu_slide_y), 靠 s_panel_kind 区分画什么 */
 static uint8_t  s_panel_kind = 0;
 static int16_t  s_panel_rest = SOK_BTN_Y;   /* 当前面板停住时的顶部Y */
-static const uint8_t sok_lvl2_row_types[3] = {
-    MENU_ROW_CHEXIAO, MENU_ROW_SHEZHI, MENU_ROW_FANHUI
+static const uint8_t sok_lvl2_row_types[SOK_LVL2_ROWS] = {
+    MENU_ROW_CHEXIAO, MENU_ROW_JIAOCHENG, MENU_ROW_SHEZHI, MENU_ROW_FANHUI
 };
+
+/* ---- 教程页(当前关自动演示): 关卡画面 + 屏幕中央大播放按钮 ---- */
+static uint8_t  s_tut_visible = 0;   /* 教程页显示中 */
+static uint8_t  s_tut_playing = 0;   /* 正在自动演示 */
+static uint8_t  s_tut_paused  = 0;   /* 教程页被手势收起(暂停): 回到无面板画面时要恢复 */
+static uint8_t  s_tut_tap_paused = 0;/* 本次手势是"按下暂停演示", 松手不算点播放 */
+static uint16_t s_tut_step  = 0;     /* 已演示步数 */
+static uint16_t s_tut_len   = 0;     /* 当前关解法总步数(0=本关没有演示) */
+static uint32_t s_tut_time  = 0;     /* 上一步的时间戳(us) */
 
 /* ---- 撤销界面: 1:1(30x31) 三个按钮 上一步/返回/下一步 ----
    位置按"底边 220 不变、左钮右缘 75 不变、右钮左缘 165 不变"排:
@@ -617,6 +630,10 @@ static uint8_t sokoban_prepare_level(uint8_t level_index) {
     s_undo_group = 0;
     s_undo_visible = 0;
     s_lvl2_visible = 0;
+    s_tut_visible = 0;
+    s_tut_playing = 0;
+    s_tut_paused = 0;
+    s_tut_tap_paused = 0;
     s_menu_sliding = 0;
     s_menu_slide_y = 240;
     s_menu_slide_anim = 0;
@@ -875,7 +892,7 @@ static void sok_menu_restore_after_close(void) {
     case 2:     /* 二级菜单 */
         s_lvl2_visible = 1;
         s_menu_from_swipe = 1;
-        menu_draw_nrow_frame_only(RESTART_MENU_Y - 1, sok_lvl2_row_types, 3);
+        menu_draw_nrow_frame_only(SOK_LVL2_Y - 1, sok_lvl2_row_types, SOK_LVL2_ROWS);
         break;
     case 1:     /* 一级按钮面板 */
         s_menu_from_swipe = 1;
@@ -979,7 +996,7 @@ static uint8_t sok_swipe_enter(uint8_t pressed) {
  */
 static void sok_panel_draw_at(int16_t y) {
     if (s_panel_kind == 1) {
-        menu_draw_nrow_frame_only(y, sok_lvl2_row_types, 3);
+        menu_draw_nrow_frame_only(y, sok_lvl2_row_types, SOK_LVL2_ROWS);
     } else {
         sok_draw_nav_buttons_at(y);
     }
@@ -996,15 +1013,15 @@ static void sok_panel_clear_from(int16_t y) {
 
 /**
  * @brief  启动跟手上划(导航按钮组 或 二级菜单, 三处共用: 游戏内上划/一级面板上划/撤销界面上划)
- * @param  kind    0=导航按钮组(停在 SOK_BTN_Y), 1=二级菜单(停在 RESTART_MENU_Y-1)
+ * @param  kind    0=导航按钮组(停在 SOK_BTN_Y), 1=二级菜单(停在 SOK_LVL2_Y-1)
  * @param  up_move 本次上划的位移(px)
  * @note   与一级按钮面板共用同一套滑动状态(s_menu_sliding/s_menu_slide_y), 靠 s_panel_kind 区分画什么
  */
 static void sok_panel_drag_start(uint8_t kind, int16_t up_move) {
     int16_t y0 = (int16_t)(240 - up_move);
     s_panel_kind = kind;
-    /* 二级菜单停在 RESTART_MENU_Y-1: 顶边上移1px, 正好盖掉低电图标上边框露在菜单框外的第79行 */
-    s_panel_rest = (kind == 1) ? (RESTART_MENU_Y - 1) : SOK_BTN_Y;
+    /* 二级菜单停在 SOK_LVL2_Y-1: 顶边上移1px, 正好盖掉低电图标上边框露在菜单框外的第79行 */
+    s_panel_rest = (kind == 1) ? (SOK_LVL2_Y - 1) : SOK_BTN_Y;
 
     s_slide_max_dy = up_move;
     if (y0 < s_panel_rest) y0 = s_panel_rest;
@@ -1035,14 +1052,293 @@ static void sok_lvl2_clear_frame(void) {
     /* 滑动位置复位到按钮面板停靠位: 电池恢复按这个上缘裁剪, 用 240 会一直补到 y=219,
        把撤销界面的三个按钮(189 起)盖在地图下面 */
     s_menu_slide_y = SOK_BTN_Y;
-    sok_erase_panel(RESTART_MENU_X, RESTART_MENU_Y - 1,
-                    RESTART_MENU_X + RESTART_MENU_W, 240, RESTART_MENU_Y - 1, 1);
+    sok_erase_panel(RESTART_MENU_X, SOK_LVL2_Y - 1,
+                    RESTART_MENU_X + RESTART_MENU_W, 240, SOK_LVL2_Y - 1, 1);
+}
+
+/* ================= 教程页(当前关自动演示) ================= */
+
+#define SOK_TUT_CX       120           /* 播放按钮圆心 */
+#define SOK_TUT_CY       120
+#define SOK_TUT_R         46           /* 外半径 */
+#define SOK_TUT_RING_W     4           /* 外圈白环宽度 */
+#define SOK_TUT_STEP_US  160000UL      /* 演示每步间隔(us) */
+
+/* 半径 46(外圈) / 42(内圆) 圆: 每行半宽, 下标 = dy + 半径。
+   查表比"每行从 R 往回收"的开方循环省 ~1KB flash(内部 Flash 只剩几百字节), 也更快。 */
+static const uint8_t sok_tut_hw_out[SOK_TUT_R * 2 + 1] = {
+    0,  9, 13, 16, 18, 20, 22, 24, 25, 27, 28, 29, 30, 32, 33, 33, 34, 35, 36, 37, 37, 38, 39, 39, 40, 40, 41, 41, 42, 42,
+    43, 43, 43, 44, 44, 44, 44, 45, 45, 45, 45, 45, 45, 45, 45, 45, 46, 45, 45, 45, 45, 45, 45, 45, 45, 45, 44, 44, 44, 44,
+    43, 43, 43, 42, 42, 41, 41, 40, 40, 39, 39, 38, 37, 37, 36, 35, 34, 33, 33, 32, 30, 29, 28, 27, 25, 24, 22, 20, 18, 16,
+    13,  9,  0,
+};
+static const uint8_t sok_tut_hw_in[(SOK_TUT_R - SOK_TUT_RING_W) * 2 + 1] = {
+    0,  9, 12, 15, 17, 19, 21, 23, 24, 25, 27, 28, 29, 30, 31, 32, 32, 33, 34, 35, 35, 36, 36, 37, 37, 38, 38, 39, 39, 39,
+    40, 40, 40, 41, 41, 41, 41, 41, 41, 41, 41, 41, 42, 41, 41, 41, 41, 41, 41, 41, 41, 41, 40, 40, 40, 39, 39, 39, 38, 38,
+    37, 37, 36, 36, 35, 35, 34, 33, 32, 32, 31, 30, 29, 28, 27, 25, 24, 23, 21, 19, 17, 15, 12,  9,  0,
+};
+
+/**
+ * @brief  画屏幕中央的大播放按钮(白环 + 蓝底 + 白三角, **整组 50% 半透明**)
+ * @param  enabled  0=本关没有演示, 整组画成灰色(点了没反应)
+ * @note   环/底/三角的所有像素共用同一个"棋盘格"判断(隔一个画一个), 底图整片透出来。
+ *         ★ 环和底不能"先把整圆填实再挖中间": 那样半透明区会被提前刷成实色。
+ *         逐像素要各自设一次地址, 只在进/暂停教程页时画一次(20~30ms), 可以接受。
+ */
+static void __attribute__((noinline, optimize("no-unroll-loops")))
+                                          sok_tut_draw_play(uint8_t enabled) {
+    uint16_t ring = enabled ? LCD_WHITE : LCD_GRAY;
+    uint16_t disc = enabled ? LCD_BLUE : 0x4208;   /* 0x4208 = 深灰(禁用态) */
+    uint16_t tri  = enabled ? LCD_WHITE : LCD_GRAY;
+    int16_t r_in = (int16_t)(SOK_TUT_R - SOK_TUT_RING_W);
+    int16_t dy, x, dxo, dxi, tx1;
+
+    for (dy = -SOK_TUT_R; dy <= SOK_TUT_R; dy++) {
+        dxo = (int16_t)sok_tut_hw_out[dy + SOK_TUT_R];
+        dxi = (dy >= -r_in && dy <= r_in) ? (int16_t)sok_tut_hw_in[dy + r_in] : 0;
+        tx1 = -99;                                  /* 三角本行的右边界(相对圆心) */
+        if (dy >= -22 && dy <= 22) {
+            int16_t a = (dy < 0) ? -dy : dy;
+            tx1 = (int16_t)(-10 + (22 - a) * 32 / 22);
+        }
+        for (x = -dxo; x <= dxo; x++) {
+            uint16_t c;
+            if (((x + dy) & 1) != 0) continue;      /* 棋盘格: 一半像素留给底图 */
+            if (x >= -10 && x <= tx1)       c = tri;    /* 白三角 */
+            else if (x <= -dxi || x >= dxi) c = ring;   /* 外环(帽区 dxi=0 -> 整行都是环) */
+            else                            c = disc;   /* 圆底 */
+            LCD_Address_Set((uint16_t)(SOK_TUT_CX + x), (uint16_t)(SOK_TUT_CY + dy),
+                            (uint16_t)(SOK_TUT_CX + x), (uint16_t)(SOK_TUT_CY + dy));
+            LCD_WR_DATA_16Bit(c);
+        }
+    }
+}
+
+/* 当前关的解法数据(每步 2bit, 每关按字节对齐): 最长的一关 586 步 -> 147 字节, 留点余量。
+   数据不在内部 Flash(固件放不下), 存在外部 Flash 的按钮保留区(SOK_DEMO_ADDR),
+   进教程页时按关读这一片到 RAM, 演示时直接解码。 */
+static uint8_t s_demo_buf[152];
+
+/**
+ * @brief  取当前关第 i 步的方向(2bit/步, 高位在前; 0上 1下 2左 3右, 与 SokobanDir 同序)
+ */
+static uint8_t sok_demo_dir(uint16_t i) {
+    return (uint8_t)((s_demo_buf[i >> 2] >> (6 - ((i & 3) * 2))) & 3u);
+}
+
+/**
+ * @brief  把第 lv 关的解法从外部 Flash 读进 s_demo_buf
+ * @return 1=读到有效数据 0=全 0xFF(没烧过 btn 步) -> 调用方按"没有演示"处理
+ * @note   每关按字节对齐, 所以起始字节 = 前面所有关的 ceil(步数/4) 之和(最多 50 次累加)
+ */
+static uint8_t sok_demo_load(uint8_t lv) {
+    uint16_t acc = 0;
+    uint16_t len = (uint16_t)(sok_demo_off[lv + 1] - sok_demo_off[lv]);
+    uint16_t n, i;
+    uint8_t k;
+
+    for (k = 0; k < lv; k++) {
+        uint16_t l = (uint16_t)(sok_demo_off[k + 1] - sok_demo_off[k]);
+        acc = (uint16_t)(acc + ((l + 3) >> 2));
+    }
+    if (len > 600) len = 600;                    /* 防御: 不超缓冲区 */
+    n = (uint16_t)((len + 3) >> 2);
+    (void)FlashStore_RawRead(SOK_DEMO_ADDR + acc, s_demo_buf, n);
+    /* 没烧过这块时读到的是 0xFF; 真解法不可能"每一步都往右", 用它当有效性判断 */
+    for (i = 0; i < n; i++) {
+        if (s_demo_buf[i] != 0xFF) return 1;
+    }
+    return 0;
+}
+
+/**
+ * @brief  进入教程页: 当前关从头摆好 + 中央大播放按钮
+ * @note   教程是从头演示, 所以进页面就复位当前关(撤销历史一并清空)。
+ */
+static void sok_tut_enter(void) {
+    uint8_t lv = s_current_level;
+
+    s_menu_visible = 0;
+    s_undo_group = 0;
+    s_undo_visible = 0;
+    s_lvl2_visible = 0;
+    s_won = 0;
+    s_won_transition = 0;
+    s_tut_playing = 0;
+    s_tut_paused = 0;
+    s_tut_tap_paused = 0;
+    s_prev_pressed = 0;
+    s_menu_from_swipe = 0;
+
+    (void)sokoban_prepare_level(lv);
+    sokoban_draw_level(lv);
+
+    s_tut_len = (uint16_t)(sok_demo_off[lv + 1] - sok_demo_off[lv]);
+    if (!sok_demo_load(lv)) s_tut_len = 0;   /* 外部 Flash 没烧过 btn 步: 当作没有演示 */
+    s_tut_step = 0;
+    s_tut_visible = 1;
+    s_menu_cooldown = 15;
+    sok_tut_draw_play((uint8_t)(s_tut_len > 0));
+}
+
+/**
+ * @brief  开始演示: 当前关复位后按解法自动走
+ */
+static void sok_tut_demo_begin(void) {
+    (void)sokoban_prepare_level(s_current_level);   /* 会清 s_tut_visible/playing, 下面补回可见态 */
+    sokoban_draw_level(s_current_level);
+    s_tut_step = 0;
+    s_tut_visible = 1;
+    s_tut_playing = 1;
+    s_tut_paused = 0;
+    s_tut_tap_paused = 0;
+    s_tut_time = GetTimerCount();
+    s_prev_pressed = 0;
+}
+
+/**
+ * @brief  擦掉屏幕中央的播放按钮, 把底下的地图补回来
+ * @note   必须先整块刷黑: 地图里的"外界"格子(SOK_OUTER)绘制时是直接 break 不画的,
+ *         只重绘瓦片的话, 按钮压在外界格子上的那部分(通常是一圈边缘)会留下残影。
+ */
+static void sok_tut_erase_play(void) {
+    LCD_Fill((uint16_t)(SOK_TUT_CX - SOK_TUT_R), (uint16_t)(SOK_TUT_CY - SOK_TUT_R),
+             (uint16_t)(SOK_TUT_CX + SOK_TUT_R + 1), (uint16_t)(SOK_TUT_CY + SOK_TUT_R + 1),
+             LCD_BLACK);
+    sok_redraw_battery_tiles(SOK_TUT_CX - SOK_TUT_R, SOK_TUT_CY - SOK_TUT_R,
+                             SOK_TUT_CX + SOK_TUT_R, SOK_TUT_CY + SOK_TUT_R);
+}
+
+/**
+ * @brief  暂停页按下"播放": 没走过就从头演示, 走过(0<step<总步数)就从暂停处继续
+ * @note   继续时不能复位棋盘(那样就成了"重新开始"), 只把按钮擦掉接着走。
+ *         想从头演示用一级按钮组的"重新开始", 或退出教程再进。
+ */
+static void sok_tut_play(void) {
+    if (s_tut_step > 0 && s_tut_step < s_tut_len) {
+        sok_tut_erase_play();
+        s_tut_visible = 1;
+        s_tut_playing = 1;
+        s_tut_paused = 0;
+        s_tut_tap_paused = 0;
+        s_tut_time = GetTimerCount();
+        return;
+    }
+    sok_tut_demo_begin();
+}
+
+/**
+ * @brief  教程页让位给菜单(手势): 收起教程页并暂停, 记下"回来时要恢复"
+ * @note   必须把播放按钮擦掉: 按钮圆是 (74..166), 下半截(140..166)正好压在一级按钮组
+ *         的命中带(140~220)里; 面板拉上来以后, 用户点"看上去还在的播放按钮下半截"
+ *         就会被判成 重新开始/上一关/下一关。
+ */
+static void sok_tut_handoff(void) {
+    s_tut_playing = 0;
+    s_tut_visible = 0;
+    s_tut_paused = 1;
+    s_tut_tap_paused = 0;
+    s_prev_pressed = 1;        /* 本次手势还按着, 后续交给菜单状态机 */
+    sok_tut_erase_play();
+}
+
+/**
+ * @brief  教程页每帧处理: 演示推进 / 手势拉菜单 / 点播放 / 点按钮外退出
+ * @retval 恒 1: 教程页吃掉本帧触摸, 不交给游戏逻辑
+ * @note   演示中一按下就暂停(画面停在当前局面); 接着按手势走:
+ *         顶部下滑 -> 退出菜单, 底部上划 -> 一级按钮组(与游戏内一致);
+ *         原地松手 -> 圆内=播放/继续, 圆外=退出教程。
+ *         交给菜单后 s_tut_visible=0, 菜单关掉回到无面板画面时由 sokoban_update()
+ *         里的 s_tut_paused 分支把教程页(播放按钮)恢复出来。
+ */
+static uint8_t sok_tut_update(void) {
+    TouchState ts;
+
+    Touch_Scan(&ts);
+
+    /* ---- 演示推进: 手指一按下就暂停(先不画按钮, 等松手/手势结束再补) ---- */
+    if (s_tut_playing) {
+        /* 演示期间不让"息屏时间"到点黑屏: 每一帧都把休眠计时器顶回去,
+           播完(或用户暂停)后恢复按正常计时休眠。 */
+        GameAutoSleep_KeepAlive();
+        if (ts.pressed) {
+            s_tut_playing = 0;
+            s_tut_tap_paused = 1;      /* 本次手势是"暂停", 松手时不能再当成点播放 */
+        }
+        else {
+            uint32_t now = GetTimerCount();
+            if ((uint32_t)(now - s_tut_time) >= SOK_TUT_STEP_US) {
+                s_tut_time = now;
+                if (s_tut_step < s_tut_len) {
+                    sokoban_move((SokobanDir)sok_demo_dir(s_tut_step));
+                    s_tut_step++;
+                }
+                if (s_tut_step >= s_tut_len) {         /* 演示走完 */
+                    s_tut_playing = 0;
+                    if (sokoban_is_won()) {            /* 正好通关: 交给正常通关流程 */
+                        s_tut_visible = 0;
+                        sok_win_draw(65, 120);
+                        s_won = 1;
+                    } else {
+                        sok_tut_draw_play(1);
+                    }
+                }
+            }
+            s_prev_pressed = 0;
+            return 1;
+        }
+    }
+
+    /* ---- 刚从菜单恢复(s_menu_from_swipe): 本次手势只吸收, 不当点击 ---- */
+    if (sok_swipe_enter(ts.pressed)) return 1;
+
+    /* ---- 松手 ---- */
+    if (!ts.pressed) {
+        if (!s_prev_pressed) return 1;
+        s_prev_pressed = 0;
+        if (s_tut_tap_paused) {            /* 刚才只是按下暂停: 把播放按钮画回来 */
+            s_tut_tap_paused = 0;
+            sok_tut_draw_play((uint8_t)(s_tut_len > 0));
+            return 1;
+        }
+        /* 教程页点任意位置都算"播放": 没走过就从头演示, 暂停过就从暂停处继续
+           (不再按圆内/圆外区分, 也不再点空白退出: 圆外那一片正好压在隐藏的一级按钮
+           命中带上, 点下去会误触 重新开始/下一关)。离开教程用上划/顶部下滑。 */
+        if (s_tut_len) sok_tut_play();
+        return 1;
+    }
+
+    /* ---- 按下: 记起点, 本帧不判手势 ---- */
+    if (!s_prev_pressed) {
+        s_prev_pressed = 1;
+        s_swipe_origin_y = ts.y;
+        return 1;
+    }
+
+    /* ---- 按住中: 手势拉菜单(与游戏内同一套阈值/区域) ---- */
+    if (s_menu_cooldown == 0
+        && s_swipe_origin_y < MENU_SWIPE_START_Y
+        && (int16_t)ts.y - (int16_t)s_swipe_origin_y > MENU_SWIPE_TRIGGER_DIST) {
+        sok_tut_handoff();                 /* 收起教程页 + 暂停, 后面按层恢复 */
+        (void)sok_open_exit_menu_here(ts.y);
+        return 1;
+    }
+    if (s_menu_cooldown == 0
+        && s_swipe_origin_y > SOK_SWIPE_Y
+        && (int16_t)s_swipe_origin_y - (int16_t)ts.y > MENU_SWIPE_TRIGGER_DIST) {
+        int16_t up_move = (int16_t)s_swipe_origin_y - (int16_t)ts.y;
+        sok_tut_handoff();
+        sok_panel_drag_start(0, up_move);  /* 一级按钮组跟手滑入 */
+        return 1;
+    }
+    return 1;
 }
 
 /**
  * @brief  二级菜单每帧处理: 按下记录→松手同位置触发
  * @retval 0=已处理(继续游戏) EXIT_RET_SETTINGS=要进设置菜单
- * @note   行0=撤销(进撤销界面) 行1=设置 行2=返回(换回一级按钮组); 点框外空白=关闭回游戏
+ * @note   行0=撤销(进撤销界面) 行1=教程(进教程页) 行2=设置 行3=返回;
+ *         点框外空白=关闭回游戏
  */
 static uint8_t sok_lvl2_update(void) {
     TouchState ts;
@@ -1074,15 +1370,21 @@ static uint8_t sok_lvl2_update(void) {
         if (dy > MENU_SWIPE_COMMIT_DIST) return 0;
     }
     if (ts.x >= RESTART_MENU_X && ts.x < RESTART_MENU_X + RESTART_MENU_W
-        && ts.y >= RESTART_MENU_Y) {
-        row = menu_row_from_y(RESTART_MENU_Y, ts.y, 3);
+        && ts.y >= SOK_LVL2_Y) {
+        row = menu_row_from_y(SOK_LVL2_Y, ts.y, SOK_LVL2_ROWS);
     } else {
         row = -1;                          /* 框外/上方空白 */
     }
-    if (row == 1) {                        /* 设置: 瞬间弹出整屏设置页(不做跟手动画, 省空间) */
+    if (row == 2) {                        /* 设置: 瞬间弹出整屏设置页(不做跟手动画, 省空间) */
         s_lvl2_visible = 0;
         menu_enter_game_settings();
         return EXIT_RET_SETTINGS;
+    }
+    if (row == 1) {                        /* 教程: 收掉二级菜单, 进教程页(关卡画面+播放按钮) */
+        sok_lvl2_clear_frame();
+        s_menu_cooldown = 15;
+        sok_tut_enter();
+        return 0;
     }
 
     sok_lvl2_clear_frame();
@@ -1090,7 +1392,7 @@ static uint8_t sok_lvl2_update(void) {
         s_undo_group = 1;
         s_undo_visible = 1;
         sok_draw_undo_buttons();
-    } else if (row == 2) {                 /* 返回: 按模式回到撤销的3个按钮 / 一级按钮组 */
+    } else if (row == 3) {                 /* 返回: 按模式回到撤销的3个按钮 / 一级按钮组 */
         sok_restore_panel_by_mode();
     } else if (row < 0 && s_won) {
         /* 通关后点框外空白: 回到通关界面(原来什么都不恢复 -> 看着像"进入游戏了") */
@@ -1657,8 +1959,14 @@ uint8_t sokoban_update(void) {
         if (!g_exit_menu_visible) {
             /* 重绘UI覆盖层: 二级菜单框(盖住电池区) / 导航按钮 / 通关画面。
                撤销按钮在 y=189 以下, 电池区重绘够不到它, 不用管 */
-            if (s_lvl2_visible) {
-                menu_draw_nrow_frame_only(RESTART_MENU_Y - 1, sok_lvl2_row_types, 3);
+            if (s_tut_visible) {
+                /* 教程页: 低电图标(45~195 × 79~161)正好压在中央播放按钮上,
+                   补完电池带的瓦片后要把按钮再画回来(演示中则只补瓦片, 画面就是棋盘本身) */
+                sok_redraw_battery_tiles(45, 79, 195, 161);
+                if (!s_tut_playing) sok_tut_draw_play((uint8_t)(s_tut_len > 0));
+            }
+            else if (s_lvl2_visible) {
+                menu_draw_nrow_frame_only(SOK_LVL2_Y - 1, sok_lvl2_row_types, SOK_LVL2_ROWS);
             }
             else {
                 /* 只补面板上缘(s_menu_slide_y, 纯游戏=240)以上露出的电池区: 跟手滑动时面板
@@ -1685,6 +1993,9 @@ uint8_t sokoban_update(void) {
 
     if (g_exit_menu_visible) goto process_exit_menu;
     game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 0);
+
+    /* ---- 教程页: 关卡画面 + 中央播放按钮, 本帧到此为止 ---- */
+    if (s_tut_visible) return sok_tut_update();
 
     /* ---- 二级菜单 / 撤销界面: 独立处理, 本帧到此为止 ---- */
     if (s_lvl2_visible) {
@@ -2049,6 +2360,27 @@ process_exit_menu:
         }
     }
 
+    /* ---- 教程页被手势收起后: 只要回到"无面板/无菜单"的画面, 就把教程页(播放按钮)恢复出来 ---- */
+    if (s_tut_paused) {
+        TouchState ts_h;
+        Touch_Scan(&ts_h);
+        s_tut_paused = 0;
+        s_tut_visible = 1;
+        s_tut_playing = 0;
+        s_menu_cooldown = 15;
+        if (ts_h.pressed) {
+            /* 手指还按着(菜单是拖拽中收掉的): 本次手势作废, 别当成点播放 */
+            s_prev_pressed = 1;
+            s_menu_from_swipe = 1;
+        } else {
+            /* 已经松手(点空白/点按钮关掉的): 不清标志, 否则"关掉菜单后第一下点播放"会被吞掉 */
+            s_prev_pressed = 0;
+            s_menu_from_swipe = 0;
+        }
+        sok_tut_draw_play((uint8_t)(s_tut_len > 0));
+        return 0;
+    }
+
     /* ---- 游戏进行中 ---- */
     TouchState ts;
     Touch_Scan(&ts);
@@ -2198,9 +2530,16 @@ int sokoban_sim_touch_rects(void)
         sim_touch_add_rows(MENU_X, MENU_W, MENU_Y, MENU_Y + MENU_H - 1, 5, SIM_TOUCH_TAP);
         return 1;
     }
-    if (s_lvl2_visible) {                       /* level-2 menu: 3 rows, bottom aligned */
+    if (s_tut_visible) {                        /* tutorial: 中央大播放按钮 + 上/下滑手势带 */
+        sim_touch_add(SOK_TUT_CX - SOK_TUT_R, SOK_TUT_CY - SOK_TUT_R,
+                      SOK_TUT_CX + SOK_TUT_R, SOK_TUT_CY + SOK_TUT_R, SIM_TOUCH_TAP);
+        sim_touch_add(0, 0, 240, MENU_SWIPE_START_Y, SIM_TOUCH_BAND);
+        sim_touch_add(0, SOK_SWIPE_Y + 1, 240, 240, SIM_TOUCH_BAND);
+        return 1;
+    }
+    if (s_lvl2_visible) {                       /* level-2 menu: 4 rows, bottom aligned */
         sim_touch_add_rows(RESTART_MENU_X, RESTART_MENU_W,
-                           RESTART_MENU_Y, 239, 3, SIM_TOUCH_TAP);
+                           SOK_LVL2_Y, 239, SOK_LVL2_ROWS, SIM_TOUCH_TAP);
         return 1;
     }
 
@@ -2223,6 +2562,51 @@ int sokoban_sim_touch_rects(void)
 }
 #endif
 #ifdef SIM_BUILD
+/* ---- sim-only: 唤醒时对齐真机语义 ----
+   真机休眠 = 存档 + 软复位, 唤醒 = 复位 + 读存档(sokoban_restore_state);
+   所以**菜单/撤销组/二级菜单/教程页全都不存在了**, 只有游戏局面保留。
+   模拟器里 RAM 不丢, 这些 file-static 面板标志没人清 -> 表现为"唤醒后菜单还在",
+   这里手动清一遍, 并按 g_runtime_map 重画整屏(不能用 sokoban_draw_level: 它画的是初始地图)。 */
+void sokoban_sim_wake_clean(void)
+{
+    s_menu_visible    = 0;
+    s_undo_group      = 0;
+    s_undo_visible    = 0;
+    s_lvl2_visible    = 0;
+    s_tut_visible     = 0;
+    s_tut_playing     = 0;
+    s_tut_paused      = 0;
+    s_tut_tap_paused  = 0;
+    s_menu_sliding    = 0;
+    s_menu_slide_anim = 0;
+    s_menu_slide_y    = 240;
+    s_menu_from_swipe = 0;
+    s_prev_pressed    = 1;        /* 吸收唤醒那一下点击 */
+    s_menu_cooldown   = 15;
+    s_drag_btn        = 0;
+    s_hold_button     = 0;
+    s_hold_us         = 0;
+    /* ★ 退出菜单的"状态机"是独立的: 只清 g_exit_menu_visible 不够 —— sokoban_update 末尾
+       的 process_exit_menu 段只要 s_sok_state==EXIT_MENU 就会继续跑 game_menu_command,
+       表现为"菜单看不见了, 但点菜单位置还在执行菜单功能"。真机唤醒是复位, 这里等价于复位。 */
+    s_sok_state       = SOK_STATE_PLAYING;
+    g_exit_menu_visible = 0;
+    g_exit_sliding    = 0;
+    g_exit_dragging   = 0;
+    g_exit_drag_y     = -MENU_H;
+
+    LCD_Fill(0, 0, 240, 240, LCD_BLACK);
+    sok_redraw_battery_tiles(0, 0, 240, 240);
+    if (s_won) {
+        s_won = 2;
+        s_menu_visible = 1;
+        sok_show_win_screen();
+    } else {
+        game_battery_icon_update(SOK_BATTERY_X, SOK_BATTERY_Y, 1);
+    }
+}
+#endif
+#ifdef SIM_BUILD
 /* ---- sim-only: 一键通关(测"通关界面 / 按钮 / 上划二级菜单"用), 真机不编 ----
    直接把面板状态摆成"刚通关"的样子, 不用真的把箱子推到位。 */
 void sokoban_sim_force_win(void)
@@ -2232,6 +2616,10 @@ void sokoban_sim_force_win(void)
     s_undo_group    = 0;      /* 通关后是普通导航按钮组(上一关/重来/下一关) */
     s_undo_visible  = 0;
     s_lvl2_visible  = 0;
+    s_tut_visible   = 0;
+    s_tut_playing   = 0;
+    s_tut_paused    = 0;
+    s_tut_tap_paused = 0;
     g_exit_menu_visible = 0;
     s_prev_pressed  = 0;
     s_hold_button   = 0;
@@ -2275,6 +2663,9 @@ int sokoban_sim_hold_info(int which)
     case 14: return (int)g_exit_drag_y;          /* 退出菜单当前顶边 */
     case 15: return (int)s_exit_prev_layer;      /* 打开退出菜单前所在层 */
     case 16: return (int)g_exit_dragging;        /* 退出菜单拖拽中 */
+    case 17: return (int)(s_tut_visible | (s_tut_playing << 1) | (s_tut_paused << 2) | (s_tut_tap_paused << 3));
+    case 18: return (int)s_tut_step;             /* 教程已演示步数 */
+    case 19: return (int)s_tut_len;              /* 教程本关总步数(0=无演示) */
     default: return -1;
     }
 }
