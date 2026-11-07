@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""跑还没解的关卡: python run_solve.py <solver.exe> [单关超时秒=900]
-   新解出的结果先回放校验, 通过后追加进 solutions.txt。"""
+"""跑关卡并写回 solutions.txt。
+   用法:
+     python run_solve.py <solver.exe> [单关超时秒=900]                 # 只跑还没有解的关
+     python run_solve.py <solver.exe> [超时] --levels 24,27,28,...     # 强制重解指定关(求最优)
+   重解时**只有更短才替换**, 否则保留原来的解(视频反解那批不一定最优)。"""
 import os
 import re
 import subprocess
@@ -71,11 +74,18 @@ def load_sol():
 
 
 def main():
-    exe = sys.argv[1]
-    timeout = int(sys.argv[2]) if len(sys.argv) > 2 else 900
+    args = sys.argv[1:]
+    exe = args[0]
+    rest = args[1:]
+    only = None
+    if '--levels' in rest:
+        k = rest.index('--levels')
+        only = [int(x) - 1 for x in rest[k + 1].split(',')]
+        rest = rest[:k] + rest[k + 2:]
+    timeout = int(rest[0]) if rest else 900
     got = load_sol()
-    todo = [i for i in range(50) if i not in got]
-    print('剩余 %d 关: %s' % (len(todo), [x + 1 for x in todo]))
+    todo = only if only is not None else [i for i in range(50) if i not in got]
+    print('待处理 %d 关: %s' % (len(todo), [x + 1 for x in todo]), flush=True)
     for i in todo:
         no = i + 1
         print('--- p%d ---' % no, flush=True)
@@ -97,10 +107,13 @@ def main():
         if not replay(i, seq):
             print('  解出来但回放不通(跳过)', flush=True)
             continue
+        old = got.get(i)
+        if old is not None and len(old) <= len(seq):
+            print('  新解 %d 步, 不比现有的 %d 步短 -> 保留原解' % (len(seq), len(old)), flush=True)
+            continue
         got[i] = seq
-        with open(SOL, 'a', encoding='utf-8') as fh:   # 追加, 旧的先清掉该行太麻烦, 统一最后重写
-            pass
-        print('  OK %d 步' % len(seq), flush=True)
+        print('  OK %d 步%s' % (len(seq),
+              (' (原 %d 步)' % len(old)) if old is not None else ''), flush=True)
     # 统一重写
     lines = []
     for i in range(50):
